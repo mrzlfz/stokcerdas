@@ -1,0 +1,269 @@
+{
+  "vhosts": [
+    {
+      "name": "stokcerdas_vhost"
+    }
+  ],
+  "users": [
+    {
+      "name": "stokcerdas",
+      "password": "stokcerdas_queue",
+      "tags": "administrator"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "stokcerdas",
+      "vhost": "stokcerdas_vhost",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "stokcerdas.direct",
+      "vhost": "stokcerdas_vhost",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "stokcerdas.topic",
+      "vhost": "stokcerdas_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "stokcerdas.fanout",
+      "vhost": "stokcerdas_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "stokcerdas.dlx",
+      "vhost": "stokcerdas_vhost",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "inventory.updates",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-dead-letter-exchange": "stokcerdas.dlx",
+        "x-dead-letter-routing-key": "inventory.updates.dlq"
+      }
+    },
+    {
+      "name": "inventory.updates.dlq",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notifications.email",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 1800000,
+        "x-dead-letter-exchange": "stokcerdas.dlx",
+        "x-dead-letter-routing-key": "notifications.email.dlq"
+      }
+    },
+    {
+      "name": "notifications.email.dlq",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notifications.push",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 900000,
+        "x-dead-letter-exchange": "stokcerdas.dlx",
+        "x-dead-letter-routing-key": "notifications.push.dlq"
+      }
+    },
+    {
+      "name": "notifications.push.dlq",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "analytics.events",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 7200000,
+        "x-dead-letter-exchange": "stokcerdas.dlx",
+        "x-dead-letter-routing-key": "analytics.events.dlq"
+      }
+    },
+    {
+      "name": "analytics.events.dlq",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "integration.sync",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 5400000,
+        "x-dead-letter-exchange": "stokcerdas.dlx",
+        "x-dead-letter-routing-key": "integration.sync.dlq"
+      }
+    },
+    {
+      "name": "integration.sync.dlq",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "reports.generation",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 10800000,
+        "x-dead-letter-exchange": "stokcerdas.dlx",
+        "x-dead-letter-routing-key": "reports.generation.dlq"
+      }
+    },
+    {
+      "name": "reports.generation.dlq",
+      "vhost": "stokcerdas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "stokcerdas.direct",
+      "vhost": "stokcerdas_vhost",
+      "destination": "inventory.updates",
+      "destination_type": "queue",
+      "routing_key": "inventory.update",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.direct",
+      "vhost": "stokcerdas_vhost",
+      "destination": "notifications.email",
+      "destination_type": "queue",
+      "routing_key": "notification.email",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.direct",
+      "vhost": "stokcerdas_vhost",
+      "destination": "notifications.push",
+      "destination_type": "queue",
+      "routing_key": "notification.push",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.topic",
+      "vhost": "stokcerdas_vhost",
+      "destination": "analytics.events",
+      "destination_type": "queue",
+      "routing_key": "analytics.*",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.topic",
+      "vhost": "stokcerdas_vhost",
+      "destination": "integration.sync",
+      "destination_type": "queue",
+      "routing_key": "integration.*.sync",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.direct",
+      "vhost": "stokcerdas_vhost",
+      "destination": "reports.generation",
+      "destination_type": "queue",
+      "routing_key": "report.generate",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.dlx",
+      "vhost": "stokcerdas_vhost",
+      "destination": "inventory.updates.dlq",
+      "destination_type": "queue",
+      "routing_key": "inventory.updates.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.dlx",
+      "vhost": "stokcerdas_vhost",
+      "destination": "notifications.email.dlq",
+      "destination_type": "queue",
+      "routing_key": "notifications.email.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.dlx",
+      "vhost": "stokcerdas_vhost",
+      "destination": "notifications.push.dlq",
+      "destination_type": "queue",
+      "routing_key": "notifications.push.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.dlx",
+      "vhost": "stokcerdas_vhost",
+      "destination": "analytics.events.dlq",
+      "destination_type": "queue",
+      "routing_key": "analytics.events.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.dlx",
+      "vhost": "stokcerdas_vhost",
+      "destination": "integration.sync.dlq",
+      "destination_type": "queue",
+      "routing_key": "integration.sync.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "stokcerdas.dlx",
+      "vhost": "stokcerdas_vhost",
+      "destination": "reports.generation.dlq",
+      "destination_type": "queue",
+      "routing_key": "reports.generation.dlq",
+      "arguments": {}
+    }
+  ]
+}

@@ -1,0 +1,214 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: stokcerdas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stokcerdas_dev
+      POSTGRES_USER: stokcerdas
+      POSTGRES_PASSWORD: stokcerdas_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - stokcerdas-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U stokcerdas -d stokcerdas_dev']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching
+  redis:
+    image: redis:7-alpine
+    container_name: stokcerdas-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - stokcerdas-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO for S3-compatible Storage
+  minio:
+    image: minio/minio:latest
+    container_name: stokcerdas-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_DEFAULT_BUCKETS: stokcerdas-dev,stokcerdas-uploads,stokcerdas-exports
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - stokcerdas-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # MinIO Client for bucket creation
+  minio-init:
+    image: minio/mc:latest
+    container_name: stokcerdas-minio-init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set stokcerdas http://minio:9000 minioadmin minioadmin123;
+      /usr/bin/mc mb stokcerdas/stokcerdas-dev;
+      /usr/bin/mc mb stokcerdas/stokcerdas-uploads;
+      /usr/bin/mc mb stokcerdas/stokcerdas-exports;
+      /usr/bin/mc policy set public stokcerdas/stokcerdas-uploads;
+      exit 0;
+      "
+    networks:
+      - stokcerdas-network
+
+  # RabbitMQ for Message Queuing
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: stokcerdas-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: stokcerdas
+      RABBITMQ_DEFAULT_PASS: stokcerdas_queue
+      RABBITMQ_DEFAULT_VHOST: stokcerdas_vhost
+    ports:
+      - '5672:5672'   # AMQP port
+      - '15672:15672' # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+    networks:
+      - stokcerdas-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  # Elasticsearch for Search
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: stokcerdas-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - cluster.name=stokcerdas-cluster
+      - node.name=stokcerdas-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - '9200:9200'
+      - '9300:9300'
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - stokcerdas-network
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:9200/_cluster/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kibana for Elasticsearch Management (Optional for development)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: stokcerdas-kibana
+    restart: unless-stopped
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_NAME: stokcerdas-kibana
+    ports:
+      - '5601:5601'
+    depends_on:
+      - elasticsearch
+    networks:
+      - stokcerdas-network
+    profiles:
+      - tools
+
+  # MailHog for Email Testing (Development only)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: stokcerdas-mailhog
+    restart: unless-stopped
+    ports:
+      - '1025:1025' # SMTP
+      - '8025:8025' # Web UI
+    networks:
+      - stokcerdas-network
+    profiles:
+      - tools
+
+  # Jaeger for Distributed Tracing (Optional)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: stokcerdas-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+    ports:
+      - '5775:5775/udp'
+      - '6831:6831/udp'
+      - '6832:6832/udp'
+      - '5778:5778'
+      - '16686:16686' # Web UI
+      - '14250:14250'
+      - '14268:14268'
+      - '14269:14269'
+      - '9411:9411'
+    networks:
+      - stokcerdas-network
+    profiles:
+      - tools
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+# Network for service communication
+networks:
+  stokcerdas-network:
+    driver: bridge
+    name: stokcerdas-network

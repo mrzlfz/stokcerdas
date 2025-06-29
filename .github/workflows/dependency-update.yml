@@ -1,0 +1,137 @@
+name: Dependency Updates
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  # Update Dependencies
+  dependency-update:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Update Dependencies
+        run: |
+          npm update
+          npm audit fix --audit-level=moderate
+
+      - name: Check for Changes
+        id: changes
+        run: |
+          if git diff --quiet package-lock.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update dependencies'
+          title: 'chore: automated dependency updates'
+          body: |
+            ## Automated Dependency Updates
+            
+            This PR contains automated dependency updates.
+            
+            ### Changes
+            - Updated npm dependencies to latest versions
+            - Applied security fixes where available
+            
+            ### Testing
+            - [ ] Automated tests pass
+            - [ ] Manual testing completed
+            
+            **Note**: This PR was created automatically by GitHub Actions.
+          branch: chore/dependency-updates
+          base: develop
+          labels: |
+            dependencies
+            automated
+            
+  # Security Updates
+  security-update:
+    name: Security Updates
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Security Audit
+        run: |
+          npm audit --audit-level=high --json > audit-results.json || true
+
+      - name: Check for Security Issues
+        id: security
+        run: |
+          if [ -s audit-results.json ] && jq -e '.vulnerabilities | length > 0' audit-results.json > /dev/null; then
+            echo "issues=true" >> $GITHUB_OUTPUT
+            echo "Security vulnerabilities found!"
+            jq '.vulnerabilities' audit-results.json
+          else
+            echo "issues=false" >> $GITHUB_OUTPUT
+            echo "No security vulnerabilities found."
+          fi
+
+      - name: Apply Security Fixes
+        if: steps.security.outputs.issues == 'true'
+        run: |
+          npm audit fix --audit-level=high --force
+
+      - name: Create Security PR
+        if: steps.security.outputs.issues == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'security: fix vulnerabilities'
+          title: '🔒 Security: Fix vulnerability issues'
+          body: |
+            ## Security Vulnerability Fixes
+            
+            This PR addresses security vulnerabilities found in dependencies.
+            
+            ### Security Issues
+            High and critical security vulnerabilities were detected and automatically fixed.
+            
+            ### Changes
+            - Applied `npm audit fix` to resolve security issues
+            - Updated vulnerable packages to safe versions
+            
+            ### Priority
+            This is a **HIGH PRIORITY** security update that should be reviewed and merged immediately.
+            
+            **Note**: This PR was created automatically by security scanning.
+          branch: security/vulnerability-fixes
+          base: develop
+          labels: |
+            security
+            high-priority
+            automated
