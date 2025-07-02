@@ -48,6 +48,15 @@ npm run ios             # Run on iOS
 npm run test            # Run mobile tests
 ```
 
+## Project Status & Implementation Workflow
+
+This project follows a structured 3-phase development plan with 150 tasks across 12 months. Before implementing any feature:
+
+1. **Check Current Phase**: Review `masterplan.md` to understand which phase and week you're in
+2. **Verify Dependencies**: Each task has clear dependencies - don't start a task until its prerequisites are complete
+3. **Update Progress**: Always update task progress in `masterplan.md` using the defined status indicators
+4. **Follow Critical Path**: Priority should be given to critical path items that block other work
+
 ## Architecture Overview
 
 ### Multi-Tenant Architecture
@@ -114,14 +123,30 @@ npm run test            # Run mobile tests
 - Performance testing for 10K concurrent users
 - Security testing following OWASP guidelines
 
-## Progress Tracking
+## Progress Tracking System
 
-When implementing tasks:
-1. Always update `masterplan.md` with progress
-2. Mark checkboxes as completed: `[ ]` → `[x]`
-3. Update progress percentages and status indicators
-4. Add completion dates to finished tasks
-5. Update the Progress Dashboard weekly
+The project uses a comprehensive tracking system in `masterplan.md`:
+
+### Status Indicators
+- 🔴 Not Started (0%)
+- 🟡 In Progress (1-99%)
+- 🟢 Completed (100%)
+- ⏸️ On Hold
+- ❌ Blocked
+
+### Required Updates When Implementing
+1. **Task Level**: Update progress percentage and status indicator
+2. **Subtask Level**: Check off completed items with completion dates
+3. **Phase Tracker**: Update weekly checkpoint tables
+4. **Dashboard**: Update overall progress at top of masterplan
+5. **Dependencies**: Note any new blockers or dependency changes
+
+### Critical Path Awareness
+Key dependency chains that must be followed:
+- Development Environment → Backend Architecture → Core Features
+- Backend API → Mobile Foundation → Mobile Features
+- Core Features → AI Models → Advanced Analytics
+- All MVP Features → Growth Features → Scale Features
 
 ## Security & Compliance
 - Implement UU PDP (Indonesian Personal Data Protection Law) compliance
@@ -143,13 +168,34 @@ When implementing tasks:
 4. **Offline Support**: Implement offline-first architecture for unreliable connections
 5. **Integration Testing**: Mock all third-party APIs (Tokopedia, Shopee, etc.) for testing
 
-## Reporting Requirements
+## Implementation Guidelines
 
-When implementing any task:
-1. Create a clear implementation report explaining what was done
-2. Document any deviations from the original plan
-3. List all files created or modified
-4. Provide testing instructions
-5. Note any dependencies or blockers
+### Pre-Implementation Checklist
+1. **Review PRD**: Check `stokcerdas-prd.md` for detailed requirements
+2. **Check Masterplan**: Verify task dependencies and current phase status
+3. **Verify Multi-tenant**: Ensure all database operations include `tenant_id`
+4. **Indonesian Context**: Test with local data (phone numbers, addresses, payments)
+5. **Mobile-First**: Design for mobile users primarily (85% of user base)
 
-Remember to check the PRD and masterplan for detailed requirements before implementing any feature.
+### Post-Implementation Requirements
+1. **Update Progress**: Mark tasks complete in `masterplan.md` with dates
+2. **Testing**: Achieve minimum 80% code coverage
+3. **Documentation**: Update relevant documentation files
+4. **Performance**: Verify API responses <200ms, real-time updates <100ms
+5. **Security**: Ensure proper tenant isolation and data encryption
+
+### Reporting Format
+When completing tasks, provide:
+- Summary of what was implemented
+- Files created/modified
+- Testing approach and results
+- Any deviations from original plan
+- Dependencies or blockers identified
+- Next steps or follow-up items needed
+
+Remember: This is a 12-month, 150-task project. Focus on the current phase requirements and maintain the critical path progression.
+
+## Project Workflow Memories
+
+- selalu baca @CLAUDE.md dan @masterplan.md terlebih dahulu
+- selalu baca @CLAUDE.md dan @masterplan.md terlibih dahulu untuk implementasi

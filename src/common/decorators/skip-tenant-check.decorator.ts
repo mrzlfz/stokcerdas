@@ -1,0 +1,1 @@
+import { SetMetadata } from '@nestjs/common';\nimport { SKIP_TENANT_CHECK } from '../interceptors/tenant.interceptor';\n\nexport const SkipTenantCheck = () => SetMetadata(SKIP_TENANT_CHECK, true);"
