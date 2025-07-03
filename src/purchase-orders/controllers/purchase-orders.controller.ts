@@ -28,6 +28,8 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { Tenant } from '../../common/decorators/tenant.decorator';
+import { PermissionResource, PermissionAction } from '../../auth/entities/permission.entity';
+import { User } from '../../users/entities/user.entity';
 
 import { PurchaseOrdersService } from '../services/purchase-orders.service';
 import { 
@@ -72,7 +74,7 @@ export class PurchaseOrdersController {
 
   // CRUD Operations
   @Post()
-  @Permissions('purchase_orders:create')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.CREATE })
   @ApiOperation({ 
     summary: 'Buat purchase order baru',
     description: 'Membuat purchase order baru dengan item-item yang diperlukan. PO akan otomatis memerlukan approval jika total melebihi threshold yang ditentukan.'
@@ -92,7 +94,7 @@ export class PurchaseOrdersController {
   })
   async create(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Body(ValidationPipe) createPurchaseOrderDto: CreatePurchaseOrderDto,
   ): Promise<{
     success: boolean;
@@ -102,7 +104,7 @@ export class PurchaseOrdersController {
     const result = await this.purchaseOrdersService.create(
       tenantId,
       createPurchaseOrderDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -113,7 +115,7 @@ export class PurchaseOrdersController {
   }
 
   @Get()
-  @Permissions('purchase_orders:read')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.READ })
   @ApiOperation({
     summary: 'Dapatkan daftar purchase orders',
     description: 'Mengambil daftar purchase orders dengan filtering dan pagination. Mendukung berbagai filter seperti status, supplier, tanggal, dll.'
@@ -147,7 +149,7 @@ export class PurchaseOrdersController {
   }
 
   @Get('stats')
-  @Permissions('purchase_orders:read')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.READ })
   @ApiOperation({
     summary: 'Dapatkan statistik purchase orders',
     description: 'Mengambil statistik lengkap purchase orders termasuk jumlah berdasarkan status, prioritas, dan total nilai'
@@ -173,7 +175,7 @@ export class PurchaseOrdersController {
   }
 
   @Get(':id')
-  @Permissions('purchase_orders:read')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.READ })
   @ApiOperation({
     summary: 'Dapatkan detail purchase order',
     description: 'Mengambil detail lengkap purchase order termasuk items, approvals, dan status history'
@@ -211,7 +213,7 @@ export class PurchaseOrdersController {
   }
 
   @Get('po-number/:poNumber')
-  @Permissions('purchase_orders:read')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.READ })
   @ApiOperation({
     summary: 'Dapatkan purchase order berdasarkan nomor PO',
     description: 'Mencari purchase order berdasarkan nomor PO'
@@ -248,7 +250,7 @@ export class PurchaseOrdersController {
   }
 
   @Put(':id')
-  @Permissions('purchase_orders:update')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.UPDATE })
   @ApiOperation({
     summary: 'Update purchase order',
     description: 'Mengupdate purchase order. Hanya bisa dilakukan jika PO masih dalam status DRAFT atau REJECTED'
@@ -274,7 +276,7 @@ export class PurchaseOrdersController {
   })
   async update(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) updatePurchaseOrderDto: UpdatePurchaseOrderDto,
   ): Promise<{
@@ -286,7 +288,7 @@ export class PurchaseOrdersController {
       tenantId,
       id,
       updatePurchaseOrderDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -297,7 +299,7 @@ export class PurchaseOrdersController {
   }
 
   @Delete(':id')
-  @Permissions('purchase_orders:delete')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.DELETE })
   @ApiOperation({
     summary: 'Hapus purchase order',
     description: 'Menghapus purchase order (soft delete) atau membatalkan PO. Hard delete hanya untuk admin'
@@ -328,14 +330,14 @@ export class PurchaseOrdersController {
   })
   async remove(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('hardDelete') hardDelete?: boolean,
   ): Promise<{
     success: boolean;
     message: string;
   }> {
-    await this.purchaseOrdersService.remove(tenantId, id, hardDelete || false, userId);
+    await this.purchaseOrdersService.remove(tenantId, id, hardDelete || false, user.id);
 
     return {
       success: true,
@@ -347,7 +349,7 @@ export class PurchaseOrdersController {
 
   // Approval Operations
   @Post(':id/approve')
-  @Permissions('purchase_orders:approve')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.APPROVE })
   @ApiOperation({
     summary: 'Approve purchase order',
     description: 'Menyetujui purchase order yang sedang pending approval'
@@ -369,7 +371,7 @@ export class PurchaseOrdersController {
   })
   async approve(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) approveDto: ApprovePurchaseOrderDto,
   ): Promise<{
@@ -381,7 +383,7 @@ export class PurchaseOrdersController {
       tenantId,
       id,
       approveDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -392,7 +394,7 @@ export class PurchaseOrdersController {
   }
 
   @Post(':id/reject')
-  @Permissions('purchase_orders:approve')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.APPROVE })
   @ApiOperation({
     summary: 'Reject purchase order',
     description: 'Menolak purchase order yang sedang pending approval'
@@ -414,7 +416,7 @@ export class PurchaseOrdersController {
   })
   async reject(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) rejectDto: RejectPurchaseOrderDto,
   ): Promise<{
@@ -426,7 +428,7 @@ export class PurchaseOrdersController {
       tenantId,
       id,
       rejectDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -437,7 +439,7 @@ export class PurchaseOrdersController {
   }
 
   @Post(':id/send-to-supplier')
-  @Permissions('purchase_orders:send')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.UPDATE })
   @ApiOperation({
     summary: 'Kirim purchase order ke supplier',
     description: 'Mengirim purchase order yang sudah approved ke supplier via email dengan PDF attachment'
@@ -459,7 +461,7 @@ export class PurchaseOrdersController {
   })
   async sendToSupplier(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{
     success: boolean;
@@ -469,7 +471,7 @@ export class PurchaseOrdersController {
     const result = await this.purchaseOrdersService.sendToSupplier(
       tenantId,
       id,
-      userId,
+      user.id,
     );
 
     return {
@@ -481,7 +483,7 @@ export class PurchaseOrdersController {
 
   // Item Management Operations
   @Post(':id/items')
-  @Permissions('purchase_orders:update')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.UPDATE })
   @ApiOperation({
     summary: 'Tambah item ke purchase order',
     description: 'Menambahkan item baru ke purchase order yang masih bisa diedit'
@@ -503,7 +505,7 @@ export class PurchaseOrdersController {
   })
   async addItem(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) addItemDto: AddPurchaseOrderItemDto,
   ): Promise<{
@@ -515,7 +517,7 @@ export class PurchaseOrdersController {
       tenantId,
       id,
       addItemDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -526,7 +528,7 @@ export class PurchaseOrdersController {
   }
 
   @Put(':id/items/:itemId')
-  @Permissions('purchase_orders:update')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.UPDATE })
   @ApiOperation({
     summary: 'Update item purchase order',
     description: 'Mengupdate item dalam purchase order yang masih bisa diedit'
@@ -558,7 +560,7 @@ export class PurchaseOrdersController {
   })
   async updateItem(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body(ValidationPipe) updateItemDto: UpdatePurchaseOrderItemDto,
@@ -572,7 +574,7 @@ export class PurchaseOrdersController {
       id,
       itemId,
       updateItemDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -583,7 +585,7 @@ export class PurchaseOrdersController {
   }
 
   @Delete(':id/items/:itemId')
-  @Permissions('purchase_orders:update')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.UPDATE })
   @ApiOperation({
     summary: 'Hapus item dari purchase order',
     description: 'Menghapus item dari purchase order yang masih bisa diedit. Minimal harus ada 1 item tersisa'
@@ -614,14 +616,14 @@ export class PurchaseOrdersController {
   })
   async removeItem(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
   ): Promise<{
     success: boolean;
     message: string;
   }> {
-    await this.purchaseOrdersService.removeItem(tenantId, id, itemId, userId);
+    await this.purchaseOrdersService.removeItem(tenantId, id, itemId, user.id);
 
     return {
       success: true,
@@ -630,7 +632,7 @@ export class PurchaseOrdersController {
   }
 
   @Post(':id/items/:itemId/receive')
-  @Permissions('purchase_orders:receive')
+  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.UPDATE })
   @ApiOperation({
     summary: 'Terima item dari supplier',
     description: 'Mencatat penerimaan item dari supplier. Akan mengupdate status PO secara otomatis'
@@ -662,7 +664,7 @@ export class PurchaseOrdersController {
   })
   async receiveItem(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body(ValidationPipe) receiveDto: ReceiveItemDto,
@@ -676,7 +678,7 @@ export class PurchaseOrdersController {
       id,
       itemId,
       receiveDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -688,7 +690,7 @@ export class PurchaseOrdersController {
 
   // Bulk Operations
   @Post('bulk/create')
-  @Permissions('purchase_orders:create')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.CREATE })
   @ApiOperation({
     summary: 'Bulk create purchase orders',
     description: 'Membuat multiple purchase orders sekaligus'
@@ -700,7 +702,7 @@ export class PurchaseOrdersController {
   })
   async bulkCreate(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Body(ValidationPipe) bulkCreateDto: BulkCreatePurchaseOrderDto,
   ): Promise<{
     success: boolean;
@@ -710,7 +712,7 @@ export class PurchaseOrdersController {
     const result = await this.purchaseOrdersService.bulkCreate(
       tenantId,
       bulkCreateDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -721,7 +723,7 @@ export class PurchaseOrdersController {
   }
 
   @Post('bulk/approve')
-  @Permissions('purchase_orders:approve')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.APPROVE })
   @ApiOperation({
     summary: 'Bulk approve/reject purchase orders',
     description: 'Approve atau reject multiple purchase orders sekaligus'
@@ -733,7 +735,7 @@ export class PurchaseOrdersController {
   })
   async bulkApprove(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Body(ValidationPipe) bulkApprovalDto: BulkApprovalDto,
   ): Promise<{
     success: boolean;
@@ -743,7 +745,7 @@ export class PurchaseOrdersController {
     const result = await this.purchaseOrdersService.bulkApprove(
       tenantId,
       bulkApprovalDto,
-      userId,
+      user.id,
     );
 
     const action = bulkApprovalDto.action === 'approve' ? 'approval' : 'rejection';
@@ -756,7 +758,7 @@ export class PurchaseOrdersController {
   }
 
   @Post('bulk/send-to-supplier')
-  @Permissions('purchase_orders:send')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.UPDATE })
   @ApiOperation({
     summary: 'Bulk send to supplier',
     description: 'Mengirim multiple purchase orders ke supplier sekaligus'
@@ -768,7 +770,7 @@ export class PurchaseOrdersController {
   })
   async bulkSendToSupplier(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Body(ValidationPipe) bulkSendDto: BulkSendToSupplierDto,
   ): Promise<{
     success: boolean;
@@ -778,7 +780,7 @@ export class PurchaseOrdersController {
     const result = await this.purchaseOrdersService.bulkSendToSupplier(
       tenantId,
       bulkSendDto,
-      userId,
+      user.id,
     );
 
     return {
@@ -790,7 +792,7 @@ export class PurchaseOrdersController {
 
   // Export/Import Operations
   @Post('export')
-  @Permissions('purchase_orders:export')
+  @Permissions({ resource: PermissionResource.SUPPLIERS, action: PermissionAction.EXPORT })
   @ApiOperation({
     summary: 'Export purchase orders',
     description: 'Export purchase orders ke file Excel, CSV, atau PDF'
@@ -801,7 +803,7 @@ export class PurchaseOrdersController {
   })
   async export(
     @Tenant() tenantId: string,
-    @GetUser('sub') userId: string,
+    @GetUser() user: User,
     @Body(ValidationPipe) exportDto: ExportPurchaseOrdersDto,
   ): Promise<{
     success: boolean;

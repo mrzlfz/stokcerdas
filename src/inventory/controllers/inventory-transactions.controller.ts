@@ -22,7 +22,7 @@ import {
 
 import { InventoryTransactionsService } from '../services/inventory-transactions.service';
 import { InventoryItemsService } from '../services/inventory-items.service';
-import { InventoryTransactionQueryDto } from '../dto/inventory-query.dto';
+import { InventoryTransactionQueryDto, SortOrder } from '../dto/inventory-query.dto';
 import {
   CreateInventoryTransferDto,
   UpdateTransferStatusDto,
@@ -348,7 +348,7 @@ export class InventoryTransactionsController {
       status: 'pending',
       locationId,
       sortBy: 'transactionDate',
-      sortOrder: 'DESC',
+      sortOrder: SortOrder.DESC,
       limit: 100,
     };
 
@@ -385,7 +385,7 @@ export class InventoryTransactionsController {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       sortBy: 'transactionDate',
-      sortOrder: 'DESC',
+      sortOrder: SortOrder.DESC,
       limit: limit || 50,
     };
 
@@ -419,7 +419,7 @@ export class InventoryTransactionsController {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       sortBy: 'transactionDate',
-      sortOrder: 'DESC',
+      sortOrder: SortOrder.DESC,
       limit: limit || 100,
     };
 

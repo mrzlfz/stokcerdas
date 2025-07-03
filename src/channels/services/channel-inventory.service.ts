@@ -16,6 +16,7 @@ import { TokopediaInventoryService } from '../../integrations/tokopedia/services
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
 
 export interface CreateChannelInventoryDto {
   channelId: string;
@@ -225,8 +226,8 @@ export class ChannelInventoryService {
       await this.logService.log({
         tenantId,
         channelId: createDto.channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel inventory allocation created: ${createDto.sku}`,
         metadata: {
           productId: createDto.productId,
@@ -382,8 +383,8 @@ export class ChannelInventoryService {
       await this.logService.log({
         tenantId,
         channelId: allocation.channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel inventory updated: ${allocation.sku}`,
         metadata: { updates: updateDto, allocationId },
       });
@@ -427,8 +428,8 @@ export class ChannelInventoryService {
       await this.logService.log({
         tenantId,
         channelId: allocation.channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel inventory allocation deleted: ${allocation.sku}`,
         metadata: { allocationId, productId: allocation.productId },
       });
@@ -536,8 +537,8 @@ export class ChannelInventoryService {
       // Log rebalancing
       await this.logService.log({
         tenantId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Inventory rebalancing completed for product ${request.productId}`,
         metadata: {
           productId: request.productId,
@@ -647,8 +648,8 @@ export class ChannelInventoryService {
       await this.logService.log({
         tenantId,
         channelId: request.channelId,
-        type: 'SYNC',
-        level: result.success ? 'INFO' : 'WARN',
+        type: IntegrationLogType.SYNC,
+        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
         message: `Inventory sync completed: ${result.successCount}/${result.processedItems} successful`,
         metadata: {
           channelId: request.channelId,
@@ -708,8 +709,8 @@ export class ChannelInventoryService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: `Inventory reserved: ${quantity} units of ${allocation.sku}`,
           metadata: { productId, quantity, reservedQuantity: allocation.reservedQuantity },
         });
@@ -754,8 +755,8 @@ export class ChannelInventoryService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Inventory reservation released: ${quantity} units of ${allocation.sku}`,
         metadata: { productId, quantity, reservedQuantity: allocation.reservedQuantity },
       });

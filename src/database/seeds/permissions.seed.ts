@@ -23,7 +23,7 @@ export class PermissionsSeed {
       });
 
       if (!existing) {
-        const permission = permissionRepository.create(permissionData);
+        const permission: any = permissionRepository.create(permissionData);
         await permissionRepository.save(permission);
         console.log(`✅ Created permission: ${permission.name}`);
       }

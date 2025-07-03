@@ -45,6 +45,7 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
 import { AllocationStrategy, AllocationStatus } from '../entities/channel-inventory.entity';
+import { UserRole } from '../../users/entities/user.entity';
 
 // Services
 import { ChannelInventoryService } from '../services/channel-inventory.service';
@@ -109,11 +110,13 @@ export class CreateChannelInventoryDto {
 
   @IsOptional()
   @IsDateString()
-  discountStartDate?: string;
+  @Transform(({ value }) => value ? new Date(value) : value)
+  discountStartDate?: Date;
 
   @IsOptional()
   @IsDateString()
-  discountEndDate?: string;
+  @Transform(({ value }) => value ? new Date(value) : value)
+  discountEndDate?: Date;
 
   @IsOptional()
   @IsBoolean()
@@ -188,11 +191,13 @@ export class UpdateChannelInventoryDto {
 
   @IsOptional()
   @IsDateString()
-  discountStartDate?: string;
+  @Transform(({ value }) => value ? new Date(value) : value)
+  discountStartDate?: Date;
 
   @IsOptional()
   @IsDateString()
-  discountEndDate?: string;
+  @Transform(({ value }) => value ? new Date(value) : value)
+  discountEndDate?: Date;
 
   @IsOptional()
   @IsEnum(AllocationStatus)
@@ -353,7 +358,7 @@ export class ChannelInventoryController {
   @ApiQuery({ name: 'limit', type: 'number', required: false })
   @ApiQuery({ name: 'offset', type: 'number', required: false })
   @ApiQuery({ name: 'includeMetrics', type: 'boolean', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getChannelInventory(
     @CurrentUser() user: any,
     @Query() query: ChannelInventoryQueryDto,
@@ -385,7 +390,7 @@ export class ChannelInventoryController {
   @Post()
   @ApiOperation({ summary: 'Create channel inventory allocation' })
   @ApiResponse({ status: 201, description: 'Allocation created successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createChannelInventory(
     @CurrentUser() user: any,
     @Body() createDto: CreateChannelInventoryDto,
@@ -416,7 +421,7 @@ export class ChannelInventoryController {
   @ApiOperation({ summary: 'Update channel inventory allocation' })
   @ApiResponse({ status: 200, description: 'Allocation updated successfully' })
   @ApiParam({ name: 'allocationId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateChannelInventory(
     @CurrentUser() user: any,
     @Param('allocationId') allocationId: string,
@@ -449,7 +454,7 @@ export class ChannelInventoryController {
   @ApiOperation({ summary: 'Delete channel inventory allocation' })
   @ApiResponse({ status: 200, description: 'Allocation deleted successfully' })
   @ApiParam({ name: 'allocationId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async deleteChannelInventory(
     @CurrentUser() user: any,
     @Param('allocationId') allocationId: string,
@@ -476,7 +481,7 @@ export class ChannelInventoryController {
   @Post('rebalance')
   @ApiOperation({ summary: 'Rebalance inventory allocations' })
   @ApiResponse({ status: 200, description: 'Rebalancing completed successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async rebalanceAllocations(
     @CurrentUser() user: any,
     @Body() rebalanceDto: AllocationRebalanceDto,
@@ -506,7 +511,7 @@ export class ChannelInventoryController {
   @Post('sync')
   @ApiOperation({ summary: 'Sync channel inventory' })
   @ApiResponse({ status: 200, description: 'Inventory sync completed successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async syncInventory(
     @CurrentUser() user: any,
     @Body() syncDto: InventorySyncDto,
@@ -536,7 +541,7 @@ export class ChannelInventoryController {
   @Post('reserve')
   @ApiOperation({ summary: 'Reserve inventory for order' })
   @ApiResponse({ status: 200, description: 'Inventory reserved successfully' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async reserveInventory(
     @CurrentUser() user: any,
     @Body() reserveDto: ReserveInventoryDto,
@@ -569,7 +574,7 @@ export class ChannelInventoryController {
   @Post('release')
   @ApiOperation({ summary: 'Release inventory reservation' })
   @ApiResponse({ status: 200, description: 'Reservation released successfully' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async releaseReservation(
     @CurrentUser() user: any,
     @Body() releaseDto: ReserveInventoryDto,
@@ -604,7 +609,7 @@ export class ChannelInventoryController {
   @ApiResponse({ status: 200, description: 'Analytics retrieved successfully' })
   @ApiQuery({ name: 'channelId', type: 'string', required: false })
   @ApiQuery({ name: 'productId', type: 'string', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getAllocationSummary(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,
@@ -664,7 +669,7 @@ export class ChannelInventoryController {
   @ApiResponse({ status: 200, description: 'Performance analytics retrieved successfully' })
   @ApiQuery({ name: 'channelId', type: 'string', required: false })
   @ApiQuery({ name: 'days', type: 'number', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getPerformanceAnalytics(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,

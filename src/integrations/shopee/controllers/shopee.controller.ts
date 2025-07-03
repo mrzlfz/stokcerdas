@@ -25,6 +25,7 @@ import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
+import { UserRole } from '../../../users/entities/user.entity';
 
 import { ShopeeAuthService } from '../services/shopee-auth.service';
 import { ShopeeProductService } from '../services/shopee-product.service';
@@ -111,7 +112,7 @@ export class ShopeeController {
   // Authentication endpoints
 
   @Post('auth/url')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get Shopee authorization URL' })
   @ApiResponse({ status: 201, description: 'Authorization URL generated successfully' })
   async getAuthorizationUrl(
@@ -148,7 +149,7 @@ export class ShopeeController {
   }
 
   @Post('auth/token')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Exchange authorization code for access token' })
   @ApiResponse({ status: 201, description: 'Token exchange successful' })
   async exchangeToken(
@@ -186,7 +187,7 @@ export class ShopeeController {
   }
 
   @Post('auth/refresh')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Refresh Shopee access token' })
   @ApiResponse({ status: 201, description: 'Token refresh successful' })
   async refreshToken(
@@ -216,7 +217,7 @@ export class ShopeeController {
   }
 
   @Get('auth/status')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get authentication status' })
   @ApiQuery({ name: 'channelId', required: true })
   @ApiResponse({ status: 200, description: 'Authentication status retrieved' })
@@ -247,7 +248,7 @@ export class ShopeeController {
   }
 
   @Post('auth/test')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test Shopee authentication' })
   @ApiQuery({ name: 'channelId', required: true })
   @ApiResponse({ status: 201, description: 'Authentication test completed' })
@@ -278,7 +279,7 @@ export class ShopeeController {
   }
 
   @Delete('auth/revoke')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke Shopee authentication' })
   @ApiQuery({ name: 'channelId', required: true })
   @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
@@ -311,7 +312,7 @@ export class ShopeeController {
   // Product sync endpoints
 
   @Post('products/sync')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Sync products from Shopee' })
   @ApiResponse({ status: 201, description: 'Product sync started' })
   async syncProducts(
@@ -347,7 +348,7 @@ export class ShopeeController {
   }
 
   @Post('products/:productId/sync')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Sync single product to Shopee' })
   @ApiParam({ name: 'productId', description: 'Product ID' })
   @ApiQuery({ name: 'channelId', required: true })
@@ -381,7 +382,7 @@ export class ShopeeController {
   }
 
   @Get('products/:itemId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Shopee product details' })
   @ApiParam({ name: 'itemId', description: 'Shopee Item ID' })
   @ApiQuery({ name: 'channelId', required: true })
@@ -417,7 +418,7 @@ export class ShopeeController {
   // Order sync endpoints
 
   @Post('orders/sync')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Sync orders from Shopee' })
   @ApiResponse({ status: 201, description: 'Order sync started' })
   async syncOrders(
@@ -461,7 +462,7 @@ export class ShopeeController {
   }
 
   @Get('orders/:orderSn')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Shopee order details' })
   @ApiParam({ name: 'orderSn', description: 'Shopee Order SN' })
   @ApiQuery({ name: 'channelId', required: true })
@@ -495,7 +496,7 @@ export class ShopeeController {
   }
 
   @Put('orders/:orderSn/ship')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Ship Shopee order' })
   @ApiParam({ name: 'orderSn', description: 'Shopee Order SN' })
   @ApiQuery({ name: 'channelId', required: true })
@@ -532,7 +533,7 @@ export class ShopeeController {
   }
 
   @Put('orders/:orderSn/cancel')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Cancel Shopee order' })
   @ApiParam({ name: 'orderSn', description: 'Shopee Order SN' })
   @ApiQuery({ name: 'channelId', required: true })
@@ -571,7 +572,7 @@ export class ShopeeController {
   // Inventory sync endpoints
 
   @Post('inventory/sync')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Sync inventory from Shopee' })
   @ApiResponse({ status: 201, description: 'Inventory sync started' })
   async syncInventory(
@@ -607,7 +608,7 @@ export class ShopeeController {
   }
 
   @Put('inventory/stock')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update stock in Shopee' })
   @ApiResponse({ status: 200, description: 'Stock updated successfully' })
   async updateStock(
@@ -638,7 +639,7 @@ export class ShopeeController {
   }
 
   @Put('inventory/prices')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update prices in Shopee' })
   @ApiResponse({ status: 200, description: 'Prices updated successfully' })
   async updatePrices(
@@ -669,7 +670,7 @@ export class ShopeeController {
   }
 
   @Get('inventory/stock')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get stock info from Shopee' })
   @ApiQuery({ name: 'channelId', required: true })
   @ApiQuery({ name: 'itemIds', required: true, description: 'Comma-separated item IDs' })

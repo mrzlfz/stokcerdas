@@ -12,6 +12,7 @@ import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
+import { IntegrationLogLevel, IntegrationLogType } from '../../integrations/entities/integration-log.entity';
 
 // Channel services
 import { ChannelsService } from '../../channels/services/channels.service';
@@ -90,9 +91,11 @@ export interface UpdateOrderDto {
   billingAddress?: any;
   shippingMethod?: string;
   shippingCarrier?: string;
+  shippingAmount?: number;
   trackingNumber?: string;
   estimatedDeliveryDate?: Date;
   actualDeliveryDate?: Date;
+  deliveredAt?: Date;
   
   // Payment information
   paymentMethod?: string;
@@ -784,8 +787,8 @@ export class OrdersService {
       // Log bulk action
       await this.logService.log({
         tenantId,
-        type: 'ORDER',
-        level: failedCount > 0 ? 'WARN' : 'INFO',
+        type: IntegrationLogType.ORDER,
+        level: failedCount > 0 ? IntegrationLogLevel.WARN : IntegrationLogLevel.INFO,
         message: `Bulk action completed: ${action.action}`,
         metadata: { 
           action: action.action,

@@ -150,7 +150,8 @@ export class CompanyService {
   async getCompanyTree(tenantId: string, rootCompanyId?: string): Promise<Company[]> {
     if (rootCompanyId) {
       const rootCompany = await this.findByIdAndTenant(rootCompanyId, tenantId);
-      return this.companyRepository.findDescendantsTree(rootCompany);
+      const tree = await this.companyRepository.findDescendantsTree(rootCompany);
+      return [tree];
     }
 
     // Get all root companies (companies without parent)
@@ -503,9 +504,9 @@ export class CompanyService {
 
     return {
       totalCompanies: companies.length,
-      activeCompanies: companies.filter(c => c.isActive()).length,
-      holdingCompanies: companies.filter(c => c.isHolding()).length,
-      subsidiaries: companies.filter(c => c.isSubsidiary()).length,
+      activeCompanies: companies.filter(c => c.isActive).length,
+      holdingCompanies: companies.filter(c => c.isHolding).length,
+      subsidiaries: companies.filter(c => c.isSubsidiary).length,
       totalEmployees,
       companiesByType,
       companiesByStatus,

@@ -6,9 +6,10 @@ import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
 
-import { Channel } from '../../../channels/entities/channel.entity';
+import { Channel, ChannelStatus } from '../../../channels/entities/channel.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { TokopediaApiService, TokopediaConfig } from './tokopedia-api.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface TokopediaAuthConfig {
   clientId: string;
@@ -26,7 +27,7 @@ export interface TokopediaAuthConfig {
 export interface TokopediaCredentials {
   accessToken: string;
   refreshToken: string;
-  expiresAt: Date;
+  expiresAt: string;
   tokenType: string;
   scope: string;
   shopId?: string;
@@ -34,7 +35,7 @@ export interface TokopediaCredentials {
   // TikTok Shop credentials
   tiktokAccessToken?: string;
   tiktokRefreshToken?: string;
-  tiktokExpiresAt?: Date;
+  tiktokExpiresAt?: string;
 }
 
 export interface TokopediaTokenInfo {
@@ -127,8 +128,8 @@ export class TokopediaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Tokopedia authorization URL generated',
         metadata: {
           state: authState,
@@ -149,7 +150,7 @@ export class TokopediaAuthService {
         tenantId,
         channelId,
         error,
-        { context: 'generate_auth_url' },
+        { },
       );
 
       throw error;
@@ -209,7 +210,7 @@ export class TokopediaAuthService {
       await this.saveCredentials(tenantId, channelId, {
         accessToken: tokenInfo.access_token,
         refreshToken: tokenInfo.refresh_token,
-        expiresAt,
+        expiresAt: expiresAt.toISOString(),
         tokenType: tokenInfo.token_type,
         scope: tokenInfo.scope,
         fsId: config.fsId,
@@ -226,8 +227,8 @@ export class TokopediaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Tokopedia token exchange successful',
         metadata: {
           expiresAt,
@@ -245,7 +246,7 @@ export class TokopediaAuthService {
         tenantId,
         channelId,
         error,
-        { context: 'token_exchange' },
+        { },
       );
 
       throw error;
@@ -314,7 +315,7 @@ export class TokopediaAuthService {
         ...credentials,
         accessToken: tokenInfo.access_token,
         refreshToken: tokenInfo.refresh_token || credentials.refreshToken,
-        expiresAt,
+        expiresAt: expiresAt.toISOString(),
         tokenType: tokenInfo.token_type,
         scope: tokenInfo.scope,
       });
@@ -328,8 +329,8 @@ export class TokopediaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Tokopedia token refresh successful',
         metadata: { expiresAt },
       });
@@ -343,7 +344,7 @@ export class TokopediaAuthService {
         tenantId,
         channelId,
         error,
-        { context: 'token_refresh' },
+        { },
       );
 
       throw error;
@@ -471,9 +472,9 @@ export class TokopediaAuthService {
           config: {
             ...{}, // Clear all config including credentials
           },
-          status: 'disconnected',
+          status: ChannelStatus.INACTIVE,
           lastSyncAt: null,
-          healthStatus: 'unhealthy',
+          // healthStatus: 'unhealthy',
         },
       );
 
@@ -485,8 +486,8 @@ export class TokopediaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Tokopedia authentication revoked',
       });
 
@@ -502,7 +503,7 @@ export class TokopediaAuthService {
         tenantId,
         channelId,
         error,
-        { context: 'revoke_auth' },
+        { },
       );
 
       return {
@@ -522,11 +523,9 @@ export class TokopediaAuthService {
     await this.channelRepository.update(
       { id: channelId, tenantId },
       {
-        config: {
-          credentials,
-        },
-        status: 'connected',
-        healthStatus: 'healthy',
+        apiCredentials: credentials,
+        status: ChannelStatus.ACTIVE,
+        // healthStatus: 'healthy',
         lastSyncAt: new Date(),
       },
     );
@@ -561,8 +560,8 @@ export class TokopediaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'TikTok Shop migration initiated',
         metadata: { tiktokAppKey: config.tiktokAppKey },
       });
@@ -579,7 +578,7 @@ export class TokopediaAuthService {
         tenantId,
         channelId,
         error,
-        { context: 'tiktok_migration' },
+        { },
       );
 
       return {

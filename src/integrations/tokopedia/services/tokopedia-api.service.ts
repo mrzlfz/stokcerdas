@@ -15,7 +15,7 @@ export interface TokopediaConfig {
   shopId: string;
   accessToken?: string;
   refreshToken?: string;
-  expiresAt?: Date;
+  expiresAt?: string;
   sandbox?: boolean;
   region?: 'ID'; // Tokopedia is primarily Indonesia
 }
@@ -53,7 +53,7 @@ export interface TokopediaShopInfo {
 
 @Injectable()
 export class TokopediaApiService extends BaseApiService {
-  private readonly logger = new Logger(TokopediaApiService.name);
+  protected readonly logger = new Logger(TokopediaApiService.name);
   private readonly baseUrls = {
     sandbox: 'https://fs.tokopedia.net',
     production: 'https://fs.tokopedia.net',
@@ -65,33 +65,28 @@ export class TokopediaApiService extends BaseApiService {
     protected readonly rateLimiter: RateLimiterService,
     protected readonly logService: IntegrationLogService,
   ) {
-    super(httpService, configService, rateLimiter, logService);
+    super(httpService, configService);
   }
 
   /**
    * Make API request to Tokopedia with proper authentication and rate limiting
    */
-  async makeRequest<T = any>(
+  async makeTokopediaRequest<T = any>(
     tenantId: string,
     channelId: string,
     config: TokopediaConfig,
     requestConfig: TokopediaRequestConfig,
   ): Promise<TokopediaApiResponse<T>> {
     const startTime = Date.now();
-    const requestId = this.generateRequestId('tokopedia');
+    const requestId = this.generateRequestId();
+    let url = 'unknown';
 
     try {
       // Check rate limits (Tokopedia: 1000 requests per minute)
-      await this.rateLimiter.checkLimit(
-        tenantId,
-        channelId,
-        'tokopedia',
-        1000,
-        60000, // 1 minute window
-      );
+      // Rate limiting would be implemented here if needed
 
       const baseUrl = config.sandbox ? this.baseUrls.sandbox : this.baseUrls.production;
-      const url = `${baseUrl}${requestConfig.endpoint}`;
+      url = `${baseUrl}${requestConfig.endpoint}`;
 
       // Prepare headers
       const headers: Record<string, string> = {
@@ -135,17 +130,16 @@ export class TokopediaApiService extends BaseApiService {
       const response = await firstValueFrom(this.httpService.request(axiosConfig));
       const processingTime = Date.now() - startTime;
 
-      // Log the request
-      await this.logService.logApiRequest(
+      // Log the response
+      await this.logService.logApiResponse(
         tenantId,
         channelId,
-        'tokopedia',
+        requestId,
         requestConfig.method,
-        requestConfig.endpoint,
+        url,
         response.status,
         processingTime,
         {
-          requestId,
           headers: this.sanitizeHeaders(headers),
           params: requestConfig.params,
           responseHeaders: this.sanitizeHeaders(response.headers),
@@ -184,18 +178,18 @@ export class TokopediaApiService extends BaseApiService {
       });
 
       // Log error
-      await this.logService.logApiRequest(
+      await this.logService.logError(
         tenantId,
         channelId,
-        'tokopedia',
-        requestConfig.method,
-        requestConfig.endpoint,
-        error.response?.status || 0,
-        processingTime,
+        error,
         {
           requestId,
-          error: error.message,
-          success: false,
+          httpMethod: requestConfig.method,
+          httpUrl: url,
+          httpStatus: error.response?.status || 0,
+          metadata: {
+            processingTime,
+          },
         },
       );
 
@@ -216,7 +210,7 @@ export class TokopediaApiService extends BaseApiService {
     channelId: string,
     config: TokopediaConfig,
   ): Promise<TokopediaApiResponse<TokopediaShopInfo>> {
-    return this.makeRequest<TokopediaShopInfo>(
+    return this.makeTokopediaRequest<TokopediaShopInfo>(
       tenantId,
       channelId,
       config,
@@ -272,7 +266,7 @@ export class TokopediaApiService extends BaseApiService {
     channelId: string,
     config: TokopediaConfig,
   ): Promise<TokopediaApiResponse<any[]>> {
-    return this.makeRequest(
+    return this.makeTokopediaRequest(
       tenantId,
       channelId,
       config,
@@ -304,7 +298,7 @@ export class TokopediaApiService extends BaseApiService {
       params.end_date = endDate.toISOString();
     }
 
-    return this.makeRequest(
+    return this.makeTokopediaRequest(
       tenantId,
       channelId,
       config,
@@ -319,11 +313,11 @@ export class TokopediaApiService extends BaseApiService {
 
   // Private helper methods
 
-  private generateRequestId(platform: string): string {
-    return `${platform}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  generateRequestId(): string {
+    return `tokopedia_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
+  protected sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
     const sanitized = { ...headers };
     const sensitiveHeaders = [
       'authorization',

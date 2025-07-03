@@ -6,10 +6,9 @@ import {
   IsBoolean,
   Min,
   Max,
-  Transform,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   SupplierStatus,
   SupplierType,

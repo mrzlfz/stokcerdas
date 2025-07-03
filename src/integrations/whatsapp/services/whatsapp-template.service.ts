@@ -7,6 +7,7 @@ import { IntegrationLogService } from '../../common/services/integration-log.ser
 import { WhatsAppApiService, WhatsAppConfig } from './whatsapp-api.service';
 import { WhatsAppAuthService } from './whatsapp-auth.service';
 import { Channel } from '../../../channels/entities/channel.entity';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface WhatsAppTemplate {
   id: string;
@@ -157,7 +158,7 @@ export class WhatsAppTemplateService {
         params.name = filters.name;
       }
 
-      const result = await this.apiService.makeRequest<{ data: WhatsAppTemplate[] }>(
+      const result = await this.apiService.makeWhatsAppRequest<{ data: WhatsAppTemplate[] }>(
         tenantId,
         channelId,
         config,
@@ -176,8 +177,8 @@ export class WhatsAppTemplateService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp templates retrieved successfully',
           metadata: {
             templateCount: templates.length,
@@ -227,7 +228,7 @@ export class WhatsAppTemplateService {
         verifyToken: credentials.verifyToken,
       };
 
-      const result = await this.apiService.makeRequest<WhatsAppTemplate>(
+      const result = await this.apiService.makeWhatsAppRequest<WhatsAppTemplate>(
         tenantId,
         channelId,
         config,
@@ -291,7 +292,7 @@ export class WhatsAppTemplateService {
         return { success: false, error: validation.errors?.join(', ') };
       }
 
-      const result = await this.apiService.makeRequest<{ id: string; status: string }>(
+      const result = await this.apiService.makeWhatsAppRequest<{ id: string; status: string }>(
         tenantId,
         channelId,
         config,
@@ -310,8 +311,8 @@ export class WhatsAppTemplateService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp template created successfully',
           metadata: {
             templateId,
@@ -376,7 +377,7 @@ export class WhatsAppTemplateService {
         verifyToken: credentials.verifyToken,
       };
 
-      const result = await this.apiService.makeRequest(
+      const result = await this.apiService.makeWhatsAppRequest(
         tenantId,
         channelId,
         config,
@@ -395,8 +396,8 @@ export class WhatsAppTemplateService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp template deleted successfully',
           metadata: {
             templateId,
@@ -670,8 +671,8 @@ export class WhatsAppTemplateService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp template created from library',
           metadata: {
             templateType,

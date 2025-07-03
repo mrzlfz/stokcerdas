@@ -14,7 +14,7 @@ export interface QuickBooksCredentials {
   expiresAt?: Date;
 }
 
-export interface QuickBooksApiRequest extends Omit<ApiRequest, 'headers'> {
+export interface QuickBooksApiRequest extends ApiRequest {
   requiresAuth?: boolean;
   acceptType?: 'application/json' | 'application/pdf';
   minorVersion?: string;
@@ -191,7 +191,7 @@ export interface QuickBooksCustomer {
 
 @Injectable()
 export class QuickBooksApiService extends BaseApiService {
-  private readonly logger = new Logger(QuickBooksApiService.name);
+  protected readonly logger = new Logger(QuickBooksApiService.name);
   
   constructor(
     protected readonly httpService: HttpService,

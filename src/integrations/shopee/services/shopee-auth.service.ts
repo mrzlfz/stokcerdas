@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 
 import { ShopeeApiService, ShopeeCredentials } from './shopee-api.service';
-import { Channel } from '../../../channels/entities/channel.entity';
+import { Channel, ChannelStatus } from '../../../channels/entities/channel.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
 export interface ShopeeAuthConfig {
@@ -439,7 +439,7 @@ export class ShopeeAuthService {
       where: {
         id: channelId,
         tenantId,
-        platform: 'shopee',
+        platformId: 'shopee',
       },
     });
 
@@ -487,7 +487,7 @@ export class ShopeeAuthService {
     };
 
     // Update channel status
-    channel.status = 'active';
+    channel.status = ChannelStatus.ACTIVE;
     channel.lastSyncAt = new Date();
 
     await this.channelRepository.save(channel);

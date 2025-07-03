@@ -5,8 +5,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LazadaApiService, LazadaConfig } from './lazada-api.service';
 import { LazadaAuthService } from './lazada-auth.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { Order } from '../../../orders/entities/order.entity';
-import { OrderItem } from '../../../orders/entities/order-item.entity';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import { Order, OrderType, OrderStatus } from '../../../orders/entities/order.entity';
+import { OrderItem } from '../../../orders/entities/order.entity';
 
 export interface LazadaOrder {
   order_id: number;
@@ -194,7 +195,7 @@ export class LazadaOrderService {
       }
 
       // Get orders from Lazada
-      const result = await this.lazadaApi.makeRequest<{ orders: LazadaOrder[]; count_total: number }>(
+      const result = await this.lazadaApi.makeLazadaRequest<{ orders: LazadaOrder[]; count_total: number }>(
         tenantId,
         channelId,
         lazadaConfig,
@@ -236,7 +237,7 @@ export class LazadaOrderService {
         tenantId,
         channelId,
         'lazada_orders_inbound',
-        errorCount === 0 ? 'completed' : 'partial',
+        errorCount === 0 ? 'completed' : 'failed',
         `Order sync completed: ${syncedCount} synced, ${errorCount} errors`,
         {
           syncedCount,
@@ -295,7 +296,7 @@ export class LazadaOrderService {
       };
 
       // Get order details from Lazada
-      const result = await this.lazadaApi.makeRequest<LazadaOrder>(
+      const result = await this.lazadaApi.makeLazadaRequest<LazadaOrder>(
         tenantId,
         channelId,
         lazadaConfig,
@@ -374,7 +375,7 @@ export class LazadaOrderService {
       }
 
       // Ship order items
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,
@@ -398,8 +399,8 @@ export class LazadaOrderService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYNC',
-        level: 'INFO',
+        type: IntegrationLogType.SYNC,
+        level: IntegrationLogLevel.INFO,
         message: `Lazada order items shipped successfully`,
         metadata: {
           orderItemIds,
@@ -448,7 +449,7 @@ export class LazadaOrderService {
       };
 
       // Cancel order items
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,
@@ -475,8 +476,8 @@ export class LazadaOrderService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYNC',
-        level: 'INFO',
+        type: IntegrationLogType.SYNC,
+        level: IntegrationLogLevel.INFO,
         message: `Lazada order items cancelled successfully`,
         metadata: {
           orderItemIds,
@@ -515,7 +516,7 @@ export class LazadaOrderService {
       };
 
       // Get tracking info
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,
@@ -591,8 +592,10 @@ export class LazadaOrderService {
     const orderData = {
       tenantId,
       channelId,
+      orderNumber: `LZ-${lazadaOrder.order_number}`,
       externalOrderId: lazadaOrder.order_number,
       externalOrderNumber: lazadaOrder.order_number,
+      type: OrderType.SALE,
       status: this.mapOrderStatus(lazadaOrder.status),
       totalAmount: parseFloat(lazadaOrder.price) || 0,
       currency: 'MYR', // Default, would be determined by region
@@ -603,7 +606,6 @@ export class LazadaOrderService {
       customerPhone: lazadaOrder.address_billing?.phone || '',
       shippingAmount: parseFloat(lazadaOrder.shipping_fee) || 0,
       orderDate: new Date(lazadaOrder.created_at),
-      lastUpdated: new Date(lazadaOrder.updated_at),
       shippingAddress: this.formatAddress(lazadaOrder.address_shipping),
       billingAddress: this.formatAddress(lazadaOrder.address_billing),
       notes: lazadaOrder.remarks,
@@ -621,7 +623,6 @@ export class LazadaOrderService {
     // Update local order with Lazada data
     localOrder.status = this.mapOrderStatus(lazadaOrder.status);
     localOrder.totalAmount = parseFloat(lazadaOrder.price) || 0;
-    localOrder.lastUpdated = new Date(lazadaOrder.updated_at);
     localOrder.notes = lazadaOrder.remarks;
     
     await this.orderRepository.save(localOrder);
@@ -662,37 +663,62 @@ export class LazadaOrderService {
         await this.orderItemRepository.save(localItem);
       } else {
         // Update existing order item
-        localItem.status = this.mapOrderItemStatus(lazadaItem.status);
-        localItem.trackingNumber = lazadaItem.tracking_code;
-        localItem.shippingProvider = lazadaItem.shipment_provider;
+        // TODO: Add status, trackingNumber, shippingProvider to OrderItem entity
+        // localItem.status = this.mapOrderItemStatus(lazadaItem.status);
+        // localItem.trackingNumber = lazadaItem.tracking_code;
+        // localItem.shippingProvider = lazadaItem.shipment_provider;
         
         await this.orderItemRepository.save(localItem);
       }
     }
   }
 
-  private mapOrderStatus(lazadaStatus: string): string {
-    return this.statusMapping[lazadaStatus] || 'unknown';
+  private mapOrderStatus(lazadaStatus: string): OrderStatus {
+    const mapping: Record<string, OrderStatus> = {
+      'pending': OrderStatus.PENDING,
+      'confirmed': OrderStatus.CONFIRMED,
+      'processing': OrderStatus.PROCESSING,
+      'shipped': OrderStatus.SHIPPED,
+      'delivered': OrderStatus.DELIVERED,
+      'cancelled': OrderStatus.CANCELLED,
+      'refunded': OrderStatus.REFUNDED,
+      'returned': OrderStatus.RETURNED,
+    };
+    return mapping[lazadaStatus] || OrderStatus.PENDING;
   }
 
   private mapOrderItemStatus(lazadaStatus: string): string {
     return this.statusMapping[lazadaStatus] || 'unknown';
   }
 
-  private formatAddress(address: LazadaAddress): string {
-    if (!address) return '';
+  private formatAddress(address: LazadaAddress): any {
+    if (!address) {
+      return {
+        name: '',
+        address: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        country: '',
+        phone: '',
+      };
+    }
 
-    const parts = [
+    const fullAddress = [
       address.address1,
       address.address2,
       address.address3,
-      address.city,
-      address.region,
-      address.post_code,
-      address.country,
-    ].filter(Boolean);
+    ].filter(Boolean).join(' ');
 
-    return parts.join(', ');
+    return {
+      name: `${address.first_name || ''} ${address.last_name || ''}`.trim() || 'Customer',
+      address: fullAddress || '',
+      city: address.city || '',
+      state: address.region || '',
+      postalCode: address.post_code || '',
+      country: address.country || '',
+      phone: address.phone || '',
+    };
   }
 
   private async ensureOrderMapping(

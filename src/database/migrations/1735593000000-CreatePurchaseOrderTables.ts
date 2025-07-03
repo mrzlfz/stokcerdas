@@ -773,145 +773,59 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
     );
 
     // Create indexes for purchase_orders table
-    await queryRunner.createIndex(
-      'purchase_orders',
-      new Index('IDX_purchase_orders_tenant_id_po_number', ['tenant_id', 'po_number'], {
-        unique: true,
-      }),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_orders',
-      new Index('IDX_purchase_orders_tenant_id_supplier_id', ['tenant_id', 'supplier_id']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_orders',
-      new Index('IDX_purchase_orders_tenant_id_status', ['tenant_id', 'status']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_orders',
-      new Index('IDX_purchase_orders_tenant_id_priority', ['tenant_id', 'priority']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_orders',
-      new Index('IDX_purchase_orders_tenant_id_order_date', ['tenant_id', 'order_date']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_orders',
-      new Index('IDX_purchase_orders_tenant_id_expected_delivery_date', ['tenant_id', 'expected_delivery_date']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_orders',
-      new Index('IDX_purchase_orders_tenant_id_approval_status', ['tenant_id', 'approval_status']),
-    );
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_purchase_orders_tenant_id_po_number" ON "purchase_orders" ("tenant_id", "po_number")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_supplier_id" ON "purchase_orders" ("tenant_id", "supplier_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_status" ON "purchase_orders" ("tenant_id", "status")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_priority" ON "purchase_orders" ("tenant_id", "priority")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_order_date" ON "purchase_orders" ("tenant_id", "order_date")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_expected_delivery_date" ON "purchase_orders" ("tenant_id", "expected_delivery_date")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_approval_status" ON "purchase_orders" ("tenant_id", "approval_status")`);
 
     // Create indexes for purchase_order_items table
-    await queryRunner.createIndex(
-      'purchase_order_items',
-      new Index('IDX_purchase_order_items_tenant_id_purchase_order_id', ['tenant_id', 'purchase_order_id']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_order_items',
-      new Index('IDX_purchase_order_items_tenant_id_product_id', ['tenant_id', 'product_id']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_order_items',
-      new Index('IDX_purchase_order_items_tenant_id_sku', ['tenant_id', 'sku']),
-    );
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_items_tenant_id_purchase_order_id" ON "purchase_order_items" ("tenant_id", "purchase_order_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_items_tenant_id_product_id" ON "purchase_order_items" ("tenant_id", "product_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_items_tenant_id_sku" ON "purchase_order_items" ("tenant_id", "sku")`);
 
     // Create indexes for purchase_order_approvals table
-    await queryRunner.createIndex(
-      'purchase_order_approvals',
-      new Index('IDX_purchase_order_approvals_tenant_id_purchase_order_id', ['tenant_id', 'purchase_order_id']),
-    );
-
-    await queryRunner.createIndex(
-      'purchase_order_approvals',
-      new Index('IDX_purchase_order_approvals_tenant_id_approver_id', ['tenant_id', 'approver_id']),
-    );
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_approvals_tenant_id_purchase_order_id" ON "purchase_order_approvals" ("tenant_id", "purchase_order_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_approvals_tenant_id_approver_id" ON "purchase_order_approvals" ("tenant_id", "approver_id")`);
 
     // Create indexes for purchase_order_status_history table
-    await queryRunner.createIndex(
-      'purchase_order_status_history',
-      new Index('IDX_purchase_order_status_history_tenant_id_purchase_order_id', ['tenant_id', 'purchase_order_id']),
-    );
+    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_status_history_tenant_id_purchase_order_id" ON "purchase_order_status_history" ("tenant_id", "purchase_order_id")`);
 
     // Create foreign key constraints
-    await queryRunner.createForeignKey(
-      'purchase_orders',
-      new ForeignKey({
-        columnNames: ['supplier_id'],
-        referencedTableName: 'suppliers',
-        referencedColumnNames: ['id'],
-        onDelete: 'RESTRICT',
-        onUpdate: 'CASCADE',
-      }),
-    );
-
-    await queryRunner.createForeignKey(
-      'purchase_order_items',
-      new ForeignKey({
-        columnNames: ['purchase_order_id'],
-        referencedTableName: 'purchase_orders',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
-      }),
-    );
-
-    await queryRunner.createForeignKey(
-      'purchase_order_items',
-      new ForeignKey({
-        columnNames: ['product_id'],
-        referencedTableName: 'products',
-        referencedColumnNames: ['id'],
-        onDelete: 'RESTRICT',
-        onUpdate: 'CASCADE',
-      }),
-    );
-
-    await queryRunner.createForeignKey(
-      'purchase_order_approvals',
-      new ForeignKey({
-        columnNames: ['purchase_order_id'],
-        referencedTableName: 'purchase_orders',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
-      }),
-    );
-
-    await queryRunner.createForeignKey(
-      'purchase_order_status_history',
-      new ForeignKey({
-        columnNames: ['purchase_order_id'],
-        referencedTableName: 'purchase_orders',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
-      }),
-    );
-
-    // Add permission for purchase orders in permissions table
     await queryRunner.query(`
-      INSERT INTO permissions (resource, action, name, description, is_active) VALUES
-      ('purchase_orders', 'create', 'Create Purchase Orders', 'Dapat membuat purchase order baru', true),
-      ('purchase_orders', 'read', 'Read Purchase Orders', 'Dapat melihat purchase orders', true),
-      ('purchase_orders', 'update', 'Update Purchase Orders', 'Dapat mengupdate purchase orders', true),
-      ('purchase_orders', 'delete', 'Delete Purchase Orders', 'Dapat menghapus purchase orders', true),
-      ('purchase_orders', 'approve', 'Approve Purchase Orders', 'Dapat menyetujui purchase orders', true),
-      ('purchase_orders', 'send', 'Send Purchase Orders', 'Dapat mengirim purchase orders ke supplier', true),
-      ('purchase_orders', 'receive', 'Receive Purchase Orders', 'Dapat mencatat penerimaan barang', true),
-      ('purchase_orders', 'export', 'Export Purchase Orders', 'Dapat mengexport purchase orders', true)
-      ON CONFLICT (resource, action) DO NOTHING;
+      ALTER TABLE "purchase_orders" 
+      ADD CONSTRAINT "FK_purchase_orders_supplier_id" 
+      FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id") ON DELETE RESTRICT ON UPDATE CASCADE
     `);
+
+    await queryRunner.query(`
+      ALTER TABLE "purchase_order_items" 
+      ADD CONSTRAINT "FK_purchase_order_items_purchase_order_id" 
+      FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "purchase_order_items" 
+      ADD CONSTRAINT "FK_purchase_order_items_product_id" 
+      FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "purchase_order_approvals" 
+      ADD CONSTRAINT "FK_purchase_order_approvals_purchase_order_id" 
+      FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "purchase_order_status_history" 
+      ADD CONSTRAINT "FK_purchase_order_status_history_purchase_order_id" 
+      FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    `);
+
+    // Note: Purchase order permissions will be added in a separate migration 
+    // due to PostgreSQL enum value transaction limitations
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

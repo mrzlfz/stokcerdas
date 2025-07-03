@@ -5,8 +5,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Entities
 import { Order } from './entities/order.entity';
-import { OrderItem } from './entities/order-item.entity';
-import { OrderStatus } from './entities/order-status.entity';
+// Note: OrderItem and OrderStatus entities are embedded in Order entity
 
 // External entities
 import { Product } from '../products/entities/product.entity';
@@ -16,13 +15,16 @@ import { User } from '../users/entities/user.entity';
 // Services
 import { OrdersService } from './services/orders.service';
 import { OrderFulfillmentService } from './services/order-fulfillment.service';
-import { OrderSyncService } from './services/order-sync.service';
+// Note: OrderSyncService and OrderRoutingService to be implemented
+// import { OrderSyncService } from './services/order-sync.service';
+// import { OrderRoutingService } from './services/order-routing.service';
 
 // Controllers
 import { OrdersController } from './controllers/orders.controller';
 
 // Processors
-import { OrderProcessor } from './processors/order.processor';
+// Note: OrderProcessor to be implemented
+// import { OrderProcessor } from './processors/order.processor';
 
 @Module({
   imports: [
@@ -32,8 +34,6 @@ import { OrderProcessor } from './processors/order.processor';
     TypeOrmModule.forFeature([
       // Order entities
       Order,
-      OrderItem,
-      OrderStatus,
       
       // External entities
       Product,
@@ -64,17 +64,19 @@ import { OrderProcessor } from './processors/order.processor';
     // Core services
     OrdersService,
     OrderFulfillmentService,
-    OrderSyncService,
+    // OrderSyncService,
+    // OrderRoutingService,
     
     // Queue processors
-    OrderProcessor,
+    // OrderProcessor,
   ],
   
   exports: [
     // Export services for use by other modules
     OrdersService,
     OrderFulfillmentService,
-    OrderSyncService,
+    // OrderSyncService,
+    // OrderRoutingService,
   ],
 })
 export class OrdersModule {}

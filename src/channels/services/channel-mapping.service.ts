@@ -9,6 +9,7 @@ import { Channel } from '../entities/channel.entity';
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
 
 export interface CreateChannelMappingDto {
   channelId: string;
@@ -189,8 +190,8 @@ export class ChannelMappingService {
       await this.logService.log({
         tenantId,
         channelId: createDto.channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel mapping created: ${createDto.mappingType} (${createDto.internalId} → ${createDto.externalId})`,
         metadata: {
           mappingId: savedMapping.id,
@@ -368,8 +369,8 @@ export class ChannelMappingService {
       await this.logService.log({
         tenantId,
         channelId: mapping.channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel mapping updated: ${mapping.mappingType} (${mapping.internalId})`,
         metadata: { mappingId, updates: updateDto },
       });
@@ -407,8 +408,8 @@ export class ChannelMappingService {
       await this.logService.log({
         tenantId,
         channelId: mapping.channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel mapping deleted: ${mapping.mappingType} (${mapping.internalId})`,
         metadata: { mappingId, mappingType: mapping.mappingType },
       });
@@ -485,8 +486,8 @@ export class ChannelMappingService {
       await this.logService.log({
         tenantId,
         channelId: mapping.channelId,
-        type: 'SYSTEM',
-        level: result.success ? 'DEBUG' : 'WARN',
+        type: IntegrationLogType.SYSTEM,
+        level: result.success ? IntegrationLogLevel.DEBUG : IntegrationLogLevel.WARN,
         message: `Data transformation ${result.success ? 'completed' : 'failed'}: ${mapping.mappingType}`,
         metadata: {
           mappingId: request.mappingId,
@@ -526,15 +527,23 @@ export class ChannelMappingService {
       }
 
       // Apply conflict resolution
-      mapping.resolveConflict(resolution.resolution, resolution.mergeStrategy);
+      const resolutionMap = {
+        'internal_wins': 'internal' as const,
+        'external_wins': 'external' as const,
+        'merge': 'merge' as const,
+        'manual': 'merge' as const, // Default manual to merge
+      };
+      
+      const mappedResolution = resolutionMap[resolution.resolution] || 'merge';
+      mapping.resolveConflict(mappedResolution, resolution.mergeStrategy);
       const resolvedMapping = await this.mappingRepository.save(mapping);
 
       // Log resolution
       await this.logService.log({
         tenantId,
         channelId: mapping.channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Mapping conflict resolved: ${resolution.resolution}`,
         metadata: {
           mappingId: resolution.mappingId,
@@ -713,8 +722,8 @@ export class ChannelMappingService {
       // Log bulk operation
       await this.logService.log({
         tenantId,
-        type: 'SYSTEM',
-        level: result.success ? 'INFO' : 'WARN',
+        type: IntegrationLogType.SYSTEM,
+        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
         message: `Bulk mapping operation completed: ${result.successCount}/${result.totalItems} successful`,
         metadata: {
           operation: operation.operation,

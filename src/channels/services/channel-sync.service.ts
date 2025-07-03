@@ -28,6 +28,7 @@ import { TokopediaInventoryService } from '../../integrations/tokopedia/services
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
 
 export interface SyncRequest {
   channelIds?: string[];
@@ -225,8 +226,8 @@ export class ChannelSyncService {
       // Log sync start
       await this.logService.log({
         tenantId,
-        type: 'SYNC',
-        level: 'INFO',
+        type: IntegrationLogType.SYNC,
+        level: IntegrationLogLevel.INFO,
         message: `Sync started: ${syncId}`,
         metadata: {
           syncId,
@@ -293,8 +294,8 @@ export class ChannelSyncService {
       // Log cancellation
       await this.logService.log({
         tenantId,
-        type: 'SYNC',
-        level: 'INFO',
+        type: IntegrationLogType.SYNC,
+        level: IntegrationLogLevel.INFO,
         message: `Sync cancelled: ${syncId}`,
         metadata: { syncId },
       });
@@ -346,14 +347,17 @@ export class ChannelSyncService {
       }, {
         priority: request.syncRules?.priorityOrder ? 10 : 5,
         attempts: 3,
-        backoff: 'exponential',
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
       });
 
       // Log start
       await this.logService.log({
         tenantId,
-        type: 'SYNC',
-        level: 'INFO',
+        type: IntegrationLogType.SYNC,
+        level: IntegrationLogLevel.INFO,
         message: `Cross-channel sync started: ${syncId}`,
         metadata: {
           syncId,
@@ -452,8 +456,8 @@ export class ChannelSyncService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYNC',
-        level: result.success ? 'INFO' : 'WARN',
+        type: IntegrationLogType.SYNC,
+        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
         message: `Channel sync completed: ${result.itemsSucceeded}/${result.itemsProcessed} successful`,
         metadata: {
           syncId,
@@ -499,7 +503,7 @@ export class ChannelSyncService {
       // For now, return recent sync logs
       const query = {
         tenantId,
-        type: 'SYNC' as any,
+        type: IntegrationLogType.SYNC,
         limit,
         orderBy: 'createdAt' as const,
         orderDirection: 'DESC' as const,
@@ -513,7 +517,7 @@ export class ChannelSyncService {
         channelId: log.channelId,
         syncType: log.metadata?.syncType,
         direction: log.metadata?.direction,
-        status: log.level === 'ERROR' ? 'failed' : 'completed',
+        status: log.level === IntegrationLogLevel.ERROR ? 'failed' : 'completed',
         startTime: log.createdAt,
         duration: log.metadata?.result?.duration,
         itemsProcessed: log.metadata?.result?.itemsProcessed || 0,
@@ -590,7 +594,10 @@ export class ChannelSyncService {
           delay,
           priority: request.priority === 'high' ? 10 : request.priority === 'low' ? 1 : 5,
           attempts: 3,
-          backoff: 'exponential',
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
         });
       }
     }
@@ -614,7 +621,10 @@ export class ChannelSyncService {
         }, {
           priority: request.priority === 'high' ? 10 : request.priority === 'low' ? 1 : 5,
           attempts: 3,
-          backoff: 'exponential',
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
         });
       }
     }

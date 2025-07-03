@@ -161,7 +161,7 @@ export class EnterpriseAuthService {
       return {
         granted: false,
         source: 'legacy',
-        details: { error: error.message },
+        details: {},
       };
     }
   }
@@ -364,7 +364,7 @@ export class EnterpriseAuthService {
 
       for (const role of hierarchicalRoles) {
         // Check role validity
-        if (!role.isValidNow) continue;
+        if (!role.isValid) continue;
 
         // Check context restrictions
         const restrictions = this.checkRoleRestrictions(role, context);
@@ -397,7 +397,7 @@ export class EnterpriseAuthService {
 
     } catch (error) {
       this.logger.error(`Error checking hierarchical role permissions: ${error.message}`);
-      return { granted: false, source: 'hierarchical_role', details: { error: error.message } };
+      return { granted: false, source: 'hierarchical_role', details: {} };
     }
   }
 
@@ -433,7 +433,7 @@ export class EnterpriseAuthService {
 
     } catch (error) {
       this.logger.error(`Error checking permission set permissions: ${error.message}`);
-      return { granted: false, source: 'permission_set', details: { error: error.message } };
+      return { granted: false, source: 'permission_set', details: {} };
     }
   }
 
@@ -498,7 +498,7 @@ export class EnterpriseAuthService {
     const permissions = new Set<string>();
 
     for (const role of roles) {
-      if (role.isValidNow && role.isWithinAllowedHours()) {
+      if (role.isValid && role.isWithinAllowedHours()) {
         const rolePermissions = role.getEffectivePermissions();
         rolePermissions.forEach(perm => permissions.add(perm));
       }

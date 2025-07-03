@@ -6,7 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WhatsAppApiService, WhatsAppConfig, WhatsAppMessage, WhatsAppApiResponse } from './whatsapp-api.service';
 import { WhatsAppAuthService } from './whatsapp-auth.service';
-import { IntegrationLog } from '../../entities/integration-log.entity';
+import { IntegrationLog, IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface WhatsAppTextMessage {
   to: string;
@@ -241,8 +241,8 @@ export class WhatsAppMessageService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp text message sent successfully',
           metadata: {
             messageId,
@@ -326,8 +326,8 @@ export class WhatsAppMessageService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp template message sent successfully',
           metadata: {
             messageId,
@@ -414,8 +414,8 @@ export class WhatsAppMessageService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp interactive message sent successfully',
           metadata: {
             messageId,
@@ -513,8 +513,8 @@ export class WhatsAppMessageService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp media message sent successfully',
           metadata: {
             messageId,
@@ -601,8 +601,8 @@ export class WhatsAppMessageService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp location message sent successfully',
           metadata: {
             messageId,
@@ -681,8 +681,8 @@ export class WhatsAppMessageService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp contact message sent successfully',
           metadata: {
             messageId,
@@ -800,8 +800,8 @@ export class WhatsAppMessageService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: 'WhatsApp bulk message send completed',
         metadata: {
           totalMessages: bulkRequest.recipients.length,
@@ -866,8 +866,8 @@ export class WhatsAppMessageService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp message marked as read',
           metadata: { messageId },
         });

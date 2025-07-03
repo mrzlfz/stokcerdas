@@ -358,6 +358,29 @@ export class AutomationSchedule extends AuditableEntity {
     if (!this.nextExecution) return false;
     return this.nextExecution <= new Date();
   }
+
+  recordExecution(success: boolean, executionTime: number, errorMessage?: string): void {
+    this.totalExecutions += 1;
+    this.lastExecution = new Date();
+    this.averageExecutionTimeMs = this.averageExecutionTimeMs
+      ? Math.round((this.averageExecutionTimeMs + executionTime) / 2)
+      : executionTime;
+
+    if (success) {
+      this.successfulExecutions += 1;
+      this.consecutiveFailures = 0;
+    } else {
+      this.failedExecutions += 1;
+      this.consecutiveFailures += 1;
+      this.lastErrorMessage = errorMessage;
+    }
+
+    // Update success rate
+    this.successRate = (this.successfulExecutions / this.totalExecutions) * 100;
+
+    // Calculate next execution time
+    this.calculateNextExecution();
+  }
 }
 
 @Entity('schedule_executions')

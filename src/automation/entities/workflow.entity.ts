@@ -45,7 +45,7 @@ export enum WorkflowCategory {
 @Index(['tenantId', 'category'])
 @Index(['tenantId', 'triggerType'])
 @Index(['tenantId', 'priority'])
-@Index(['tenantId', 'nextExecution'])
+@Index(['tenantId', 'nextExecutionAt'])
 export class Workflow extends AuditableEntity {
   @Column({ type: 'varchar', length: 100 })
   name: string;

@@ -1,3 +1,20 @@
+// Load environment variables
+require('dotenv').config({ path: '.env.development' });
+
+// Register ts-node with transpile-only mode to skip type checking
+require('ts-node').register({
+  transpileOnly: true,
+  compilerOptions: {
+    module: 'commonjs',
+    target: 'es2020',
+    esModuleInterop: true,
+    allowSyntheticDefaultImports: true,
+    experimentalDecorators: true,
+    emitDecoratorMetadata: true,
+    skipLibCheck: true
+  }
+});
+
 const { DataSource } = require('typeorm');
 const path = require('path');
 
@@ -8,9 +25,9 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || 'stokcerdas',
   password: process.env.DB_PASSWORD || 'stokcerdas_password',
   database: process.env.DB_NAME || 'stokcerdas_dev',
-  entities: [path.join(__dirname, '/../**/*.entity{.ts,.js}')],
-  migrations: [path.join(__dirname, '/migrations/*{.ts,.js}')],
-  synchronize: (process.env.DB_SYNCHRONIZE || 'false') === 'true',
+  entities: [],  // Skip entities for migration only
+  migrations: [path.join(__dirname, '/migrations/*.ts')],
+  synchronize: false, // Always false for migrations
   logging: (process.env.DB_LOGGING || 'false') === 'true',
   ssl: (process.env.DB_SSL || 'false') === 'true',
   extra: {

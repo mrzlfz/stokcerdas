@@ -21,6 +21,9 @@ export enum PermissionResource {
   SUPPLIERS = 'suppliers',
   LOCATIONS = 'locations',
   TRANSACTIONS = 'transactions',
+  PRIVACY = 'privacy',
+  COMPLIANCE = 'compliance',
+  AUDIT_LOGS = 'audit_logs',
 }
 
 export enum PermissionAction {

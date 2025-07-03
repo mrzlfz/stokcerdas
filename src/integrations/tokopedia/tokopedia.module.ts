@@ -33,8 +33,8 @@ import { Channel } from '../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../channels/entities/channel-mapping.entity';
 import { Product } from '../../products/entities/product.entity';
 import { Order } from '../../orders/entities/order.entity';
-import { OrderItem } from '../../orders/entities/order-item.entity';
-import { InventoryLevel } from '../../inventory/entities/inventory-level.entity';
+import { OrderItem } from '../../orders/entities/order.entity';
+// import { InventoryLevel } from '../../inventory/entities/inventory-level.entity';
 
 @Module({
   imports: [
@@ -50,7 +50,7 @@ import { InventoryLevel } from '../../inventory/entities/inventory-level.entity'
       Product,
       Order,
       OrderItem,
-      InventoryLevel,
+      // InventoryLevel,
     ]),
 
     // HTTP client for API calls

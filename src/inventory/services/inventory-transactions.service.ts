@@ -8,12 +8,13 @@ import {
   TransactionStatus 
 } from '../entities/inventory-transaction.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
-import { InventoryTransactionQueryDto } from '../dto/inventory-query.dto';
+import { InventoryTransactionQueryDto, SortOrder } from '../dto/inventory-query.dto';
 import { StockAdjustmentDto, AdjustmentReason } from '../dto/stock-adjustment.dto';
 import {
   CreateInventoryTransferDto,
   UpdateTransferStatusDto,
   TransferReceiptDto,
+  TransferStatus,
 } from '../dto/inventory-transfer.dto';
 
 @Injectable()
@@ -48,7 +49,7 @@ export class InventoryTransactionsService {
       referenceNumber,
       referenceType,
       sortBy = 'transactionDate',
-      sortOrder = 'DESC',
+      sortOrder = SortOrder.DESC,
       page = 1,
       limit = 20,
     } = query;
@@ -114,7 +115,7 @@ export class InventoryTransactionsService {
     ];
 
     if (validSortFields.includes(sortBy)) {
-      queryBuilder.orderBy(sortBy, sortOrder as 'ASC' | 'DESC');
+      queryBuilder.orderBy(sortBy, sortOrder);
     }
 
     // Apply pagination
@@ -382,13 +383,23 @@ export class InventoryTransactionsService {
   ): Promise<InventoryTransaction> {
     const transaction = await this.findOne(tenantId, transactionId);
 
-    transaction.status = updateStatusDto.status;
+    // Map TransferStatus to TransactionStatus
+    const statusMapping: Record<TransferStatus, TransactionStatus> = {
+      [TransferStatus.DRAFT]: TransactionStatus.PENDING,
+      [TransferStatus.PENDING]: TransactionStatus.PENDING,
+      [TransferStatus.IN_TRANSIT]: TransactionStatus.PENDING,
+      [TransferStatus.COMPLETED]: TransactionStatus.COMPLETED,
+      [TransferStatus.CANCELLED]: TransactionStatus.CANCELLED,
+      [TransferStatus.REJECTED]: TransactionStatus.CANCELLED,
+    };
+
+    transaction.status = statusMapping[updateStatusDto.status];
     transaction.updatedBy = userId;
 
-    if (updateStatusDto.status === TransactionStatus.COMPLETED) {
+    if (updateStatusDto.status === TransferStatus.COMPLETED) {
       transaction.processedAt = new Date();
       transaction.processedBy = userId;
-    } else if (updateStatusDto.status === TransactionStatus.CANCELLED) {
+    } else if (updateStatusDto.status === TransferStatus.CANCELLED || updateStatusDto.status === TransferStatus.REJECTED) {
       transaction.cancelledAt = new Date();
       transaction.cancelledBy = userId;
       transaction.cancellationReason = updateStatusDto.notes;
@@ -396,7 +407,8 @@ export class InventoryTransactionsService {
 
     if (updateStatusDto.notes) {
       transaction.notes = transaction.notes 
-        ? `${transaction.notes}\n[${new Date().toISOString()}] ${updateStatusDto.notes}`
+        ? `${transaction.notes}
+[${new Date().toISOString()}] ${updateStatusDto.notes}`
         : updateStatusDto.notes;
     }
 

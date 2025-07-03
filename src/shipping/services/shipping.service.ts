@@ -8,10 +8,12 @@ import { ShippingLabel, ShippingLabelStatus, ShippingServiceType, InsuranceType 
 import { ShippingTracking, TrackingStatus, TrackingEventType } from '../entities/shipping-tracking.entity';
 import { ShippingRate, RateType } from '../entities/shipping-rate.entity';
 import { Order, OrderStatus, FulfillmentStatus } from '../../orders/entities/order.entity';
+import { UpdateOrderDto } from '../../orders/dto/update-order.dto';
 
 // Services
 import { OrdersService } from '../../orders/services/orders.service';
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
 
 // Interfaces
 export interface ShippingQuoteRequest {
@@ -201,7 +203,7 @@ export class ShippingService {
         }
 
         // Filter by service type if specified
-        if (request.serviceTypes && !request.serviceTypes.includes(rate.rateType as ShippingServiceType)) {
+        if (request.serviceTypes && !request.serviceTypes.includes(this.convertRateTypeToServiceType(rate.rateType))) {
           continue;
         }
 
@@ -222,7 +224,7 @@ export class ShippingService {
           carrierName: rate.carrierName,
           serviceCode: rate.serviceCode,
           serviceName: rate.serviceName,
-          serviceType: rate.rateType as ShippingServiceType,
+          serviceType: this.convertRateTypeToServiceType(rate.rateType),
           cost: costCalculation,
           timeframe: {
             estimatedDays: rate.estimatedDays,
@@ -366,8 +368,8 @@ export class ShippingService {
       // Log the creation
       await this.logService.log({
         tenantId,
-        type: 'SHIPPING',
-        level: 'INFO',
+        type: IntegrationLogType.SHIPPING,
+        level: IntegrationLogLevel.INFO,
         message: `Shipping label created for order ${order.orderNumber}`,
         metadata: {
           orderId: request.orderId,
@@ -439,8 +441,8 @@ export class ShippingService {
       // Log generation
       await this.logService.log({
         tenantId,
-        type: 'SHIPPING',
-        level: 'INFO',
+        type: IntegrationLogType.SHIPPING,
+        level: IntegrationLogLevel.INFO,
         message: `Shipping label generated: ${trackingNumber}`,
         metadata: {
           shippingLabelId,
@@ -742,5 +744,22 @@ export class ShippingService {
       acc[serviceType].totalCost += Number(shipment.totalCost);
       return acc;
     }, {} as Record<ShippingServiceType, any>);
+  }
+
+  /**
+   * Convert RateType to ShippingServiceType
+   */
+  private convertRateTypeToServiceType(rateType: RateType): ShippingServiceType {
+    const mapping: Record<RateType, ShippingServiceType> = {
+      [RateType.STANDARD]: ShippingServiceType.REGULAR,
+      [RateType.EXPRESS]: ShippingServiceType.EXPRESS,
+      [RateType.ECONOMY]: ShippingServiceType.REGULAR,
+      [RateType.PREMIUM]: ShippingServiceType.EXPRESS,
+      [RateType.SAME_DAY]: ShippingServiceType.SAME_DAY,
+      [RateType.NEXT_DAY]: ShippingServiceType.NEXT_DAY,
+      [RateType.INSTANT]: ShippingServiceType.INSTANT,
+    };
+    
+    return mapping[rateType] || ShippingServiceType.REGULAR;
   }
 }

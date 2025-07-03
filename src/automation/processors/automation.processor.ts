@@ -534,11 +534,21 @@ export class AutomationProcessor {
     parameters?: any,
   ): Promise<any> {
     const context = {
-      criticalLevel: parameters?.criticalLevel || 10,
-      warningLevel: parameters?.warningLevel || 25,
-      budgetConstraint: parameters?.budgetConstraint,
-      dailyLimit: parameters?.dailyLimit,
-      monthlyLimit: parameters?.monthlyLimit,
+      currentTime: new Date(),
+      inventoryThresholds: {
+        criticalLevel: parameters?.criticalLevel || 10,
+        warningLevel: parameters?.warningLevel || 25,
+      },
+      systemLoad: {
+        cpuUsage: 50,
+        memoryUsage: 60,
+        activeJobs: 5,
+      },
+      budgetConstraints: {
+        dailyLimit: parameters?.dailyLimit,
+        monthlyLimit: parameters?.monthlyLimit,
+        remainingBudget: parameters?.budgetConstraint,
+      },
     };
 
     return this.automationRuleEngine.processAutomationRules(schedule.tenantId, context);
@@ -658,19 +668,27 @@ export class AutomationProcessor {
     jobData: ProcessReorderRulesJobData,
     metrics: any,
   ): Promise<void> {
-    const message = `Automation rules processing completed for tenant ${jobData.tenantId}.\n\n` +
-      `📊 Summary:\n` +
-      `• Rules Processed: ${metrics.totalRulesProcessed}\n` +
-      `• Rules Triggered: ${metrics.triggeredRules}\n` +
-      `• Successful Executions: ${metrics.successfulExecutions}\n` +
-      `• Failed Executions: ${metrics.failedExecutions}\n` +
-      `• Total Value Generated: IDR ${metrics.totalValueGenerated.toLocaleString()}\n` +
+    const message = `Automation rules processing completed for tenant ${jobData.tenantId}.
+
+` +
+      `📊 Summary:
+` +
+      `• Rules Processed: ${metrics.totalRulesProcessed}
+` +
+      `• Rules Triggered: ${metrics.triggeredRules}
+` +
+      `• Successful Executions: ${metrics.successfulExecutions}
+` +
+      `• Failed Executions: ${metrics.failedExecutions}
+` +
+      `• Total Value Generated: IDR ${metrics.totalValueGenerated.toLocaleString()}
+` +
       `• System Efficiency: ${(metrics.systemEfficiency * 100).toFixed(1)}%`;
 
     await this.alertManagementService.createAlert(
       jobData.tenantId,
-      AlertType.SYSTEM_INFO,
-      metrics.failedExecutions > 0 ? AlertSeverity.MEDIUM : AlertSeverity.LOW,
+      AlertType.SYSTEM_MAINTENANCE,
+      metrics.failedExecutions > 0 ? AlertSeverity.WARNING : AlertSeverity.INFO,
       'Automation Processing Completed',
       message,
       {
@@ -684,19 +702,27 @@ export class AutomationProcessor {
   private async sendPurchaseOrderNotification(result: any): Promise<void> {
     if (!result.success || !result.purchaseOrderId) return;
 
-    const severity = result.urgencyLevel >= 8 ? AlertSeverity.HIGH : AlertSeverity.MEDIUM;
-    const message = `Automated purchase order created successfully.\n\n` +
-      `📦 Order Details:\n` +
-      `• Product: ${result.reorderCalculation.productName || 'Unknown'}\n` +
-      `• Quantity: ${result.actualQuantity}\n` +
-      `• Estimated Value: IDR ${result.estimatedValue.toLocaleString()}\n` +
-      `• Supplier: ${result.supplierSelection.selectedSupplier?.supplier?.name || 'Unknown'}\n` +
-      `• Urgency Level: ${result.urgencyLevel}/10\n` +
+    const severity = result.urgencyLevel >= 8 ? AlertSeverity.CRITICAL : AlertSeverity.WARNING;
+    const message = `Automated purchase order created successfully.
+
+` +
+      `📦 Order Details:
+` +
+      `• Product: ${result.reorderCalculation.productName || 'Unknown'}
+` +
+      `• Quantity: ${result.actualQuantity}
+` +
+      `• Estimated Value: IDR ${result.estimatedValue.toLocaleString()}
+` +
+      `• Supplier: ${result.supplierSelection.selectedSupplier?.supplier?.name || 'Unknown'}
+` +
+      `• Urgency Level: ${result.urgencyLevel}/10
+` +
       `• Requires Approval: ${result.requiresApproval ? 'Yes' : 'No'}`;
 
     await this.alertManagementService.createAlert(
       result.tenantId,
-      AlertType.PURCHASE_ORDER_CREATED,
+      AlertType.ORDER_STATUS_UPDATE,
       severity,
       `Purchase Order Created: ${result.purchaseOrderId}`,
       message,
@@ -713,21 +739,31 @@ export class AutomationProcessor {
   }
 
   private async sendBulkPurchaseNotification(result: any, batchId?: string): Promise<void> {
-    const message = `Bulk automated purchase processing completed.\n\n` +
-      `📊 Batch Summary:\n` +
-      `• Total Processed: ${result.totalProcessed}\n` +
-      `• Successful Orders: ${result.successfulOrders}\n` +
-      `• Failed Orders: ${result.failedOrders}\n` +
-      `• Skipped Orders: ${result.skippedOrders}\n` +
-      `• Total Value: IDR ${result.summary.totalValue.toLocaleString()}\n` +
-      `• Average Order Value: IDR ${result.summary.averageOrderValue.toLocaleString()}\n` +
-      `• Unique Suppliers: ${result.summary.uniqueSuppliers}\n` +
+    const message = `Bulk automated purchase processing completed.
+
+` +
+      `📊 Batch Summary:
+` +
+      `• Total Processed: ${result.totalProcessed}
+` +
+      `• Successful Orders: ${result.successfulOrders}
+` +
+      `• Failed Orders: ${result.failedOrders}
+` +
+      `• Skipped Orders: ${result.skippedOrders}
+` +
+      `• Total Value: IDR ${result.summary.totalValue.toLocaleString()}
+` +
+      `• Average Order Value: IDR ${result.summary.averageOrderValue.toLocaleString()}
+` +
+      `• Unique Suppliers: ${result.summary.uniqueSuppliers}
+` +
       `• Orders Requiring Approval: ${result.summary.ordersRequiringApproval}`;
 
     await this.alertManagementService.createAlert(
       result.tenantId,
-      AlertType.SYSTEM_INFO,
-      result.failedOrders > 0 ? AlertSeverity.MEDIUM : AlertSeverity.LOW,
+      AlertType.SYSTEM_MAINTENANCE,
+      result.failedOrders > 0 ? AlertSeverity.WARNING : AlertSeverity.INFO,
       `Bulk Purchase Completed: ${batchId || 'Unknown Batch'}`,
       message,
       {
@@ -741,49 +777,63 @@ export class AutomationProcessor {
   }
 
   private async sendScheduleCompletionNotification(schedule: AutomationSchedule, result: any): Promise<void> {
-    const message = `Scheduled automation task completed successfully.\n\n` +
-      `📅 Schedule Details:\n` +
-      `• Name: ${schedule.name}\n` +
-      `• Type: ${schedule.type}\n` +
-      `• Execution Time: ${(schedule.lastExecutionDuration || 0) / 1000}s\n` +
-      `• Next Execution: ${schedule.nextExecution?.toISOString() || 'Not scheduled'}\n\n` +
+    const message = `Scheduled automation task completed successfully.
+
+` +
+      `📅 Schedule Details:
+` +
+      `• Name: ${schedule.name}
+` +
+      `• Type: ${schedule.type}
+` +
+      `• Execution Time: ${(schedule.lastExecutionTimeMs || 0) / 1000}s
+` +
+      `• Next Execution: ${schedule.nextExecution?.toISOString() || 'Not scheduled'}
+
+` +
       `✅ Results: ${JSON.stringify(result, null, 2)}`;
 
     if (schedule.notificationEmails?.length) {
       await this.emailService.sendEmail({
-        to: schedule.notificationEmails,
+        to: schedule.notificationEmails.join(','),
         subject: `Schedule Completed: ${schedule.name}`,
         text: message,
-        tenantId: schedule.tenantId,
       });
     }
   }
 
   private async sendScheduleErrorNotification(schedule: AutomationSchedule, error: string): Promise<void> {
-    const message = `Scheduled automation task failed.\n\n` +
-      `📅 Schedule Details:\n` +
-      `• Name: ${schedule.name}\n` +
-      `• Type: ${schedule.type}\n` +
-      `• Error: ${error}\n` +
-      `• Failed At: ${new Date().toISOString()}\n` +
-      `• Consecutive Failures: ${schedule.consecutiveFailures}\n\n` +
+    const message = `Scheduled automation task failed.
+
+` +
+      `📅 Schedule Details:
+` +
+      `• Name: ${schedule.name}
+` +
+      `• Type: ${schedule.type}
+` +
+      `• Error: ${error}
+` +
+      `• Failed At: ${new Date().toISOString()}
+` +
+      `• Consecutive Failures: ${schedule.consecutiveFailures}
+
+` +
       `⚠️ Please review the schedule configuration and system logs.`;
 
     if (schedule.notificationEmails?.length) {
       await this.emailService.sendEmail({
-        to: schedule.notificationEmails,
+        to: schedule.notificationEmails.join(','),
         subject: `Schedule Failed: ${schedule.name}`,
         text: message,
-        tenantId: schedule.tenantId,
-        priority: 'high',
       });
     }
 
     // Create high-priority alert
     await this.alertManagementService.createAlert(
       schedule.tenantId,
-      AlertType.SYSTEM_ERROR,
-      AlertSeverity.HIGH,
+      AlertType.SYSTEM_MAINTENANCE,
+      AlertSeverity.CRITICAL,
       `Schedule Failed: ${schedule.name}`,
       message,
       {
@@ -798,8 +848,8 @@ export class AutomationProcessor {
   private async sendErrorNotification(tenantId: string, subject: string, error: string): Promise<void> {
     await this.alertManagementService.createAlert(
       tenantId,
-      AlertType.SYSTEM_ERROR,
-      AlertSeverity.HIGH,
+      AlertType.SYSTEM_MAINTENANCE,
+      AlertSeverity.CRITICAL,
       subject,
       `System error occurred: ${error}`,
       { error, timestamp: new Date().toISOString() },
@@ -808,22 +858,20 @@ export class AutomationProcessor {
 
   private async sendEmailNotification(data: SendNotificationJobData): Promise<void> {
     await this.emailService.sendEmail({
-      to: data.recipients,
+      to: Array.isArray(data.recipients) ? data.recipients.join(',') : data.recipients,
       subject: data.subject,
       text: data.message,
-      tenantId: data.tenantId,
-      priority: data.priority === 'critical' ? 'high' : 'normal',
     });
   }
 
   private async sendAlertNotification(data: SendNotificationJobData): Promise<void> {
     const severity = data.priority === 'critical' ? AlertSeverity.CRITICAL :
-                    data.priority === 'high' ? AlertSeverity.HIGH :
-                    data.priority === 'low' ? AlertSeverity.LOW : AlertSeverity.MEDIUM;
+                    data.priority === 'high' ? AlertSeverity.WARNING :
+                    data.priority === 'low' ? AlertSeverity.INFO : AlertSeverity.WARNING;
 
     await this.alertManagementService.createAlert(
       data.tenantId,
-      AlertType.SYSTEM_INFO,
+      AlertType.SYSTEM_MAINTENANCE,
       severity,
       data.subject,
       data.message,

@@ -49,11 +49,13 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
 import { OrderStatus, OrderType, PaymentStatus, FulfillmentStatus } from '../entities/order.entity';
+import { UserRole } from '../../users/entities/user.entity';
 
 // Services
 import { OrdersService } from '../services/orders.service';
 import { OrderFulfillmentService } from '../services/order-fulfillment.service';
-import { OrderRoutingService } from '../services/order-routing.service';
+// Note: OrderRoutingService to be implemented
+// import { OrderRoutingService } from '../services/order-routing.service';
 
 // DTOs
 export class CreateOrderItemDto {
@@ -520,7 +522,7 @@ export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly fulfillmentService: OrderFulfillmentService,
-    private readonly routingService: OrderRoutingService,
+    // private readonly routingService: OrderRoutingService,
   ) {}
 
   // ==================== BASIC CRUD OPERATIONS ====================
@@ -538,7 +540,7 @@ export class OrdersController {
   @ApiQuery({ name: 'offset', type: 'number', required: false })
   @ApiQuery({ name: 'includeItems', type: 'boolean', required: false })
   @ApiQuery({ name: 'includeMetrics', type: 'boolean', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getOrders(
     @CurrentUser() user: any,
     @Query() query: OrdersQueryDto,
@@ -572,7 +574,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get order by ID' })
   @ApiResponse({ status: 200, description: 'Order retrieved successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getOrderById(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -600,7 +602,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get order by order number' })
   @ApiResponse({ status: 200, description: 'Order retrieved successfully' })
   @ApiParam({ name: 'orderNumber', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getOrderByNumber(
     @CurrentUser() user: any,
     @Param('orderNumber') orderNumber: string,
@@ -628,7 +630,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get order by external order ID' })
   @ApiResponse({ status: 200, description: 'Order retrieved successfully' })
   @ApiParam({ name: 'externalOrderId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getOrderByExternalId(
     @CurrentUser() user: any,
     @Param('externalOrderId') externalOrderId: string,
@@ -665,7 +667,7 @@ export class OrdersController {
   @Post()
   @ApiOperation({ summary: 'Create new order' })
   @ApiResponse({ status: 201, description: 'Order created successfully' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async createOrder(
     @CurrentUser() user: any,
     @Body() createDto: CreateOrderDto,
@@ -693,7 +695,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update order' })
   @ApiResponse({ status: 200, description: 'Order updated successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async updateOrder(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -729,7 +731,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update order status' })
   @ApiResponse({ status: 200, description: 'Order status updated successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async updateOrderStatus(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -764,7 +766,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Cancel order' })
   @ApiResponse({ status: 200, description: 'Order cancelled successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async cancelOrder(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -801,7 +803,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get fulfillment options for order' })
   @ApiResponse({ status: 200, description: 'Fulfillment options retrieved successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getFulfillmentOptions(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -829,7 +831,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Assign order to fulfillment location' })
   @ApiResponse({ status: 200, description: 'Fulfillment assigned successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async assignFulfillment(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -864,7 +866,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update fulfillment status' })
   @ApiResponse({ status: 200, description: 'Fulfillment status updated successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async updateFulfillmentStatus(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -896,12 +898,14 @@ export class OrdersController {
   }
 
   // ==================== ROUTING & MULTI-CHANNEL ====================
-
+  // Note: Routing functionality to be implemented
+  
+  /*
   @Post(':orderId/route')
   @ApiOperation({ summary: 'Route order through intelligent routing system' })
   @ApiResponse({ status: 200, description: 'Order routed successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async routeOrder(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -926,14 +930,16 @@ export class OrdersController {
       );
     }
   }
+  */
 
+  /*
   @Get('multi-channel/view')
   @ApiOperation({ summary: 'Get multi-channel orders view' })
   @ApiResponse({ status: 200, description: 'Multi-channel orders retrieved successfully' })
   @ApiQuery({ name: 'channelIds', type: 'string', isArray: true, required: false })
   @ApiQuery({ name: 'groupBy', enum: ['channel', 'date', 'status'], required: false })
   @ApiQuery({ name: 'includeMetrics', type: 'boolean', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getMultiChannelOrders(
     @CurrentUser() user: any,
     @Query() query: any,
@@ -960,12 +966,14 @@ export class OrdersController {
       );
     }
   }
+  */
 
+  /*
   @Post(':orderId/sync')
   @ApiOperation({ summary: 'Synchronize order status across platforms' })
   @ApiResponse({ status: 200, description: 'Order synchronized successfully' })
   @ApiParam({ name: 'orderId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async synchronizeOrder(
     @CurrentUser() user: any,
     @Param('orderId') orderId: string,
@@ -994,41 +1002,42 @@ export class OrdersController {
       );
     }
   }
+  */
 
-  @Get('conflicts/detect')
-  @ApiOperation({ summary: 'Detect cross-channel conflicts' })
-  @ApiResponse({ status: 200, description: 'Conflicts detected successfully' })
-  @ApiQuery({ name: 'orderId', type: 'string', required: false })
-  @Roles('admin', 'manager')
-  async detectConflicts(
-    @CurrentUser() user: any,
-    @Query('orderId') orderId?: string,
-  ) {
-    try {
-      const conflicts = await this.routingService.detectCrossChannelConflicts(user.tenantId, orderId);
-      
-      return {
-        success: true,
-        data: conflicts,
-      };
-    } catch (error) {
-      this.logger.error(`Failed to detect conflicts: ${error.message}`, error.stack);
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
+  //   @Get('conflicts/detect')
+  //   @ApiOperation({ summary: 'Detect cross-channel conflicts' })
+  //   @ApiResponse({ status: 200, description: 'Conflicts detected successfully' })
+  //   @ApiQuery({ name: 'orderId', type: 'string', required: false })
+  //   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  //   async detectConflicts(
+  //     @CurrentUser() user: any,
+  //     @Query('orderId') orderId?: string,
+  //   ) {
+  //     try {
+  //       const conflicts = await this.routingService.detectCrossChannelConflicts(user.tenantId, orderId);
+  //       
+  //       return {
+  //         success: true,
+  //         data: conflicts,
+  //       };
+  //     } catch (error) {
+  //       this.logger.error(`Failed to detect conflicts: ${error.message}`, error.stack);
+  //       throw new HttpException(
+  //         {
+  //           success: false,
+  //           error: error.message,
+  //         },
+  //         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+  //       );
+  //     }
+  //   }
 
   // ==================== BULK OPERATIONS ====================
 
   @Post('bulk/action')
   @ApiOperation({ summary: 'Perform bulk action on orders' })
   @ApiResponse({ status: 200, description: 'Bulk action completed successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async bulkOrderAction(
     @CurrentUser() user: any,
     @Body() actionDto: BulkOrderActionDto,
@@ -1053,10 +1062,11 @@ export class OrdersController {
     }
   }
 
+  /*
   @Post('bulk/route')
   @ApiOperation({ summary: 'Perform bulk routing on orders' })
   @ApiResponse({ status: 200, description: 'Bulk routing completed successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async bulkRouting(
     @CurrentUser() user: any,
     @Body() body: {
@@ -1086,11 +1096,12 @@ export class OrdersController {
       );
     }
   }
+  */
 
   @Post('fulfillment/batch/optimize')
   @ApiOperation({ summary: 'Optimize batch fulfillment for multiple orders' })
   @ApiResponse({ status: 200, description: 'Batch fulfillment optimized successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async optimizeBatchFulfillment(
     @CurrentUser() user: any,
     @Body() body: {
@@ -1127,7 +1138,7 @@ export class OrdersController {
   @ApiQuery({ name: 'dateFrom', type: 'string', required: false })
   @ApiQuery({ name: 'dateTo', type: 'string', required: false })
   @ApiQuery({ name: 'groupBy', enum: ['day', 'week', 'month'], required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getAnalyticsSummary(
     @CurrentUser() user: any,
     @Query() query: any,
@@ -1136,10 +1147,10 @@ export class OrdersController {
       const filters: any = {};
       
       if (query.dateFrom) {
-        filters.orderDateFrom = new Date(query.dateFrom);
+        filters.orderDateFrom = typeof query.dateFrom === 'string' ? new Date(query.dateFrom) : query.dateFrom;
       }
       if (query.dateTo) {
-        filters.orderDateTo = new Date(query.dateTo);
+        filters.orderDateTo = typeof query.dateTo === 'string' ? new Date(query.dateTo) : query.dateTo;
       }
 
       const summary = await this.ordersService.getOrderSummary(user.tenantId, filters);
@@ -1160,10 +1171,11 @@ export class OrdersController {
     }
   }
 
+  /*
   @Get('dashboard/routing')
   @ApiOperation({ summary: 'Get routing dashboard data' })
   @ApiResponse({ status: 200, description: 'Routing dashboard retrieved successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getRoutingDashboard(
     @CurrentUser() user: any,
   ) {
@@ -1185,11 +1197,12 @@ export class OrdersController {
       );
     }
   }
+  */
 
   @Get('capacity/locations')
   @ApiOperation({ summary: 'Get location capacity information' })
   @ApiResponse({ status: 200, description: 'Location capacities retrieved successfully' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getLocationCapacities(
     @CurrentUser() user: any,
   ) {
@@ -1218,7 +1231,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get orders by channel' })
   @ApiResponse({ status: 200, description: 'Channel orders retrieved successfully' })
   @ApiParam({ name: 'channelId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getOrdersByChannel(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -1247,7 +1260,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'Export orders data' })
   @ApiResponse({ status: 200, description: 'Orders exported successfully' })
   @ApiParam({ name: 'format', enum: ['csv', 'excel', 'pdf'] })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async exportOrders(
     @CurrentUser() user: any,
     @Param('format') format: 'csv' | 'excel' | 'pdf',

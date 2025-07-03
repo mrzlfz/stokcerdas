@@ -102,14 +102,14 @@ export class AlertConfigurationController {
     description: 'Daftar konfigurasi alert berhasil diambil',
   })
   async findAll(
+    @GetTenant() tenantId: string,
     @Query('alertType') alertType?: AlertType,
     @Query('productId') productId?: string,
     @Query('locationId') locationId?: string,
     @Query('isEnabled') isEnabled?: boolean,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @GetTenant() tenantId: string,
-    @Req() req: Request,
+    @Req() req?: Request,
   ) {
     const result = await this.alertConfigService.findAll(tenantId, {
       alertType,
@@ -324,11 +324,11 @@ export class AlertConfigurationController {
     description: 'Konfigurasi alert berhasil diambil',
   })
   async getConfigurationForAlert(
+    @GetTenant() tenantId: string,
     @Param('alertType') alertType: AlertType,
     @Query('productId') productId?: string,
     @Query('locationId') locationId?: string,
-    @GetTenant() tenantId: string,
-    @Req() req: Request,
+    @Req() req?: Request,
   ) {
     const configuration = await this.alertConfigService.getConfigurationForAlert(
       tenantId,

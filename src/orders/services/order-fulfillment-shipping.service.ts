@@ -286,8 +286,8 @@ export class OrderFulfillmentShippingService {
       // Log complete fulfillment
       await this.logService.log({
         tenantId,
-        type: 'FULFILLMENT',
-        level: 'INFO',
+        type: 'fulfillment' as any,
+        level: 'info' as any,
         message: `Order fulfillment completed with shipping`,
         metadata: {
           orderId: request.orderId,
@@ -363,8 +363,8 @@ export class OrderFulfillmentShippingService {
       // Log shipping
       await this.logService.log({
         tenantId,
-        type: 'SHIPPING',
-        level: 'INFO',
+        type: 'shipping' as any,
+        level: 'info' as any,
         message: `Order marked as shipped: ${order.orderNumber}`,
         metadata: {
           orderId,
@@ -431,8 +431,8 @@ export class OrderFulfillmentShippingService {
       // Log delivery
       await this.logService.log({
         tenantId,
-        type: 'DELIVERY',
-        level: 'INFO',
+        type: 'delivery' as any,
+        level: 'info' as any,
         message: `Order delivered: ${order.orderNumber}`,
         metadata: {
           orderId,
@@ -514,12 +514,14 @@ export class OrderFulfillmentShippingService {
           stage: 'preparing',
           status: order.fulfillmentStatus === FulfillmentStatus.PROCESSING ? 'in_progress' : 
                  [FulfillmentStatus.READY, FulfillmentStatus.SHIPPED, FulfillmentStatus.DELIVERED].includes(order.fulfillmentStatus) ? 'completed' : 'pending',
+          timestamp: undefined,
           description: 'Order being prepared for shipping',
         },
         {
           stage: 'ready_for_shipping',
           status: order.fulfillmentStatus === FulfillmentStatus.READY ? 'in_progress' : 
                  [FulfillmentStatus.SHIPPED, FulfillmentStatus.DELIVERED].includes(order.fulfillmentStatus) ? 'completed' : 'pending',
+          timestamp: undefined,
           description: 'Order ready for pickup/shipping',
         },
         {

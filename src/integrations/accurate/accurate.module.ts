@@ -6,9 +6,9 @@ import { HttpModule } from '@nestjs/axios';
 // Entities
 import { AccountingAccount } from '../entities/accounting-account.entity';
 import { Order } from '../../orders/entities/order.entity';
-import { Invoice } from '../../invoices/entities/invoice.entity';
+// import { Invoice } from '../../invoices/entities/invoice.entity'; // TODO: Create invoice entity
 import { Product } from '../../products/entities/product.entity';
-import { Customer } from '../../customers/entities/customer.entity';
+// import { Customer } from '../../customers/entities/customer.entity'; // TODO: Create customer entity
 
 // Services
 import { AccurateApiService } from './services/accurate-api.service';
@@ -32,9 +32,9 @@ import { RateLimiterService } from '../common/services/rate-limiter.service';
     TypeOrmModule.forFeature([
       AccountingAccount,
       Order,
-      Invoice,
+      // Invoice, // TODO: Uncomment when invoice entity is created
       Product,
-      Customer,
+      // Customer, // TODO: Uncomment when customer entity is created
     ]),
 
     // HTTP module for API calls

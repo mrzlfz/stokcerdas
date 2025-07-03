@@ -49,6 +49,8 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
 import { ShippingServiceType, InsuranceType } from '../entities/shipping-label.entity';
+import { TrackingStatus } from '../entities/shipping-tracking.entity';
+import { UserRole } from '../../users/entities/user.entity';
 
 // Services
 import { ShippingService, ShippingQuoteRequest, CreateShippingLabelRequest } from '../services/shipping.service';
@@ -343,7 +345,7 @@ export class ShippingController {
   @Post('quotes')
   @ApiOperation({ summary: 'Get shipping quotes for a package' })
   @ApiResponse({ status: 200, description: 'Shipping quotes retrieved successfully' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getShippingQuotes(
     @CurrentUser() user: any,
     @Body() quotesDto: GetShippingQuotesDto,
@@ -372,7 +374,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Get available carriers and their services' })
   @ApiResponse({ status: 200, description: 'Carriers retrieved successfully' })
   @ApiQuery({ name: 'active', type: 'boolean', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getCarriers(
     @CurrentUser() user: any,
     @Query('active') active?: boolean,
@@ -471,7 +473,7 @@ export class ShippingController {
   @ApiQuery({ name: 'limit', type: 'number', required: false })
   @ApiQuery({ name: 'offset', type: 'number', required: false })
   @ApiQuery({ name: 'includeTracking', type: 'boolean', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getShippingLabels(
     @CurrentUser() user: any,
     @Query() query: ShippingLabelsQueryDto,
@@ -536,7 +538,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Get shipping label by ID' })
   @ApiResponse({ status: 200, description: 'Shipping label retrieved successfully' })
   @ApiParam({ name: 'labelId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getShippingLabelById(
     @CurrentUser() user: any,
     @Param('labelId') labelId: string,
@@ -563,7 +565,7 @@ export class ShippingController {
   @Post('labels')
   @ApiOperation({ summary: 'Create shipping label' })
   @ApiResponse({ status: 201, description: 'Shipping label created successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createShippingLabel(
     @CurrentUser() user: any,
     @Body() createDto: CreateShippingLabelDto,
@@ -592,7 +594,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Generate shipping label with carrier' })
   @ApiResponse({ status: 200, description: 'Shipping label generated successfully' })
   @ApiParam({ name: 'labelId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async generateShippingLabel(
     @CurrentUser() user: any,
     @Param('labelId') labelId: string,
@@ -621,7 +623,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Download shipping label PDF' })
   @ApiResponse({ status: 200, description: 'Label PDF download URL' })
   @ApiParam({ name: 'labelId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async downloadShippingLabel(
     @CurrentUser() user: any,
     @Param('labelId') labelId: string,
@@ -663,7 +665,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Cancel shipping label' })
   @ApiResponse({ status: 200, description: 'Shipping label cancelled successfully' })
   @ApiParam({ name: 'labelId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async cancelShippingLabel(
     @CurrentUser() user: any,
     @Param('labelId') labelId: string,
@@ -726,7 +728,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Get tracking information for a package' })
   @ApiResponse({ status: 200, description: 'Tracking information retrieved successfully' })
   @ApiParam({ name: 'trackingNumber', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getTrackingInfo(
     @CurrentUser() user: any,
     @Param('trackingNumber') trackingNumber: string,
@@ -736,7 +738,7 @@ export class ShippingController {
       
       // Get current status (latest tracking entry)
       const currentStatus = trackingHistory[0];
-      const deliveryProgress = currentStatus?.progressPercentage || 0;
+      const deliveryProgress = 0; // Progress calculation not implemented yet
       
       return {
         success: true,
@@ -746,7 +748,7 @@ export class ShippingController {
           currentDescription: currentStatus?.description,
           deliveryProgress,
           isDelivered: currentStatus?.isDelivered || false,
-          estimatedDeliveryDate: currentStatus?.estimatedDeliveryDate,
+          estimatedDeliveryDate: null, // Not available at tracking level
           history: trackingHistory,
         },
       };
@@ -765,7 +767,7 @@ export class ShippingController {
   @Post('tracking/update')
   @ApiOperation({ summary: 'Update tracking information (webhook endpoint)' })
   @ApiResponse({ status: 200, description: 'Tracking updated successfully' })
-  @Roles('admin', 'manager') // In production, this might be called by carrier webhooks
+  @Roles(UserRole.ADMIN, UserRole.MANAGER) // In production, this might be called by carrier webhooks
   async updateTracking(
     @CurrentUser() user: any,
     @Body() updates: UpdateTrackingDto[],
@@ -773,6 +775,7 @@ export class ShippingController {
     try {
       const trackingUpdates = updates.map(update => ({
         ...update,
+        status: update.status as TrackingStatus,
         eventTime: new Date(update.eventTime),
       }));
 
@@ -798,7 +801,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Refresh tracking from carrier API' })
   @ApiResponse({ status: 200, description: 'Tracking refreshed successfully' })
   @ApiParam({ name: 'trackingNumber', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async refreshTracking(
     @CurrentUser() user: any,
     @Param('trackingNumber') trackingNumber: string,
@@ -853,7 +856,7 @@ export class ShippingController {
   @ApiQuery({ name: 'carrierIds', type: 'string', isArray: true, required: false })
   @ApiQuery({ name: 'serviceTypes', enum: ShippingServiceType, isArray: true, required: false })
   @ApiQuery({ name: 'includeDetails', type: 'boolean', required: false })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getShippingAnalytics(
     @CurrentUser() user: any,
     @Query() query: ShippingAnalyticsQueryDto,
@@ -887,7 +890,7 @@ export class ShippingController {
   @ApiResponse({ status: 200, description: 'Cost analysis retrieved successfully' })
   @ApiQuery({ name: 'period', enum: ['day', 'week', 'month', 'quarter'], required: false })
   @ApiQuery({ name: 'groupBy', enum: ['carrier', 'service', 'location'], required: false })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getShippingCostAnalysis(
     @CurrentUser() user: any,
     @Query('period') period: 'day' | 'week' | 'month' | 'quarter' = 'month',
@@ -953,7 +956,7 @@ export class ShippingController {
   @ApiOperation({ summary: 'Get carrier performance metrics' })
   @ApiResponse({ status: 200, description: 'Performance metrics retrieved successfully' })
   @ApiQuery({ name: 'period', enum: ['week', 'month', 'quarter'], required: false })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getCarrierPerformance(
     @CurrentUser() user: any,
     @Query('period') period: 'week' | 'month' | 'quarter' = 'month',
@@ -1032,7 +1035,7 @@ export class ShippingController {
   @ApiQuery({ name: 'postalCode', type: 'string' })
   @ApiQuery({ name: 'city', type: 'string' })
   @ApiQuery({ name: 'state', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async validateAddress(
     @CurrentUser() user: any,
     @Query('postalCode') postalCode: string,
@@ -1087,7 +1090,7 @@ export class ShippingController {
   @Post('calculate/dimensions')
   @ApiOperation({ summary: 'Calculate volumetric weight and chargeable weight' })
   @ApiResponse({ status: 200, description: 'Weight calculations completed' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async calculateWeights(
     @CurrentUser() user: any,
     @Body() data: {

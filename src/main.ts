@@ -52,7 +52,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector)));
   app.useGlobalInterceptors(new LoggingInterceptor());
-  app.useGlobalInterceptors(new TenantInterceptor());
+  app.useGlobalInterceptors(new TenantInterceptor(app.get(Reflector)));
 
   // CORS configuration
   app.enableCors({

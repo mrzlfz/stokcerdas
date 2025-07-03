@@ -396,13 +396,13 @@ export class BusinessIntelligenceService {
             profitMargin,
             averageSellingPrice: Number(item.averageSellingPrice) || 0,
             inventoryTurnover,
-            abcClassification: 'A', // Will be calculated after sorting
+            abcClassification: 'A' as 'A' | 'B' | 'C', // Will be calculated after sorting
             performanceScore,
             performanceRank: index + 1, // Will be updated after sorting
             revenueContribution,
             growthRate: 0, // Will be calculated with historical data
             currentStockLevel: Number(item.currentStockLevel) || 0,
-            recommendation: 'maintain', // Will be determined based on performance
+            recommendation: 'maintain' as 'promote' | 'maintain' | 'review_pricing' | 'discontinue', // Will be determined based on performance
           };
         })
         .sort((a, b) => b.performanceScore - a.performanceScore); // Sort by performance score
@@ -690,11 +690,11 @@ export class BusinessIntelligenceService {
       const cumulativePercent = (cumulativeRevenue / totalRevenue) * 100;
 
       if (cumulativePercent <= 80) {
-        item.abcClassification = 'A';
+        item.abcClassification = 'A' as 'A' | 'B' | 'C';
       } else if (cumulativePercent <= 95) {
-        item.abcClassification = 'B';
+        item.abcClassification = 'B' as 'A' | 'B' | 'C';
       } else {
-        item.abcClassification = 'C';
+        item.abcClassification = 'C' as 'A' | 'B' | 'C';
       }
     });
   }

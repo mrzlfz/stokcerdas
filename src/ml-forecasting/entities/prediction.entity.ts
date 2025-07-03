@@ -167,7 +167,7 @@ export class Prediction extends BaseEntity {
   predictionJobId?: string; // Reference to batch prediction job
 
   // Relations
-  @ManyToOne(() => MLModel, model => model.predictions)
+  @ManyToOne(() => MLModel)
   @JoinColumn({ name: 'modelId' })
   model: MLModel;
 
@@ -274,7 +274,7 @@ export class Prediction extends BaseEntity {
       ...this.metadata,
       error,
       failedAt: new Date().toISOString(),
-    };
+    } as any;
   }
 
   expire(): void {

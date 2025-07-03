@@ -9,6 +9,7 @@ import { TokopediaOrderService } from '../services/tokopedia-order.service';
 import { TokopediaInventoryService } from '../services/tokopedia-inventory.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface TokopediaWebhookJobData {
   webhookId: string;
@@ -120,7 +121,7 @@ export class TokopediaProcessor {
         tenantId,
         channelId,
         eventType as any,
-        payload,
+        payload as any,
       );
 
       if (result.success) {
@@ -577,7 +578,7 @@ export class TokopediaProcessor {
         tenantId,
         channelId,
         `tokopedia_batch_${syncType}`,
-        errorCount === 0 ? 'completed' : 'partial',
+        errorCount === 0 ? 'completed' : 'failed',
         `Batch ${syncType} sync completed: ${successCount}/${batchData.length} successful`,
         batchResult,
       );
@@ -633,8 +634,8 @@ export class TokopediaProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Tokopedia auth refresh job completed',
         metadata: { jobId: job.id },
       });
@@ -649,7 +650,7 @@ export class TokopediaProcessor {
         tenantId,
         channelId,
         error,
-        { context: 'auth_refresh', jobId: job.id },
+        { metadata: { jobId: job.id } },
       );
 
       throw error;
@@ -700,8 +701,8 @@ export class TokopediaProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Tokopedia health check ${checkType} completed`,
         metadata: { checkType, result },
       });
@@ -716,7 +717,7 @@ export class TokopediaProcessor {
         tenantId,
         channelId,
         error,
-        { context: 'health_check', checkType },
+        { metadata: { checkType } },
       );
 
       throw error;
@@ -748,8 +749,8 @@ export class TokopediaProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'TikTok Shop migration job completed',
         metadata: { jobId: job.id },
       });
@@ -764,7 +765,7 @@ export class TokopediaProcessor {
         tenantId,
         channelId,
         error,
-        { context: 'tiktok_migration', jobId: job.id },
+        { metadata: { jobId: job.id } },
       );
 
       throw error;

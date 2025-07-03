@@ -42,7 +42,6 @@ import { AnalyticsProcessor } from './processors/analytics.processor';
     HttpModule.register({
       timeout: 30000,
       maxRedirects: 3,
-      retries: 2,
     }),
     
     // Database entities for analytics

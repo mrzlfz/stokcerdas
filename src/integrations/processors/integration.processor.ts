@@ -5,6 +5,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { WebhookHandlerService } from '../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../entities/integration-log.entity';
 import { RateLimiterService } from '../common/services/rate-limiter.service';
 
 export interface IntegrationJobData {
@@ -108,8 +109,8 @@ export class IntegrationProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Started processing ${jobType} job`,
         metadata: { jobId: job.id, jobType, payload },
       });
@@ -141,8 +142,8 @@ export class IntegrationProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Completed processing ${jobType} job`,
         metadata: { jobId: job.id, jobType, result },
       });
@@ -210,8 +211,8 @@ export class IntegrationProcessor {
       // Log cleanup completion
       await this.logService.log({
         tenantId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Cleanup completed: ${deletedCount} logs, ${deletedWebhooks} webhooks deleted`,
         metadata: result,
       });
@@ -426,8 +427,8 @@ export class IntegrationProcessor {
       // Log health check result
       await this.logService.log({
         tenantId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Health check ${checkType} completed`,
         metadata: { checkType, platforms, result },
       });

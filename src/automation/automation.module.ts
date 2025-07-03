@@ -35,7 +35,7 @@ import { SuppliersModule } from '../suppliers/suppliers.module';
 import { PurchaseOrdersModule } from '../purchase-orders/purchase-orders.module';
 import { AlertsModule } from '../alerts/alerts.module';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { MlForecastingModule } from '../ml-forecasting/ml-forecasting.module';
+import { MLForecastingModule } from '../ml-forecasting/ml-forecasting.module';
 
 // Import required entities from other modules
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
@@ -104,7 +104,7 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
     PurchaseOrdersModule,
     AlertsModule,
     NotificationsModule,
-    MlForecastingModule,
+    MLForecastingModule,
   ],
 
   controllers: [

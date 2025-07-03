@@ -4,10 +4,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { Channel } from '../../../channels/entities/channel.entity';
+import { Channel, ChannelStatus } from '../../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WhatsAppApiService, WhatsAppConfig, WhatsAppApiResponse } from './whatsapp-api.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface WhatsAppAuthConfig {
   appId: string;
@@ -76,7 +77,7 @@ export class WhatsAppAuthService {
         where: {
           id: channelId,
           tenantId,
-          platform: 'whatsapp',
+          platformId: 'whatsapp',
         },
       });
 
@@ -112,8 +113,8 @@ export class WhatsAppAuthService {
       await this.channelRepository.update(
         { id: channelId, tenantId },
         {
-          configuration: secureCredentials,
-          status: 'active',
+          apiCredentials: secureCredentials as any,
+          status: ChannelStatus.ACTIVE,
           lastSyncAt: new Date(),
         },
       );
@@ -123,32 +124,30 @@ export class WhatsAppAuthService {
         {
           tenantId,
           channelId,
-          internalField: 'phone_number_id',
-          externalField: 'phone_number_id',
-          externalValue: credentials.phoneNumberId,
-          mappingType: 'identifier',
+          internalId: 'phone_number_id',
+          externalId: credentials.phoneNumberId,
+          mappingType: 'identifier' as any,
         },
-        ['tenantId', 'channelId', 'internalField'],
+        ['tenantId', 'channelId', 'internalId'],
       );
 
       await this.channelMappingRepository.upsert(
         {
           tenantId,
           channelId,
-          internalField: 'business_account_id',
-          externalField: 'business_account_id',
-          externalValue: credentials.businessAccountId,
-          mappingType: 'identifier',
+          internalId: 'business_account_id',
+          externalId: credentials.businessAccountId,
+          mappingType: 'identifier' as any,
         },
-        ['tenantId', 'channelId', 'internalField'],
+        ['tenantId', 'channelId', 'internalId'],
       );
 
       // Log successful credential storage
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'WhatsApp credentials stored successfully',
         metadata: {
           phoneNumberId: credentials.phoneNumberId,
@@ -177,7 +176,7 @@ export class WhatsAppAuthService {
       });
 
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'store_credentials',
+        metadata: { operation: 'store_credentials' },
       });
 
       return {
@@ -199,15 +198,15 @@ export class WhatsAppAuthService {
         where: {
           id: channelId,
           tenantId,
-          platform: 'whatsapp',
+          platformId: 'whatsapp',
         },
       });
 
-      if (!channel || !channel.configuration) {
+      if (!channel || !channel.apiCredentials) {
         return null;
       }
 
-      const credentials = channel.configuration as WhatsAppCredentials;
+      const credentials = channel.apiCredentials as any as WhatsAppCredentials;
 
       // Check if credentials are still valid (if we have expiration)
       if (credentials.expiresAt && credentials.expiresAt < new Date()) {
@@ -390,10 +389,10 @@ export class WhatsAppAuthService {
         await this.channelRepository.update(
           { id: channelId, tenantId },
           {
-            configuration: {
+            apiCredentials: {
               ...credentials,
               lastVerified: new Date(),
-            },
+            } as any,
             lastSyncAt: new Date(),
           },
         );
@@ -445,8 +444,8 @@ export class WhatsAppAuthService {
       await this.channelRepository.update(
         { id: channelId, tenantId },
         {
-          status: 'inactive',
-          configuration: null,
+          status: ChannelStatus.INACTIVE,
+          apiCredentials: null,
         },
       );
 
@@ -460,8 +459,8 @@ export class WhatsAppAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'WhatsApp authentication revoked',
         metadata: { reason: 'manual_revocation' },
       });
@@ -515,7 +514,7 @@ export class WhatsAppAuthService {
       await this.channelRepository.update(
         { id: channelId, tenantId },
         {
-          configuration: updatedCredentials,
+          apiCredentials: updatedCredentials as any,
         },
       );
 
@@ -523,8 +522,8 @@ export class WhatsAppAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: 'WhatsApp webhook URL updated',
         metadata: {
           webhookUrl,

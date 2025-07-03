@@ -5,11 +5,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { MokaApiService, MokaCredentials, MokaSale } from './moka-api.service';
 import { MokaAuthService } from './moka-auth.service';
-import { Order, OrderStatus } from '../../../orders/entities/order.entity';
-import { OrderItem } from '../../../orders/entities/order-item.entity';
+import { Order, OrderStatus, PaymentStatus } from '../../../orders/entities/order.entity';
+import { OrderItem } from '../../../orders/entities/order.entity';
 import { InventoryItem } from '../../../inventory/entities/inventory-item.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface SalesSyncOptions {
   fromDate?: Date;
@@ -307,8 +308,8 @@ export class MokaSalesService {
 
       await this.logService.log({
         tenantId,
-        type: 'INVENTORY',
-        level: 'INFO',
+        type: IntegrationLogType.INVENTORY,
+        level: IntegrationLogLevel.INFO,
         message: `Moka inventory sync completed: ${updatedCount} products updated`,
         metadata: {
           channelId,
@@ -413,16 +414,17 @@ export class MokaSalesService {
       taxAmount: mokaSale.tax_amount,
       discountAmount: mokaSale.discount_amount,
       shippingAmount: 0, // POS sales don't have shipping
-      netAmount: mokaSale.net_amount,
       currency: 'IDR',
       paymentMethod: mokaSale.payment_method,
-      paymentStatus: 'paid', // POS sales are always paid
+      paymentStatus: PaymentStatus.PAID, // POS sales are always paid
       createdAt: this.mokaApiService.parseDateTime(mokaSale.sale_date),
       orderDate: this.mokaApiService.parseDateTime(mokaSale.sale_date),
       
       // Customer information
       customerName: mokaSale.customer_name,
-      customerExternalId: mokaSale.customer_id,
+      customerInfo: {
+        id: mokaSale.customer_id,
+      },
       
       // Staff information
       channelMetadata: {
@@ -471,7 +473,7 @@ export class MokaSalesService {
         // Store Moka-specific data
         externalProductId: item.product_id,
         externalVariantId: item.variant_id,
-        metadata: {
+        externalData: {
           moka: {
             productId: item.product_id,
             variantId: item.variant_id,
@@ -525,8 +527,7 @@ export class MokaSalesService {
 
         // Deduct quantity
         inventoryItem.quantityOnHand -= item.quantity;
-        inventoryItem.quantityAvailable = Math.max(0, inventoryItem.quantityAvailable - item.quantity);
-        inventoryItem.lastMovementDate = this.mokaApiService.parseDateTime(mokaSale.sale_date);
+        inventoryItem.lastMovementAt = this.mokaApiService.parseDateTime(mokaSale.sale_date);
 
         await this.inventoryRepository.save(inventoryItem);
         hasUpdates = true;

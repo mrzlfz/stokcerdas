@@ -5,7 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LazadaApiService, LazadaConfig } from './lazada-api.service';
 import { LazadaAuthService } from './lazada-auth.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { Product } from '../../../products/entities/product.entity';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import { Product, ProductType, ProductStatus } from '../../../products/entities/product.entity';
 import { Channel } from '../../../channels/entities/channel.entity';
 
 export interface LazadaProduct {
@@ -165,7 +166,7 @@ export class LazadaProductService {
       }
 
       // Get products from Lazada
-      const result = await this.lazadaApi.makeRequest<{ products: LazadaProduct[]; total_products: number }>(
+      const result = await this.lazadaApi.makeLazadaRequest<{ products: LazadaProduct[]; total_products: number }>(
         tenantId,
         channelId,
         lazadaConfig,
@@ -207,7 +208,7 @@ export class LazadaProductService {
         tenantId,
         channelId,
         'lazada_products_inbound',
-        errorCount === 0 ? 'completed' : 'partial',
+        errorCount === 0 ? 'completed' : 'failed',
         `Product sync completed: ${syncedCount} synced, ${errorCount} errors`,
         {
           syncedCount,
@@ -321,7 +322,7 @@ export class LazadaProductService {
       };
 
       // Get product details from Lazada
-      const result = await this.lazadaApi.makeRequest<LazadaProduct>(
+      const result = await this.lazadaApi.makeLazadaRequest<LazadaProduct>(
         tenantId,
         channelId,
         lazadaConfig,
@@ -376,7 +377,7 @@ export class LazadaProductService {
       };
 
       // Upload images to Lazada
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,
@@ -400,8 +401,8 @@ export class LazadaProductService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYNC',
-        level: 'INFO',
+        type: IntegrationLogType.SYNC,
+        level: IntegrationLogLevel.INFO,
         message: `Lazada product images updated successfully`,
         metadata: { itemId, imageCount: images.length },
       });
@@ -456,8 +457,9 @@ export class LazadaProductService {
       name: lazadaProduct.attributes?.name || `Lazada Product ${lazadaProduct.item_id}`,
       description: lazadaProduct.short_description || '',
       sku: lazadaProduct.item_sku || `LAZ-${lazadaProduct.item_id}`,
-      status: lazadaProduct.status === 'active' ? 'active' : 'inactive',
-      category: lazadaProduct.primary_category?.toString(),
+      type: ProductType.SIMPLE,
+      status: lazadaProduct.status === 'active' ? ProductStatus.ACTIVE : ProductStatus.INACTIVE,
+      categoryId: lazadaProduct.primary_category?.toString(),
       // Add other fields as needed
     };
 
@@ -472,7 +474,7 @@ export class LazadaProductService {
     // Update local product with Lazada data
     localProduct.name = lazadaProduct.attributes?.name || localProduct.name;
     localProduct.description = lazadaProduct.short_description || localProduct.description;
-    localProduct.status = lazadaProduct.status === 'active' ? 'active' : 'inactive';
+    localProduct.status = lazadaProduct.status === 'active' ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
     
     await this.productRepository.save(localProduct);
   }
@@ -486,7 +488,7 @@ export class LazadaProductService {
     try {
       // Prepare product data for Lazada
       const createRequest: ProductCreateRequest = {
-        primary_category: parseInt(product.category || '1'),
+        primary_category: product.category?.id ? parseInt(product.category.id) : 1,
         attributes: {
           name: product.name,
           description: product.description,
@@ -501,7 +503,7 @@ export class LazadaProductService {
       };
 
       // Create product in Lazada
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,
@@ -565,7 +567,7 @@ export class LazadaProductService {
       };
 
       // Update product in Lazada
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,

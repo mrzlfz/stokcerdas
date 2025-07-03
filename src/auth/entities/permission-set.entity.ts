@@ -285,7 +285,7 @@ export class PermissionSet extends AuditableEntity {
     if (!allowedHours) return true;
     
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'lowercase' });
+    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase();
     const schedule = allowedHours[dayOfWeek];
     
     if (!schedule) return false;

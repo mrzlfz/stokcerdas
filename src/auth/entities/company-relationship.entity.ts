@@ -7,7 +7,7 @@ import {
   Index,
   Unique,
 } from 'typeorm';
-import { AuditableEntity } from '../../common/entities/auditable.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { Company } from './company.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -51,9 +51,7 @@ export enum TradingTerms {
 }
 
 @Entity('company_relationships')
-@Unique(['tenantId', 'fromCompanyId', 'toCompanyId', 'relationshipType'], {
-  where: 'is_deleted = false'
-})
+@Unique('unique_relationship', ['tenantId', 'fromCompanyId', 'toCompanyId', 'relationshipType'])
 @Index(['tenantId', 'isDeleted'])
 @Index(['tenantId', 'fromCompanyId'])
 @Index(['tenantId', 'toCompanyId'])
@@ -305,7 +303,7 @@ export class CompanyRelationship extends AuditableEntity {
   notes: string;
 
   // Helper methods
-  isActive(): boolean {
+  getIsActive(): boolean {
     return this.status === RelationshipStatus.ACTIVE && this.isActive;
   }
 
@@ -346,7 +344,7 @@ export class CompanyRelationship extends AuditableEntity {
   }
 
   canTransfer(): boolean {
-    return this.isActive() && this.allowsInterCompanyTransfers;
+    return this.getIsActive() && this.allowsInterCompanyTransfers;
   }
 
   requiresTransferApproval(amount?: number): boolean {

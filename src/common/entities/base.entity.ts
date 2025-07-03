@@ -1,1 +1,76 @@
-import {\n  PrimaryGeneratedColumn,\n  Column,\n  CreateDateColumn,\n  UpdateDateColumn,\n  BeforeInsert,\n  BeforeUpdate,\n} from 'typeorm';\nimport { Exclude } from 'class-transformer';\n\nexport abstract class BaseEntity {\n  @PrimaryGeneratedColumn('uuid')\n  id: string;\n\n  @Column({ type: 'uuid', name: 'tenant_id' })\n  @Exclude({ toPlainOnly: true }) // Hide tenant_id from API responses\n  tenantId: string;\n\n  @CreateDateColumn({\n    type: 'timestamp with time zone',\n    name: 'created_at',\n    default: () => 'CURRENT_TIMESTAMP',\n  })\n  createdAt: Date;\n\n  @UpdateDateColumn({\n    type: 'timestamp with time zone',\n    name: 'updated_at',\n    default: () => 'CURRENT_TIMESTAMP',\n  })\n  updatedAt: Date;\n\n  @Column({ type: 'uuid', name: 'created_by', nullable: true })\n  createdBy?: string;\n\n  @Column({ type: 'uuid', name: 'updated_by', nullable: true })\n  updatedBy?: string;\n\n  @BeforeInsert()\n  beforeInsert() {\n    this.createdAt = new Date();\n    this.updatedAt = new Date();\n  }\n\n  @BeforeUpdate()\n  beforeUpdate() {\n    this.updatedAt = new Date();\n  }\n}\n\n// Audit entity for tracking changes\nexport abstract class AuditableEntity extends BaseEntity {\n  @Column({ type: 'boolean', default: false, name: 'is_deleted' })\n  @Exclude({ toPlainOnly: true })\n  isDeleted: boolean;\n\n  @Column({ type: 'timestamp with time zone', name: 'deleted_at', nullable: true })\n  @Exclude({ toPlainOnly: true })\n  deletedAt?: Date;\n\n  @Column({ type: 'uuid', name: 'deleted_by', nullable: true })\n  @Exclude({ toPlainOnly: true })\n  deletedBy?: string;\n\n  softDelete(deletedBy?: string) {\n    this.isDeleted = true;\n    this.deletedAt = new Date();\n    this.deletedBy = deletedBy;\n  }\n\n  restore() {\n    this.isDeleted = false;\n    this.deletedAt = null;\n    this.deletedBy = null;\n  }\n}"
+import {
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  BeforeInsert,
+  BeforeUpdate,
+} from 'typeorm';
+import { Exclude } from 'class-transformer';
+
+export abstract class BaseEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'uuid', name: 'tenant_id' })
+  @Exclude({ toPlainOnly: true }) // Hide tenant_id from API responses
+  tenantId: string;
+
+  @CreateDateColumn({
+    type: 'timestamp with time zone',
+    name: 'created_at',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  createdAt: Date;
+
+  @UpdateDateColumn({
+    type: 'timestamp with time zone',
+    name: 'updated_at',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  updatedAt: Date;
+
+  @Column({ type: 'uuid', name: 'created_by', nullable: true })
+  createdBy?: string;
+
+  @Column({ type: 'uuid', name: 'updated_by', nullable: true })
+  updatedBy?: string;
+
+  @BeforeInsert()
+  beforeInsert() {
+    this.createdAt = new Date();
+    this.updatedAt = new Date();
+  }
+
+  @BeforeUpdate()
+  beforeUpdate() {
+    this.updatedAt = new Date();
+  }
+}
+
+// Audit entity for tracking changes
+export abstract class AuditableEntity extends BaseEntity {
+  @Column({ type: 'boolean', default: false, name: 'is_deleted' })
+  @Exclude({ toPlainOnly: true })
+  isDeleted: boolean;
+
+  @Column({ type: 'timestamp with time zone', name: 'deleted_at', nullable: true })
+  @Exclude({ toPlainOnly: true })
+  deletedAt?: Date;
+
+  @Column({ type: 'uuid', name: 'deleted_by', nullable: true })
+  @Exclude({ toPlainOnly: true })
+  deletedBy?: string;
+
+  softDelete(deletedBy?: string) {
+    this.isDeleted = true;
+    this.deletedAt = new Date();
+    this.deletedBy = deletedBy;
+  }
+
+  restore() {
+    this.isDeleted = false;
+    this.deletedAt = null;
+    this.deletedBy = null;
+  }
+}

@@ -259,15 +259,15 @@ export class ReorderRule extends AuditableEntity {
   pauseReason?: string;
 
   // Relations
-  @ManyToOne(() => Product, product => product.reorderRules)
+  @ManyToOne(() => Product)
   @JoinColumn({ name: 'productId' })
   product: Product;
 
-  @ManyToOne(() => InventoryLocation, location => location.reorderRules, { nullable: true })
+  @ManyToOne(() => InventoryLocation, { nullable: true })
   @JoinColumn({ name: 'locationId' })
   location?: InventoryLocation;
 
-  @ManyToOne(() => Supplier, supplier => supplier.reorderRules, { nullable: true })
+  @ManyToOne(() => Supplier, { nullable: true })
   @JoinColumn({ name: 'primarySupplierId' })
   primarySupplier?: Supplier;
 

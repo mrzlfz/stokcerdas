@@ -26,6 +26,7 @@ import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
+import { UserRole } from '../../../users/entities/user.entity';
 
 import { TokopediaAuthService, TokopediaAuthConfig } from '../services/tokopedia-auth.service';
 import { TokopediaProductService, ProductSyncOptions } from '../services/tokopedia-product.service';
@@ -125,7 +126,7 @@ export class TokopediaController {
   // Authentication endpoints
 
   @Get('auth/url/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get Tokopedia authorization URL' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authorization URL generated successfully' })
@@ -158,7 +159,7 @@ export class TokopediaController {
   }
 
   @Post('auth/token/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Exchange authorization code for access token' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiBody({
@@ -206,7 +207,7 @@ export class TokopediaController {
   }
 
   @Post('auth/refresh/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Access token refreshed successfully' })
@@ -240,7 +241,7 @@ export class TokopediaController {
   }
 
   @Get('auth/status/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get authentication status' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authentication status retrieved successfully' })
@@ -271,7 +272,7 @@ export class TokopediaController {
   }
 
   @Post('auth/test/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test authentication with current credentials' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Authentication tested successfully' })
@@ -302,7 +303,7 @@ export class TokopediaController {
   }
 
   @Delete('auth/revoke/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
@@ -333,7 +334,7 @@ export class TokopediaController {
   }
 
   @Post('auth/tiktok-migrate/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Migrate to TikTok Shop authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiBody({
@@ -378,7 +379,7 @@ export class TokopediaController {
   // Product endpoints
 
   @Post('products/sync/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync products from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Product sync initiated successfully' })
@@ -435,7 +436,7 @@ export class TokopediaController {
   }
 
   @Post('products/sync/:channelId/:productId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync single product to Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'productId', description: 'Product ID' })
@@ -469,7 +470,7 @@ export class TokopediaController {
   }
 
   @Get('products/:channelId/:productId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Tokopedia product details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'productId', description: 'Tokopedia Product ID' })
@@ -505,7 +506,7 @@ export class TokopediaController {
   // Order endpoints
 
   @Post('orders/sync/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync orders from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Order sync initiated successfully' })
@@ -561,7 +562,7 @@ export class TokopediaController {
   }
 
   @Get('orders/:channelId/:orderId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Tokopedia order details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'orderId', description: 'Tokopedia Order ID' })
@@ -595,7 +596,7 @@ export class TokopediaController {
   }
 
   @Post('orders/ship/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Ship Tokopedia order items' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Order shipped successfully' })
@@ -628,7 +629,7 @@ export class TokopediaController {
   }
 
   @Post('orders/cancel/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Cancel Tokopedia order items' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Order cancelled successfully' })
@@ -664,7 +665,7 @@ export class TokopediaController {
   // Inventory endpoints
 
   @Post('inventory/sync/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync inventory from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Inventory sync initiated successfully' })
@@ -699,7 +700,7 @@ export class TokopediaController {
   }
 
   @Put('inventory/stock/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Update stock in Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Stock updated successfully' })
@@ -732,7 +733,7 @@ export class TokopediaController {
   }
 
   @Put('inventory/prices/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Update prices in Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Prices updated successfully' })
@@ -765,7 +766,7 @@ export class TokopediaController {
   }
 
   @Get('inventory/stock/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get stock levels from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiQuery({ name: 'skus', description: 'Comma-separated product SKUs' })
@@ -801,7 +802,7 @@ export class TokopediaController {
   }
 
   @Get('inventory/prices/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get price information from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiQuery({ name: 'skus', description: 'Comma-separated product SKUs' })

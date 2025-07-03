@@ -6,7 +6,7 @@ import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import * as moment from 'moment-timezone';
 
-import { MLModel, ModelType } from '../entities/ml-model.entity';
+import { MLModel, ModelType, ModelStatus } from '../entities/ml-model.entity';
 import { Prediction, PredictionType } from '../entities/prediction.entity';
 import { Product } from '../../products/entities/product.entity';
 import { ProductCategory } from '../../products/entities/product-category.entity';
@@ -405,7 +405,7 @@ export class ForecastingService {
     return await this.mlModelRepo.findOne({
       where: {
         tenantId,
-        status: 'deployed',
+        status: ModelStatus.DEPLOYED,
         modelType: ModelType.PROPHET, // Prefer Prophet for time series forecasting
       },
       order: { accuracy: 'DESC' },

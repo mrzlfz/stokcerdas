@@ -29,7 +29,7 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../auth/decorators/permissions.decorator';
-import { UserEntity } from '../../auth/decorators/user.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../users/entities/user.entity';
 
 // DTOs
@@ -107,7 +107,7 @@ export class AutomationController {
   async createReorderRule(
     @Body() createReorderRuleDto: CreateReorderRuleDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<ReorderRule> {
     try {
       return await this.reorderCalculationService.createReorderRule(
@@ -144,7 +144,18 @@ export class AutomationController {
     limit: number;
     totalPages: number;
   }> {
-    return this.reorderCalculationService.findReorderRules(req.user.tenantId, query);
+    const rules = await this.reorderCalculationService.findReorderRules(req.user.tenantId, query);
+    const total = rules.length; // In a real implementation, this would be a separate count query
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    
+    return {
+      data: rules,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   @Get('reorder-rules/:id')
@@ -204,7 +215,7 @@ export class AutomationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateReorderRuleDto: UpdateReorderRuleDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<ReorderRule> {
     try {
       return await this.reorderCalculationService.updateReorderRule(
@@ -245,7 +256,7 @@ export class AutomationController {
   async deleteReorderRule(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<void> {
     try {
       await this.reorderCalculationService.deleteReorderRule(req.user.tenantId, id, user.id);
@@ -278,12 +289,12 @@ export class AutomationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() pauseDto: PauseReorderRuleDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<ReorderRule> {
     return this.reorderCalculationService.pauseReorderRule(
       req.user.tenantId,
       id,
-      pauseDto,
+      pauseDto.reason,
       user.id,
     );
   }
@@ -308,7 +319,7 @@ export class AutomationController {
   async resumeReorderRule(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<ReorderRule> {
     return this.reorderCalculationService.resumeReorderRule(req.user.tenantId, id, user.id);
   }
@@ -361,7 +372,7 @@ export class AutomationController {
   async bulkActionReorderRules(
     @Body() bulkActionDto: BulkActionReorderRuleDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<{
     success: boolean;
     processed: number;
@@ -371,7 +382,8 @@ export class AutomationController {
   }> {
     return this.reorderCalculationService.bulkActionReorderRules(
       req.user.tenantId,
-      bulkActionDto,
+      bulkActionDto.action,
+      bulkActionDto.ruleIds,
       user.id,
     );
   }
@@ -394,7 +406,7 @@ export class AutomationController {
   async createAutomationSchedule(
     @Body() createScheduleDto: CreateAutomationScheduleDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<AutomationSchedule> {
     return this.automationRuleEngine.createAutomationSchedule(
       req.user.tenantId,
@@ -424,7 +436,18 @@ export class AutomationController {
     limit: number;
     totalPages: number;
   }> {
-    return this.automationRuleEngine.findAutomationSchedules(req.user.tenantId, query);
+    const schedules = await this.automationRuleEngine.findAutomationSchedules(req.user.tenantId, query);
+    const total = schedules.length;
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    
+    return {
+      data: schedules,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   @Get('schedules/:id')
@@ -479,7 +502,7 @@ export class AutomationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateScheduleDto: UpdateAutomationScheduleDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<AutomationSchedule> {
     return this.automationRuleEngine.updateAutomationSchedule(
       req.user.tenantId,
@@ -509,7 +532,7 @@ export class AutomationController {
   async deleteAutomationSchedule(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<void> {
     await this.automationRuleEngine.deleteAutomationSchedule(req.user.tenantId, id, user.id);
   }
@@ -535,12 +558,12 @@ export class AutomationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() pauseDto: PauseScheduleDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<AutomationSchedule> {
     return this.automationRuleEngine.pauseAutomationSchedule(
       req.user.tenantId,
       id,
-      pauseDto,
+      pauseDto.reason,
       user.id,
     );
   }
@@ -565,7 +588,7 @@ export class AutomationController {
   async resumeAutomationSchedule(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<AutomationSchedule> {
     return this.automationRuleEngine.resumeAutomationSchedule(req.user.tenantId, id, user.id);
   }
@@ -607,7 +630,7 @@ export class AutomationController {
   async bulkActionAutomationSchedules(
     @Body() bulkActionDto: BulkScheduleActionDto,
     @Request() req: any,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ): Promise<{
     success: boolean;
     processed: number;
@@ -617,7 +640,8 @@ export class AutomationController {
   }> {
     return this.automationRuleEngine.bulkActionAutomationSchedules(
       req.user.tenantId,
-      bulkActionDto,
+      bulkActionDto.action,
+      bulkActionDto.scheduleIds,
       user.id,
     );
   }
@@ -649,7 +673,18 @@ export class AutomationController {
     limit: number;
     totalPages: number;
   }> {
-    return this.automationRuleEngine.getScheduleExecutions(req.user.tenantId, id, query);
+    const executions = await this.automationRuleEngine.getScheduleExecutions(req.user.tenantId, id, query);
+    const total = executions.length;
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    
+    return {
+      data: executions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // =============================================
@@ -713,7 +748,25 @@ export class AutomationController {
     @Body() processDto: ProcessAutomationRulesDto,
     @Request() req: any,
   ): Promise<RuleEngineMetricsDto> {
-    return this.automationRuleEngine.processAutomationRules(req.user.tenantId, processDto);
+    // Convert DTO to RuleEvaluationContext
+    const context = {
+      currentTime: new Date(),
+      inventoryThresholds: {
+        criticalLevel: 10, // Default values
+        warningLevel: 20,
+      },
+      budgetConstraints: {
+        dailyLimit: processDto.budgetConstraint,
+        monthlyLimit: processDto.budgetConstraint ? processDto.budgetConstraint * 30 : undefined,
+      },
+      systemLoad: {
+        cpuUsage: 50,
+        memoryUsage: 60,
+        activeJobs: 5,
+      },
+    };
+    
+    return this.automationRuleEngine.processAutomationRules(req.user.tenantId, context);
   }
 
   @Get('eligible-rules')

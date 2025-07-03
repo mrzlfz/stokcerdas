@@ -30,6 +30,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { UserRole } from '../../users/entities/user.entity';
 
 import { WebhookHandlerService } from '../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../common/services/integration-log.service';
@@ -214,7 +215,7 @@ export class WebhookController {
 
   @Get('events')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get webhook events' })
   @ApiQuery({ name: 'channelId', required: false })
@@ -262,7 +263,7 @@ export class WebhookController {
 
   @Get('stats')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get webhook statistics' })
   @ApiQuery({ name: 'channelId', required: false })
@@ -304,7 +305,7 @@ export class WebhookController {
 
   @Post('test')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Test webhook signature verification' })
   @ApiResponse({ status: 201, description: 'Webhook signature tested successfully' })
@@ -313,10 +314,18 @@ export class WebhookController {
     @Body() dto: WebhookTestDto,
   ) {
     try {
+      const webhookConfig = {
+        platform: dto.platform || 'generic',
+        signatureHeader: dto.signature,
+        secretKey: dto.secretKey,
+        signatureAlgorithm: 'sha256' as const,
+        signatureFormat: 'hex' as const,
+      };
+      
       const verified = this.webhookHandler.verifyWebhookSignature(
         dto.payload ? JSON.stringify(dto.payload) : '',
         dto.signature,
-        dto.secretKey,
+        webhookConfig,
       );
 
       await this.logService.logWebhook(
@@ -354,7 +363,7 @@ export class WebhookController {
 
   @Put('events/:webhookId/retry')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Retry failed webhook event' })
   @ApiParam({ name: 'webhookId', description: 'Webhook event ID' })
@@ -385,7 +394,7 @@ export class WebhookController {
 
   @Delete('events/cleanup')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
-  @Roles('admin')
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Clean up old webhook events' })
   @ApiQuery({ name: 'olderThanDays', required: false, type: Number })

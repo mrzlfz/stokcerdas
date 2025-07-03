@@ -101,6 +101,12 @@ export class MLModel extends BaseEntity {
   @Column({ type: 'decimal', precision: 5, scale: 4, default: 0.85 })
   accuracyThreshold: number; // Minimum accuracy for deployment
 
+  @Column({ type: 'decimal', precision: 5, scale: 4, nullable: true })
+  accuracy?: number; // Current model accuracy
+
+  @Column({ type: 'decimal', precision: 5, scale: 4, nullable: true })
+  dataQuality?: number; // Data quality score
+
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
@@ -143,11 +149,11 @@ export class MLModel extends BaseEntity {
   metadata?: Record<string, any>; // Additional model-specific data
 
   // Relations
-  @OneToMany(() => TrainingJob, job => job.model)
-  trainingJobs?: TrainingJob[];
+  // @OneToMany(() => TrainingJob, job => job.model)
+  // trainingJobs?: TrainingJob[];
 
-  @OneToMany(() => Prediction, prediction => prediction.model)
-  predictions?: Prediction[];
+  // @OneToMany(() => Prediction, prediction => prediction.model)
+  // predictions?: Prediction[];
 
   // Virtual fields
   get isDeployed(): boolean {

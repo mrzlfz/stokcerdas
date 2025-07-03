@@ -1,1 +1,89 @@
-import { Repository, SelectQueryBuilder, FindManyOptions, FindOneOptions } from 'typeorm';\nimport { BaseEntity } from '../entities/base.entity';\n\nexport class BaseRepository<T extends BaseEntity> extends Repository<T> {\n  private tenantId: string;\n\n  setTenantId(tenantId: string) {\n    this.tenantId = tenantId;\n  }\n\n  // Override find methods to add tenant filter\n  find(options?: FindManyOptions<T>): Promise<T[]> {\n    return super.find(this.addTenantFilter(options));\n  }\n\n  findOne(options: FindOneOptions<T>): Promise<T | null> {\n    return super.findOne(this.addTenantFilter(options));\n  }\n\n  findOneBy(where: any): Promise<T | null> {\n    return super.findOneBy(this.addTenantToWhere(where));\n  }\n\n  findBy(where: any): Promise<T[]> {\n    return super.findBy(this.addTenantToWhere(where));\n  }\n\n  count(options?: FindManyOptions<T>): Promise<number> {\n    return super.count(this.addTenantFilter(options));\n  }\n\n  // Override query builder to add tenant filter\n  createQueryBuilder(alias?: string): SelectQueryBuilder<T> {\n    const qb = super.createQueryBuilder(alias);\n    if (this.tenantId && alias) {\n      qb.andWhere(`${alias}.tenant_id = :tenantId`, { tenantId: this.tenantId });\n    }\n    return qb;\n  }\n\n  // Helper method to create a query builder with tenant filter\n  createTenantQueryBuilder(alias: string, tenantId: string): SelectQueryBuilder<T> {\n    return super.createQueryBuilder(alias)\n      .andWhere(`${alias}.tenant_id = :tenantId`, { tenantId });\n  }\n\n  // Override save to add tenant ID\n  async save<Entity extends T>(entity: Entity): Promise<Entity>;\n  async save<Entity extends T>(entities: Entity[]): Promise<Entity[]>;\n  async save<Entity extends T>(entityOrEntities: Entity | Entity[]): Promise<Entity | Entity[]> {\n    if (Array.isArray(entityOrEntities)) {\n      entityOrEntities.forEach(entity => {\n        if (!entity.tenantId && this.tenantId) {\n          entity.tenantId = this.tenantId;\n        }\n      });\n    } else {\n      if (!entityOrEntities.tenantId && this.tenantId) {\n        entityOrEntities.tenantId = this.tenantId;\n      }\n    }\n    return super.save(entityOrEntities as any);\n  }\n\n  private addTenantFilter(options?: FindManyOptions<T> | FindOneOptions<T>) {\n    if (!this.tenantId) {\n      return options;\n    }\n\n    return {\n      ...options,\n      where: this.addTenantToWhere(options?.where),\n    };\n  }\n\n  private addTenantToWhere(where: any) {\n    if (!this.tenantId) {\n      return where;\n    }\n\n    if (Array.isArray(where)) {\n      return where.map(w => ({ ...w, tenantId: this.tenantId }));\n    } else if (where && typeof where === 'object') {\n      return { ...where, tenantId: this.tenantId };\n    } else {\n      return { tenantId: this.tenantId };\n    }\n  }\n}"
+import { Repository, SelectQueryBuilder, FindManyOptions, FindOneOptions } from 'typeorm';
+import { BaseEntity } from '../entities/base.entity';
+
+export class BaseRepository<T extends BaseEntity> extends Repository<T> {
+  private tenantId: string;
+
+  setTenantId(tenantId: string) {
+    this.tenantId = tenantId;
+  }
+
+  // Override find methods to add tenant filter
+  find(options?: FindManyOptions<T>): Promise<T[]> {
+    return super.find(this.addTenantFilter(options));
+  }
+
+  findOne(options: FindOneOptions<T>): Promise<T | null> {
+    return super.findOne(this.addTenantFilter(options));
+  }
+
+  findOneBy(where: any): Promise<T | null> {
+    return super.findOneBy(this.addTenantToWhere(where));
+  }
+
+  findBy(where: any): Promise<T[]> {
+    return super.findBy(this.addTenantToWhere(where));
+  }
+
+  count(options?: FindManyOptions<T>): Promise<number> {
+    return super.count(this.addTenantFilter(options));
+  }
+
+  // Override query builder to add tenant filter
+  createQueryBuilder(alias?: string): SelectQueryBuilder<T> {
+    const qb = super.createQueryBuilder(alias);
+    if (this.tenantId && alias) {
+      qb.andWhere(`${alias}.tenant_id = :tenantId`, { tenantId: this.tenantId });
+    }
+    return qb;
+  }
+
+  // Helper method to create a query builder with tenant filter
+  createTenantQueryBuilder(alias: string, tenantId: string): SelectQueryBuilder<T> {
+    return super.createQueryBuilder(alias)
+      .andWhere(`${alias}.tenant_id = :tenantId`, { tenantId });
+  }
+
+  // Override save to add tenant ID
+  async save<Entity extends T>(entity: Entity): Promise<Entity>;
+  async save<Entity extends T>(entities: Entity[]): Promise<Entity[]>;
+  async save<Entity extends T>(entityOrEntities: Entity | Entity[]): Promise<Entity | Entity[]> {
+    if (Array.isArray(entityOrEntities)) {
+      entityOrEntities.forEach(entity => {
+        if (!entity.tenantId && this.tenantId) {
+          entity.tenantId = this.tenantId;
+        }
+      });
+    } else {
+      if (!entityOrEntities.tenantId && this.tenantId) {
+        entityOrEntities.tenantId = this.tenantId;
+      }
+    }
+    return super.save(entityOrEntities as any);
+  }
+
+  private addTenantFilter(options?: FindManyOptions<T> | FindOneOptions<T>) {
+    if (!this.tenantId) {
+      return options;
+    }
+
+    return {
+      ...options,
+      where: this.addTenantToWhere(options?.where),
+    };
+  }
+
+  private addTenantToWhere(where: any) {
+    if (!this.tenantId) {
+      return where;
+    }
+
+    if (Array.isArray(where)) {
+      return where.map(w => ({ ...w, tenantId: this.tenantId }));
+    } else if (where && typeof where === 'object') {
+      return { ...where, tenantId: this.tenantId };
+    } else {
+      return { tenantId: this.tenantId };
+    }
+  }
+}

@@ -6,7 +6,7 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { InventoryLocation } from '../entities/inventory-location.entity';
 import { Product } from '../../products/entities/product.entity';
 import { CreateInventoryItemDto } from '../dto/create-inventory-item.dto';
-import { InventoryQueryDto } from '../dto/inventory-query.dto';
+import { InventoryQueryDto, SortOrder } from '../dto/inventory-query.dto';
 import { StockAdjustmentDto, BulkStockAdjustmentDto, AdjustmentType } from '../dto/stock-adjustment.dto';
 
 import { InventoryTransactionsService } from './inventory-transactions.service';
@@ -115,7 +115,7 @@ export class InventoryItemsService {
       lotNumber,
       batchNumber,
       sortBy = 'product.name',
-      sortOrder = 'ASC',
+      sortOrder = SortOrder.ASC,
       page = 1,
       limit = 20,
     } = query;
@@ -213,9 +213,9 @@ export class InventoryItemsService {
           '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated)',
           'quantityAvailable'
         );
-        queryBuilder.orderBy('quantityAvailable', sortOrder as 'ASC' | 'DESC');
+        queryBuilder.orderBy('quantityAvailable', sortOrder);
       } else {
-        queryBuilder.orderBy(sortBy, sortOrder as 'ASC' | 'DESC');
+        queryBuilder.orderBy(sortBy, sortOrder);
       }
     }
 
@@ -640,5 +640,28 @@ export class InventoryItemsService {
     }
 
     return location;
+  }
+
+  // Alias methods for workflow execution compatibility
+  async getInventoryByProduct(
+    tenantId: string,
+    productId: string,
+    locationId?: string,
+  ): Promise<InventoryItem | null> {
+    if (locationId) {
+      return this.findByProductAndLocation(tenantId, productId, locationId);
+    }
+    
+    // If no locationId provided, find first available inventory for this product
+    const items = await this.findAll(tenantId, { productId, limit: 1 });
+    return items.data.length > 0 ? items.data[0] : null;
+  }
+
+  async createInventoryAdjustment(
+    tenantId: string,
+    adjustmentData: StockAdjustmentDto,
+    userId: string,
+  ): Promise<InventoryItem> {
+    return this.adjustStock(tenantId, adjustmentData, userId);
   }
 }

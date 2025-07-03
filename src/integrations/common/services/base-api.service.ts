@@ -264,7 +264,7 @@ export class BaseApiService {
 
   // Private methods
 
-  private generateRequestId(): string {
+  protected generateRequestId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
@@ -463,7 +463,7 @@ export class BaseApiService {
     });
   }
 
-  private sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
+  protected sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
     const sanitized = { ...headers };
     
     // Remove sensitive headers

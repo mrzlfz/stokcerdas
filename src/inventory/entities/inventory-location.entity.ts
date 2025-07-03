@@ -122,14 +122,14 @@ export class InventoryLocation extends BaseEntity {
   @OneToMany(() => InventoryLocation, location => location.parent)
   children?: InventoryLocation[];
 
-  @OneToMany(() => InventoryItem, item => item.location)
-  inventoryItems?: InventoryItem[];
+  // @OneToMany(() => InventoryItem, item => item.location)
+  // inventoryItems?: InventoryItem[];
 
-  @OneToMany(() => InventoryTransaction, transaction => transaction.location)
-  transactions?: InventoryTransaction[];
+  // @OneToMany(() => InventoryTransaction, transaction => transaction.location)
+  // transactions?: InventoryTransaction[];
 
-  @OneToMany(() => ReorderRule, rule => rule.location)
-  reorderRules?: ReorderRule[];
+  // @OneToMany(() => ReorderRule, rule => rule.location)
+  // reorderRules?: ReorderRule[];
 
   // Virtual fields
   get isActive(): boolean {
@@ -155,8 +155,8 @@ export class InventoryLocation extends BaseEntity {
     if (!this.operatingHours) return true;
     
     const now = new Date();
-    const dayName = now.toLocaleLowerCase()
-      .toLocaleDateString('en-US', { weekday: 'long' }) as keyof typeof this.operatingHours;
+    const dayName = now
+      .toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as keyof typeof this.operatingHours;
     
     const todayHours = this.operatingHours[dayName];
     if (!todayHours) return false;

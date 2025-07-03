@@ -19,6 +19,7 @@ import {
   ApiBody,
   ApiQuery,
   ApiParam,
+  ApiProperty,
 } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsDateString, IsArray, IsObject, IsNumber, Min, Max } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -28,102 +29,103 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { GetTenant } from '../../common/decorators/tenant.decorator';
 import { GetUser } from '../../common/decorators/user.decorator';
+import { UserRole } from '../../users/entities/user.entity';
 
 import { ModelTrainingService, TrainingRequest } from '../services/model-training.service';
 import { ModelType } from '../entities/ml-model.entity';
 
 // DTOs
 class StartTrainingDto {
-  @ApiOperation({ description: 'Model name' })
+  @ApiProperty({ description: 'Model name' })
   @IsString()
   modelName: string;
 
-  @ApiOperation({ description: 'Model type to train' })
+  @ApiProperty({ description: 'Model type to train' })
   @IsEnum(ModelType)
   modelType: ModelType;
 
-  @ApiOperation({ description: 'Product ID for product-specific models (optional)' })
+  @ApiProperty({ description: 'Product ID for product-specific models (optional)' })
   @IsOptional()
   @IsString()
   productId?: string;
 
-  @ApiOperation({ description: 'Category ID for category-level models (optional)' })
+  @ApiProperty({ description: 'Category ID for category-level models (optional)' })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiOperation({ description: 'Location ID for location-specific models (optional)' })
+  @ApiProperty({ description: 'Location ID for location-specific models (optional)' })
   @IsOptional()
   @IsString()
   locationId?: string;
 
-  @ApiOperation({ description: 'Training data start date' })
+  @ApiProperty({ description: 'Training data start date' })
   @IsDateString()
   trainingDataFrom: string;
 
-  @ApiOperation({ description: 'Training data end date' })
+  @ApiProperty({ description: 'Training data end date' })
   @IsDateString()
   trainingDataTo: string;
 
-  @ApiOperation({ description: 'Product IDs to include in training (optional)' })
+  @ApiProperty({ description: 'Product IDs to include in training (optional)' })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   productIds?: string[];
 
-  @ApiOperation({ description: 'Category IDs to include in training (optional)' })
+  @ApiProperty({ description: 'Category IDs to include in training (optional)' })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   categoryIds?: string[];
 
-  @ApiOperation({ description: 'Location IDs to include in training (optional)' })
+  @ApiProperty({ description: 'Location IDs to include in training (optional)' })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   locationIds?: string[];
 
-  @ApiOperation({ description: 'Validation split ratio (0.1-0.9)' })
+  @ApiProperty({ description: 'Validation split ratio (0.1-0.9)' })
   @IsNumber()
   @Min(0.1)
   @Max(0.9)
   validationSplit: number = 0.8;
 
-  @ApiOperation({ description: 'Validation method' })
+  @ApiProperty({ description: 'Validation method' })
   @IsEnum(['time_series', 'random'])
   validationMethod: 'time_series' | 'random' = 'time_series';
 
-  @ApiOperation({ description: 'Feature list for training' })
+  @ApiProperty({ description: 'Feature list for training' })
   @IsArray()
   @IsString({ each: true })
   features: string[];
 
-  @ApiOperation({ description: 'Target variable for prediction' })
+  @ApiProperty({ description: 'Target variable for prediction' })
   @IsString()
   target: string;
 
-  @ApiOperation({ description: 'Model hyperparameters' })
+  @ApiProperty({ description: 'Model hyperparameters' })
   @IsObject()
   hyperparameters: Record<string, any>;
 }
 
 class RetrainModelDto {
-  @ApiOperation({ description: 'New training data start date (optional)' })
+  @ApiProperty({ description: 'New training data start date (optional)' })
   @IsOptional()
   @IsDateString()
   trainingDataFrom?: string;
 
-  @ApiOperation({ description: 'New training data end date (optional)' })
+  @ApiProperty({ description: 'New training data end date (optional)' })
   @IsOptional()
   @IsDateString()
   trainingDataTo?: string;
 
-  @ApiOperation({ description: 'Updated hyperparameters (optional)' })
+  @ApiProperty({ description: 'Updated hyperparameters (optional)' })
   @IsOptional()
   @IsObject()
   hyperparameters?: Record<string, any>;
 
-  @ApiOperation({ description: 'Updated feature list (optional)' })
+  @ApiProperty({ description: 'Updated feature list (optional)' })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -131,17 +133,17 @@ class RetrainModelDto {
 }
 
 class TrainingJobQueryDto {
-  @ApiOperation({ description: 'Filter by model ID' })
+  @ApiProperty({ description: 'Filter by model ID' })
   @IsOptional()
   @IsString()
   modelId?: string;
 
-  @ApiOperation({ description: 'Filter by job status' })
+  @ApiProperty({ description: 'Filter by job status' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiOperation({ description: 'Number of results to return' })
+  @ApiProperty({ description: 'Number of results to return' })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
@@ -149,7 +151,7 @@ class TrainingJobQueryDto {
   @Max(100)
   limit?: number = 20;
 
-  @ApiOperation({ description: 'Number of results to skip' })
+  @ApiProperty({ description: 'Number of results to skip' })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
@@ -167,7 +169,7 @@ export class MLTrainingController {
   ) {}
 
   @Post('start')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Start Model Training',
@@ -262,7 +264,7 @@ export class MLTrainingController {
   }
 
   @Post(':modelId/retrain')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Retrain Existing Model',
@@ -299,7 +301,7 @@ export class MLTrainingController {
   }
 
   @Get('jobs')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get Training Jobs',
     description: 'Retrieve list of training jobs with their status',
@@ -373,7 +375,7 @@ export class MLTrainingController {
   }
 
   @Get('jobs/:jobId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get Training Job Details',
     description: 'Retrieve detailed information about a specific training job',
@@ -417,7 +419,7 @@ export class MLTrainingController {
   }
 
   @Post('jobs/:jobId/cancel')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Cancel Training Job',
@@ -454,7 +456,7 @@ export class MLTrainingController {
   }
 
   @Get('models')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get Trained Models',
     description: 'Retrieve list of trained ML models',
@@ -506,7 +508,7 @@ export class MLTrainingController {
   }
 
   @Get('models/:modelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get Model Details',
     description: 'Retrieve detailed information about a specific ML model',
@@ -552,7 +554,7 @@ export class MLTrainingController {
   }
 
   @Post('models/:modelId/deploy')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Deploy Model',
@@ -588,7 +590,7 @@ export class MLTrainingController {
   }
 
   @Post('models/:modelId/deprecate')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Deprecate Model',

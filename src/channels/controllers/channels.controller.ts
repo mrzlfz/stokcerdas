@@ -44,6 +44,7 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
 import { ChannelType, ChannelStatus, SyncStrategy } from '../entities/channel.entity';
+import { UserRole } from '../../users/entities/user.entity';
 
 // Services
 import { ChannelsService } from '../services/channels.service';
@@ -318,7 +319,7 @@ export class ChannelsController {
   @ApiQuery({ name: 'limit', type: 'number', required: false })
   @ApiQuery({ name: 'offset', type: 'number', required: false })
   @ApiQuery({ name: 'includeMetrics', type: 'boolean', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getChannels(
     @CurrentUser() user: any,
     @Query() query: ChannelsQueryDto,
@@ -351,7 +352,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Get channel by ID' })
   @ApiResponse({ status: 200, description: 'Channel retrieved successfully' })
   @ApiParam({ name: 'channelId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getChannelById(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -378,7 +379,7 @@ export class ChannelsController {
   @Post()
   @ApiOperation({ summary: 'Create new channel' })
   @ApiResponse({ status: 201, description: 'Channel created successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createChannel(
     @CurrentUser() user: any,
     @Body() createDto: CreateChannelDto,
@@ -406,7 +407,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Update channel' })
   @ApiResponse({ status: 200, description: 'Channel updated successfully' })
   @ApiParam({ name: 'channelId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateChannel(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -439,7 +440,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Delete channel' })
   @ApiResponse({ status: 200, description: 'Channel deleted successfully' })
   @ApiParam({ name: 'channelId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async deleteChannel(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -467,7 +468,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Test channel connection' })
   @ApiResponse({ status: 200, description: 'Connection test completed' })
   @ApiParam({ name: 'channelId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async testConnection(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -498,7 +499,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Update channel credentials' })
   @ApiResponse({ status: 200, description: 'Credentials updated successfully' })
   @ApiParam({ name: 'channelId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateCredentials(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -534,7 +535,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Get channels by platform' })
   @ApiResponse({ status: 200, description: 'Platform channels retrieved successfully' })
   @ApiParam({ name: 'platformId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getChannelsByPlatform(
     @CurrentUser() user: any,
     @Param('platformId') platformId: string,
@@ -564,7 +565,7 @@ export class ChannelsController {
   @Get('status/active')
   @ApiOperation({ summary: 'Get all active channels' })
   @ApiResponse({ status: 200, description: 'Active channels retrieved successfully' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getActiveChannels(
     @CurrentUser() user: any,
   ) {
@@ -590,7 +591,7 @@ export class ChannelsController {
   @Post('sync')
   @ApiOperation({ summary: 'Start channel synchronization' })
   @ApiResponse({ status: 200, description: 'Sync started successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async startSync(
     @CurrentUser() user: any,
     @Body() syncDto: ChannelSyncDto,
@@ -626,7 +627,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Sync specific channel' })
   @ApiResponse({ status: 200, description: 'Channel sync completed' })
   @ApiParam({ name: 'channelId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async syncChannel(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -665,7 +666,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Get sync status' })
   @ApiResponse({ status: 200, description: 'Sync status retrieved successfully' })
   @ApiParam({ name: 'syncId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getSyncStatus(
     @CurrentUser() user: any,
     @Param('syncId') syncId: string,
@@ -703,7 +704,7 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Cancel sync' })
   @ApiResponse({ status: 200, description: 'Sync cancelled successfully' })
   @ApiParam({ name: 'syncId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async cancelSync(
     @CurrentUser() user: any,
     @Param('syncId') syncId: string,
@@ -732,7 +733,7 @@ export class ChannelsController {
   @ApiResponse({ status: 200, description: 'Sync history retrieved successfully' })
   @ApiQuery({ name: 'channelId', type: 'string', required: false })
   @ApiQuery({ name: 'limit', type: 'number', required: false })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getSyncHistory(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,

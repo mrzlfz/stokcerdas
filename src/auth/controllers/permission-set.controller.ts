@@ -84,7 +84,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set berhasil dibuat',
-      data: permissionSet as PermissionSetResponseDto,
+      data: {
+        ...permissionSet,
+        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: permissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -163,7 +168,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Daftar template permission set berhasil diambil',
-      data: templates as PermissionSetResponseDto[],
+      data: templates.map(template => ({
+        ...template,
+        permissions: template.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: template.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      })) as PermissionSetResponseDto[],
     };
   }
 
@@ -187,7 +197,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set populer berhasil diambil',
-      data: popularSets as PermissionSetResponseDto[],
+      data: popularSets.map(set => ({
+        ...set,
+        permissions: set.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: set.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      })) as PermissionSetResponseDto[],
     };
   }
 
@@ -211,7 +226,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set yang baru digunakan berhasil diambil',
-      data: recentSets as PermissionSetResponseDto[],
+      data: recentSets.map(set => ({
+        ...set,
+        permissions: set.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: set.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      })) as PermissionSetResponseDto[],
     };
   }
 
@@ -258,7 +278,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Detail permission set berhasil diambil',
-      data: permissionSet as PermissionSetResponseDto,
+      data: {
+        ...permissionSet,
+        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: permissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -354,7 +379,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set berhasil diperbarui',
-      data: permissionSet as PermissionSetResponseDto,
+      data: {
+        ...permissionSet,
+        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: permissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -385,7 +415,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Status permission set berhasil diubah',
-      data: permissionSet as PermissionSetResponseDto,
+      data: {
+        ...permissionSet,
+        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: permissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -416,7 +451,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission berhasil ditambahkan ke permission set',
-      data: permissionSet as PermissionSetResponseDto,
+      data: {
+        ...permissionSet,
+        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: permissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -447,7 +487,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission berhasil dihapus dari permission set',
-      data: permissionSet as PermissionSetResponseDto,
+      data: {
+        ...permissionSet,
+        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: permissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -480,7 +525,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set berhasil di-clone',
-      data: clonedPermissionSet as PermissionSetResponseDto,
+      data: {
+        ...clonedPermissionSet,
+        permissions: clonedPermissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: clonedPermissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -512,7 +562,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Template permission set berhasil dibuat',
-      data: template as PermissionSetResponseDto,
+      data: {
+        ...template,
+        permissions: template.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: template.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -550,7 +605,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set dari template berhasil dibuat',
-      data: newPermissionSet as PermissionSetResponseDto,
+      data: {
+        ...newPermissionSet,
+        permissions: newPermissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: newPermissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -628,7 +688,7 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Perbandingan permission set berhasil',
-      data: comparison as PermissionSetComparisonDto,
+      data: comparison as unknown as PermissionSetComparisonDto,
     };
   }
 
@@ -688,7 +748,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set berhasil diimport',
-      data: importedPermissionSet as PermissionSetResponseDto,
+      data: {
+        ...importedPermissionSet,
+        permissions: importedPermissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: importedPermissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 
@@ -739,7 +804,12 @@ export class PermissionSetController {
     return {
       success: true,
       message: 'Permission set berhasil dipulihkan',
-      data: permissionSet as PermissionSetResponseDto,
+      data: {
+        ...permissionSet,
+        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissionCount: permissionSet.permissions?.length || 0,
+        usageCount: 0, // This would be tracked separately
+      } as PermissionSetResponseDto,
     };
   }
 

@@ -17,6 +17,8 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiQuery,
+  ApiProperty,
+  ApiPropertyOptional,
 } from '@nestjs/swagger';
 import { IsEmail, IsString, IsOptional, IsArray, IsEnum, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -24,9 +26,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { GetTenant } from '../../common/decorators/tenant.decorator';
 import { GetUser } from '../../common/decorators/user.decorator';
+import { UserRole } from '../../users/entities/user.entity';
 
 import { EmailNotificationService } from '../services/email-notification.service';
 import { AlertManagementService } from '../services/alert-management.service';
@@ -34,60 +37,60 @@ import { AlertType } from '../entities/alert-configuration.entity';
 
 // DTOs
 class TestEmailDto {
-  @ApiOperation({ description: 'Email address to send test email to' })
+  @ApiProperty({ description: 'Email address to send test email to' })
   @IsEmail()
   email: string;
 }
 
 class SendCustomNotificationDto {
-  @ApiOperation({ description: 'Recipient email addresses' })
+  @ApiProperty({ description: 'Recipient email addresses' })
   @IsArray()
   @IsEmail({}, { each: true })
   recipients: string[];
 
-  @ApiOperation({ description: 'Email subject' })
+  @ApiProperty({ description: 'Email subject' })
   @IsString()
   subject: string;
 
-  @ApiOperation({ description: 'Email message content' })
+  @ApiProperty({ description: 'Email message content' })
   @IsString()
   message: string;
 
-  @ApiOperation({ description: 'Alert type for styling (optional)' })
+  @ApiPropertyOptional({ description: 'Alert type for styling (optional)' })
   @IsOptional()
   @IsEnum(AlertType)
   alertType?: AlertType;
 }
 
 class SendAlertNotificationDto {
-  @ApiOperation({ description: 'Alert ID to send notification for' })
+  @ApiProperty({ description: 'Alert ID to send notification for' })
   @IsString()
   alertId: string;
 
-  @ApiOperation({ description: 'Additional recipient emails (optional)' })
+  @ApiPropertyOptional({ description: 'Additional recipient emails (optional)' })
   @IsOptional()
   @IsArray()
   @IsEmail({}, { each: true })
   additionalRecipients?: string[];
 
-  @ApiOperation({ description: 'Custom email subject (optional)' })
+  @ApiPropertyOptional({ description: 'Custom email subject (optional)' })
   @IsOptional()
   @IsString()
   customSubject?: string;
 
-  @ApiOperation({ description: 'Custom email message (optional)' })
+  @ApiPropertyOptional({ description: 'Custom email message (optional)' })
   @IsOptional()
   @IsString()
   customMessage?: string;
 }
 
 class BulkAlertNotificationDto {
-  @ApiOperation({ description: 'Array of Alert IDs to send notifications for' })
+  @ApiProperty({ description: 'Array of Alert IDs to send notifications for' })
   @IsArray()
   @IsString({ each: true })
   alertIds: string[];
 
-  @ApiOperation({ description: 'Additional recipient emails (optional)' })
+  @ApiPropertyOptional({ description: 'Additional recipient emails (optional)' })
   @IsOptional()
   @IsArray()
   @IsEmail({}, { each: true })
@@ -95,7 +98,7 @@ class BulkAlertNotificationDto {
 }
 
 class EmailNotificationStatsQueryDto {
-  @ApiOperation({ description: 'Number of days to get stats for' })
+  @ApiPropertyOptional({ description: 'Number of days to get stats for' })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   days?: number = 30;
@@ -147,7 +150,7 @@ export class EmailNotificationController {
   ) {}
 
   @Post('test')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Test Email Configuration',
@@ -189,7 +192,7 @@ export class EmailNotificationController {
   }
 
   @Post('send-custom')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Send Custom Notification',
@@ -238,7 +241,7 @@ export class EmailNotificationController {
   }
 
   @Post('send-alert')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Send Alert Notification',
@@ -295,7 +298,7 @@ export class EmailNotificationController {
   }
 
   @Post('send-bulk')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Send Bulk Alert Notifications',
@@ -361,7 +364,7 @@ export class EmailNotificationController {
   }
 
   @Post('trigger-daily-digest')
-  @Roles('admin')
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Trigger Daily Digest',
@@ -406,7 +409,7 @@ export class EmailNotificationController {
   }
 
   @Get('stats')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get Email Notification Statistics',
@@ -463,7 +466,7 @@ export class EmailNotificationController {
   }
 
   @Get('configuration-status')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Check Email Configuration Status',

@@ -54,6 +54,7 @@ export class PurchaseOrderProcessor {
   @Process('sendCreationNotification')
   async handleSendCreationNotification(job: Job<{
     purchaseOrderId: string;
+    tenantId: string;
   }>): Promise<void> {
     const { purchaseOrderId } = job.data;
     
@@ -81,6 +82,7 @@ export class PurchaseOrderProcessor {
   @Process('sendApprovalNotification')
   async handleSendApprovalNotification(job: Job<{
     purchaseOrderId: string;
+    tenantId: string;
     action: 'approved' | 'rejected';
     comments?: string;
     reason?: string;
@@ -119,6 +121,7 @@ export class PurchaseOrderProcessor {
   @Process('sendToSupplier')
   async handleSendToSupplier(job: Job<{
     purchaseOrderId: string;
+    tenantId: string;
     sendEmail: boolean;
     generatePdf: boolean;
     sentBy?: string;
@@ -166,6 +169,7 @@ export class PurchaseOrderProcessor {
   @Process('sendStatusUpdate')
   async handleSendStatusUpdate(job: Job<{
     purchaseOrderId: string;
+    tenantId: string;
     previousStatus?: string;
     newStatus: string;
     reason?: string;
@@ -203,6 +207,7 @@ export class PurchaseOrderProcessor {
   @Process('generatePdf')
   async handleGeneratePdf(job: Job<{
     purchaseOrderId: string;
+    tenantId: string;
     emailToRecipients?: string[];
     saveToStorage?: boolean;
   }>): Promise<string> {
@@ -343,6 +348,7 @@ export class PurchaseOrderProcessor {
   @Process('syncWithInventory')
   async handleSyncWithInventory(job: Job<{
     purchaseOrderId: string;
+    tenantId: string;
     action: 'reserve' | 'release' | 'receive';
   }>): Promise<void> {
     const { purchaseOrderId, action } = job.data;

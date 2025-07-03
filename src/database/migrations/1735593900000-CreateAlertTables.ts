@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, Table, Index, ForeignKey } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 export class CreateAlertTables1735593900000 implements MigrationInterface {
   name = 'CreateAlertTables1735593900000';
@@ -357,213 +357,135 @@ export class CreateAlertTables1735593900000 implements MigrationInterface {
     );
 
     // Create indexes for alert_configurations
-    await queryRunner.createIndex(
-      'alert_configurations',
-      new Index('IDX_alert_configurations_tenant_type', ['tenantId', 'alertType']),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_alert_configurations_tenant_type" ON "alert_configurations" ("tenantId", "alertType")
+    `);
 
-    await queryRunner.createIndex(
-      'alert_configurations',
-      new Index('IDX_alert_configurations_tenant_product_location', ['tenantId', 'productId', 'locationId']),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_alert_configurations_tenant_product_location" ON "alert_configurations" ("tenantId", "productId", "locationId")
+    `);
 
     // Create indexes for alert_instances
-    await queryRunner.createIndex(
-      'alert_instances',
-      new Index('IDX_alert_instances_tenant_status', ['tenantId', 'status']),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_alert_instances_tenant_status" ON "alert_instances" ("tenantId", "status")
+    `);
 
-    await queryRunner.createIndex(
-      'alert_instances',
-      new Index('IDX_alert_instances_tenant_type_status', ['tenantId', 'alertType', 'status']),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_alert_instances_tenant_type_status" ON "alert_instances" ("tenantId", "alertType", "status")
+    `);
 
-    await queryRunner.createIndex(
-      'alert_instances',
-      new Index('IDX_alert_instances_tenant_severity_status', ['tenantId', 'severity', 'status']),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_alert_instances_tenant_severity_status" ON "alert_instances" ("tenantId", "severity", "status")
+    `);
 
-    await queryRunner.createIndex(
-      'alert_instances',
-      new Index('IDX_alert_instances_created_at', ['createdAt']),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_alert_instances_created_at" ON "alert_instances" ("createdAt")
+    `);
 
-    await queryRunner.createIndex(
-      'alert_instances',
-      new Index('IDX_alert_instances_resolved_at', ['resolvedAt']),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_alert_instances_resolved_at" ON "alert_instances" ("resolvedAt")
+    `);
 
     // Create foreign keys for alert_configurations
-    await queryRunner.createForeignKey(
-      'alert_configurations',
-      new ForeignKey({
-        columnNames: ['productId'],
-        referencedTableName: 'products',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_configurations" ADD CONSTRAINT "FK_alert_configurations_product_id" 
+      FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_configurations',
-      new ForeignKey({
-        columnNames: ['locationId'],
-        referencedTableName: 'inventory_locations',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_configurations" ADD CONSTRAINT "FK_alert_configurations_location_id" 
+      FOREIGN KEY ("locationId") REFERENCES "inventory_locations"("id") ON DELETE CASCADE
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_configurations',
-      new ForeignKey({
-        columnNames: ['createdBy'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'RESTRICT',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_configurations" ADD CONSTRAINT "FK_alert_configurations_created_by" 
+      FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_configurations',
-      new ForeignKey({
-        columnNames: ['updatedBy'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'RESTRICT',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_configurations" ADD CONSTRAINT "FK_alert_configurations_updated_by" 
+      FOREIGN KEY ("updatedBy") REFERENCES "users"("id") ON DELETE RESTRICT
+    `);
 
     // Create foreign keys for alert_instances
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['productId'],
-        referencedTableName: 'products',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_product_id" 
+      FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['locationId'],
-        referencedTableName: 'inventory_locations',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_location_id" 
+      FOREIGN KEY ("locationId") REFERENCES "inventory_locations"("id") ON DELETE CASCADE
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['inventoryItemId'],
-        referencedTableName: 'inventory_items',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_inventory_item_id" 
+      FOREIGN KEY ("inventoryItemId") REFERENCES "inventory_items"("id") ON DELETE CASCADE
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['configurationId'],
-        referencedTableName: 'alert_configurations',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_configuration_id" 
+      FOREIGN KEY ("configurationId") REFERENCES "alert_configurations"("id") ON DELETE SET NULL
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['acknowledgedBy'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_acknowledged_by" 
+      FOREIGN KEY ("acknowledgedBy") REFERENCES "users"("id") ON DELETE SET NULL
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['resolvedBy'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_resolved_by" 
+      FOREIGN KEY ("resolvedBy") REFERENCES "users"("id") ON DELETE SET NULL
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['dismissedBy'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_dismissed_by" 
+      FOREIGN KEY ("dismissedBy") REFERENCES "users"("id") ON DELETE SET NULL
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['snoozedBy'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_snoozed_by" 
+      FOREIGN KEY ("snoozedBy") REFERENCES "users"("id") ON DELETE SET NULL
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['escalatedBy'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_escalated_by" 
+      FOREIGN KEY ("escalatedBy") REFERENCES "users"("id") ON DELETE SET NULL
+    `);
 
-    await queryRunner.createForeignKey(
-      'alert_instances',
-      new ForeignKey({
-        columnNames: ['escalatedTo'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "alert_instances" ADD CONSTRAINT "FK_alert_instances_escalated_to" 
+      FOREIGN KEY ("escalatedTo") REFERENCES "users"("id") ON DELETE SET NULL
+    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign keys first
-    const alertInstancesTable = await queryRunner.getTable('alert_instances');
-    if (alertInstancesTable) {
-      const foreignKeys = alertInstancesTable.foreignKeys;
-      for (const foreignKey of foreignKeys) {
-        await queryRunner.dropForeignKey('alert_instances', foreignKey);
-      }
-    }
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_escalated_to"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_escalated_by"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_snoozed_by"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_dismissed_by"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_resolved_by"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_acknowledged_by"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_configuration_id"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_inventory_item_id"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_location_id"`);
+    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_product_id"`);
 
-    const alertConfigurationsTable = await queryRunner.getTable('alert_configurations');
-    if (alertConfigurationsTable) {
-      const foreignKeys = alertConfigurationsTable.foreignKeys;
-      for (const foreignKey of foreignKeys) {
-        await queryRunner.dropForeignKey('alert_configurations', foreignKey);
-      }
-    }
+    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_updated_by"`);
+    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_created_by"`);
+    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_location_id"`);
+    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_product_id"`);
 
     // Drop indexes
-    await queryRunner.dropIndex('alert_instances', 'IDX_alert_instances_escalated_to');
-    await queryRunner.dropIndex('alert_instances', 'IDX_alert_instances_resolved_at');
-    await queryRunner.dropIndex('alert_instances', 'IDX_alert_instances_created_at');
-    await queryRunner.dropIndex('alert_instances', 'IDX_alert_instances_tenant_severity_status');
-    await queryRunner.dropIndex('alert_instances', 'IDX_alert_instances_tenant_type_status');
-    await queryRunner.dropIndex('alert_instances', 'IDX_alert_instances_tenant_status');
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_resolved_at"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_created_at"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_tenant_severity_status"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_tenant_type_status"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_tenant_status"`);
 
-    await queryRunner.dropIndex('alert_configurations', 'IDX_alert_configurations_tenant_product_location');
-    await queryRunner.dropIndex('alert_configurations', 'IDX_alert_configurations_tenant_type');
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_configurations_tenant_product_location"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_configurations_tenant_type"`);
 
     // Drop tables
     await queryRunner.dropTable('alert_instances');

@@ -298,9 +298,19 @@ export class PriceOptimizationService {
     );
 
     // Generate seasonal pricing recommendations
-    const seasonalPricing = query.includeSeasonalPricing 
+    const seasonalPricingData = query.includeSeasonalPricing 
       ? this.generateSeasonalPricing(product, recommendedPrice)
       : undefined;
+    
+    const seasonalPricing = seasonalPricingData ? {
+      peakSeasonAdjustment: (seasonalPricingData.peakSeasonMultiplier - 1) * 100,
+      lowSeasonAdjustment: (seasonalPricingData.lowSeasonMultiplier - 1) * 100,
+      holidayPricing: seasonalPricingData.holidayAdjustments.map(holiday => ({
+        period: holiday.period,
+        adjustment: (holiday.multiplier - 1) * 100,
+        reasoning: holiday.reasoning,
+      })),
+    } : undefined;
 
     // Create implementation plan
     const implementation = this.createImplementationPlan(recommendedPrice, currentPrice);
@@ -698,12 +708,12 @@ export class PriceOptimizationService {
     );
 
     return {
-      peakSeasonAdjustment: 10, // 10% increase during peak season
-      lowSeasonAdjustment: -5, // 5% decrease during low season
+      peakSeasonMultiplier: 1.1, // 10% increase during peak season
+      lowSeasonMultiplier: 0.95, // 5% decrease during low season
       holidayAdjustments: relevantHolidays.map(holiday => ({
         holiday: holiday.name,
         period: holiday.period,
-        adjustment: (holiday.multiplier - 1) * 100,
+        multiplier: holiday.multiplier,
         reasoning: holiday.reasoning,
       })),
     };

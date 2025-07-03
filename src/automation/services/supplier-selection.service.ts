@@ -212,10 +212,12 @@ export class SupplierSelectionService {
     }
 
     // Check if supplier can handle the order quantity (basic capacity check)
-    if (orderQuantity > 0) {
+    // Note: Using creditLimit as a proxy for capacity since maxOrderQuantity is not defined
+    if (orderQuantity > 0 && request.product.costPrice) {
+      const estimatedOrderValue = orderQuantity * request.product.costPrice;
       query = query.andWhere(
-        '(supplier.maxOrderQuantity IS NULL OR supplier.maxOrderQuantity >= :quantity)',
-        { quantity: orderQuantity }
+        '(supplier.creditLimit IS NULL OR supplier.creditLimit >= :estimatedValue)',
+        { estimatedValue: estimatedOrderValue }
       );
     }
 
@@ -407,21 +409,25 @@ export class SupplierSelectionService {
   }
 
   /**
-   * Calculate capacity score
+   * Calculate capacity score based on credit limit as proxy for capacity
    */
   private calculateCapacityScore(supplier: Supplier, orderQuantity: number): number {
-    const maxCapacity = supplier.maxOrderQuantity;
+    // Since maxOrderQuantity is not defined, use creditLimit as capacity proxy
+    const creditLimit = supplier.creditLimit;
     
-    if (!maxCapacity) return 75; // Assume good capacity if not specified
+    if (!creditLimit) return 75; // Assume good capacity if not specified
     
-    const utilizationRatio = orderQuantity / maxCapacity;
+    // Estimate order value (using a default unit cost if not available)
+    const estimatedUnitCost = 100000; // IDR 100,000 as default
+    const estimatedOrderValue = orderQuantity * estimatedUnitCost;
+    const utilizationRatio = estimatedOrderValue / creditLimit;
     
-    if (utilizationRatio > 1) return 0; // Over capacity
-    if (utilizationRatio > 0.9) return 30; // Near capacity limit
-    if (utilizationRatio > 0.7) return 60; // High utilization
-    if (utilizationRatio > 0.5) return 90; // Good utilization
+    if (utilizationRatio > 1) return 0; // Over credit capacity
+    if (utilizationRatio > 0.9) return 30; // Near credit limit
+    if (utilizationRatio > 0.7) return 60; // High credit utilization
+    if (utilizationRatio > 0.5) return 90; // Good credit utilization
     
-    return 100; // Low utilization, high capacity available
+    return 100; // Low credit utilization, high capacity available
   }
 
   /**

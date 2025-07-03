@@ -23,6 +23,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UserRole } from '../../users/entities/user.entity';
 
 import { BusinessIntelligenceService } from '../services/business-intelligence.service';
 import { CustomMetricsService } from '../services/custom-metrics.service';
@@ -64,7 +65,7 @@ export class AnalyticsController {
   // Dashboard & Overview Endpoints
 
   @Get('dashboard')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ 
     summary: 'Get comprehensive dashboard metrics',
     description: 'Returns key performance indicators, real-time metrics, and dashboard alerts for business intelligence overview'
@@ -100,7 +101,7 @@ export class AnalyticsController {
   // Revenue Analytics Endpoints
 
   @Get('revenue')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Generate revenue analytics report',
     description: 'Comprehensive revenue analysis including profit margins, COGS, trends, and comparisons'
@@ -134,7 +135,7 @@ export class AnalyticsController {
   }
 
   @Get('revenue/trends')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Get revenue trends analysis',
     description: 'Historical revenue trends with forecasting and seasonal analysis'
@@ -174,7 +175,7 @@ export class AnalyticsController {
   // Inventory Analytics Endpoints
 
   @Get('inventory/turnover')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Generate inventory turnover analysis',
     description: 'Comprehensive inventory turnover analysis with fast/slow moving items, aging, and optimization recommendations'
@@ -208,7 +209,7 @@ export class AnalyticsController {
   }
 
   @Get('inventory/slow-moving')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Get slow-moving inventory items',
     description: 'Identify slow-moving and dead stock items with actionable recommendations'
@@ -260,7 +261,7 @@ export class AnalyticsController {
   // Product Analytics Endpoints
 
   @Get('products/performance')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Generate product performance analytics',
     description: 'Comprehensive product performance analysis with ABC classification, profitability, and growth metrics'
@@ -294,7 +295,7 @@ export class AnalyticsController {
   }
 
   @Get('products/abc-analysis')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Get ABC analysis of products',
     description: 'Pareto analysis (80/20 rule) of products by revenue contribution'
@@ -352,7 +353,7 @@ export class AnalyticsController {
   }
 
   @Get('products/top-performers')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ 
     summary: 'Get top performing products',
     description: 'List of top performing products by revenue, profit, or volume'
@@ -410,7 +411,7 @@ export class AnalyticsController {
   // Customer Analytics Endpoints (placeholder)
 
   @Get('customers/insights')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Generate customer insights analytics',
     description: 'Customer segmentation, lifetime value, and behavioral analysis'
@@ -469,7 +470,7 @@ export class AnalyticsController {
   // Custom Metrics Endpoints
 
   @Post('custom-metrics')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Calculate custom metric',
     description: 'Calculate custom business metrics using user-defined formulas and parameters'
@@ -505,7 +506,7 @@ export class AnalyticsController {
   // Benchmarking Endpoints
 
   @Get('benchmarking')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Generate benchmarking analysis',
     description: 'Compare business metrics against industry standards, category averages, or historical performance'
@@ -539,7 +540,7 @@ export class AnalyticsController {
   }
 
   @Get('benchmarking/industry-standards')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ 
     summary: 'Get industry standard benchmarks',
     description: 'Retrieve current industry standard benchmarks for Indonesian retail sector'
@@ -594,7 +595,7 @@ export class AnalyticsController {
   // Utility Endpoints
 
   @Get('health')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ 
     summary: 'Check analytics service health',
     description: 'Health check endpoint for analytics and business intelligence services'

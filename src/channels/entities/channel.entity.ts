@@ -199,14 +199,14 @@ export class Channel extends BaseEntity {
   tags?: string[];
 
   // Relations
-  @OneToOne(() => ChannelConfig, config => config.channel, { cascade: true })
-  config?: ChannelConfig;
+  @OneToOne('ChannelConfig', 'channel', { cascade: true })
+  config?: any;
 
-  @OneToMany(() => ChannelInventory, inventory => inventory.channel)
-  inventoryAllocations?: ChannelInventory[];
+  @OneToMany('ChannelInventory', 'channel')
+  inventoryAllocations?: any[];
 
-  @OneToMany(() => ChannelMapping, mapping => mapping.channel)
-  mappings?: ChannelMapping[];
+  @OneToMany('ChannelMapping', 'channel')
+  mappings?: any[];
 
   // Virtual fields
   get isActive(): boolean {

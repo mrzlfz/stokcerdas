@@ -5,13 +5,14 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
-import { WebhookEvent } from '../../entities/webhook-event.entity';
+import { WebhookEvent, WebhookEventType, WebhookProcessingStatus } from '../../entities/webhook-event.entity';
 import { Channel } from '../../../channels/entities/channel.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { TokopediaApiService } from './tokopedia-api.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
-export type WebhookEventType = 
+export type TokopediaWebhookEventType = 
   | 'order_created'
   | 'order_updated'
   | 'order_cancelled'
@@ -24,7 +25,7 @@ export type WebhookEventType =
   | 'system_notification';
 
 export interface TokopediaWebhookPayload {
-  event_type: WebhookEventType;
+  event_type: TokopediaWebhookEventType;
   timestamp: string;
   shop_id: string;
   data: {
@@ -154,14 +155,13 @@ export class TokopediaWebhookService {
       const webhookEvent = await this.webhookRepository.save({
         tenantId,
         channelId,
-        platform: 'tokopedia',
-        eventType: parsedPayload.event_type,
+        eventType: parsedPayload.event_type as any,
         eventSource: 'webhook',
         payload: parsedPayload,
         headers,
-        status: 'received',
-        receivedAt: new Date(),
-        metadata: {
+        processingStatus: WebhookProcessingStatus.PENDING,
+        createdAt: new Date(),
+        processingDetails: {
           webhookType,
           shopId: parsedPayload.shop_id,
           timestamp: parsedPayload.timestamp,
@@ -240,7 +240,7 @@ export class TokopediaWebhookService {
     webhookId: string,
     tenantId: string,
     channelId: string,
-    eventType: WebhookEventType,
+    eventType: TokopediaWebhookEventType,
     payload: TokopediaWebhookPayload,
   ): Promise<{
     success: boolean;
@@ -753,8 +753,8 @@ export class TokopediaWebhookService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: notificationData.severity === 'error' ? 'ERROR' : 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: notificationData.severity === 'error' ? IntegrationLogLevel.ERROR : IntegrationLogLevel.INFO,
         message: `Tokopedia: ${notificationData.title}`,
         metadata: {
           type: notificationData.type,

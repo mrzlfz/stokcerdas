@@ -6,9 +6,9 @@ import { HttpModule } from '@nestjs/axios';
 // Entities
 import { AccountingAccount } from '../entities/accounting-account.entity';
 import { Order } from '../../orders/entities/order.entity';
-import { Invoice } from '../../invoices/entities/invoice.entity';
+// import { Invoice } from '../../invoices/entities/invoice.entity';
 import { Product } from '../../products/entities/product.entity';
-import { Customer } from '../../customers/entities/customer.entity';
+// import { Customer } from '../../customers/entities/customer.entity';
 
 // Services
 import { QuickBooksApiService } from './services/quickbooks-api.service';
@@ -33,9 +33,9 @@ import { RateLimiterService } from '../common/services/rate-limiter.service';
     TypeOrmModule.forFeature([
       AccountingAccount,
       Order,
-      Invoice,
+      // Invoice,
       Product,
-      Customer,
+      // Customer,
     ]),
 
     // HTTP module for API calls

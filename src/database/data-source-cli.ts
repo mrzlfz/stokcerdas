@@ -24,6 +24,6 @@ export const AppDataSource = new DataSource({
     max: configService.get('DB_MAX_CONNECTIONS', 100),
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
+    timezone: configService.get('DB_TIMEZONE', 'Asia/Jakarta'),
   },
-  timezone: configService.get('DB_TIMEZONE', 'Asia/Jakarta'),
 });

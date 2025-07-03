@@ -436,41 +436,38 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
             isNullable: true,
           },
         ],
-        indices: [
-          new Index('IDX_reorder_rules_tenant_product_location', ['tenant_id', 'product_id', 'location_id'], { isUnique: true }),
-          new Index('IDX_reorder_rules_tenant_active', ['tenant_id', 'is_active']),
-          new Index('IDX_reorder_rules_status', ['status']),
-          new Index('IDX_reorder_rules_trigger', ['trigger']),
-          new Index('IDX_reorder_rules_next_review', ['next_review_date']),
-          new Index('IDX_reorder_rules_urgency', ['urgency_score']),
-          new Index('IDX_reorder_rules_priority', ['priority']),
-          new Index('IDX_reorder_rules_created_at', ['created_at']),
-          new Index('IDX_reorder_rules_product', ['product_id']),
-          new Index('IDX_reorder_rules_location', ['location_id']),
-          new Index('IDX_reorder_rules_supplier', ['primary_supplier_id']),
-        ],
-        foreignKeys: [
-          new ForeignKey({
-            columnNames: ['product_id'],
-            referencedTableName: 'products',
-            referencedColumnNames: ['id'],
-            onDelete: 'CASCADE',
-          }),
-          new ForeignKey({
-            columnNames: ['location_id'],
-            referencedTableName: 'inventory_locations',
-            referencedColumnNames: ['id'],
-            onDelete: 'CASCADE',
-          }),
-          new ForeignKey({
-            columnNames: ['primary_supplier_id'],
-            referencedTableName: 'suppliers',
-            referencedColumnNames: ['id'],
-            onDelete: 'SET NULL',
-          }),
-        ],
       }),
     );
+
+    // Create indexes for reorder_rules table
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_reorder_rules_tenant_product_location" ON "reorder_rules" ("tenant_id", "product_id", "location_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_tenant_active" ON "reorder_rules" ("tenant_id", "is_active")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_status" ON "reorder_rules" ("status")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_trigger" ON "reorder_rules" ("trigger")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_next_review" ON "reorder_rules" ("next_review_date")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_urgency" ON "reorder_rules" ("urgency_score")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_priority" ON "reorder_rules" ("priority")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_created_at" ON "reorder_rules" ("created_at")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_product" ON "reorder_rules" ("product_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_location" ON "reorder_rules" ("location_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_supplier" ON "reorder_rules" ("primary_supplier_id")`);
+
+    // Create foreign key constraints for reorder_rules table
+    await queryRunner.query(`
+      ALTER TABLE "reorder_rules" 
+      ADD CONSTRAINT "FK_reorder_rules_product_id" 
+      FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE
+    `);
+    await queryRunner.query(`
+      ALTER TABLE "reorder_rules" 
+      ADD CONSTRAINT "FK_reorder_rules_location_id" 
+      FOREIGN KEY ("location_id") REFERENCES "inventory_locations"("id") ON DELETE CASCADE
+    `);
+    await queryRunner.query(`
+      ALTER TABLE "reorder_rules" 
+      ADD CONSTRAINT "FK_reorder_rules_primary_supplier_id" 
+      FOREIGN KEY ("primary_supplier_id") REFERENCES "suppliers"("id") ON DELETE SET NULL
+    `);
 
     // =============================================
     // CREATE REORDER_EXECUTIONS TABLE
@@ -607,36 +604,33 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
             default: 'CURRENT_TIMESTAMP',
           },
         ],
-        indices: [
-          new Index('IDX_reorder_executions_tenant', ['tenant_id']),
-          new Index('IDX_reorder_executions_rule', ['reorder_rule_id']),
-          new Index('IDX_reorder_executions_executed_at', ['executed_at']),
-          new Index('IDX_reorder_executions_success', ['success']),
-          new Index('IDX_reorder_executions_purchase_order', ['purchase_order_id']),
-          new Index('IDX_reorder_executions_supplier', ['supplier_id']),
-        ],
-        foreignKeys: [
-          new ForeignKey({
-            columnNames: ['reorder_rule_id'],
-            referencedTableName: 'reorder_rules',
-            referencedColumnNames: ['id'],
-            onDelete: 'CASCADE',
-          }),
-          new ForeignKey({
-            columnNames: ['purchase_order_id'],
-            referencedTableName: 'purchase_orders',
-            referencedColumnNames: ['id'],
-            onDelete: 'SET NULL',
-          }),
-          new ForeignKey({
-            columnNames: ['supplier_id'],
-            referencedTableName: 'suppliers',
-            referencedColumnNames: ['id'],
-            onDelete: 'SET NULL',
-          }),
-        ],
       }),
     );
+
+    // Create indexes for reorder_executions table
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_tenant" ON "reorder_executions" ("tenant_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_rule" ON "reorder_executions" ("reorder_rule_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_executed_at" ON "reorder_executions" ("executed_at")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_success" ON "reorder_executions" ("success")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_purchase_order" ON "reorder_executions" ("purchase_order_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_supplier" ON "reorder_executions" ("supplier_id")`);
+
+    // Create foreign key constraints for reorder_executions table
+    await queryRunner.query(`
+      ALTER TABLE "reorder_executions" 
+      ADD CONSTRAINT "FK_reorder_executions_reorder_rule_id" 
+      FOREIGN KEY ("reorder_rule_id") REFERENCES "reorder_rules"("id") ON DELETE CASCADE
+    `);
+    await queryRunner.query(`
+      ALTER TABLE "reorder_executions" 
+      ADD CONSTRAINT "FK_reorder_executions_purchase_order_id" 
+      FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE SET NULL
+    `);
+    await queryRunner.query(`
+      ALTER TABLE "reorder_executions" 
+      ADD CONSTRAINT "FK_reorder_executions_supplier_id" 
+      FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id") ON DELETE SET NULL
+    `);
 
     // =============================================
     // CREATE AUTOMATION_SCHEDULES TABLE
@@ -934,18 +928,18 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
             isNullable: true,
           },
         ],
-        indices: [
-          new Index('IDX_automation_schedules_tenant', ['tenant_id']),
-          new Index('IDX_automation_schedules_type', ['type']),
-          new Index('IDX_automation_schedules_status', ['status']),
-          new Index('IDX_automation_schedules_active', ['is_active']),
-          new Index('IDX_automation_schedules_next_execution', ['next_execution']),
-          new Index('IDX_automation_schedules_priority', ['priority']),
-          new Index('IDX_automation_schedules_resource_group', ['resource_group']),
-          new Index('IDX_automation_schedules_created_at', ['created_at']),
-        ],
       }),
     );
+
+    // Create indexes for automation_schedules table
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_tenant" ON "automation_schedules" ("tenant_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_type" ON "automation_schedules" ("type")`);
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_status" ON "automation_schedules" ("status")`);
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_active" ON "automation_schedules" ("is_active")`);
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_next_execution" ON "automation_schedules" ("next_execution")`);
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_priority" ON "automation_schedules" ("priority")`);
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_resource_group" ON "automation_schedules" ("resource_group")`);
+    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_created_at" ON "automation_schedules" ("created_at")`);
 
     // =============================================
     // CREATE SCHEDULE_EXECUTIONS TABLE
@@ -1086,24 +1080,23 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
             default: 'CURRENT_TIMESTAMP',
           },
         ],
-        indices: [
-          new Index('IDX_schedule_executions_tenant', ['tenant_id']),
-          new Index('IDX_schedule_executions_schedule', ['schedule_id']),
-          new Index('IDX_schedule_executions_started_at', ['started_at']),
-          new Index('IDX_schedule_executions_status', ['status']),
-          new Index('IDX_schedule_executions_job_id', ['job_id']),
-          new Index('IDX_schedule_executions_completed_at', ['completed_at']),
-        ],
-        foreignKeys: [
-          new ForeignKey({
-            columnNames: ['schedule_id'],
-            referencedTableName: 'automation_schedules',
-            referencedColumnNames: ['id'],
-            onDelete: 'CASCADE',
-          }),
-        ],
       }),
     );
+
+    // Create indexes for schedule_executions table
+    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_tenant" ON "schedule_executions" ("tenant_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_schedule" ON "schedule_executions" ("schedule_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_started_at" ON "schedule_executions" ("started_at")`);
+    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_status" ON "schedule_executions" ("status")`);
+    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_job_id" ON "schedule_executions" ("job_id")`);
+    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_completed_at" ON "schedule_executions" ("completed_at")`);
+
+    // Create foreign key constraints for schedule_executions table
+    await queryRunner.query(`
+      ALTER TABLE "schedule_executions" 
+      ADD CONSTRAINT "FK_schedule_executions_schedule_id" 
+      FOREIGN KEY ("schedule_id") REFERENCES "automation_schedules"("id") ON DELETE CASCADE
+    `);
 
     // =============================================
     // CREATE UPDATED_AT TRIGGERS
@@ -1220,7 +1213,7 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE INDEX IDX_reorder_rules_due_for_execution 
       ON reorder_rules (tenant_id, next_review_date) 
-      WHERE is_active = true AND is_paused = false AND (next_review_date IS NULL OR next_review_date <= CURRENT_TIMESTAMP);
+      WHERE is_active = true AND is_paused = false;
     `);
 
     await queryRunner.query(`
@@ -1237,8 +1230,7 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
 
     await queryRunner.query(`
       CREATE INDEX IDX_reorder_executions_recent 
-      ON reorder_executions (tenant_id, executed_at DESC) 
-      WHERE executed_at >= CURRENT_TIMESTAMP - INTERVAL '30 days';
+      ON reorder_executions (tenant_id, executed_at DESC);
     `);
 
     // =============================================

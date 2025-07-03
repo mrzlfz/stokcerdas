@@ -173,22 +173,34 @@ export class OptimisticUpdatesService {
       return { updateId, resolution: 'server_wins' };
     }
 
-    // Use state service for conflict resolution
-    const resolution = await this.stateService.resolveConflict(update.tenantId, {
-      resourceType: update.resourceType,
-      resourceId: update.resourceId,
-      localVersion: update.version,
-      serverVersion: serverData.version || update.version + 1,
-      localChanges: update.localChanges,
-      serverChanges: serverData,
-    });
-
-    const conflictResolution: ConflictResolution = {
-      updateId,
-      resolution: resolution.resolution,
-      resolvedData: resolution.resolvedData,
-      conflictDetails: resolution.conflictDetails,
-    };
+    // Use state service for conflict resolution (only for supported resource types)
+    let conflictResolution: ConflictResolution;
+    
+    if (['inventory_item', 'location', 'product'].includes(update.resourceType)) {
+      const resolution = await this.stateService.resolveConflict(update.tenantId, {
+        resourceType: update.resourceType as 'inventory_item' | 'location' | 'product',
+        resourceId: update.resourceId,
+        localVersion: update.version,
+        serverVersion: serverData.version || update.version + 1,
+        localChanges: update.localChanges,
+        serverChanges: serverData,
+      });
+      
+      conflictResolution = {
+        updateId,
+        resolution: resolution.resolution,
+        resolvedData: resolution.resolvedData,
+        conflictDetails: resolution.conflictDetails,
+      };
+    } else {
+      // For unsupported resource types, default to server wins
+      conflictResolution = {
+        updateId,
+        resolution: 'server_wins' as any,
+        resolvedData: serverData,
+        conflictDetails: `Resource type ${update.resourceType} not supported for conflict resolution`,
+      };
+    }
 
     update.status = 'conflict';
 
@@ -206,7 +218,7 @@ export class OptimisticUpdatesService {
     });
 
     // Handle resolution
-    switch (resolution.resolution) {
+    switch (conflictResolution.resolution) {
       case 'local_wins':
         // Keep optimistic update, ignore server data
         await this.confirmOptimisticUpdate(updateId, update.localChanges);
@@ -219,7 +231,7 @@ export class OptimisticUpdatesService {
         
       case 'merge':
         // Apply merged data
-        await this.confirmOptimisticUpdate(updateId, resolution.resolvedData);
+        await this.confirmOptimisticUpdate(updateId, conflictResolution.resolvedData);
         break;
         
       case 'manual_required':
@@ -228,7 +240,7 @@ export class OptimisticUpdatesService {
         break;
     }
 
-    this.logger.debug(`⚖️ Handled conflict for update ${updateId}: ${resolution.resolution}`);
+    this.logger.debug(`⚖️ Handled conflict for update ${updateId}: ${conflictResolution.resolution}`);
     
     return conflictResolution;
   }

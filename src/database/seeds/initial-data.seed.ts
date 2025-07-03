@@ -18,38 +18,36 @@ export class InitialDataSeed {
     // Create test admin user
     const hashedPassword = await bcrypt.hash('admin123', 12);
     
-    const adminUser = userRepository.create({
-      tenantId: testTenantId,
-      email: 'admin@stokcerdas.test',
-      password: hashedPassword,
-      firstName: 'Admin',
-      lastName: 'User',
-      role: UserRole.ADMIN,
-      status: UserStatus.ACTIVE,
-      emailVerified: true,
-      language: 'id',
-      timezone: 'Asia/Jakarta',
-    });
+    const adminUser = new User();
+    (adminUser as any).tenantId = testTenantId;
+    adminUser.email = 'admin@stokcerdas.test';
+    adminUser.password = hashedPassword;
+    adminUser.firstName = 'Admin';
+    adminUser.lastName = 'User';
+    adminUser.role = UserRole.ADMIN;
+    adminUser.status = UserStatus.ACTIVE;
+    adminUser.emailVerified = true;
+    adminUser.language = 'id';
+    adminUser.timezone = 'Asia/Jakarta';
 
-    await userRepository.save(adminUser);
+    const savedAdminUser = await userRepository.save(adminUser);
     console.log('✅ Created admin user: admin@stokcerdas.test');
 
     // Create test staff user
-    const staffUser = userRepository.create({
-      tenantId: testTenantId,
-      email: 'staff@stokcerdas.test',
-      password: hashedPassword,
-      firstName: 'Staff',
-      lastName: 'User',
-      role: UserRole.STAFF,
-      status: UserStatus.ACTIVE,
-      emailVerified: true,
-      language: 'id',
-      timezone: 'Asia/Jakarta',
-      createdBy: adminUser.id,
-    });
+    const staffUser = new User();
+    (staffUser as any).tenantId = testTenantId;
+    staffUser.email = 'staff@stokcerdas.test';
+    staffUser.password = hashedPassword;
+    staffUser.firstName = 'Staff';
+    staffUser.lastName = 'User';
+    staffUser.role = UserRole.STAFF;
+    staffUser.status = UserStatus.ACTIVE;
+    staffUser.emailVerified = true;
+    staffUser.language = 'id';
+    staffUser.timezone = 'Asia/Jakarta';
+    (staffUser as any).createdBy = (savedAdminUser as any).id;
 
-    await userRepository.save(staffUser);
+    const savedStaffUser = await userRepository.save(staffUser);
     console.log('✅ Created staff user: staff@stokcerdas.test');
 
     // Create product categories
@@ -77,11 +75,11 @@ export class InitialDataSeed {
     ];
 
     for (const categoryData of categories) {
-      const category = categoryRepository.create({
-        tenantId: testTenantId,
-        ...categoryData,
-        createdBy: adminUser.id,
-      });
+      const category = new ProductCategory();
+      (category as any).tenantId = testTenantId;
+      category.name = categoryData.name;
+      category.description = categoryData.description;
+      (category as any).createdBy = (savedAdminUser as any).id;
 
       await categoryRepository.save(category);
       console.log(`✅ Created category: ${category.name}`);
@@ -175,11 +173,12 @@ export class InitialDataSeed {
     ];
 
     for (const locationData of locations) {
-      const location = locationRepository.create({
-        tenantId: testTenantId,
-        ...locationData,
-        createdBy: adminUser.id,
-      });
+      const location = new InventoryLocation();
+      (location as any).tenantId = testTenantId;
+      (location as any).createdBy = (savedAdminUser as any).id;
+      
+      // Assign all location properties
+      Object.assign(location, locationData);
 
       await locationRepository.save(location);
       console.log(`✅ Created location: ${location.name}`);

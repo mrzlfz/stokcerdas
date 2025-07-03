@@ -9,7 +9,6 @@ export class DepartmentService {
     @InjectRepository(Department)
     private departmentRepository: TreeRepository<Department>,
   ) {}
-}
 
   // Create a new department
   async create(
@@ -37,11 +36,11 @@ export class DepartmentService {
       tenantId,
       createdBy: userId,
       updatedBy: userId,
-    });
+    }) as unknown as Department;
 
     // Set parent if provided
     if (parentId) {
-      const parent = await this.findById(parentId, tenantId);
+      const parent = await this.findById(parentId, tenantId) as unknown as Department;
       department.parent = parent;
       department.level = parent.level + 1;
       department.path = parent.buildPath(parent.path);

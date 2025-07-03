@@ -1,1 +1,93 @@
-import {\n  ExceptionFilter,\n  Catch,\n  ArgumentsHost,\n  HttpException,\n  HttpStatus,\n  Logger,\n} from '@nestjs/common';\nimport { Request, Response } from 'express';\nimport { QueryFailedError } from 'typeorm';\n\n@Catch()\nexport class GlobalExceptionFilter implements ExceptionFilter {\n  private readonly logger = new Logger(GlobalExceptionFilter.name);\n\n  catch(exception: unknown, host: ArgumentsHost): void {\n    const ctx = host.switchToHttp();\n    const response = ctx.getResponse<Response>();\n    const request = ctx.getRequest<Request>();\n\n    let status = HttpStatus.INTERNAL_SERVER_ERROR;\n    let message = 'Internal server error';\n    let code = 'INTERNAL_ERROR';\n    let details: any = null;\n\n    if (exception instanceof HttpException) {\n      status = exception.getStatus();\n      const exceptionResponse = exception.getResponse();\n      \n      if (typeof exceptionResponse === 'string') {\n        message = exceptionResponse;\n      } else if (typeof exceptionResponse === 'object') {\n        message = (exceptionResponse as any).message || exception.message;\n        code = (exceptionResponse as any).code || exception.name;\n        details = (exceptionResponse as any).details;\n      }\n    } else if (exception instanceof QueryFailedError) {\n      status = HttpStatus.BAD_REQUEST;\n      message = 'Database query failed';\n      code = 'DATABASE_ERROR';\n      \n      // Handle specific database errors\n      if (exception.message.includes('duplicate key')) {\n        message = 'Resource already exists';\n        code = 'DUPLICATE_RESOURCE';\n        status = HttpStatus.CONFLICT;\n      } else if (exception.message.includes('foreign key')) {\n        message = 'Invalid reference to related resource';\n        code = 'INVALID_REFERENCE';\n      }\n    } else if (exception instanceof Error) {\n      message = exception.message;\n      code = exception.name;\n    }\n\n    const errorResponse = {\n      success: false,\n      error: {\n        code,\n        message,\n        details,\n        timestamp: new Date().toISOString(),\n        path: request.url,\n        method: request.method,\n        ...(process.env.NODE_ENV === 'development' && {\n          stack: exception instanceof Error ? exception.stack : undefined,\n        }),\n      },\n      meta: {\n        requestId: request.headers['x-request-id'] || 'unknown',\n        tenantId: request.headers['x-tenant-id'] || null,\n        userId: (request as any).user?.id || null,\n      },\n    };\n\n    // Log the error\n    this.logger.error(\n      `${request.method} ${request.url} - ${status} - ${message}`,\n      {\n        exception: exception instanceof Error ? exception.stack : exception,\n        request: {\n          headers: request.headers,\n          query: request.query,\n          params: request.params,\n          body: request.body,\n        },\n        user: (request as any).user,\n      },\n    );\n\n    response.status(status).json(errorResponse);\n  }\n}"
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
+import { QueryFailedError } from 'typeorm';
+
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(GlobalExceptionFilter.name);
+
+  catch(exception: unknown, host: ArgumentsHost): void {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message = 'Internal server error';
+    let code = 'INTERNAL_ERROR';
+    let details: any = null;
+
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+      const exceptionResponse = exception.getResponse();
+      
+      if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
+      } else if (typeof exceptionResponse === 'object') {
+        message = (exceptionResponse as any).message || exception.message;
+        code = (exceptionResponse as any).code || exception.name;
+        details = (exceptionResponse as any).details;
+      }
+    } else if (exception instanceof QueryFailedError) {
+      status = HttpStatus.BAD_REQUEST;
+      message = 'Database query failed';
+      code = 'DATABASE_ERROR';
+      
+      // Handle specific database errors
+      if (exception.message.includes('duplicate key')) {
+        message = 'Resource already exists';
+        code = 'DUPLICATE_RESOURCE';
+        status = HttpStatus.CONFLICT;
+      } else if (exception.message.includes('foreign key')) {
+        message = 'Invalid reference to related resource';
+        code = 'INVALID_REFERENCE';
+      }
+    } else if (exception instanceof Error) {
+      message = exception.message;
+      code = exception.name;
+    }
+
+    const errorResponse = {
+      success: false,
+      error: {
+        code,
+        message,
+        details,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        method: request.method,
+        ...(process.env.NODE_ENV === 'development' && {
+          stack: exception instanceof Error ? exception.stack : undefined,
+        }),
+      },
+      meta: {
+        requestId: request.headers['x-request-id'] || 'unknown',
+        tenantId: request.headers['x-tenant-id'] || null,
+        userId: (request as any).user?.id || null,
+      },
+    };
+
+    // Log the error
+    this.logger.error(
+      `${request.method} ${request.url} - ${status} - ${message}`,
+      {
+        exception: exception instanceof Error ? exception.stack : exception,
+        request: {
+          headers: request.headers,
+          query: request.query,
+          params: request.params,
+          body: request.body,
+        },
+        user: (request as any).user,
+      },
+    );
+
+    response.status(status).json(errorResponse);
+  }
+}

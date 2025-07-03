@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { ShopeeWebhookService } from '../services/shopee-webhook.service';
+import { ShopeeWebhookService, ShopeeWebhookPayload } from '../services/shopee-webhook.service';
 import { ShopeeProductService } from '../services/shopee-product.service';
 import { ShopeeOrderService } from '../services/shopee-order.service';
 import { ShopeeInventoryService } from '../services/shopee-inventory.service';
@@ -120,7 +120,7 @@ export class ShopeeProcessor {
         tenantId,
         channelId,
         eventType as any,
-        payload,
+        payload as ShopeeWebhookPayload,
       );
 
       if (result.success) {
@@ -577,7 +577,7 @@ export class ShopeeProcessor {
         tenantId,
         channelId,
         `shopee_batch_${syncType}`,
-        errorCount === 0 ? 'completed' : 'partial',
+        errorCount === 0 ? 'completed' : 'failed',
         `Batch ${syncType} sync completed: ${successCount}/${batchData.length} successful`,
         batchResult,
       );

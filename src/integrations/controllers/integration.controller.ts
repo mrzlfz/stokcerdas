@@ -25,6 +25,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { UserRole } from '../../users/entities/user.entity';
 
 import { IntegrationLogService } from '../common/services/integration-log.service';
 import { RateLimiterService } from '../common/services/rate-limiter.service';
@@ -72,7 +73,7 @@ export class IntegrationController {
   // Integration logs endpoints
 
   @Get('logs')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get integration logs' })
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'type', required: false })
@@ -128,7 +129,7 @@ export class IntegrationController {
   }
 
   @Get('logs/stats')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get integration log statistics' })
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'startDate', required: false })
@@ -168,7 +169,7 @@ export class IntegrationController {
   }
 
   @Get('logs/request/:requestId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get logs for specific request' })
   @ApiParam({ name: 'requestId', description: 'Request ID' })
   @ApiResponse({ status: 200, description: 'Request logs retrieved successfully' })
@@ -203,7 +204,7 @@ export class IntegrationController {
   }
 
   @Get('logs/errors')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get recent error logs' })
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -240,7 +241,7 @@ export class IntegrationController {
   }
 
   @Delete('logs/cleanup')
-  @Roles('admin')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Clean up old integration logs' })
   @ApiResponse({ status: 200, description: 'Log cleanup completed successfully' })
   async cleanupLogs(
@@ -276,7 +277,7 @@ export class IntegrationController {
   // Rate limiting endpoints
 
   @Get('rate-limit/status')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get rate limit status' })
   @ApiQuery({ name: 'key', required: true })
   @ApiQuery({ name: 'platform', required: true })
@@ -317,7 +318,7 @@ export class IntegrationController {
   }
 
   @Post('rate-limit/test')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test rate limiting' })
   @ApiResponse({ status: 201, description: 'Rate limit test completed successfully' })
   async testRateLimit(
@@ -357,7 +358,7 @@ export class IntegrationController {
   }
 
   @Delete('rate-limit/reset')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Reset rate limit for specific key' })
   @ApiQuery({ name: 'key', required: true })
   @ApiQuery({ name: 'platform', required: true })
@@ -398,7 +399,7 @@ export class IntegrationController {
   // Integration status and health endpoints
 
   @Get('health')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get integration health status' })
   @ApiResponse({ status: 200, description: 'Integration health status retrieved successfully' })
   async getIntegrationHealth(
@@ -471,7 +472,7 @@ export class IntegrationController {
   }
 
   @Get('platforms')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get supported integration platforms' })
   @ApiResponse({ status: 200, description: 'Supported platforms retrieved successfully' })
   async getSupportedPlatforms() {
@@ -532,7 +533,7 @@ export class IntegrationController {
   }
 
   @Get('sync-status')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get integration sync status' })
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'entityType', required: false })

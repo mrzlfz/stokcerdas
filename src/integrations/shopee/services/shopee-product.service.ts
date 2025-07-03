@@ -5,7 +5,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { ShopeeApiService, ShopeeCredentials, ShopeeApiRequest } from './shopee-api.service';
 import { ShopeeAuthService } from './shopee-auth.service';
-import { Product } from '../../../products/entities/product.entity';
+import { Product, ProductStatus } from '../../../products/entities/product.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
@@ -622,7 +622,7 @@ export class ShopeeProductService {
       name: shopeeProduct.item_name,
       description: shopeeProduct.description,
       sku: shopeeProduct.item_sku,
-      status: this.mapShopeeStatus(shopeeProduct.status),
+      status: this.mapShopeeStatus(shopeeProduct.status) as ProductStatus,
       weight: shopeeProduct.weight,
       metadata: {
         shopee: {
@@ -645,7 +645,7 @@ export class ShopeeProductService {
     product.name = shopeeProduct.item_name;
     product.description = shopeeProduct.description;
     product.sku = shopeeProduct.item_sku;
-    product.status = this.mapShopeeStatus(shopeeProduct.status);
+    product.status = this.mapShopeeStatus(shopeeProduct.status) as ProductStatus;
     product.weight = shopeeProduct.weight;
     
     product.metadata = {
@@ -681,15 +681,15 @@ export class ShopeeProductService {
     return await this.mappingRepository.save(mapping);
   }
 
-  private mapShopeeStatus(shopeeStatus: string): 'active' | 'inactive' | 'draft' | 'archived' {
-    const statusMap: Record<string, 'active' | 'inactive' | 'draft' | 'archived'> = {
-      'NORMAL': 'active',
-      'BANNED': 'inactive',
-      'DELETED': 'archived',
-      'UNLIST': 'inactive',
+  private mapShopeeStatus(shopeeStatus: string): ProductStatus {
+    const statusMap: Record<string, ProductStatus> = {
+      'NORMAL': ProductStatus.ACTIVE,
+      'BANNED': ProductStatus.INACTIVE,
+      'DELETED': ProductStatus.DISCONTINUED,
+      'UNLIST': ProductStatus.INACTIVE,
     };
 
-    return statusMap[shopeeStatus] || 'inactive';
+    return statusMap[shopeeStatus] || ProductStatus.INACTIVE;
   }
 
   private async getProductWithVariants(

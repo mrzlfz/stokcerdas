@@ -7,7 +7,7 @@ import { createTransport } from 'nodemailer';
 
 import { AlertInstance, AlertStatus } from '../entities/alert-instance.entity';
 import { AlertConfiguration, AlertType, AlertSeverity } from '../entities/alert-configuration.entity';
-import { User } from '../../users/entities/user.entity';
+import { User, UserStatus } from '../../users/entities/user.entity';
 
 export interface EmailNotificationData {
   tenantId: string;
@@ -238,7 +238,7 @@ export class EmailNotificationService {
           where: {
             id: config.recipientUserIds as any,
             tenantId: data.tenantId,
-            isActive: true,
+            status: UserStatus.ACTIVE,
           },
           select: ['email'],
         });
@@ -251,7 +251,7 @@ export class EmailNotificationService {
           where: {
             tenantId: data.tenantId,
             role: config.recipientRoles as any,
-            isActive: true,
+            status: UserStatus.ACTIVE,
           },
           select: ['email'],
         });

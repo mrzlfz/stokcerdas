@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { Product } from '../../../products/entities/product.entity';
+import { Product, ProductStatus } from '../../../products/entities/product.entity';
 import { Channel } from '../../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
@@ -193,7 +193,7 @@ export class TokopediaProductService {
       }
 
       // Fetch products from Tokopedia
-      const result = await this.apiService.makeRequest<{
+      const result = await this.apiService.makeTokopediaRequest<{
         products: TokopediaProduct[];
         pagination: {
           current_page: number;
@@ -213,7 +213,10 @@ export class TokopediaProductService {
       );
 
       if (!result.success || !result.data?.products) {
-        throw new Error(result.error || 'Failed to fetch products from Tokopedia');
+        const errorMessage = typeof result.error === 'string' 
+          ? result.error 
+          : this.extractErrorMessage(result.error) || 'Failed to fetch products from Tokopedia';
+        throw new Error(errorMessage);
       }
 
       const products = result.data.products;
@@ -251,7 +254,7 @@ export class TokopediaProductService {
         tenantId,
         channelId,
         'tokopedia_product_inbound',
-        errorCount === 0 ? 'completed' : 'partial',
+        errorCount === 0 ? 'completed' : 'failed',
         `Synced ${syncedCount} products from Tokopedia`,
         {
           syncedCount,
@@ -362,7 +365,7 @@ export class TokopediaProductService {
       if (existingMapping?.externalId) {
         // Update existing product
         isUpdate = true;
-        result = await this.apiService.makeRequest(
+        result = await this.apiService.makeTokopediaRequest(
           tenantId,
           channelId,
           config,
@@ -375,7 +378,7 @@ export class TokopediaProductService {
         );
       } else {
         // Create new product
-        result = await this.apiService.makeRequest<{ product_id: number }>(
+        result = await this.apiService.makeTokopediaRequest<{ product_id: number }>(
           tenantId,
           channelId,
           config,
@@ -389,7 +392,10 @@ export class TokopediaProductService {
       }
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to sync product to Tokopedia');
+        const errorMessage = typeof result.error === 'string' 
+          ? result.error 
+          : this.extractErrorMessage(result.error) || 'Failed to sync product to Tokopedia';
+        throw new Error(errorMessage);
       }
 
       const externalId = isUpdate 
@@ -483,7 +489,7 @@ export class TokopediaProductService {
         sandbox: channel.config.sandbox || false,
       };
 
-      const result = await this.apiService.makeRequest<TokopediaProduct>(
+      const result = await this.apiService.makeTokopediaRequest<TokopediaProduct>(
         tenantId,
         channelId,
         config,
@@ -494,7 +500,19 @@ export class TokopediaProductService {
         },
       );
 
-      return result;
+      if (result.success) {
+        return {
+          success: true,
+          data: result.data,
+        };
+      } else {
+        return {
+          success: false,
+          error: typeof result.error === 'string' 
+            ? result.error 
+            : this.extractErrorMessage(result.error) || 'Failed to get product details',
+        };
+      }
 
     } catch (error) {
       this.logger.error(`Failed to get Tokopedia product details: ${error.message}`, error.stack);
@@ -533,7 +551,7 @@ export class TokopediaProductService {
         sandbox: channel.config.sandbox || false,
       };
 
-      const result = await this.apiService.makeRequest(
+      const result = await this.apiService.makeTokopediaRequest(
         tenantId,
         channelId,
         config,
@@ -554,7 +572,18 @@ export class TokopediaProductService {
         });
       }
 
-      return result;
+      if (result.success) {
+        return {
+          success: true,
+        };
+      } else {
+        return {
+          success: false,
+          error: typeof result.error === 'string' 
+            ? result.error 
+            : this.extractErrorMessage(result.error) || 'Failed to update product images',
+        };
+      }
 
     } catch (error) {
       this.logger.error(`Failed to update product images: ${error.message}`, error.stack);
@@ -604,11 +633,12 @@ export class TokopediaProductService {
     product.name = tokopediaProduct.name;
     product.description = tokopediaProduct.description;
     product.sku = tokopediaProduct.sku;
-    product.price = tokopediaProduct.price;
+    product.sellingPrice = tokopediaProduct.price;
     product.weight = tokopediaProduct.weight;
-    product.status = tokopediaProduct.status === 'active' ? 'active' : 'inactive';
+    product.status = tokopediaProduct.status === 'active' ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
     product.images = tokopediaProduct.images;
-    product.metadata = {
+    // Store tokopedia-specific data in attributes
+    product.attributes = {
       tokopedia: {
         productId: tokopediaProduct.product_id,
         categoryId: tokopediaProduct.category_id,
@@ -630,17 +660,13 @@ export class TokopediaProductService {
         entityType: 'product',
         internalId: savedProduct.id,
         externalId: tokopediaProduct.product_id.toString(),
-        metadata: {
+        externalData: {
           syncedAt: new Date(),
           productName: tokopediaProduct.name,
         },
       });
     } else {
-      mapping.metadata = {
-        ...mapping.metadata,
-        syncedAt: new Date(),
-        productName: tokopediaProduct.name,
-      };
+      mapping.lastSyncAt = new Date();
       await this.mappingRepository.save(mapping);
     }
   }
@@ -649,17 +675,28 @@ export class TokopediaProductService {
     return {
       name: product.name,
       description: product.description || '',
-      category_id: product.metadata?.tokopedia?.categoryId || 1, // Default category
-      price: product.price,
+      category_id: product.attributes?.tokopedia?.categoryId || 1, // Default category
+      price: product.sellingPrice,
       stock: 0, // Will be handled by inventory service
       weight: product.weight || 100, // Default 100g
       sku: product.sku,
-      condition: (product.metadata?.tokopedia?.condition as 'new' | 'used') || 'new',
-      minimum_order: product.metadata?.tokopedia?.minimumOrder || 1,
+      condition: (product.attributes?.tokopedia?.condition as 'new' | 'used') || 'new',
+      minimum_order: product.attributes?.tokopedia?.minimumOrder || 1,
       images: product.images || [],
       preorder: false,
       is_free_return: false,
       is_wholesale: false,
     };
+  }
+
+  // Helper method to extract error messages from API responses
+  private extractErrorMessage(error: any): string {
+    if (typeof error === 'string') {
+      return error;
+    }
+    if (error && typeof error === 'object' && 'message' in error) {
+      return (error as any).message;
+    }
+    return 'Unknown error';
   }
 }

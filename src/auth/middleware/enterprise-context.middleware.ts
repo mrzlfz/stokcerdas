@@ -6,7 +6,7 @@ import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Department } from '../entities/department.entity';
 import { HierarchicalRole } from '../entities/hierarchical-role.entity';
-import { PermissionSet } from '../entities/permission-set.entity';
+import { PermissionSet, PermissionSetStatus } from '../entities/permission-set.entity';
 
 export interface EnterpriseRequest extends Request {
   user?: User;
@@ -241,7 +241,7 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
         where: {
           tenantId,
           isDeleted: false,
-          status: 'ACTIVE',
+          status: PermissionSetStatus.ACTIVE,
         },
         relations: ['permissions'],
         take: 50, // Limit for performance

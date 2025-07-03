@@ -212,8 +212,8 @@ export class Supplier extends AuditableEntity {
   @OneToMany(() => PurchaseOrder, (purchaseOrder) => purchaseOrder.supplier)
   purchaseOrders: PurchaseOrder[];
 
-  @OneToMany(() => ReorderRule, (rule) => rule.primarySupplier)
-  reorderRules: ReorderRule[];
+  // @OneToMany(() => ReorderRule, (rule) => rule.primarySupplier)
+  // reorderRules: ReorderRule[];
 
   // Business Logic Methods
   updatePerformance(orderData: {

@@ -7,9 +7,10 @@ import { Queue } from 'bull';
 
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 import { WhatsAppApiService } from './whatsapp-api.service';
 import { WhatsAppAuthService } from './whatsapp-auth.service';
-import { WebhookEvent } from '../../entities/webhook-event.entity';
+import { WebhookEvent, WebhookProcessingStatus } from '../../entities/webhook-event.entity';
 
 export interface WhatsAppWebhookPayload {
   object: 'whatsapp_business_account';
@@ -246,13 +247,12 @@ export class WhatsAppWebhookService {
       const webhookEvent = await this.webhookEventRepository.save({
         tenantId,
         channelId,
-        platform: 'whatsapp',
-        eventType: webhookType,
+        eventType: webhookType as any,
         eventSource: webhookData.object,
         payload: webhookData,
         headers,
-        status: 'processing',
-        receivedAt: new Date(),
+        processingStatus: WebhookProcessingStatus.PROCESSING,
+        createdAt: new Date(),
       });
 
       webhookId = webhookEvent.id;
@@ -281,14 +281,14 @@ export class WhatsAppWebhookService {
 
       // Update webhook status
       await this.webhookEventRepository.update(webhookId, {
-        status: errors.length === 0 ? 'processed' : 'partial',
+        processingStatus: errors.length === 0 ? WebhookProcessingStatus.PROCESSED : WebhookProcessingStatus.FAILED,
         processedAt: new Date(),
-        processingTime: Date.now() - startTime,
-        metadata: {
+        processingDurationMs: Date.now() - startTime,
+        processingDetails: {
           processedCount,
           errorCount: errors.length,
           errors: errors.length > 0 ? errors : undefined,
-        },
+        } as any,
       });
 
       // Log webhook processing completion
@@ -296,7 +296,7 @@ export class WhatsAppWebhookService {
         tenantId,
         channelId,
         webhookType,
-        errors.length === 0 ? 'processed' : 'partial',
+        errors.length === 0 ? 'processed' : 'failed',
         `WhatsApp webhook processed: ${processedCount} changes, ${errors.length} errors`,
         {
           webhookId,
@@ -325,10 +325,10 @@ export class WhatsAppWebhookService {
       // Update webhook status if we have an ID
       if (webhookId) {
         await this.webhookEventRepository.update(webhookId, {
-          status: 'failed',
+          processingStatus: WebhookProcessingStatus.FAILED,
           processedAt: new Date(),
-          processingTime: Date.now() - startTime,
-          metadata: {
+          processingDurationMs: Date.now() - startTime,
+          processingDetails: {
             error: error.message,
             stack: error.stack,
           },
@@ -543,8 +543,8 @@ export class WhatsAppWebhookService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'WEBHOOK',
-        level: 'INFO',
+        type: IntegrationLogType.WEBHOOK,
+        level: IntegrationLogLevel.INFO,
         message: 'WhatsApp incoming message processed',
         metadata: {
           webhookId,
@@ -603,8 +603,8 @@ export class WhatsAppWebhookService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'WEBHOOK',
-        level: 'INFO',
+        type: IntegrationLogType.WEBHOOK,
+        level: IntegrationLogLevel.INFO,
         message: `WhatsApp message status updated: ${status.status}`,
         metadata: {
           webhookId,
@@ -662,8 +662,8 @@ export class WhatsAppWebhookService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'WEBHOOK',
-        level: 'INFO',
+        type: IntegrationLogType.WEBHOOK,
+        level: IntegrationLogLevel.INFO,
         message: `WhatsApp template status updated: ${value.event_type}`,
         metadata: {
           webhookId,
@@ -770,11 +770,13 @@ export class WhatsAppWebhookService {
 
     // Log webhook error
     await this.logService.logError(tenantId, channelId, new Error(error.message), {
-      context: 'webhook_error',
-      webhookId,
-      errorCode: error.code,
-      errorTitle: error.title,
-      errorDetails: error.error_data?.details,
+      metadata: {
+        operation: 'webhook_error',
+        webhookId,
+        errorCode: error.code,
+        errorTitle: error.title,
+        errorDetails: error.error_data?.details,
+      },
     });
   }
 

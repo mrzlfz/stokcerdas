@@ -290,7 +290,7 @@ export class UserRole extends AuditableEntity {
     if (!timeRestriction?.allowedHours) return true;
     
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'lowercase' });
+    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase();
     const schedule = timeRestriction.allowedHours[dayOfWeek];
     
     if (!schedule) return false;

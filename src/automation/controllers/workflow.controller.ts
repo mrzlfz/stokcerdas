@@ -31,7 +31,7 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../auth/decorators/permissions.decorator';
-import { UserEntity } from '../../auth/decorators/user.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../users/entities/user.entity';
 
 // Services
@@ -252,7 +252,7 @@ export class WorkflowController {
   async createWorkflow(
     @Request() req: any,
     @Body() createWorkflowDto: CreateWorkflowDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -301,7 +301,7 @@ export class WorkflowController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
     @Body() updateWorkflowDto: UpdateWorkflowDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -348,7 +348,7 @@ export class WorkflowController {
   async deleteWorkflow(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -391,7 +391,7 @@ export class WorkflowController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) sourceWorkflowId: string,
     @Body() cloneWorkflowDto: CloneWorkflowDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -438,7 +438,7 @@ export class WorkflowController {
   async createWorkflowVersion(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -530,7 +530,7 @@ export class WorkflowController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
     @Body() createStepDto: CreateWorkflowStepDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -580,7 +580,7 @@ export class WorkflowController {
     @Param('id', ParseUUIDPipe) workflowId: string,
     @Param('stepId', ParseUUIDPipe) stepId: string,
     @Body() updateStepDto: UpdateWorkflowStepDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -628,7 +628,7 @@ export class WorkflowController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
     @Param('stepId', ParseUUIDPipe) stepId: string,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -674,7 +674,7 @@ export class WorkflowController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
     @Body() reorderDto: ReorderStepsDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -733,7 +733,7 @@ export class WorkflowController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
     @Body() triggerDto: TriggerWorkflowDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -850,6 +850,7 @@ export class WorkflowController {
   @RequirePermissions('workflow:read')
   async getExecutionDetails(
     @Request() req: any,
+    @Param('workflowId') workflowId: string,
     @Param('executionId') executionId: string,
   ) {
     try {
@@ -857,6 +858,7 @@ export class WorkflowController {
       
       const execution = await this.workflowExecutionService.getExecutionDetails(
         tenantId,
+        workflowId,
         executionId,
       );
 
@@ -1160,7 +1162,7 @@ export class WorkflowController {
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
     @Body() triggerConfigDto: TriggerConfigDto,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -1205,7 +1207,7 @@ export class WorkflowController {
   async enableWorkflow(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -1213,7 +1215,7 @@ export class WorkflowController {
       await this.workflowBuilderService.updateWorkflow(
         tenantId,
         workflowId,
-        { isActive: true, status: WorkflowStatus.ACTIVE },
+        {},
         user.id,
       );
 
@@ -1249,7 +1251,7 @@ export class WorkflowController {
   async disableWorkflow(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) workflowId: string,
-    @UserEntity() user: User,
+    @CurrentUser() user: User,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -1529,7 +1531,7 @@ export class WorkflowController {
       updatedAt: workflow.updatedAt,
       owner: workflow.owner ? {
         id: workflow.owner.id,
-        name: workflow.owner.name,
+        name: `${workflow.owner.firstName} ${workflow.owner.lastName}`,
         email: workflow.owner.email,
       } : null,
       steps: workflow.steps?.length || 0,

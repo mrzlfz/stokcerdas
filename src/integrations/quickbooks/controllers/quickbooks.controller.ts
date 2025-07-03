@@ -16,14 +16,14 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { Role } from '../../../auth/entities/role.entity';
+import { UserRole } from '../../../users/entities/user.entity';
 import { QuickBooksApiService, QuickBooksCredentials } from '../services/quickbooks-api.service';
 import { QuickBooksItemSyncService, ItemSyncOptions } from '../services/quickbooks-item-sync.service';
 import { QuickBooksCOGSService, COGSConfiguration } from '../services/quickbooks-cogs.service';
 import { QuickBooksInvoiceService, InvoiceGenerationOptions } from '../services/quickbooks-invoice.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AccountingAccount, AccountingPlatform } from '../../entities/accounting-account.entity';
+import { AccountingAccount, AccountingPlatform, AccountingConnectionStatus } from '../../entities/accounting-account.entity';
 
 @ApiTags('QuickBooks Integration')
 @Controller('api/v1/integrations/quickbooks')
@@ -42,7 +42,7 @@ export class QuickBooksController {
   ) {}
 
   @Get('auth/url')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get QuickBooks OAuth authorization URL' })
   @ApiResponse({ status: 200, description: 'Authorization URL generated successfully' })
   getAuthorizationUrl(
@@ -84,7 +84,7 @@ export class QuickBooksController {
   }
 
   @Post('auth/token')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Exchange authorization code for access token' })
   @ApiResponse({ status: 200, description: 'Token exchanged successfully' })
   async exchangeToken(
@@ -157,7 +157,7 @@ export class QuickBooksController {
   }
 
   @Get(':accountId/connection/test')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Test QuickBooks connection' })
   @ApiResponse({ status: 200, description: 'Connection tested successfully' })
   async testConnection(
@@ -196,7 +196,7 @@ export class QuickBooksController {
   }
 
   @Get(':accountId/company-info')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get QuickBooks company information' })
   @ApiResponse({ status: 200, description: 'Company information retrieved successfully' })
   async getCompanyInfo(
@@ -235,7 +235,7 @@ export class QuickBooksController {
   }
 
   @Post(':accountId/items/sync')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Sync products to QuickBooks items' })
   @ApiResponse({ status: 200, description: 'Items synced successfully' })
   async syncItemsToQuickBooks(
@@ -269,7 +269,7 @@ export class QuickBooksController {
   }
 
   @Post(':accountId/items/import')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Import items from QuickBooks' })
   @ApiResponse({ status: 200, description: 'Items imported successfully' })
   async importItemsFromQuickBooks(
@@ -303,7 +303,7 @@ export class QuickBooksController {
   }
 
   @Post(':accountId/items/bidirectional-sync')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Perform bidirectional item sync' })
   @ApiResponse({ status: 200, description: 'Bidirectional sync completed successfully' })
   async bidirectionalItemSync(
@@ -337,7 +337,7 @@ export class QuickBooksController {
   }
 
   @Post(':accountId/cogs/calculate')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Calculate and post COGS to QuickBooks' })
   @ApiResponse({ status: 200, description: 'COGS calculated and posted successfully' })
   async calculateCOGS(
@@ -378,7 +378,7 @@ export class QuickBooksController {
   }
 
   @Get(':accountId/cogs/report')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Generate COGS report' })
   @ApiResponse({ status: 200, description: 'COGS report generated successfully' })
   async generateCOGSReport(
@@ -426,7 +426,7 @@ export class QuickBooksController {
   }
 
   @Post(':accountId/invoices/generate')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Generate QuickBooks invoice from order' })
   @ApiResponse({ status: 200, description: 'Invoice generated successfully' })
   async generateInvoice(
@@ -465,7 +465,7 @@ export class QuickBooksController {
   }
 
   @Post(':accountId/invoices/batch-generate')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Generate QuickBooks invoices for multiple orders' })
   @ApiResponse({ status: 200, description: 'Batch invoice generation completed' })
   async generateInvoiceBatch(
@@ -504,7 +504,7 @@ export class QuickBooksController {
   }
 
   @Get(':accountId/invoices/:invoiceId/status')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get QuickBooks invoice status' })
   @ApiResponse({ status: 200, description: 'Invoice status retrieved successfully' })
   async getInvoiceStatus(
@@ -538,7 +538,7 @@ export class QuickBooksController {
   }
 
   @Get(':accountId/accounts')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get QuickBooks chart of accounts' })
   @ApiResponse({ status: 200, description: 'Chart of accounts retrieved successfully' })
   async getAccounts(
@@ -577,7 +577,7 @@ export class QuickBooksController {
   }
 
   @Get(':accountId/tax-codes')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get QuickBooks tax codes' })
   @ApiResponse({ status: 200, description: 'Tax codes retrieved successfully' })
   async getTaxCodes(
@@ -616,7 +616,7 @@ export class QuickBooksController {
   }
 
   @Delete(':accountId/disconnect')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Disconnect QuickBooks account' })
   @ApiResponse({ status: 200, description: 'Account disconnected successfully' })
   async disconnectAccount(
@@ -629,7 +629,7 @@ export class QuickBooksController {
       await this.accountingAccountRepository.update(
         { id: accountId, tenantId },
         {
-          status: 'disconnected',
+          status: AccountingConnectionStatus.DISCONNECTED,
           accessToken: null,
           refreshToken: null,
           tokenExpiresAt: null,
@@ -698,7 +698,7 @@ export class QuickBooksController {
     const accountData = {
       tenantId,
       platform: AccountingPlatform.QUICKBOOKS,
-      status: 'connected' as const,
+      status: AccountingConnectionStatus.CONNECTED,
       companyId: credentials.realmId,
       clientId: credentials.clientId,
       clientSecret: credentials.clientSecret,
@@ -714,7 +714,7 @@ export class QuickBooksController {
 
     if (existingAccount) {
       await this.accountingAccountRepository.update(existingAccount.id, accountData);
-      return { ...existingAccount, ...accountData };
+      return this.accountingAccountRepository.findOne({ where: { id: existingAccount.id } });
     } else {
       const newAccount = this.accountingAccountRepository.create({
         ...accountData,

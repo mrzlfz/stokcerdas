@@ -16,7 +16,7 @@ import { Channel } from '../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../channels/entities/channel-mapping.entity';
 import { Product } from '../../products/entities/product.entity';
 import { Order } from '../../orders/entities/order.entity';
-import { OrderItem } from '../../orders/entities/order-item.entity';
+import { OrderItem } from '../../orders/entities/order.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 
 // Common services

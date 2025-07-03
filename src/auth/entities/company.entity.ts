@@ -10,7 +10,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { AuditableEntity } from '../../common/entities/auditable.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { Department } from './department.entity';
 
@@ -418,7 +418,7 @@ export class Company extends AuditableEntity {
     return this.type === CompanyType.BRANCH;
   }
 
-  isActive(): boolean {
+  getIsActive(): boolean {
     return this.status === CompanyStatus.ACTIVE && this.isActive;
   }
 

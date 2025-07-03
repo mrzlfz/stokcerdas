@@ -275,7 +275,7 @@ export class ReportExportService {
       column.width = 15;
     });
 
-    return workbook.xlsx.writeBuffer();
+    return workbook.xlsx.writeBuffer() as Promise<Buffer>;
   }
 
   private async exportInventoryValuationToPdf(
@@ -373,7 +373,7 @@ export class ReportExportService {
       column.width = 15;
     });
 
-    return workbook.xlsx.writeBuffer();
+    return workbook.xlsx.writeBuffer() as Promise<Buffer>;
   }
 
   private async exportStockMovementToPdf(
@@ -487,7 +487,7 @@ export class ReportExportService {
       column.width = 15;
     });
 
-    return workbook.xlsx.writeBuffer();
+    return workbook.xlsx.writeBuffer() as Promise<Buffer>;
   }
 
   private async exportLowStockToPdf(
@@ -611,7 +611,7 @@ export class ReportExportService {
       column.width = 15;
     });
 
-    return workbook.xlsx.writeBuffer();
+    return workbook.xlsx.writeBuffer() as Promise<Buffer>;
   }
 
   private async exportProductPerformanceToPdf(
@@ -647,7 +647,7 @@ export class ReportExportService {
         printBackground: true,
       });
 
-      return pdfBuffer;
+      return Buffer.from(pdfBuffer);
     } catch (error) {
       this.logger.error(`PDF generation error: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to generate PDF');

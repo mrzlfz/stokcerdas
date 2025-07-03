@@ -14,7 +14,7 @@ export interface ShopeeCredentials {
   isSandbox?: boolean;
 }
 
-export interface ShopeeApiRequest extends Omit<ApiRequest, 'headers'> {
+export interface ShopeeApiRequest extends ApiRequest {
   shopId?: string;
   requiresAuth?: boolean;
   timestamp?: number;
@@ -22,7 +22,7 @@ export interface ShopeeApiRequest extends Omit<ApiRequest, 'headers'> {
 
 @Injectable()
 export class ShopeeApiService extends BaseApiService {
-  private readonly logger = new Logger(ShopeeApiService.name);
+  protected readonly logger = new Logger(ShopeeApiService.name);
   
   constructor(
     protected readonly httpService: HttpService,

@@ -16,13 +16,14 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { Role } from '../../../auth/entities/role.entity';
+import { UserRole } from '../../../users/entities/user.entity';
+// import { Role } from '../../../auth/entities/role.entity'; // TODO: Create role entity
 import { AccurateApiService, AccurateCredentials } from '../services/accurate-api.service';
 import { AccurateTaxComplianceService, IndonesianTaxConfiguration } from '../services/accurate-tax-compliance.service';
 import { AccurateMultiCurrencyService, CurrencyConfiguration } from '../services/accurate-multi-currency.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AccountingAccount, AccountingPlatform } from '../../entities/accounting-account.entity';
+import { AccountingAccount, AccountingPlatform, AccountingConnectionStatus } from '../../entities/accounting-account.entity';
 
 @ApiTags('Accurate Online Integration')
 @Controller('api/v1/integrations/accurate')
@@ -40,7 +41,7 @@ export class AccurateController {
   ) {}
 
   @Post('auth/authenticate')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Authenticate with Accurate Online' })
   @ApiResponse({ status: 200, description: 'Authentication successful' })
   async authenticate(
@@ -109,7 +110,7 @@ export class AccurateController {
   }
 
   @Get(':accountId/connection/test')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Test Accurate connection' })
   @ApiResponse({ status: 200, description: 'Connection tested successfully' })
   async testConnection(
@@ -148,7 +149,7 @@ export class AccurateController {
   }
 
   @Get(':accountId/company-profile')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Accurate company profile' })
   @ApiResponse({ status: 200, description: 'Company profile retrieved successfully' })
   async getCompanyProfile(
@@ -187,16 +188,16 @@ export class AccurateController {
   }
 
   @Get(':accountId/items')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get items from Accurate' })
   @ApiResponse({ status: 200, description: 'Items retrieved successfully' })
   async getItems(
+    @Request() req: any,
     @Param('accountId') accountId: string,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
     @Query('filter') filter?: string,
     @Query('itemType') itemType?: 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE',
-    @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -231,7 +232,7 @@ export class AccurateController {
   }
 
   @Post(':accountId/items')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create item in Accurate' })
   @ApiResponse({ status: 200, description: 'Item created successfully' })
   async createItem(
@@ -272,17 +273,17 @@ export class AccurateController {
   }
 
   @Get(':accountId/invoices')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get invoices from Accurate' })
   @ApiResponse({ status: 200, description: 'Invoices retrieved successfully' })
   async getInvoices(
+    @Request() req: any,
     @Param('accountId') accountId: string,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
     @Query('filter') filter?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
-    @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -317,7 +318,7 @@ export class AccurateController {
   }
 
   @Post(':accountId/invoices')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create invoice in Accurate' })
   @ApiResponse({ status: 200, description: 'Invoice created successfully' })
   async createInvoice(
@@ -358,15 +359,15 @@ export class AccurateController {
   }
 
   @Get(':accountId/customers')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get customers from Accurate' })
   @ApiResponse({ status: 200, description: 'Customers retrieved successfully' })
   async getCustomers(
+    @Request() req: any,
     @Param('accountId') accountId: string,
     @Query('skip') skip?: number,
     @Query('take') take?: number,
     @Query('filter') filter?: string,
-    @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -401,7 +402,7 @@ export class AccurateController {
   }
 
   @Get(':accountId/accounts')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get chart of accounts from Accurate' })
   @ApiResponse({ status: 200, description: 'Chart of accounts retrieved successfully' })
   async getAccounts(
@@ -440,7 +441,7 @@ export class AccurateController {
   }
 
   @Get(':accountId/tax-rates')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get tax rates from Accurate' })
   @ApiResponse({ status: 200, description: 'Tax rates retrieved successfully' })
   async getTaxRates(
@@ -481,7 +482,7 @@ export class AccurateController {
   // Tax Compliance Endpoints
 
   @Post(':accountId/tax/configure')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Configure Indonesian tax settings' })
   @ApiResponse({ status: 200, description: 'Tax settings configured successfully' })
   async configureTaxSettings(
@@ -515,7 +516,7 @@ export class AccurateController {
   }
 
   @Post(':accountId/tax/calculate')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Calculate tax for order or invoice' })
   @ApiResponse({ status: 200, description: 'Tax calculated successfully' })
   async calculateTax(
@@ -554,7 +555,7 @@ export class AccurateController {
   }
 
   @Post(':accountId/tax/efaktur/generate')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Generate e-Faktur for invoice' })
   @ApiResponse({ status: 200, description: 'e-Faktur generated successfully' })
   async generateEFaktur(
@@ -589,7 +590,7 @@ export class AccurateController {
   }
 
   @Get(':accountId/tax/report')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Generate tax report' })
   @ApiResponse({ status: 200, description: 'Tax report generated successfully' })
   async generateTaxReport(
@@ -625,7 +626,7 @@ export class AccurateController {
   }
 
   @Get(':accountId/tax/compliance/check')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Check tax compliance status' })
   @ApiResponse({ status: 200, description: 'Compliance status checked successfully' })
   async checkCompliance(
@@ -659,7 +660,7 @@ export class AccurateController {
   // Multi-Currency Endpoints
 
   @Post(':accountId/currency/configure')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Configure multi-currency settings' })
   @ApiResponse({ status: 200, description: 'Currency settings configured successfully' })
   async configureCurrency(
@@ -693,15 +694,15 @@ export class AccurateController {
   }
 
   @Get(':accountId/currency/exchange-rate')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get exchange rate between currencies' })
   @ApiResponse({ status: 200, description: 'Exchange rate retrieved successfully' })
   async getExchangeRate(
+    @Request() req: any,
     @Param('accountId') accountId: string,
     @Query('fromCurrency') fromCurrency: string,
     @Query('toCurrency') toCurrency: string,
     @Query('date') date?: string,
-    @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -731,7 +732,7 @@ export class AccurateController {
   }
 
   @Post(':accountId/currency/convert')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Convert amount between currencies' })
   @ApiResponse({ status: 200, description: 'Currency converted successfully' })
   async convertCurrency(
@@ -774,7 +775,7 @@ export class AccurateController {
   }
 
   @Post(':accountId/currency/revaluation')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Perform currency revaluation' })
   @ApiResponse({ status: 200, description: 'Currency revaluation completed successfully' })
   async performRevaluation(
@@ -809,13 +810,13 @@ export class AccurateController {
   }
 
   @Get(':accountId/currency/report')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Generate currency report' })
   @ApiResponse({ status: 200, description: 'Currency report generated successfully' })
   async generateCurrencyReport(
+    @Request() req: any,
     @Param('accountId') accountId: string,
     @Query('reportDate') reportDate?: string,
-    @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
@@ -843,7 +844,7 @@ export class AccurateController {
   }
 
   @Delete(':accountId/disconnect')
-  @Roles(Role.ADMIN, Role.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Disconnect Accurate account' })
   @ApiResponse({ status: 200, description: 'Account disconnected successfully' })
   async disconnectAccount(
@@ -856,7 +857,7 @@ export class AccurateController {
       await this.accountingAccountRepository.update(
         { id: accountId, tenantId },
         {
-          status: 'disconnected',
+          status: AccountingConnectionStatus.DISCONNECTED,
           accessToken: null,
           platformConfig: null,
           updatedBy: req.user.id,
@@ -927,20 +928,22 @@ export class AccurateController {
     const accountData = {
       tenantId,
       platform: AccountingPlatform.ACCURATE,
-      status: 'connected' as const,
+      status: AccountingConnectionStatus.CONNECTED,
       apiBaseUrl: credentials.serverUrl,
       platformConfig: {
         sessionId: credentials.sessionId,
         databaseId: credentials.databaseId,
         serverUrl: credentials.serverUrl,
-        environment: credentials.environment,
+        environment: (credentials.environment === 'demo' ? 'sandbox' : 'production') as 'sandbox' | 'production',
       },
       updatedBy: userId,
     };
 
     if (existingAccount) {
       await this.accountingAccountRepository.update(existingAccount.id, accountData);
-      return { ...existingAccount, ...accountData };
+      return this.accountingAccountRepository.findOne({
+        where: { id: existingAccount.id, tenantId },
+      });
     } else {
       const newAccount = this.accountingAccountRepository.create({
         ...accountData,

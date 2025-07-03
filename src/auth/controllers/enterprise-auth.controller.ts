@@ -304,9 +304,9 @@ export class EnterpriseAuthController {
   @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
   async getUserAssignments(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentTenant() tenantId: string,
     @Query('type') type?: 'role' | 'permission_set' | 'department',
     @Query('active') active?: boolean,
-    @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<UserAssignmentDto[]>> {
     // This would be implemented with actual assignment retrieval
     // For now, return empty array
@@ -462,10 +462,10 @@ export class EnterpriseAuthController {
   @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
   async getUserAuditTrail(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentTenant() tenantId: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('limit') limit: number = 100,
-    @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<Array<{
     id: string;
     userId: string;

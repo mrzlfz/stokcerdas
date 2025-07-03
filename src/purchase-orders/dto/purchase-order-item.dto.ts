@@ -137,6 +137,10 @@ export class AddPurchaseOrderItemDto {
 
 export class UpdatePurchaseOrderItemDto extends PartialType(AddPurchaseOrderItemDto) {
   // All fields from AddPurchaseOrderItemDto are optional for updates
+  
+  @IsOptional()
+  @IsString()
+  updatedBy?: string;
 }
 
 export class ReceiveItemDto {

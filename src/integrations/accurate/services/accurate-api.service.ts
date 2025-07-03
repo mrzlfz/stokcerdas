@@ -198,7 +198,7 @@ export interface AccurateAccount {
 
 @Injectable()
 export class AccurateApiService extends BaseApiService {
-  private readonly logger = new Logger(AccurateApiService.name);
+  protected readonly logger = new Logger(AccurateApiService.name);
   
   constructor(
     protected readonly httpService: HttpService,
@@ -249,7 +249,7 @@ export class AccurateApiService extends BaseApiService {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'StokCerdas/1.0',
-        ...request.headers,
+        // Custom headers handled by Accurate service
       },
     };
 

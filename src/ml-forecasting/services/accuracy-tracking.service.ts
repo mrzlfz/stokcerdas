@@ -415,17 +415,17 @@ export class AccuracyTrackingService {
     });
 
     // Update model status to indicate retraining needed
-    await this.mlModelRepo.update(
-      { id: trigger.modelId, tenantId },
-      { 
-        metadata: {
-          retrainingTriggered: true,
-          retrainingReason: trigger.description,
-          retrainingPriority: trigger.priority,
-          triggeredAt: new Date().toISOString(),
-        }
-      }
-    );
+    const model = await this.mlModelRepo.findOne({ where: { id: trigger.modelId, tenantId } });
+    if (model) {
+      model.metadata = {
+        ...model.metadata,
+        retrainingTriggered: true,
+        retrainingReason: trigger.description,
+        retrainingPriority: trigger.priority,
+        triggeredAt: new Date().toISOString(),
+      };
+      await this.mlModelRepo.save(model);
+    }
   }
 
   // Private helper methods for calculations

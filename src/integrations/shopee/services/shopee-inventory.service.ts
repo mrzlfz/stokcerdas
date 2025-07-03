@@ -8,7 +8,7 @@ import { ShopeeAuthService } from './shopee-auth.service';
 import { InventoryTransaction } from '../../../inventory/entities/inventory-transaction.entity';
 import { InventoryLocation } from '../../../inventory/entities/inventory-location.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
-import { ChannelInventory } from '../../../channels/entities/channel-inventory.entity';
+import { ChannelInventory, AllocationStrategy } from '../../../channels/entities/channel-inventory.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
 export interface ShopeeStock {
@@ -600,7 +600,8 @@ export class ShopeeInventoryService {
           allocatedQuantity: stockDetail.current_stock,
           availableQuantity: stockDetail.current_stock - stockDetail.reserved_stock,
           reservedQuantity: stockDetail.reserved_stock,
-          allocationRule: 'manual',
+          allocationStrategy: AllocationStrategy.FIXED_AMOUNT,
+          allocationValue: stockDetail.current_stock,
           priority: 1,
         });
       } else {
@@ -646,7 +647,8 @@ export class ShopeeInventoryService {
                 allocatedQuantity: stockDetail.current_stock,
                 availableQuantity: stockDetail.current_stock - stockDetail.reserved_stock,
                 reservedQuantity: stockDetail.reserved_stock,
-                allocationRule: 'manual',
+                allocationStrategy: AllocationStrategy.FIXED_AMOUNT,
+          allocationValue: stockDetail.current_stock,
                 priority: 1,
               });
             } else {

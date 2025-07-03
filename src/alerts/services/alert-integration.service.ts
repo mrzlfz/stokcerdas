@@ -6,7 +6,7 @@ import { Repository } from 'typeorm';
 import { AlertManagementService } from './alert-management.service';
 import { AlertConfigurationService } from './alert-configuration.service';
 import { AlertType, AlertSeverity } from '../entities/alert-configuration.entity';
-import { AlertInstance } from '../entities/alert-instance.entity';
+import { AlertInstance, AlertStatus, AlertPriority } from '../entities/alert-instance.entity';
 import { InventoryUpdateEvent, StockAlert } from '../../inventory/services/inventory-realtime.service';
 
 @Injectable()
@@ -173,7 +173,7 @@ export class AlertIntegrationService {
         alertType: this.mapStockAlertTypeToAlertType(alertType),
         productId,
         locationId,
-        status: 'active',
+        status: AlertStatus.ACTIVE,
       },
       relations: ['product', 'location'],
     });
@@ -193,7 +193,7 @@ export class AlertIntegrationService {
       where: {
         tenantId,
         inventoryItemId,
-        status: 'active',
+        status: AlertStatus.ACTIVE,
       },
     });
 
@@ -297,8 +297,8 @@ export class AlertIntegrationService {
   /**
    * Escalate priority
    */
-  private escalatePriority(currentPriority: string): string {
-    const priorities = ['low', 'medium', 'high', 'critical'];
+  private escalatePriority(currentPriority: AlertPriority): AlertPriority {
+    const priorities = [AlertPriority.LOW, AlertPriority.MEDIUM, AlertPriority.HIGH, AlertPriority.CRITICAL];
     const currentIndex = priorities.indexOf(currentPriority);
     return priorities[Math.min(currentIndex + 1, priorities.length - 1)];
   }

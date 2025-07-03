@@ -8,6 +8,7 @@ import { AccurateTaxComplianceService } from '../services/accurate-tax-complianc
 import { AccurateMultiCurrencyService } from '../services/accurate-multi-currency.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
+import { IntegrationLogLevel, IntegrationLogType } from '../../entities/integration-log.entity';
 
 export interface AccurateWebhookJobData {
   webhookId: string;
@@ -272,7 +273,7 @@ export class AccurateProcessor {
           if (itemsResponse.success) {
             result = {
               success: true,
-              itemsProcessed: itemsResponse.data?.length || 0,
+              itemsProcessed: itemsResponse.data?.sp?.length || 0,
               items: itemsResponse.data,
             };
           } else {
@@ -427,8 +428,8 @@ export class AccurateProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Accurate tax ${operation} completed successfully`,
         metadata: { 
           accountingAccountId, 
@@ -555,8 +556,8 @@ export class AccurateProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Accurate currency ${operation} completed successfully`,
         metadata: { 
           accountingAccountId, 
@@ -676,8 +677,8 @@ export class AccurateProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Accurate invoice ${operation} completed successfully`,
         metadata: { 
           accountingAccountId, 
@@ -778,8 +779,8 @@ export class AccurateProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Accurate auth ${operation} completed successfully`,
         metadata: { 
           accountingAccountId, 
@@ -873,8 +874,8 @@ export class AccurateProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Accurate ${reportType} report generated successfully`,
         metadata: { 
           accountingAccountId, 

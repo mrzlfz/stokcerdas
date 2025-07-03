@@ -32,8 +32,8 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import { Channel } from '../../channels/entities/channel.entity';
 import { Product } from '../../products/entities/product.entity';
 import { Order } from '../../orders/entities/order.entity';
-import { OrderItem } from '../../orders/entities/order-item.entity';
-import { InventoryLevel } from '../../inventory/entities/inventory-level.entity';
+import { OrderItem } from '../../orders/entities/order.entity';
+import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 
 @Module({
   imports: [
@@ -48,7 +48,7 @@ import { InventoryLevel } from '../../inventory/entities/inventory-level.entity'
       Product,
       Order,
       OrderItem,
-      InventoryLevel,
+      InventoryItem,
     ]),
 
     // HTTP client for API calls

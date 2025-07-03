@@ -3,9 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { LazadaApiService, LazadaConfig } from './lazada-api.service';
+import { LazadaApiService, LazadaConfig, LazadaRegion } from './lazada-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { Channel } from '../../../channels/entities/channel.entity';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface LazadaAuthConfig {
   appKey: string;
@@ -91,11 +92,11 @@ export class LazadaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Lazada authorization URL generated',
         metadata: {
-          region: config.region,
+          region: config.region as LazadaRegion,
           redirectUri: config.redirectUri,
           state: authState,
         },
@@ -125,18 +126,18 @@ export class LazadaAuthService {
       this.logger.debug(`Exchanging authorization code for token`, {
         tenantId,
         channelId,
-        region: config.region,
+        region: config.region as LazadaRegion,
       });
 
       const lazadaConfig: LazadaConfig = {
         appKey: config.appKey,
         appSecret: config.appSecret,
-        region: config.region,
+        region: config.region as LazadaRegion,
         sandbox: config.sandbox,
       };
 
       // Exchange code for token
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,
@@ -180,11 +181,11 @@ export class LazadaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Lazada access token obtained successfully',
         metadata: {
-          region: config.region,
+          region: config.region as LazadaRegion,
           expiresAt: expiresAt.toISOString(),
           refreshExpiresAt: refreshExpiresAt.toISOString(),
           countryUserInfo: tokenInfo.countryUserInfo,
@@ -202,8 +203,10 @@ export class LazadaAuthService {
         channelId,
         error,
         {
-          context: 'token_exchange',
-          region: config.region,
+          metadata: {
+            tokenExchange: true,
+            region: config.region as LazadaRegion,
+          },
         },
       );
 
@@ -244,7 +247,7 @@ export class LazadaAuthService {
       };
 
       // Refresh token
-      const result = await this.lazadaApi.makeRequest(
+      const result = await this.lazadaApi.makeLazadaRequest(
         tenantId,
         channelId,
         lazadaConfig,
@@ -295,8 +298,8 @@ export class LazadaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Lazada access token refreshed successfully',
         metadata: {
           expiresAt: expiresAt.toISOString(),
@@ -315,7 +318,9 @@ export class LazadaAuthService {
         channelId,
         error,
         {
-          context: 'token_refresh',
+          metadata: {
+            tokenRefresh: true,
+          },
         },
       );
 
@@ -333,7 +338,7 @@ export class LazadaAuthService {
     try {
       // Get channel with config
       const channel = await this.channelRepository.findOne({
-        where: { id: channelId, tenantId, platform: 'lazada' },
+        where: { id: channelId, tenantId, name: 'lazada' },
       });
 
       if (!channel || !channel.config) {
@@ -411,8 +416,8 @@ export class LazadaAuthService {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'AUTH',
-          level: 'INFO',
+          type: IntegrationLogType.AUTH,
+          level: IntegrationLogLevel.INFO,
           message: 'Lazada authentication test successful',
           metadata: { shopInfo: result.data },
         });
@@ -452,8 +457,8 @@ export class LazadaAuthService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Lazada authentication revoked',
         metadata: {},
       });
@@ -499,7 +504,7 @@ export class LazadaAuthService {
           accessToken: tokenInfo.accessToken,
           refreshToken: tokenInfo.refreshToken,
           accessTokenType: tokenInfo.accessTokenType,
-          region: config.region,
+          region: config.region as LazadaRegion,
           expiresAt: tokenInfo.expiresAt.toISOString(),
           refreshExpiresAt: tokenInfo.refreshExpiresAt.toISOString(),
           countryUserInfo: tokenInfo.countryUserInfo,

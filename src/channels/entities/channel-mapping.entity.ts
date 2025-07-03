@@ -40,6 +40,9 @@ export class ChannelMapping extends BaseEntity {
   })
   direction: MappingDirection;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  entityType?: string;
+
   // Internal system reference
   @Column({ type: 'varchar', length: 255 })
   internalId: string;

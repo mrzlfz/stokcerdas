@@ -5,16 +5,25 @@ import { lastValueFrom, map, catchError } from 'rxjs';
 import { throwError } from 'rxjs';
 import * as crypto from 'crypto';
 
-import { BaseApiService } from '../../common/services/base-api.service';
+import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../common/services/base-api.service';
 import { RateLimiterService } from '../../common/services/rate-limiter.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
+
+export enum LazadaRegion {
+  MY = 'MY',
+  SG = 'SG',
+  TH = 'TH',
+  ID = 'ID',
+  PH = 'PH',
+  VN = 'VN',
+}
 
 export interface LazadaConfig {
   appKey: string;
   appSecret: string;
   accessToken?: string;
   refreshToken?: string;
-  region: 'MY' | 'SG' | 'TH' | 'ID' | 'PH' | 'VN';
+  region: LazadaRegion;
   sandbox?: boolean;
 }
 
@@ -25,6 +34,7 @@ export interface LazadaRequestConfig {
   body?: Record<string, any>;
   requiresAuth?: boolean;
   rateLimitKey?: string;
+  headers?: Record<string, string>;
 }
 
 export interface LazadaApiResponse<T = any> {
@@ -37,7 +47,7 @@ export interface LazadaApiResponse<T = any> {
 
 @Injectable()
 export class LazadaApiService extends BaseApiService {
-  private readonly logger = new Logger(LazadaApiService.name);
+  protected readonly logger = new Logger(LazadaApiService.name);
   private readonly baseUrls = {
     // Production URLs
     MY: 'https://api.lazada.com.my/rest',
@@ -66,13 +76,59 @@ export class LazadaApiService extends BaseApiService {
     protected readonly rateLimiter: RateLimiterService,
     protected readonly logService: IntegrationLogService,
   ) {
-    super(httpService, configService, rateLimiter, logService);
+    super(httpService, configService);
   }
 
   /**
-   * Make authenticated API request to Lazada
+   * Implement base class makeRequest method
    */
   async makeRequest<T = any>(
+    config: ApiConfig,
+    request: ApiRequest,
+    tenantId: string,
+    channelId: string,
+  ): Promise<ApiResponse<T>> {
+    // Extract Lazada-specific config from authentication credentials
+    const auth = config.authentication?.credentials || {};
+    const lazadaConfig: LazadaConfig = {
+      appKey: auth.appKey || '',
+      appSecret: auth.appSecret || '',
+      region: (auth.region as LazadaRegion) || LazadaRegion.ID,
+      sandbox: auth.sandbox || false,
+      accessToken: auth.accessToken,
+      refreshToken: auth.refreshToken,
+    };
+
+    // Map method type (handle PATCH which Lazada doesn't support)
+    const method = request.method === 'PATCH' ? 'PUT' : request.method;
+
+    const lazadaRequest: LazadaRequestConfig = {
+      method: method as 'GET' | 'POST' | 'PUT' | 'DELETE',
+      path: request.endpoint,
+      params: request.params,
+      body: request.data,
+      requiresAuth: request.headers?.['Authorization'] ? true : false,
+      headers: request.headers,
+    };
+
+    const result = await this.makeLazadaRequest(tenantId, channelId, lazadaConfig, lazadaRequest);
+    
+    return {
+      success: result.success,
+      data: result.data,
+      error: result.error ? { message: result.error, code: 'LAZADA_ERROR' } : undefined,
+      metadata: {
+        requestId: this.generateRequestId(),
+        timestamp: new Date(),
+        duration: 0,
+      },
+    };
+  }
+
+  /**
+   * Make authenticated API request to Lazada (Lazada-specific)
+   */
+  async makeLazadaRequest<T = any>(
     tenantId: string,
     channelId: string,
     config: LazadaConfig,
@@ -99,7 +155,7 @@ export class LazadaApiService extends BaseApiService {
       const fullUrl = `${apiUrl}${requestConfig.path}`;
 
       // Prepare request parameters
-      const params = {
+      const params: Record<string, any> = {
         app_key: config.appKey,
         timestamp: Date.now().toString(),
         sign_method: 'sha256',
@@ -203,8 +259,10 @@ export class LazadaApiService extends BaseApiService {
         error,
         {
           requestId,
-          path: requestConfig.path,
-          method: requestConfig.method,
+          metadata: {
+            path: requestConfig.path,
+            method: requestConfig.method,
+          },
         },
       );
 
@@ -218,11 +276,12 @@ export class LazadaApiService extends BaseApiService {
   /**
    * Generate Lazada API signature
    */
-  private generateSignature(
+  generateSignature(
     method: string,
-    path: string,
+    endpoint: string,
     params: Record<string, any>,
-    appSecret: string,
+    secret: string,
+    timestamp?: number,
   ): string {
     try {
       // Sort parameters by key
@@ -234,11 +293,11 @@ export class LazadaApiService extends BaseApiService {
         .join('');
 
       // Create string to sign
-      const stringToSign = `${method}${path}${queryString}`;
+      const stringToSign = `${method}${endpoint}${queryString}`;
 
       // Generate HMAC-SHA256 signature
       const signature = crypto
-        .createHmac('sha256', appSecret)
+        .createHmac('sha256', secret)
         .update(stringToSign)
         .digest('hex')
         .toUpperCase();
@@ -275,7 +334,7 @@ export class LazadaApiService extends BaseApiService {
   /**
    * Generate unique request ID
    */
-  private generateRequestId(): string {
+  protected generateRequestId(): string {
     return `lazada_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
@@ -287,12 +346,22 @@ export class LazadaApiService extends BaseApiService {
     channelId: string,
     config: LazadaConfig,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    return this.makeRequest(tenantId, channelId, config, {
+    const result = await this.makeRequest({
+      baseUrl: config.sandbox ? this.sandboxUrls[config.region] : this.baseUrls[config.region],
+      authentication: {
+        type: 'signature',
+        credentials: config,
+      },
+    }, {
       method: 'GET',
-      path: '/seller/get',
-      requiresAuth: true,
-      rateLimitKey: 'shop_info',
-    });
+      endpoint: '/seller/get',
+    }, tenantId, channelId);
+    
+    return {
+      success: result.success,
+      data: result.data,
+      error: result.error?.message,
+    };
   }
 
   /**

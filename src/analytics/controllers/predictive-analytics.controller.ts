@@ -23,6 +23,7 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UserRole } from '../../users/entities/user.entity';
 
 import { PredictiveAnalyticsService } from '../services/predictive-analytics.service';
 import { PriceOptimizationService } from '../services/price-optimization.service';
@@ -30,6 +31,7 @@ import { DemandAnomalyService } from '../services/demand-anomaly.service';
 
 import {
   PredictiveAnalysisType,
+  TimeHorizon,
   StockoutPredictionQueryDto,
   SlowMovingDetectionQueryDto,
   OptimalReorderQueryDto,
@@ -64,7 +66,7 @@ export class PredictiveAnalyticsController {
 
   // Unified Predictive Analytics Endpoint
   @Post('analyze')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Perform comprehensive predictive analysis',
     description: 'Execute various types of predictive analytics based on the specified analysis type',
@@ -91,7 +93,7 @@ export class PredictiveAnalyticsController {
         case PredictiveAnalysisType.STOCKOUT_PREDICTION:
           const stockoutResult = await this.predictiveAnalyticsService.generateStockoutPredictions(
             user.tenantId,
-            query.parameters as StockoutPredictionQueryDto || {},
+            query.parameters as StockoutPredictionQueryDto || { timeHorizon: TimeHorizon.NEXT_30_DAYS },
           );
           data = stockoutResult.data;
           summary = stockoutResult.summary;
@@ -191,7 +193,7 @@ export class PredictiveAnalyticsController {
 
   // Stockout Prediction Endpoints
   @Get('stockout-risk')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Predict stockout risks',
     description: 'Analyze inventory levels and demand patterns to predict stockout risks',
@@ -221,7 +223,7 @@ export class PredictiveAnalyticsController {
 
   // Slow-Moving Item Detection Endpoints
   @Get('slow-moving')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Detect slow-moving inventory items',
     description: 'Identify products with low turnover rates and provide optimization recommendations',
@@ -251,7 +253,7 @@ export class PredictiveAnalyticsController {
 
   // Optimal Reorder Recommendations
   @Get('optimal-reorder')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Generate optimal reorder recommendations',
     description: 'Calculate optimal reorder quantities and timing based on demand forecasts and inventory levels',
@@ -281,7 +283,7 @@ export class PredictiveAnalyticsController {
 
   // Price Optimization Endpoints
   @Get('price-optimization')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Generate price optimization recommendations',
     description: 'Analyze demand elasticity, competitive positioning, and margin optimization to recommend optimal pricing',
@@ -311,7 +313,7 @@ export class PredictiveAnalyticsController {
 
   // Demand Anomaly Detection
   @Get('demand-anomalies')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Detect demand anomalies',
     description: 'Identify unusual patterns in demand data and provide insights into potential causes',
@@ -341,7 +343,7 @@ export class PredictiveAnalyticsController {
 
   // Seasonal Analysis
   @Get('seasonal-analysis')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Perform seasonal demand analysis',
     description: 'Analyze seasonal patterns in product demand and provide strategic recommendations',
@@ -371,7 +373,7 @@ export class PredictiveAnalyticsController {
 
   // Insights and Recommendations
   @Get('insights/summary')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Get predictive analytics insights summary',
     description: 'Comprehensive summary of all predictive analytics insights with prioritized recommendations',
@@ -428,7 +430,7 @@ export class PredictiveAnalyticsController {
   }
 
   @Get('health')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Check predictive analytics service health',
     description: 'Health check endpoint for predictive analytics services',

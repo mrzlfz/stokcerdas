@@ -1,1 +1,21 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';\n\nexport const TenantId = createParamDecorator(\n  (data: unknown, ctx: ExecutionContext): string => {\n    const request = ctx.switchToHttp().getRequest();\n    return request.tenantId;\n  },\n);\n\nexport const GetTenant = createParamDecorator(\n  (data: unknown, ctx: ExecutionContext) => {\n    const request = ctx.switchToHttp().getRequest();\n    return {\n      id: request.tenantId,\n      // Add more tenant properties as needed\n    };\n  },\n);"
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+
+export const TenantId = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string => {
+    const request = ctx.switchToHttp().getRequest();
+    return request.tenantId;
+  },
+);
+
+export const GetTenant = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    return {
+      id: request.tenantId,
+      // Add more tenant properties as needed
+    };
+  },
+);
+
+// Alias for TenantId for backward compatibility
+export const Tenant = TenantId;

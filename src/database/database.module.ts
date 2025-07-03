@@ -1,1 +1,10 @@
-import { Module } from '@nestjs/common';\nimport { TypeOrmModule } from '@nestjs/typeorm';\nimport { TenantSubscriber } from './subscribers/tenant.subscriber';\n\n@Module({\n  imports: [TypeOrmModule.forFeature([])],\n  providers: [TenantSubscriber],\n  exports: [TenantSubscriber],\n})\nexport class DatabaseModule {}"
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TenantSubscriber } from './subscribers/tenant.subscriber';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([])],
+  providers: [TenantSubscriber],
+  exports: [TenantSubscriber],
+})
+export class DatabaseModule {}

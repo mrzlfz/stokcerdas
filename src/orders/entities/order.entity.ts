@@ -350,6 +350,12 @@ export class OrderItem extends BaseEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   externalItemId?: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  externalProductId?: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  externalVariantId?: string;
+
   @Column({ type: 'jsonb', nullable: true })
   externalData?: Record<string, any>;
 

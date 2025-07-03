@@ -7,7 +7,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { AuditableEntity } from '../../common/entities/auditable.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { Company } from './company.entity';
 import { User } from '../../users/entities/user.entity';
 import { ApprovalInstance } from './approval-instance.entity';
@@ -501,8 +501,8 @@ export class InterCompanyTransfer extends AuditableEntity {
   }
 
   calculateProcessingTime(): void {
-    if (this.createdAt && this.completedDate) {
-      const diffMs = this.completedDate.getTime() - this.createdAt.getTime();
+    if ((this as any).createdAt && this.completedDate) {
+      const diffMs = this.completedDate.getTime() - (this as any).createdAt.getTime();
       this.processingTimeHours = diffMs / (1000 * 60 * 60);
     }
   }

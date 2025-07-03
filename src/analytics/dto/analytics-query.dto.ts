@@ -175,6 +175,14 @@ export class RevenueAnalyticsQueryDto extends BaseAnalyticsQueryDto {
   @IsOptional()
   @IsString()
   currency?: string = 'IDR';
+
+  @ApiPropertyOptional({
+    description: 'Include trend analysis',
+    default: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  includeTrends?: boolean = true;
 }
 
 export class InventoryTurnoverQueryDto extends BaseAnalyticsQueryDto {

@@ -9,6 +9,7 @@ import { WhatsAppTemplateService } from '../services/whatsapp-template.service';
 import { WhatsAppAuthService } from '../services/whatsapp-auth.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface WhatsAppWebhookJobData {
   webhookId: string;
@@ -247,8 +248,8 @@ export class WhatsAppProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `WhatsApp ${messageType} message sent via queue`,
         metadata: {
           messageType,
@@ -275,9 +276,11 @@ export class WhatsAppProcessor {
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'message_send_queue',
-        messageType,
-        recipient: messageData.to,
+        metadata: {
+          operation: 'message_send_queue',
+          messageType,
+          recipient: messageData.to,
+        },
       });
 
       throw error;
@@ -361,8 +364,8 @@ export class WhatsAppProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: 'WhatsApp bulk message send completed via queue',
         metadata: {
           messageType,
@@ -388,9 +391,11 @@ export class WhatsAppProcessor {
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'bulk_message_queue',
-        messageType,
-        recipientCount: recipients.length,
+        metadata: {
+          operation: 'bulk_message_queue',
+          messageType,
+          recipientCount: recipients.length,
+        },
       });
 
       throw error;
@@ -436,8 +441,8 @@ export class WhatsAppProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `WhatsApp template ${action} operation completed via queue`,
         metadata: {
           action,
@@ -464,10 +469,12 @@ export class WhatsAppProcessor {
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'template_operation_queue',
-        action,
-        templateId,
-        templateName,
+        metadata: {
+          operation: 'template_operation_queue',
+          action,
+          templateId,
+          templateName,
+        },
       });
 
       throw error;
@@ -512,8 +519,8 @@ export class WhatsAppProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `WhatsApp media ${action} operation completed via queue`,
         metadata: {
           action,
@@ -531,9 +538,11 @@ export class WhatsAppProcessor {
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'media_operation_queue',
-        action,
-        mediaId,
+        metadata: {
+          operation: 'media_operation_queue',
+          action,
+          mediaId,
+        },
       });
 
       throw error;
@@ -561,8 +570,8 @@ export class WhatsAppProcessor {
         await this.logService.log({
           tenantId,
           channelId,
-          type: 'SYSTEM',
-          level: 'INFO',
+          type: IntegrationLogType.SYSTEM,
+          level: IntegrationLogLevel.INFO,
           message: 'WhatsApp message marked as read via queue',
           metadata: { messageId },
         });
@@ -575,8 +584,10 @@ export class WhatsAppProcessor {
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'mark_as_read_queue',
-        messageId,
+        metadata: {
+          operation: 'mark_as_read_queue',
+          messageId,
+        },
       });
 
       throw error;
@@ -621,8 +632,8 @@ export class WhatsAppProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `WhatsApp health check ${checkType} completed via queue`,
         metadata: { checkType, result },
       });
@@ -634,8 +645,10 @@ export class WhatsAppProcessor {
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'health_check_queue',
-        checkType,
+        metadata: {
+          operation: 'health_check_queue',
+          checkType,
+        },
       });
 
       throw error;
@@ -679,9 +692,11 @@ export class WhatsAppProcessor {
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
-        context: 'scheduled_message_queue',
-        messageType,
-        scheduleAt,
+        metadata: {
+          operation: 'scheduled_message_queue',
+          messageType,
+          scheduleAt,
+        },
       });
 
       throw error;

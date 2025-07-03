@@ -242,7 +242,7 @@ export class WorkflowExecution extends AuditableEntity {
     ].includes(this.status);
   }
 
-  canResume(): boolean {
+  isResumable(): boolean {
     return this.status === WorkflowExecutionStatus.PAUSED && this.canResume;
   }
 

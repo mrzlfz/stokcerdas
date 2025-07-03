@@ -8,22 +8,8 @@ import { LazadaOrderService } from './lazada-order.service';
 import { LazadaInventoryService } from './lazada-inventory.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
-
-export type WebhookEventType = 
-  | 'order_created'
-  | 'order_updated'
-  | 'order_status_changed'
-  | 'order_cancelled'
-  | 'order_shipped'
-  | 'order_delivered'
-  | 'product_updated'
-  | 'product_status_changed'
-  | 'inventory_updated'
-  | 'price_updated'
-  | 'seller_performance'
-  | 'promotion_updated'
-  | 'finance_updated'
-  | 'system_notification';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import { WebhookEventType } from '../../entities/webhook-event.entity';
 
 export interface LazadaWebhookPayload {
   event: string;
@@ -199,38 +185,28 @@ export class LazadaWebhookService {
       let result = { success: true };
 
       switch (eventType) {
-        case 'order_created':
-        case 'order_updated':
-        case 'order_status_changed':
+        case WebhookEventType.ORDER_CREATED:
+        case WebhookEventType.ORDER_UPDATED:
           result = await this.handleOrderEvent(tenantId, channelId, payload.data as OrderWebhookData);
           break;
 
-        case 'order_cancelled':
+        case WebhookEventType.ORDER_CANCELLED:
           result = await this.handleOrderCancelledEvent(tenantId, channelId, payload.data as OrderWebhookData);
           break;
 
-        case 'order_shipped':
-        case 'order_delivered':
+        case WebhookEventType.ORDER_COMPLETED:
           result = await this.handleOrderShippingEvent(tenantId, channelId, payload.data as OrderWebhookData);
           break;
 
-        case 'product_updated':
-        case 'product_status_changed':
+        case WebhookEventType.PRODUCT_UPDATED:
           result = await this.handleProductEvent(tenantId, channelId, payload.data as ProductWebhookData);
           break;
 
-        case 'inventory_updated':
+        case WebhookEventType.INVENTORY_UPDATED:
           result = await this.handleInventoryEvent(tenantId, channelId, payload.data as InventoryWebhookData);
           break;
 
-        case 'price_updated':
-          result = await this.handlePriceEvent(tenantId, channelId, payload.data as PriceWebhookData);
-          break;
-
-        case 'seller_performance':
-        case 'promotion_updated':
-        case 'finance_updated':
-        case 'system_notification':
+        case WebhookEventType.SYSTEM_NOTIFICATION:
           result = await this.handleSystemEvent(tenantId, channelId, eventType, payload.data);
           break;
 
@@ -538,8 +514,8 @@ export class LazadaWebhookService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'WEBHOOK',
-        level: 'INFO',
+        type: IntegrationLogType.WEBHOOK,
+        level: IntegrationLogLevel.INFO,
         message: `Lazada system event received: ${eventType}`,
         metadata: { eventType, data },
       });
@@ -560,22 +536,22 @@ export class LazadaWebhookService {
   private mapWebhookEventType(lazadaEvent: string): WebhookEventType {
     // Map Lazada event names to our internal event types
     const eventMapping: Record<string, WebhookEventType> = {
-      'order_created': 'order_created',
-      'order_updated': 'order_updated',
-      'order_status_changed': 'order_status_changed',
-      'order_cancelled': 'order_cancelled',
-      'order_shipped': 'order_shipped',
-      'order_delivered': 'order_delivered',
-      'product_updated': 'product_updated',
-      'product_status_changed': 'product_status_changed',
-      'inventory_updated': 'inventory_updated',
-      'price_updated': 'price_updated',
-      'seller_performance': 'seller_performance',
-      'promotion_updated': 'promotion_updated',
-      'finance_updated': 'finance_updated',
+      'order_created': WebhookEventType.ORDER_CREATED,
+      'order_updated': WebhookEventType.ORDER_UPDATED,
+      'order_status_changed': WebhookEventType.ORDER_UPDATED,
+      'order_cancelled': WebhookEventType.ORDER_CANCELLED,
+      'order_shipped': WebhookEventType.ORDER_UPDATED,
+      'order_delivered': WebhookEventType.ORDER_COMPLETED,
+      'product_updated': WebhookEventType.PRODUCT_UPDATED,
+      'product_status_changed': WebhookEventType.PRODUCT_UPDATED,
+      'inventory_updated': WebhookEventType.INVENTORY_UPDATED,
+      'price_updated': WebhookEventType.PRODUCT_UPDATED,
+      'seller_performance': WebhookEventType.SYSTEM_NOTIFICATION,
+      'promotion_updated': WebhookEventType.SYSTEM_NOTIFICATION,
+      'finance_updated': WebhookEventType.SYSTEM_NOTIFICATION,
     };
 
-    return eventMapping[lazadaEvent] || 'system_notification';
+    return eventMapping[lazadaEvent] || WebhookEventType.SYSTEM_NOTIFICATION;
   }
 
   private generateExternalEventId(webhookData: LazadaWebhookPayload): string {
@@ -589,20 +565,21 @@ export class LazadaWebhookService {
   private getEventPriority(eventType: WebhookEventType): number {
     // Assign priority levels for different event types
     const priorityMap: Record<WebhookEventType, number> = {
-      'order_created': 1, // High priority
-      'order_cancelled': 1, // High priority
-      'order_updated': 2, // Normal priority
-      'order_status_changed': 2, // Normal priority
-      'order_shipped': 2, // Normal priority
-      'order_delivered': 2, // Normal priority
-      'inventory_updated': 2, // Normal priority
-      'price_updated': 2, // Normal priority
-      'product_updated': 3, // Low priority
-      'product_status_changed': 3, // Low priority
-      'seller_performance': 3, // Low priority
-      'promotion_updated': 3, // Low priority
-      'finance_updated': 3, // Low priority
-      'system_notification': 3, // Low priority
+      [WebhookEventType.ORDER_CREATED]: 1, // High priority
+      [WebhookEventType.ORDER_CANCELLED]: 1, // High priority
+      [WebhookEventType.ORDER_UPDATED]: 2, // Normal priority
+      [WebhookEventType.ORDER_COMPLETED]: 2, // Normal priority
+      [WebhookEventType.ORDER_REFUNDED]: 2, // Normal priority
+      [WebhookEventType.INVENTORY_UPDATED]: 2, // Normal priority
+      [WebhookEventType.PRODUCT_UPDATED]: 3, // Low priority
+      [WebhookEventType.PRODUCT_CREATED]: 3, // Low priority
+      [WebhookEventType.PRODUCT_DELETED]: 3, // Low priority
+      [WebhookEventType.PAYMENT_COMPLETED]: 2, // Normal priority
+      [WebhookEventType.PAYMENT_FAILED]: 1, // High priority
+      [WebhookEventType.CUSTOMER_CREATED]: 3, // Low priority
+      [WebhookEventType.CUSTOMER_UPDATED]: 3, // Low priority
+      [WebhookEventType.SHOP_UPDATED]: 3, // Low priority
+      [WebhookEventType.SYSTEM_NOTIFICATION]: 3, // Low priority
     };
 
     return priorityMap[eventType] || 3;

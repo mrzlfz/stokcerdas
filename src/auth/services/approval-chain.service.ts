@@ -115,7 +115,7 @@ export class ApprovalChainService {
       updatedBy: userId,
     });
 
-    const savedChain = await this.approvalChainRepository.save(chain);
+    const savedChain = await this.approvalChainRepository.save(chain) as unknown as ApprovalChain;
 
     // Create steps if provided
     if (steps && steps.length > 0) {
@@ -317,7 +317,8 @@ export class ApprovalChainService {
         updatedBy: userId,
       });
 
-      createdSteps.push(await this.approvalStepRepository.save(step));
+      const savedStep = await this.approvalStepRepository.save(step) as unknown as ApprovalStep;
+      createdSteps.push(savedStep);
     }
 
     return createdSteps;
@@ -778,6 +779,7 @@ export class ApprovalChainService {
           currentStepOrder: execution.currentStepOrder,
           status: execution.status,
           stepExecutions: execution.stepExecutions.map(se => ({
+            stepId: se.stepId || `step-${se.stepOrder}`,
             stepOrder: se.stepOrder,
             status: se.status,
             isEscalated: se.isEscalated,

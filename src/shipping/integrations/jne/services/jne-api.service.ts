@@ -55,7 +55,6 @@ export interface JneTrackingResponse {
 
 @Injectable()
 export class JneApiService extends BaseApiService {
-  private readonly logger = new Logger(JneApiService.name);
   
   constructor(
     protected readonly httpService: HttpService,
@@ -106,7 +105,6 @@ export class JneApiService extends BaseApiService {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        ...request.headers,
       },
     };
 

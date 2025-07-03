@@ -3,9 +3,11 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { LazadaApiService, LazadaConfig } from './lazada-api.service';
+import { ApiConfig } from '../../common/services/base-api.service';
 import { LazadaAuthService } from './lazada-auth.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { InventoryLevel } from '../../../inventory/entities/inventory-level.entity';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import { InventoryItem } from '../../../inventory/entities/inventory-item.entity';
 
 export interface LazadaInventoryItem {
   seller_sku: string;
@@ -65,8 +67,8 @@ export class LazadaInventoryService {
     private readonly lazadaApi: LazadaApiService,
     private readonly authService: LazadaAuthService,
     private readonly logService: IntegrationLogService,
-    @InjectRepository(InventoryLevel)
-    private readonly inventoryRepository: Repository<InventoryLevel>,
+    @InjectRepository(InventoryItem)
+    private readonly inventoryRepository: Repository<InventoryItem>,
   ) {}
 
   /**
@@ -129,7 +131,7 @@ export class LazadaInventoryService {
         tenantId,
         channelId,
         'lazada_inventory_inbound',
-        errorCount === 0 ? 'completed' : 'partial',
+        errorCount === 0 ? 'completed' : 'failed',
         `Inventory sync completed: ${syncedCount} synced, ${errorCount} errors`,
         {
           syncedCount,
@@ -205,7 +207,7 @@ export class LazadaInventoryService {
 
         try {
           // Update stock for batch
-          const result = await this.lazadaApi.makeRequest(
+          const result = await this.lazadaApi.makeLazadaRequest(
             tenantId,
             channelId,
             lazadaConfig,
@@ -225,8 +227,8 @@ export class LazadaInventoryService {
             await this.logService.log({
               tenantId,
               channelId,
-              type: 'SYNC',
-              level: 'INFO',
+              type: IntegrationLogType.SYNC,
+              level: IntegrationLogLevel.INFO,
               message: `Lazada inventory batch updated successfully`,
               metadata: {
                 batchSize: batch.length,
@@ -298,7 +300,7 @@ export class LazadaInventoryService {
 
         try {
           // Update prices for batch
-          const result = await this.lazadaApi.makeRequest(
+          const result = await this.lazadaApi.makeLazadaRequest(
             tenantId,
             channelId,
             lazadaConfig,
@@ -318,8 +320,8 @@ export class LazadaInventoryService {
             await this.logService.log({
               tenantId,
               channelId,
-              type: 'SYNC',
-              level: 'INFO',
+              type: IntegrationLogType.SYNC,
+              level: IntegrationLogLevel.INFO,
               message: `Lazada prices batch updated successfully`,
               metadata: {
                 batchSize: batch.length,
@@ -381,7 +383,7 @@ export class LazadaInventoryService {
       };
 
       // Get stock levels from Lazada
-      const result = await this.lazadaApi.makeRequest<LazadaStockResponse[]>(
+      const result = await this.lazadaApi.makeLazadaRequest<LazadaStockResponse[]>(
         tenantId,
         channelId,
         lazadaConfig,
@@ -399,7 +401,7 @@ export class LazadaInventoryService {
       if (!result.success) {
         return {
           success: false,
-          error: result.error,
+          error: result.error || 'Failed to fetch stock from Lazada',
         };
       }
 
@@ -443,7 +445,7 @@ export class LazadaInventoryService {
       };
 
       // Get prices from Lazada
-      const result = await this.lazadaApi.makeRequest<LazadaPriceResponse[]>(
+      const result = await this.lazadaApi.makeLazadaRequest<LazadaPriceResponse[]>(
         tenantId,
         channelId,
         lazadaConfig,
@@ -461,7 +463,7 @@ export class LazadaInventoryService {
       if (!result.success) {
         return {
           success: false,
-          error: result.error,
+          error: result.error || 'Failed to fetch stock from Lazada',
         };
       }
 
@@ -551,21 +553,20 @@ export class LazadaInventoryService {
       }
 
       // Get stock data from Lazada
+      const apiConfig = this.createApiConfig(lazadaConfig);
       const result = await this.lazadaApi.makeRequest<LazadaStockResponse[]>(
-        tenantId,
-        channelId,
-        lazadaConfig,
+        apiConfig,
         {
           method: 'GET',
-          path: '/product/quantity/get',
+          endpoint: '/product/quantity/get',
           params,
-          requiresAuth: true,
-          rateLimitKey: 'stock_sync',
         },
+        tenantId,
+        channelId,
       );
 
       if (!result.success || !result.data) {
-        throw new Error(result.error || 'Failed to fetch stock from Lazada');
+        throw new Error(result.error?.message || 'Failed to fetch stock from Lazada');
       }
 
       const stockData = result.data;
@@ -613,21 +614,20 @@ export class LazadaInventoryService {
       }
 
       // Get price data from Lazada
+      const apiConfig = this.createApiConfig(lazadaConfig);
       const result = await this.lazadaApi.makeRequest<LazadaPriceResponse[]>(
-        tenantId,
-        channelId,
-        lazadaConfig,
+        apiConfig,
         {
           method: 'GET',
-          path: '/product/price/get',
+          endpoint: '/product/price/get',
           params,
-          requiresAuth: true,
-          rateLimitKey: 'price_sync',
         },
+        tenantId,
+        channelId,
       );
 
       if (!result.success || !result.data) {
-        throw new Error(result.error || 'Failed to fetch prices from Lazada');
+        throw new Error(result.error?.message || 'Failed to fetch prices from Lazada');
       }
 
       const priceData = result.data;
@@ -706,5 +706,33 @@ export class LazadaInventoryService {
 
     // Implementation would update both inventory levels and pricing
     // For now, just log the update
+  }
+
+  private createApiConfig(lazadaConfig: LazadaConfig): ApiConfig {
+    const baseUrls = {
+      MY: 'https://api.lazada.com.my/rest',
+      SG: 'https://api.lazada.sg/rest',
+      TH: 'https://api.lazada.co.th/rest',
+      ID: 'https://api.lazada.co.id/rest',
+      PH: 'https://api.lazada.com.ph/rest',
+      VN: 'https://api.lazada.vn/rest',
+    };
+
+    return {
+      baseUrl: baseUrls[lazadaConfig.region] || baseUrls.ID,
+      timeout: 30000,
+      retries: 3,
+      authentication: {
+        type: 'oauth',
+        credentials: {
+          appKey: lazadaConfig.appKey,
+          appSecret: lazadaConfig.appSecret,
+          accessToken: lazadaConfig.accessToken,
+          refreshToken: lazadaConfig.refreshToken,
+          region: lazadaConfig.region,
+          sandbox: lazadaConfig.sandbox,
+        },
+      },
+    };
   }
 }

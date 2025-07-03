@@ -25,6 +25,11 @@ export enum IntegrationLogType {
   AUTH = 'auth',
   ERROR = 'error',
   SYSTEM = 'system',
+  SHIPPING = 'shipping',
+  TRACKING = 'tracking',
+  INSTANT_DELIVERY = 'instant_delivery',
+  INSTANT_DELIVERY_PROCESSOR = 'instant_delivery_processor',
+  INVENTORY = 'inventory',
 }
 
 @Entity('integration_logs')

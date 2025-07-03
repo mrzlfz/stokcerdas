@@ -471,8 +471,9 @@ export class ModelTrainingService {
     fs.writeFileSync(scriptPath, pythonScript);
 
     try {
-      const result = await this.executePythonScript(scriptPath);
-      const predictions = JSON.parse(result).predictions;
+      const resultStr = await this.executePythonScript(scriptPath);
+      const result = JSON.parse(resultStr);
+      const predictions = result.predictions;
       
       const performance = this.calculatePerformanceMetrics(validation.target, predictions);
 
@@ -516,8 +517,9 @@ export class ModelTrainingService {
     fs.writeFileSync(scriptPath, pythonScript);
 
     try {
-      const result = await this.executePythonScript(scriptPath);
-      const predictions = JSON.parse(result).predictions;
+      const resultStr = await this.executePythonScript(scriptPath);
+      const result = JSON.parse(resultStr);
+      const predictions = result.predictions;
       
       const performance = this.calculatePerformanceMetrics(validation.target, predictions);
 
@@ -562,8 +564,9 @@ export class ModelTrainingService {
     fs.writeFileSync(scriptPath, pythonScript);
 
     try {
-      const result = await this.executePythonScript(scriptPath);
-      const predictions = JSON.parse(result).predictions;
+      const resultStr = await this.executePythonScript(scriptPath);
+      const result = JSON.parse(resultStr);
+      const predictions = result.predictions;
       
       const performance = this.calculatePerformanceMetrics(validation.target, predictions);
 

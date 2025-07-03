@@ -73,18 +73,22 @@ export class InventoryItem extends BaseEntity {
   isActive: boolean;
 
   // Relations
-  @ManyToOne(() => Product, product => product.inventoryItems)
+  @ManyToOne(() => Product)
   @JoinColumn({ name: 'productId' })
   product: Product;
 
-  @ManyToOne(() => InventoryLocation, location => location.inventoryItems)
+  @ManyToOne(() => InventoryLocation)
   @JoinColumn({ name: 'locationId' })
   location: InventoryLocation;
 
-  @OneToMany(() => InventoryTransaction, transaction => transaction.inventoryItem)
-  transactions?: InventoryTransaction[];
+  // @OneToMany(() => InventoryTransaction, transaction => transaction.inventoryItem)
+  // transactions?: InventoryTransaction[];
 
   // Virtual fields
+  get quantity(): number {
+    return this.quantityOnHand; // Alias for analytics compatibility
+  }
+
   get quantityAvailable(): number {
     return Math.max(0, this.quantityOnHand - this.quantityReserved - this.quantityAllocated);
   }

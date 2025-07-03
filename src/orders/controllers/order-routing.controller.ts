@@ -42,6 +42,7 @@ import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UserRole } from '../../users/entities/user.entity';
 
 // Services
 import { OrderRoutingService } from '../services/order-routing.service';
@@ -226,7 +227,7 @@ export class OrderRoutingController {
   @ApiResponse({ status: 200, description: 'Routing rules retrieved successfully' })
   @ApiQuery({ name: 'isActive', type: 'boolean', required: false })
   @ApiQuery({ name: 'priority', type: 'number', required: false })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getRoutingRules(
     @CurrentUser() user: any,
     @Query() query: { isActive?: boolean; priority?: number },
@@ -290,7 +291,7 @@ export class OrderRoutingController {
   @ApiOperation({ summary: 'Get routing rule by ID' })
   @ApiResponse({ status: 200, description: 'Routing rule retrieved successfully' })
   @ApiParam({ name: 'ruleId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getRoutingRuleById(
     @CurrentUser() user: any,
     @Param('ruleId') ruleId: string,
@@ -334,7 +335,7 @@ export class OrderRoutingController {
   @Post('rules')
   @ApiOperation({ summary: 'Create new routing rule' })
   @ApiResponse({ status: 201, description: 'Routing rule created successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createRoutingRule(
     @CurrentUser() user: any,
     @Body() createDto: CreateRoutingRuleDto,
@@ -375,7 +376,7 @@ export class OrderRoutingController {
   @ApiOperation({ summary: 'Update routing rule' })
   @ApiResponse({ status: 200, description: 'Routing rule updated successfully' })
   @ApiParam({ name: 'ruleId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateRoutingRule(
     @CurrentUser() user: any,
     @Param('ruleId') ruleId: string,
@@ -413,7 +414,7 @@ export class OrderRoutingController {
   @ApiOperation({ summary: 'Toggle routing rule active status' })
   @ApiResponse({ status: 200, description: 'Routing rule toggled successfully' })
   @ApiParam({ name: 'ruleId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async toggleRoutingRule(
     @CurrentUser() user: any,
     @Param('ruleId') ruleId: string,
@@ -455,7 +456,7 @@ export class OrderRoutingController {
       },
     },
   })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async analyzeIntelligentRouting(
     @CurrentUser() user: any,
     @Body() body: {
@@ -509,7 +510,7 @@ export class OrderRoutingController {
   @Post('intelligent/optimize')
   @ApiOperation({ summary: 'Apply intelligent routing optimization' })
   @ApiResponse({ status: 200, description: 'Routing optimization applied successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async applyIntelligentOptimization(
     @CurrentUser() user: any,
     @Body() body: {
@@ -596,7 +597,7 @@ export class OrderRoutingController {
   @ApiQuery({ name: 'severity', enum: ['low', 'medium', 'high', 'critical'], required: false })
   @ApiQuery({ name: 'type', enum: ['inventory', 'pricing', 'status', 'fulfillment'], required: false })
   @ApiQuery({ name: 'autoResolvable', type: 'boolean', required: false })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getConflicts(
     @CurrentUser() user: any,
     @Query() query: {
@@ -645,7 +646,7 @@ export class OrderRoutingController {
   @ApiOperation({ summary: 'Resolve cross-channel conflict' })
   @ApiResponse({ status: 200, description: 'Conflict resolved successfully' })
   @ApiParam({ name: 'conflictId', type: 'string' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async resolveConflict(
     @CurrentUser() user: any,
     @Param('conflictId') conflictId: string,
@@ -677,7 +678,7 @@ export class OrderRoutingController {
   @Post('conflicts/auto-resolve')
   @ApiOperation({ summary: 'Auto-resolve all resolvable conflicts' })
   @ApiResponse({ status: 200, description: 'Auto-resolution completed successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async autoResolveConflicts(
     @CurrentUser() user: any,
     @Body() body: { conflictTypes?: string[]; maxSeverity?: string },
@@ -724,7 +725,7 @@ export class OrderRoutingController {
   @ApiResponse({ status: 200, description: 'Performance analytics retrieved successfully' })
   @ApiQuery({ name: 'period', enum: ['day', 'week', 'month', 'quarter'], required: false })
   @ApiQuery({ name: 'metrics', type: 'string', isArray: true, required: false })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getPerformanceAnalytics(
     @CurrentUser() user: any,
     @Query() query: LocationPerformanceDto,
@@ -800,7 +801,7 @@ export class OrderRoutingController {
   @ApiOperation({ summary: 'Get specific location performance' })
   @ApiResponse({ status: 200, description: 'Location performance retrieved successfully' })
   @ApiParam({ name: 'locationId', type: 'string' })
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getLocationPerformance(
     @CurrentUser() user: any,
     @Param('locationId') locationId: string,
@@ -873,7 +874,7 @@ export class OrderRoutingController {
   @Get('preferences')
   @ApiOperation({ summary: 'Get routing preferences' })
   @ApiResponse({ status: 200, description: 'Routing preferences retrieved successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getRoutingPreferences(
     @CurrentUser() user: any,
   ) {
@@ -921,7 +922,7 @@ export class OrderRoutingController {
   @Put('preferences')
   @ApiOperation({ summary: 'Update routing preferences' })
   @ApiResponse({ status: 200, description: 'Routing preferences updated successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateRoutingPreferences(
     @CurrentUser() user: any,
     @Body() preferencesDto: RoutingPreferencesDto,
@@ -958,7 +959,7 @@ export class OrderRoutingController {
   @Get('health')
   @ApiOperation({ summary: 'Get routing system health status' })
   @ApiResponse({ status: 200, description: 'System health retrieved successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getSystemHealth(
     @CurrentUser() user: any,
   ) {
@@ -1008,7 +1009,7 @@ export class OrderRoutingController {
   @Get('metrics/real-time')
   @ApiOperation({ summary: 'Get real-time routing metrics' })
   @ApiResponse({ status: 200, description: 'Real-time metrics retrieved successfully' })
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getRealTimeMetrics(
     @CurrentUser() user: any,
   ) {

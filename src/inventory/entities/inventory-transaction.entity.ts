@@ -256,7 +256,8 @@ export class InventoryTransaction extends BaseEntity {
 
   fail(reason?: string): void {
     this.status = TransactionStatus.FAILED;
-    this.notes = reason ? `${this.notes || ''}\nFailure reason: ${reason}`.trim() : this.notes;
+    this.notes = reason ? `${this.notes || ''}
+Failure reason: ${reason}`.trim() : this.notes;
   }
 
   addMetadata(key: string, value: any): void {

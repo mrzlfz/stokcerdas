@@ -7,7 +7,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { AuditableEntity } from '../../common/entities/auditable.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { Company } from './company.entity';
 import { User } from '../../users/entities/user.entity';
 

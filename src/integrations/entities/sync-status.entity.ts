@@ -24,7 +24,7 @@ export enum SyncDirection {
   BIDIRECTIONAL = 'bidirectional',
 }
 
-export enum SyncStatus {
+export enum SyncStatusEnum {
   PENDING = 'pending',
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
@@ -87,11 +87,11 @@ export class SyncStatus {
 
   @Column({
     type: 'enum',
-    enum: SyncStatus,
-    default: SyncStatus.PENDING,
+    enum: SyncStatusEnum,
+    default: SyncStatusEnum.PENDING,
   })
   @Index()
-  status: SyncStatus;
+  status: SyncStatusEnum;
 
   @Column({
     type: 'enum',
@@ -160,15 +160,15 @@ export class SyncStatus {
 
   // Helper methods
   get isCompleted(): boolean {
-    return this.status === SyncStatus.COMPLETED;
+    return this.status === SyncStatusEnum.COMPLETED;
   }
 
   get isFailed(): boolean {
-    return this.status === SyncStatus.FAILED;
+    return this.status === SyncStatusEnum.FAILED;
   }
 
   get isInProgress(): boolean {
-    return this.status === SyncStatus.IN_PROGRESS;
+    return this.status === SyncStatusEnum.IN_PROGRESS;
   }
 
   get successRate(): number {
@@ -188,13 +188,13 @@ export class SyncStatus {
     // Auto-update status based on progress
     if (processed === this.totalRecords) {
       if (failed === 0) {
-        this.status = SyncStatus.COMPLETED;
+        this.status = SyncStatusEnum.COMPLETED;
         this.completedAt = new Date();
       } else if (successful > 0) {
-        this.status = SyncStatus.PARTIAL;
+        this.status = SyncStatusEnum.PARTIAL;
         this.completedAt = new Date();
       } else {
-        this.status = SyncStatus.FAILED;
+        this.status = SyncStatusEnum.FAILED;
         this.completedAt = new Date();
       }
     }

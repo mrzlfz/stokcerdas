@@ -505,7 +505,9 @@ export class AlertManagementService {
     
     if (updateDto.reason) {
       alert.notes = alert.notes 
-        ? `${alert.notes}\n\nPriority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reason}`
+        ? `${alert.notes}
+
+Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reason}`
         : `Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reason}`;
     }
 

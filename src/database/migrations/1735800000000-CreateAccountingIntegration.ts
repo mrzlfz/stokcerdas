@@ -34,8 +34,8 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     await queryRunner.query(`
       CREATE TABLE "accounting_accounts" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-        "tenant_id" varchar NOT NULL,
-        "channel_id" varchar NULL,
+        "tenant_id" uuid NOT NULL,
+        "channel_id" uuid NULL,
         "platform" accounting_platform_enum NOT NULL,
         "status" accounting_connection_status_enum NOT NULL DEFAULT 'disconnected',
         
@@ -103,40 +103,15 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       FOREIGN KEY ("channel_id") REFERENCES "channels"("id") ON DELETE SET NULL
     `);
 
-    // Update existing integration tables to support accounting integration
-    
-    // Add accounting-specific fields to sync_status table
-    await queryRunner.query(`
-      ALTER TABLE "sync_status" 
-      ADD COLUMN "accounting_account_id" varchar NULL,
-      ADD COLUMN "external_reference_id" varchar NULL,
-      ADD COLUMN "sync_direction" varchar NULL DEFAULT 'bidirectional',
-      ADD COLUMN "data_transformation" jsonb NULL,
-      ADD COLUMN "conflict_resolution" varchar NULL DEFAULT 'latest_wins'
-    `);
-
-    await queryRunner.query(`CREATE INDEX "IDX_sync_status_accounting_account" ON "sync_status" ("accounting_account_id")`);
-
-    // Add accounting-specific fields to integration_logs table
-    await queryRunner.query(`
-      ALTER TABLE "integration_logs" 
-      ADD COLUMN "accounting_account_id" varchar NULL,
-      ADD COLUMN "operation_type" varchar NULL,
-      ADD COLUMN "entity_type" varchar NULL,
-      ADD COLUMN "entity_id" varchar NULL,
-      ADD COLUMN "external_entity_id" varchar NULL,
-      ADD COLUMN "transformation_details" jsonb NULL
-    `);
-
-    await queryRunner.query(`CREATE INDEX "IDX_integration_logs_accounting_account" ON "integration_logs" ("accounting_account_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_integration_logs_operation_entity" ON "integration_logs" ("operation_type", "entity_type")`);
+    // Note: sync_status and integration_logs tables will be created in future migrations
+    // These ALTER TABLE statements are commented out until those tables exist
 
     // Create table for storing accounting entity mappings
     await queryRunner.query(`
       CREATE TABLE "accounting_entity_mappings" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-        "tenant_id" varchar NOT NULL,
-        "accounting_account_id" varchar NOT NULL,
+        "tenant_id" uuid NOT NULL,
+        "accounting_account_id" uuid NOT NULL,
         "internal_entity_type" varchar NOT NULL,
         "internal_entity_id" varchar NOT NULL,
         "external_entity_type" varchar NOT NULL,
@@ -161,8 +136,8 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     await queryRunner.query(`
       CREATE TABLE "accounting_sync_jobs" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-        "tenant_id" varchar NOT NULL,
-        "accounting_account_id" varchar NOT NULL,
+        "tenant_id" uuid NOT NULL,
+        "accounting_account_id" uuid NOT NULL,
         "job_type" varchar NOT NULL,
         "job_name" varchar NOT NULL,
         "job_parameters" jsonb NULL,
@@ -195,8 +170,8 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     await queryRunner.query(`
       CREATE TABLE "exchange_rates" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-        "tenant_id" varchar NOT NULL,
-        "accounting_account_id" varchar NULL,
+        "tenant_id" uuid NOT NULL,
+        "accounting_account_id" uuid NULL,
         "from_currency" varchar(3) NOT NULL,
         "to_currency" varchar(3) NOT NULL,
         "rate" decimal(20,10) NOT NULL,
@@ -222,8 +197,8 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     await queryRunner.query(`
       CREATE TABLE "tax_compliance_records" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-        "tenant_id" varchar NOT NULL,
-        "accounting_account_id" varchar NOT NULL,
+        "tenant_id" uuid NOT NULL,
+        "accounting_account_id" uuid NOT NULL,
         "record_type" varchar NOT NULL,
         "reference_id" varchar NOT NULL,
         "reference_type" varchar NOT NULL,
@@ -272,7 +247,9 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       FOREIGN KEY ("accounting_account_id") REFERENCES "accounting_accounts"("id") ON DELETE CASCADE
     `);
 
-    // Add accounting-related fields to existing order and invoice tables
+    // Note: orders table enhancement will be done when orders table is created
+    // These ALTER TABLE statements are commented out until orders table exists
+    /*
     await queryRunner.query(`
       ALTER TABLE "orders" 
       ADD COLUMN "external_invoice_id" varchar NULL,
@@ -288,8 +265,9 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     await queryRunner.query(`CREATE INDEX "IDX_orders_external_invoice" ON "orders" ("external_invoice_id")`);
     await queryRunner.query(`CREATE INDEX "IDX_orders_external_customer" ON "orders" ("external_customer_id")`);
     await queryRunner.query(`CREATE INDEX "IDX_orders_currency" ON "orders" ("currency")`);
+    */
 
-    -- Add fields to products table for accounting integration
+    // Add fields to products table for accounting integration
     await queryRunner.query(`
       ALTER TABLE "products" 
       ADD COLUMN "external_item_id" varchar NULL,
@@ -305,7 +283,9 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     await queryRunner.query(`CREATE INDEX "IDX_products_tax_category" ON "products" ("tax_category")`);
     await queryRunner.query(`CREATE INDEX "IDX_products_tax_exempt" ON "products" ("tax_exempt")`);
 
-    -- Add fields to customers table for accounting integration
+    // Note: customers table enhancement will be done when customers table is created
+    // These ALTER TABLE statements are commented out until customers table exists
+    /*
     await queryRunner.query(`
       ALTER TABLE "customers" 
       ADD COLUMN "external_customer_id" varchar NULL,
@@ -319,8 +299,9 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     await queryRunner.query(`CREATE INDEX "IDX_customers_external_customer" ON "customers" ("external_customer_id")`);
     await queryRunner.query(`CREATE INDEX "IDX_customers_npwp" ON "customers" ("npwp")`);
     await queryRunner.query(`CREATE INDEX "IDX_customers_tax_exempt" ON "customers" ("tax_exempt")`);
+    */
 
-    -- Create view for accounting integration overview
+    // Create view for accounting integration overview
     await queryRunner.query(`
       CREATE VIEW "accounting_integration_overview" AS
       SELECT 
@@ -346,7 +327,7 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
                aa.connection_health_score, aa.last_sync_at, aa.sync_error_count, aa.created_at, aa.updated_at
     `);
 
-    -- Create function to update accounting account health score
+    // Create function to update accounting account health score
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION update_accounting_account_health_score(account_id uuid)
       RETURNS decimal(3,2) AS $$
@@ -390,7 +371,7 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       $$ LANGUAGE plpgsql;
     `);
 
-    -- Create trigger to automatically update health scores
+    // Create trigger to automatically update health scores
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION trigger_update_health_score()
       RETURNS trigger AS $$

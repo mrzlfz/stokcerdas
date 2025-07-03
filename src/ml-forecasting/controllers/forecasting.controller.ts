@@ -10,6 +10,7 @@ import {
   HttpStatus,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +20,7 @@ import {
   ApiBody,
   ApiQuery,
   ApiParam,
+  ApiProperty,
 } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsNumber, Min, Max, IsBoolean, IsObject, IsDateString } from 'class-validator';
 
@@ -26,6 +28,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { GetTenant } from '../../common/decorators/tenant.decorator';
+import { UserRole } from '../../users/entities/user.entity';
 
 import {
   ForecastingService,
@@ -37,62 +40,62 @@ import {
 
 // DTOs for Enhanced Forecasting
 class EnhancedDemandForecastDto {
-  @ApiOperation({ description: 'Product ID untuk demand forecast' })
+  @ApiProperty({ description: 'Product ID untuk demand forecast' })
   @IsString()
   productId: string;
 
-  @ApiOperation({ description: 'Forecast horizon in days (30, 60, or 90)' })
+  @ApiProperty({ description: 'Forecast horizon in days (30, 60, or 90)' })
   @IsNumber()
   @IsEnum([30, 60, 90], { message: 'Forecast horizon must be 30, 60, or 90 days' })
   forecastHorizonDays: number;
 
-  @ApiOperation({ description: 'Include confidence intervals in forecast' })
+  @ApiProperty({ description: 'Include confidence intervals in forecast' })
   @IsOptional()
   @IsBoolean()
   includeConfidenceInterval?: boolean = true;
 
-  @ApiOperation({ description: 'Include seasonality analysis' })
+  @ApiProperty({ description: 'Include seasonality analysis' })
   @IsOptional()
   @IsBoolean()
   includeSeasonality?: boolean = true;
 
-  @ApiOperation({ description: 'Include trend decomposition' })
+  @ApiProperty({ description: 'Include trend decomposition' })
   @IsOptional()
   @IsBoolean()
   includeTrendDecomposition?: boolean = true;
 
-  @ApiOperation({ description: 'Granularity of forecast data' })
+  @ApiProperty({ description: 'Granularity of forecast data' })
   @IsOptional()
   @IsEnum(['daily', 'weekly', 'monthly'])
   granularity?: 'daily' | 'weekly' | 'monthly' = 'daily';
 }
 
 class NewProductForecastDto {
-  @ApiOperation({ description: 'Nama produk baru' })
+  @ApiProperty({ description: 'Nama produk baru' })
   @IsString()
   productName: string;
 
-  @ApiOperation({ description: 'Category ID untuk produk baru' })
+  @ApiProperty({ description: 'Category ID untuk produk baru' })
   @IsString()
   categoryId: string;
 
-  @ApiOperation({ description: 'Atribut produk untuk analisis similarity' })
+  @ApiProperty({ description: 'Atribut produk untuk analisis similarity' })
   @IsOptional()
   @IsObject()
   attributes?: Record<string, any> = {};
 
-  @ApiOperation({ description: 'Tanggal peluncuran produk (optional)' })
+  @ApiProperty({ description: 'Tanggal peluncuran produk (optional)' })
   @IsOptional()
   @IsDateString()
   launchDate?: string;
 
-  @ApiOperation({ description: 'Budget marketing untuk produk baru (IDR)' })
+  @ApiProperty({ description: 'Budget marketing untuk produk baru (IDR)' })
   @IsOptional()
   @IsNumber()
   @Min(0)
   marketingBudget?: number;
 
-  @ApiOperation({ description: 'Forecast horizon in days' })
+  @ApiProperty({ description: 'Forecast horizon in days' })
   @IsNumber()
   @Min(7)
   @Max(365)
@@ -100,34 +103,34 @@ class NewProductForecastDto {
 }
 
 class SeasonalityAnalysisDto {
-  @ApiOperation({ description: 'Product ID untuk analisis seasonality' })
+  @ApiProperty({ description: 'Product ID untuk analisis seasonality' })
   @IsString()
   productId: string;
 
-  @ApiOperation({ description: 'Periode analisis dalam bulan' })
+  @ApiProperty({ description: 'Periode analisis dalam bulan' })
   @IsOptional()
   @IsNumber()
   @Min(3)
   @Max(24)
   analysisMonths?: number = 12;
 
-  @ApiOperation({ description: 'Tipe decomposition yang diinginkan' })
+  @ApiProperty({ description: 'Tipe decomposition yang diinginkan' })
   @IsOptional()
   @IsEnum(['additive', 'multiplicative'])
   decompositionType?: 'additive' | 'multiplicative' = 'additive';
 }
 
 class ForecastComparisonDto {
-  @ApiOperation({ description: 'Product IDs untuk perbandingan forecast' })
+  @ApiProperty({ description: 'Product IDs untuk perbandingan forecast' })
   @IsString({ each: true })
   productIds: string[];
 
-  @ApiOperation({ description: 'Forecast horizon untuk perbandingan' })
+  @ApiProperty({ description: 'Forecast horizon untuk perbandingan' })
   @IsNumber()
   @IsEnum([30, 60, 90])
   forecastHorizonDays: number = 30;
 
-  @ApiOperation({ description: 'Metrics yang ingin dibandingkan' })
+  @ApiProperty({ description: 'Metrics yang ingin dibandingkan' })
   @IsOptional()
   @IsString({ each: true })
   comparisonMetrics?: string[] = ['demand', 'volatility', 'seasonality'];
@@ -138,12 +141,14 @@ class ForecastComparisonDto {
 @Controller('api/v1/ml/forecasting')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ForecastingController {
+  private readonly logger = new Logger(ForecastingController.name);
+
   constructor(
     private readonly forecastingService: ForecastingService,
   ) {}
 
   @Post('demand-forecast/enhanced')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enhanced Demand Forecast',
@@ -277,7 +282,7 @@ export class ForecastingController {
   }
 
   @Post('new-product-forecast')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'New Product Forecast',
@@ -387,7 +392,7 @@ export class ForecastingController {
   }
 
   @Post('seasonality-analysis')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Seasonality Analysis',
@@ -501,7 +506,7 @@ export class ForecastingController {
   }
 
   @Post('forecast-comparison')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Forecast Comparison',
@@ -592,7 +597,7 @@ export class ForecastingController {
   }
 
   @Get('forecast-accuracy/:productId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get Forecast Accuracy',
     description: 'Retrieve forecast accuracy metrics for a specific product',

@@ -500,7 +500,7 @@ export class CompanyRelationshipService {
 
     return {
       totalRelationships: relationships.length,
-      activeRelationships: relationships.filter(rel => rel.isActive()).length,
+      activeRelationships: relationships.filter(rel => rel.isActive).length,
       relationshipsByType,
       relationshipsByStatus,
       expiringRelationships: expiringRelationships.length,

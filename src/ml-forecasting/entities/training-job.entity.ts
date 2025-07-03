@@ -11,6 +11,9 @@ export enum TrainingJobStatus {
   CANCELLED = 'cancelled',
 }
 
+// Export as JobStatus for compatibility
+export { TrainingJobStatus as JobStatus };
+
 export enum TrainingJobType {
   INITIAL_TRAINING = 'initial_training',
   RETRAINING = 'retraining',
@@ -140,6 +143,12 @@ export class TrainingJob extends BaseEntity {
   @Column({ type: 'int', default: 3 })
   maxRetries: number;
 
+  @Column({ type: 'enum', enum: ['low', 'medium', 'high', 'critical'], default: 'medium' })
+  priority: 'low' | 'medium' | 'high' | 'critical';
+
+  @Column({ type: 'int', nullable: true })
+  estimatedDuration?: number; // Estimated duration in minutes
+
   @Column({ type: 'jsonb', nullable: true })
   resourceUsage?: {
     cpuUsage?: number;
@@ -170,7 +179,7 @@ export class TrainingJob extends BaseEntity {
   cancellationReason?: string;
 
   // Relations
-  @ManyToOne(() => MLModel, model => model.trainingJobs)
+  @ManyToOne(() => MLModel)
   @JoinColumn({ name: 'modelId' })
   model: MLModel;
 

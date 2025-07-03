@@ -19,6 +19,7 @@ import {
   ApiBody,
   ApiQuery,
   ApiParam,
+  ApiProperty,
 } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsDateString, IsArray, IsObject, IsNumber, Min, Max, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -27,80 +28,81 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { GetTenant } from '../../common/decorators/tenant.decorator';
+import { UserRole } from '../../users/entities/user.entity';
 
 import { ModelServingService, PredictionRequest } from '../services/model-serving.service';
 import { PredictionType } from '../entities/prediction.entity';
 
 // DTOs
 class CreatePredictionDto {
-  @ApiOperation({ description: 'Specific model ID to use (optional)' })
+  @ApiProperty({ description: 'Specific model ID to use (optional)' })
   @IsOptional()
   @IsString()
   modelId?: string;
 
-  @ApiOperation({ description: 'Product ID for prediction' })
+  @ApiProperty({ description: 'Product ID for prediction' })
   @IsOptional()
   @IsString()
   productId?: string;
 
-  @ApiOperation({ description: 'Category ID for category-level prediction' })
+  @ApiProperty({ description: 'Category ID for category-level prediction' })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiOperation({ description: 'Location ID for location-specific prediction' })
+  @ApiProperty({ description: 'Location ID for location-specific prediction' })
   @IsOptional()
   @IsString()
   locationId?: string;
 
-  @ApiOperation({ description: 'Type of prediction to generate' })
+  @ApiProperty({ description: 'Type of prediction to generate' })
   @IsEnum(PredictionType)
   predictionType: PredictionType;
 
-  @ApiOperation({ description: 'Target date for prediction (optional, defaults to today)' })
+  @ApiProperty({ description: 'Target date for prediction (optional, defaults to today)' })
   @IsOptional()
   @IsDateString()
   targetDate?: string;
 
-  @ApiOperation({ description: 'Number of days to forecast (1-90)' })
+  @ApiProperty({ description: 'Number of days to forecast (1-90)' })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Max(90)
   forecastDays?: number;
 
-  @ApiOperation({ description: 'Include confidence intervals in response' })
+  @ApiProperty({ description: 'Include confidence intervals in response' })
   @IsOptional()
   @IsBoolean()
   includeConfidenceInterval?: boolean;
 
-  @ApiOperation({ description: 'Additional features for prediction (optional)' })
+  @ApiProperty({ description: 'Additional features for prediction (optional)' })
   @IsOptional()
   @IsObject()
   features?: Record<string, any>;
 }
 
 class BatchPredictionDto {
-  @ApiOperation({ description: 'Specific model ID to use (optional)' })
+  @ApiProperty({ description: 'Specific model ID to use (optional)' })
   @IsOptional()
   @IsString()
   modelId?: string;
 
-  @ApiOperation({ description: 'Product IDs for batch prediction' })
+  @ApiProperty({ description: 'Product IDs for batch prediction' })
   @IsArray()
   @IsString({ each: true })
   productIds: string[];
 
-  @ApiOperation({ description: 'Type of prediction to generate' })
+  @ApiProperty({ description: 'Type of prediction to generate' })
   @IsEnum(PredictionType)
   predictionType: PredictionType;
 
-  @ApiOperation({ description: 'Target date for prediction (optional, defaults to today)' })
+  @ApiProperty({ description: 'Target date for prediction (optional, defaults to today)' })
   @IsOptional()
   @IsDateString()
   targetDate?: string;
 
-  @ApiOperation({ description: 'Number of days to forecast (1-90)' })
+  @ApiProperty({ description: 'Number of days to forecast (1-90)' })
   @IsOptional()
   @IsNumber()
   @Min(1)
@@ -109,11 +111,11 @@ class BatchPredictionDto {
 }
 
 class DemandForecastDto {
-  @ApiOperation({ description: 'Product ID for demand forecast' })
+  @ApiProperty({ description: 'Product ID for demand forecast' })
   @IsString()
   productId: string;
 
-  @ApiOperation({ description: 'Number of days to forecast (1-90)' })
+  @ApiProperty({ description: 'Number of days to forecast (1-90)' })
   @IsOptional()
   @IsNumber()
   @Min(1)
@@ -122,11 +124,11 @@ class DemandForecastDto {
 }
 
 class StockoutRiskDto {
-  @ApiOperation({ description: 'Product ID for stockout risk analysis' })
+  @ApiProperty({ description: 'Product ID for stockout risk analysis' })
   @IsString()
   productId: string;
 
-  @ApiOperation({ description: 'Number of days ahead to analyze (1-30)' })
+  @ApiProperty({ description: 'Number of days ahead to analyze (1-30)' })
   @IsOptional()
   @IsNumber()
   @Min(1)
@@ -135,33 +137,33 @@ class StockoutRiskDto {
 }
 
 class OptimalReorderDto {
-  @ApiOperation({ description: 'Product ID for reorder optimization' })
+  @ApiProperty({ description: 'Product ID for reorder optimization' })
   @IsString()
   productId: string;
 }
 
 class PredictionQueryDto {
-  @ApiOperation({ description: 'Filter by product ID' })
+  @ApiProperty({ description: 'Filter by product ID' })
   @IsOptional()
   @IsString()
   productId?: string;
 
-  @ApiOperation({ description: 'Filter by prediction type' })
+  @ApiProperty({ description: 'Filter by prediction type' })
   @IsOptional()
   @IsEnum(PredictionType)
   predictionType?: PredictionType;
 
-  @ApiOperation({ description: 'Filter by date range - start date' })
+  @ApiProperty({ description: 'Filter by date range - start date' })
   @IsOptional()
   @IsDateString()
   dateFrom?: string;
 
-  @ApiOperation({ description: 'Filter by date range - end date' })
+  @ApiProperty({ description: 'Filter by date range - end date' })
   @IsOptional()
   @IsDateString()
   dateTo?: string;
 
-  @ApiOperation({ description: 'Number of results to return' })
+  @ApiProperty({ description: 'Number of results to return' })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
@@ -169,7 +171,7 @@ class PredictionQueryDto {
   @Max(100)
   limit?: number = 20;
 
-  @ApiOperation({ description: 'Number of results to skip' })
+  @ApiProperty({ description: 'Number of results to skip' })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsNumber()
@@ -187,7 +189,7 @@ export class MLPredictionsController {
   ) {}
 
   @Post('predict')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Prediction',
@@ -306,7 +308,7 @@ export class MLPredictionsController {
   }
 
   @Post('batch-predict')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Batch Predictions',
@@ -396,7 +398,7 @@ export class MLPredictionsController {
   }
 
   @Post('demand-forecast')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get Demand Forecast',
@@ -434,7 +436,7 @@ export class MLPredictionsController {
   }
 
   @Post('stockout-risk')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get Stockout Risk',
@@ -475,7 +477,7 @@ export class MLPredictionsController {
   }
 
   @Post('optimal-reorder')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get Optimal Reorder Recommendation',
@@ -513,7 +515,7 @@ export class MLPredictionsController {
   }
 
   @Get()
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get Predictions History',
     description: 'Retrieve historical predictions with filtering options',
@@ -595,7 +597,7 @@ export class MLPredictionsController {
   }
 
   @Get(':predictionId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get Prediction Details',
     description: 'Retrieve detailed information about a specific prediction',
@@ -623,7 +625,7 @@ export class MLPredictionsController {
   }
 
   @Post('validate')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Validate Predictions',

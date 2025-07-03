@@ -1,1 +1,52 @@
-import {\n  EventSubscriber,\n  EntitySubscriberInterface,\n  InsertEvent,\n  UpdateEvent,\n  RemoveEvent,\n  LoadEvent,\n} from 'typeorm';\nimport { Injectable, Scope } from '@nestjs/common';\nimport { REQUEST } from '@nestjs/core';\nimport { Request } from 'express';\nimport { BaseEntity } from '../entities/base.entity';\n\n@Injectable({ scope: Scope.REQUEST })\n@EventSubscriber()\nexport class TenantSubscriber implements EntitySubscriberInterface {\n  constructor(private readonly request: Request) {}\n\n  // Auto-inject tenant ID on insert\n  beforeInsert(event: InsertEvent<any>) {\n    if (event.entity instanceof BaseEntity) {\n      const tenantId = this.getTenantIdFromRequest();\n      if (tenantId && !event.entity.tenantId) {\n        event.entity.tenantId = tenantId;\n      }\n    }\n  }\n\n  // Auto-inject tenant ID on update\n  beforeUpdate(event: UpdateEvent<any>) {\n    if (event.entity instanceof BaseEntity) {\n      const tenantId = this.getTenantIdFromRequest();\n      if (tenantId && !event.entity.tenantId) {\n        event.entity.tenantId = tenantId;\n      }\n    }\n  }\n\n  // Add tenant filter to all SELECT queries\n  afterLoad(entity: any, event?: LoadEvent<any>) {\n    // This is handled by repository-level filtering\n    // but could be used for additional validation\n  }\n\n  private getTenantIdFromRequest(): string | null {\n    try {\n      return (this.request as any)?.tenantId || null;\n    } catch {\n      return null;\n    }\n  }\n}"
+import {
+  EventSubscriber,
+  EntitySubscriberInterface,
+  InsertEvent,
+  UpdateEvent,
+  RemoveEvent,
+  LoadEvent,
+} from 'typeorm';
+import { Injectable, Scope } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { BaseEntity } from '../../common/entities/base.entity';
+
+@Injectable({ scope: Scope.REQUEST })
+@EventSubscriber()
+export class TenantSubscriber implements EntitySubscriberInterface {
+  constructor(private readonly request: Request) {}
+
+  // Auto-inject tenant ID on insert
+  beforeInsert(event: InsertEvent<any>) {
+    if (event.entity instanceof BaseEntity) {
+      const tenantId = this.getTenantIdFromRequest();
+      if (tenantId && !event.entity.tenantId) {
+        event.entity.tenantId = tenantId;
+      }
+    }
+  }
+
+  // Auto-inject tenant ID on update
+  beforeUpdate(event: UpdateEvent<any>) {
+    if (event.entity instanceof BaseEntity) {
+      const tenantId = this.getTenantIdFromRequest();
+      if (tenantId && !event.entity.tenantId) {
+        event.entity.tenantId = tenantId;
+      }
+    }
+  }
+
+  // Add tenant filter to all SELECT queries
+  afterLoad(entity: any, event?: LoadEvent<any>) {
+    // This is handled by repository-level filtering
+    // but could be used for additional validation
+  }
+
+  private getTenantIdFromRequest(): string | null {
+    try {
+      return (this.request as any)?.tenantId || null;
+    } catch {
+      return null;
+    }
+  }
+}

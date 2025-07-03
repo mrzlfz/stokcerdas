@@ -3,12 +3,13 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { LazadaWebhookService } from '../services/lazada-webhook.service';
+import { LazadaWebhookService, LazadaWebhookPayload } from '../services/lazada-webhook.service';
 import { LazadaProductService } from '../services/lazada-product.service';
 import { LazadaOrderService } from '../services/lazada-order.service';
 import { LazadaInventoryService } from '../services/lazada-inventory.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface LazadaWebhookJobData {
   webhookId: string;
@@ -120,7 +121,7 @@ export class LazadaProcessor {
         tenantId,
         channelId,
         eventType as any,
-        payload,
+        payload as LazadaWebhookPayload,
       );
 
       if (result.success) {
@@ -577,7 +578,7 @@ export class LazadaProcessor {
         tenantId,
         channelId,
         `lazada_batch_${syncType}`,
-        errorCount === 0 ? 'completed' : 'partial',
+        errorCount === 0 ? 'completed' : 'failed',
         `Batch ${syncType} sync completed: ${successCount}/${batchData.length} successful`,
         batchResult,
       );
@@ -633,8 +634,8 @@ export class LazadaProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: 'Lazada auth refresh job completed',
         metadata: { jobId: job.id },
       });
@@ -649,7 +650,7 @@ export class LazadaProcessor {
         tenantId,
         channelId,
         error,
-        { context: 'auth_refresh', jobId: job.id },
+        { metadata: { jobId: job.id } },
       );
 
       throw error;
@@ -700,8 +701,8 @@ export class LazadaProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Lazada health check ${checkType} completed`,
         metadata: { checkType, result },
       });
@@ -716,7 +717,7 @@ export class LazadaProcessor {
         tenantId,
         channelId,
         error,
-        { context: 'health_check', checkType },
+        { metadata: { checkType } },
       );
 
       throw error;

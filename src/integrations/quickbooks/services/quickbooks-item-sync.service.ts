@@ -3,13 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuickBooksApiService, QuickBooksCredentials, QuickBooksItem } from './quickbooks-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { Product } from '../../../products/entities/product.entity';
-import { ProductVariant } from '../../../products/entities/product-variant.entity';
+import { Product, ProductType, ProductStatus } from '../../../products/entities/product.entity';
 import { AccountingAccount, AccountingDataType } from '../../entities/accounting-account.entity';
-import { SyncStatus, SyncEntityType, SyncDirection, SyncStatus as SyncStatusEnum } from '../../entities/sync-status.entity';
+import { SyncStatus, SyncEntityType, SyncDirection, SyncStatusEnum } from '../../entities/sync-status.entity';
 
 export interface ItemSyncOptions {
-  direction: 'inbound' | 'outbound' | 'bidirectional';
+  direction?: 'inbound' | 'outbound' | 'bidirectional';
   syncInventoryQuantities?: boolean;
   syncPrices?: boolean;
   createMissingAccounts?: boolean;
@@ -41,8 +40,6 @@ export class QuickBooksItemSyncService {
     private readonly integrationLogService: IntegrationLogService,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
-    @InjectRepository(ProductVariant)
-    private readonly productVariantRepository: Repository<ProductVariant>,
     @InjectRepository(SyncStatus)
     private readonly syncStatusRepository: Repository<SyncStatus>,
     @InjectRepository(AccountingAccount)
@@ -292,13 +289,12 @@ export class QuickBooksItemSyncService {
   private async getProductsToSync(tenantId: string, options: ItemSyncOptions): Promise<Product[]> {
     const queryBuilder = this.productRepository
       .createQueryBuilder('product')
-      .leftJoinAndSelect('product.variants', 'variants')
       .leftJoinAndSelect('product.category', 'category')
       .where('product.tenantId = :tenantId', { tenantId })
       .andWhere('product.isDeleted = :isDeleted', { isDeleted: false });
 
     // Only sync active products by default
-    queryBuilder.andWhere('product.isActive = :isActive', { isActive: true });
+    queryBuilder.andWhere('product.status = :status', { status: 'active' });
 
     return queryBuilder.getMany();
   }
@@ -316,66 +312,10 @@ export class QuickBooksItemSyncService {
     // Check if product already exists in QuickBooks
     const existingMapping = await this.getQuickBooksMapping(product.id, tenantId);
 
-    if (product.variants && product.variants.length > 0) {
-      // Sync product variants as separate items
-      for (const variant of product.variants) {
-        await this.syncVariantToQuickBooks(product, variant, credentials, tenantId, channelId, options);
-      }
-    } else {
-      // Sync product as single item
-      const quickBooksItem = this.mapProductToQuickBooksItem(product, null, options);
-      
-      if (existingMapping?.externalId) {
-        // Update existing item
-        quickBooksItem.Id = existingMapping.externalId;
-        const response = await this.quickBooksApiService.updateItem(
-          credentials,
-          quickBooksItem,
-          tenantId,
-          channelId,
-        );
-
-        if (!response.success) {
-          throw new Error(`Failed to update QuickBooks item: ${response.error?.message}`);
-        }
-      } else {
-        // Create new item
-        const response = await this.quickBooksApiService.createItem(
-          credentials,
-          quickBooksItem,
-          tenantId,
-          channelId,
-        );
-
-        if (!response.success) {
-          throw new Error(`Failed to create QuickBooks item: ${response.error?.message}`);
-        }
-
-        // Save mapping
-        await this.saveQuickBooksMapping(
-          product.id,
-          response.data?.Item?.Id!,
-          tenantId,
-          channelId,
-        );
-      }
-    }
-  }
-
-  /**
-   * Sync a product variant to QuickBooks
-   */
-  private async syncVariantToQuickBooks(
-    product: Product,
-    variant: ProductVariant,
-    credentials: QuickBooksCredentials,
-    tenantId: string,
-    channelId: string,
-    options: ItemSyncOptions,
-  ): Promise<void> {
-    const existingMapping = await this.getQuickBooksMapping(variant.id, tenantId);
-    const quickBooksItem = this.mapProductToQuickBooksItem(product, variant, options);
-
+    // Always sync product as single item for now
+    // TODO: Implement variant support when ProductVariant entity is available
+    const quickBooksItem = this.mapProductToQuickBooksItem(product, null, options);
+    
     if (existingMapping?.externalId) {
       // Update existing item
       quickBooksItem.Id = existingMapping.externalId;
@@ -387,7 +327,7 @@ export class QuickBooksItemSyncService {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to update QuickBooks variant item: ${response.error?.message}`);
+        throw new Error(`Failed to update QuickBooks item: ${response.error?.message}`);
       }
     } else {
       // Create new item
@@ -399,12 +339,12 @@ export class QuickBooksItemSyncService {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to create QuickBooks variant item: ${response.error?.message}`);
+        throw new Error(`Failed to create QuickBooks item: ${response.error?.message}`);
       }
 
       // Save mapping
       await this.saveQuickBooksMapping(
-        variant.id,
+        product.id,
         response.data?.Item?.Id!,
         tenantId,
         channelId,
@@ -413,31 +353,47 @@ export class QuickBooksItemSyncService {
   }
 
   /**
+   * Sync a product variant to QuickBooks
+   * TODO: Implement when ProductVariant entity is available
+   */
+  private async syncVariantToQuickBooks(
+    product: Product,
+    variant: any, // Using any until ProductVariant entity is implemented
+    credentials: QuickBooksCredentials,
+    tenantId: string,
+    channelId: string,
+    options: ItemSyncOptions,
+  ): Promise<void> {
+    // Placeholder implementation
+    throw new Error('Variant sync not yet implemented');
+  }
+
+  /**
    * Map StokCerdas product to QuickBooks item
    */
   private mapProductToQuickBooksItem(
     product: Product,
-    variant: ProductVariant | null,
+    variant: any | null, // Using any until ProductVariant entity is implemented
     options: ItemSyncOptions,
   ): QuickBooksItem {
     const item: QuickBooksItem = {
       Name: variant ? `${product.name} - ${variant.name}` : product.name,
       Description: product.description || undefined,
-      Type: product.type === 'inventory' ? 'Inventory' : 'NonInventory',
-      Active: product.isActive,
-      Sku: variant?.sku || product.sku || undefined,
-      TrackQtyOnHand: product.type === 'inventory',
+      Type: 'NonInventory', // Default to NonInventory for now
+      Active: product.status === 'active',
+      Sku: product.sku || undefined,
+      TrackQtyOnHand: false,
     };
 
     // Set price
     if (options.syncPrices) {
-      item.UnitPrice = variant?.sellingPrice || product.sellingPrice || 0;
+      item.UnitPrice = product.sellingPrice || 0;
     }
 
-    // Set quantity for inventory items
-    if (options.syncInventoryQuantities && product.type === 'inventory') {
-      item.QtyOnHand = variant?.quantityOnHand || product.totalQuantity || 0;
-    }
+    // Set quantity for inventory items - commented out for now
+    // if (options.syncInventoryQuantities && product.type === 'inventory') {
+    //   item.QtyOnHand = 0; // TODO: Calculate from inventory items
+    // }
 
     // Set accounts if provided
     if (options.defaultIncomeAccountId) {
@@ -446,7 +402,7 @@ export class QuickBooksItemSyncService {
     if (options.defaultExpenseAccountId) {
       item.ExpenseAccountRef = { value: options.defaultExpenseAccountId };
     }
-    if (options.defaultAssetAccountId && product.type === 'inventory') {
+    if (options.defaultAssetAccountId) {
       item.AssetAccountRef = { value: options.defaultAssetAccountId };
     }
 
@@ -488,11 +444,22 @@ export class QuickBooksItemSyncService {
       tenantId,
       name: qbItem.Name,
       description: qbItem.Description,
-      sku: qbItem.Sku,
-      type: qbItem.Type === 'Inventory' ? 'inventory' : 'simple',
+      sku: qbItem.Sku || `QB_${qbItem.Id}`,
+      type: ProductType.SIMPLE,
+      status: qbItem.Active ? ProductStatus.ACTIVE : ProductStatus.INACTIVE,
       sellingPrice: options.syncPrices ? qbItem.UnitPrice || 0 : 0,
-      isActive: qbItem.Active ?? true,
-      totalQuantity: options.syncInventoryQuantities ? qbItem.QtyOnHand || 0 : 0,
+      costPrice: 0,
+      unit: 'pcs',
+      minStock: 0,
+      maxStock: 0,
+      reorderPoint: 0,
+      reorderQuantity: 1,
+      trackStock: true,
+      allowBackorder: false,
+      isTaxable: true,
+      viewCount: 0,
+      salesCount: 0,
+      totalRevenue: 0,
       createdBy: 'quickbooks_sync',
       updatedBy: 'quickbooks_sync',
     });
@@ -521,15 +488,16 @@ export class QuickBooksItemSyncService {
     if (qbItem.Sku) {
       product.sku = qbItem.Sku;
     }
-    product.isActive = qbItem.Active ?? true;
+    product.status = qbItem.Active ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
 
     if (options.syncPrices && qbItem.UnitPrice !== undefined) {
       product.sellingPrice = qbItem.UnitPrice;
     }
 
-    if (options.syncInventoryQuantities && qbItem.QtyOnHand !== undefined) {
-      product.totalQuantity = qbItem.QtyOnHand;
-    }
+    // TODO: Implement inventory quantity sync with proper inventory management
+    // if (options.syncInventoryQuantities && qbItem.QtyOnHand !== undefined) {
+    //   // Would need to update inventory items, not just product
+    // }
 
     product.updatedBy = 'quickbooks_sync';
     product.updatedAt = new Date();

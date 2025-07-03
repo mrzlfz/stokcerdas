@@ -19,6 +19,7 @@ import { WhatsAppAuthService } from '../../integrations/whatsapp/services/whatsa
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
 
 export interface CreateChannelDto {
   name: string;
@@ -142,8 +143,8 @@ export class ChannelsService {
       await this.logService.log({
         tenantId,
         channelId: savedChannel.id,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel created: ${createDto.name} (${createDto.platformId})`,
         metadata: { channelId: savedChannel.id, platformId: createDto.platformId },
       });
@@ -276,8 +277,8 @@ export class ChannelsService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel updated: ${channel.name}`,
         metadata: { updates: updateDto },
       });
@@ -318,8 +319,8 @@ export class ChannelsService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Channel deleted: ${channel.name}`,
         metadata: { channelId },
       });
@@ -392,8 +393,8 @@ export class ChannelsService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: connectionResult.success ? 'INFO' : 'ERROR',
+        type: IntegrationLogType.SYSTEM,
+        level: connectionResult.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.ERROR,
         message: `Connection test ${connectionResult.success ? 'passed' : 'failed'}: ${channel.platformId}`,
         metadata: { 
           platformId: channel.platformId,
@@ -442,8 +443,8 @@ export class ChannelsService {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'AUTH',
-        level: 'INFO',
+        type: IntegrationLogType.AUTH,
+        level: IntegrationLogLevel.INFO,
         message: `Credentials updated for ${channel.platformId}`,
         metadata: { platformId: channel.platformId },
       });
@@ -578,7 +579,7 @@ export class ChannelsService {
     try {
       // Test authentication
       const authResult = await this.shopeeAuthService.testAuthentication(tenantId, channelId);
-      if (!authResult.success) {
+      if (!authResult.valid) {
         return {
           success: false,
           error: authResult.error || 'Shopee authentication failed',
@@ -587,9 +588,9 @@ export class ChannelsService {
 
       // Get store info
       const storeInfo = await this.shopeeApiService.getShopInfo(
+        channel.apiCredentials as any,
         tenantId,
         channelId,
-        channel.apiCredentials,
       );
 
       return {
@@ -619,7 +620,7 @@ export class ChannelsService {
     try {
       // Test authentication
       const authResult = await this.lazadaAuthService.testAuthentication(tenantId, channelId);
-      if (!authResult.success) {
+      if (!authResult.valid) {
         return {
           success: false,
           error: authResult.error || 'Lazada authentication failed',
@@ -627,10 +628,10 @@ export class ChannelsService {
       }
 
       // Get seller info
-      const sellerInfo = await this.lazadaApiService.getSellerInfo(
+      const sellerInfo = await this.lazadaApiService.getShopInfo(
         tenantId,
         channelId,
-        channel.apiCredentials,
+        channel.apiCredentials as any,
       );
 
       return {
@@ -660,7 +661,7 @@ export class ChannelsService {
     try {
       // Test authentication
       const authResult = await this.tokopediaAuthService.testAuthentication(tenantId, channelId);
-      if (!authResult.success) {
+      if (!authResult.isValid) {
         return {
           success: false,
           error: authResult.error || 'Tokopedia authentication failed',
@@ -671,7 +672,7 @@ export class ChannelsService {
       const shopInfo = await this.tokopediaApiService.getShopInfo(
         tenantId,
         channelId,
-        channel.apiCredentials,
+        channel.apiCredentials as any,
       );
 
       return {
@@ -712,7 +713,7 @@ export class ChannelsService {
       const accountInfo = await this.whatsappApiService.getAccountInfo(
         tenantId,
         channelId,
-        channel.apiCredentials,
+        channel.apiCredentials as any,
       );
 
       return {

@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import * as moment from 'moment-timezone';
 
 import { MLModel, ModelStatus, ModelType } from '../entities/ml-model.entity';
-import { TrainingJob, JobStatus } from '../entities/training-job.entity';
+import { TrainingJob, JobStatus, TrainingJobType } from '../entities/training-job.entity';
 import { Prediction } from '../entities/prediction.entity';
 import { ModelTrainingService } from './model-training.service';
 import { AccuracyTrackingService, RetrainingTrigger } from './accuracy-tracking.service';
@@ -105,7 +105,7 @@ export class ModelRetrainingService {
       if (shouldSchedule) {
         await this.scheduleRetraining(event.tenantId, event.trigger, policy);
       } else {
-        this.logger.info(`Retraining trigger ignored for model ${event.trigger.modelId} due to policy restrictions`);
+        this.logger.log(`Retraining trigger ignored for model ${event.trigger.modelId} due to policy restrictions`);
       }
 
     } catch (error) {
@@ -156,18 +156,14 @@ export class ModelRetrainingService {
     this.retrainingSchedule.set(trigger.modelId, schedule);
 
     // Update model metadata
-    await this.mlModelRepo.update(
-      { id: trigger.modelId, tenantId },
-      {
-        metadata: {
-          ...model.metadata,
-          retrainingScheduled: true,
-          scheduledAt: scheduledAt.toISOString(),
-          triggerReason: trigger.description,
-          requiresApproval,
-        },
-      }
-    );
+    model.metadata = {
+      ...model.metadata,
+      retrainingScheduled: true,
+      scheduledAt: scheduledAt.toISOString(),
+      triggerReason: trigger.description,
+      requiresApproval,
+    };
+    await this.mlModelRepo.save(model);
 
     // If auto-execute is enabled, add to training queue
     if (schedule.autoExecute) {
@@ -208,15 +204,20 @@ export class ModelRetrainingService {
     const trainingJob = new TrainingJob();
     trainingJob.tenantId = tenantId;
     trainingJob.modelId = modelId;
-    trainingJob.jobType = 'retraining';
+    trainingJob.jobType = TrainingJobType.RETRAINING;
     trainingJob.priority = schedule.priority;
     trainingJob.trainingConfig = {
-      modelType: model.modelType,
-      retraining: true,
-      previousModelId: modelId,
-      triggerType: schedule.triggerType,
-      approvedBy,
-      scheduledAt: schedule.scheduledAt.toISOString(),
+      dataSource: {
+        from: model.trainingConfig?.trainingDataFrom || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        to: new Date().toISOString(),
+      },
+      validation: {
+        splitRatio: 0.8,
+        method: 'time_series' as const,
+      },
+      hyperparameters: model.hyperparameters || {},
+      features: model.trainingConfig?.features || [],
+      target: model.trainingConfig?.target || 'quantity',
     };
     trainingJob.estimatedDuration = schedule.estimatedDuration;
     
@@ -224,19 +225,15 @@ export class ModelRetrainingService {
     const savedJob = await this.trainingJobRepo.save(trainingJob);
 
     // Update model status
-    await this.mlModelRepo.update(
-      { id: modelId, tenantId },
-      {
-        status: ModelStatus.TRAINING,
-        metadata: {
-          ...model.metadata,
-          retrainingInProgress: true,
-          retrainingJobId: savedJob.id,
-          retrainingStartedAt: new Date().toISOString(),
-          retrainingApprovedBy: approvedBy,
-        },
-      }
-    );
+    model.status = ModelStatus.TRAINING;
+    model.metadata = {
+      ...model.metadata,
+      retrainingInProgress: true,
+      retrainingJobId: savedJob.id,
+      retrainingStartedAt: new Date().toISOString(),
+      retrainingApprovedBy: approvedBy,
+    };
+    await this.mlModelRepo.save(model);
 
     // Add to training queue
     await this.trainingQueue.add('retrain-model', {
@@ -276,18 +273,18 @@ export class ModelRetrainingService {
     this.retrainingSchedule.delete(modelId);
 
     // Update model metadata
-    await this.mlModelRepo.update(
-      { id: modelId, tenantId },
-      {
-        metadata: {
-          retrainingScheduled: false,
-          retrainingCanceled: true,
-          canceledBy,
-          cancelReason: reason,
-          canceledAt: new Date().toISOString(),
-        },
-      }
-    );
+    const model = await this.mlModelRepo.findOne({ where: { id: modelId, tenantId } });
+    if (model) {
+      model.metadata = {
+        ...model.metadata,
+        retrainingScheduled: false,
+        retrainingCanceled: true,
+        canceledBy,
+        cancelReason: reason,
+        canceledAt: new Date().toISOString(),
+      };
+      await this.mlModelRepo.save(model);
+    }
 
     this.logger.log(`Retraining canceled for model ${modelId} by ${canceledBy}: ${reason}`);
   }

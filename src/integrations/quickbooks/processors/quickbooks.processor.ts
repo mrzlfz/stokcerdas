@@ -9,6 +9,7 @@ import { QuickBooksCOGSService } from '../services/quickbooks-cogs.service';
 import { QuickBooksInvoiceService } from '../services/quickbooks-invoice.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
 
 export interface QuickBooksWebhookJobData {
   webhookId: string;
@@ -328,8 +329,8 @@ export class QuickBooksProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `QuickBooks COGS calculation completed`,
         metadata: { 
           accountingAccountId, 
@@ -428,12 +429,8 @@ export class QuickBooksProcessor {
           if (!invoiceId) {
             throw new Error('Invoice ID is required for update');
           }
-          result = await this.quickBooksInvoiceService.updateInvoiceInQuickBooks(
-            accountingAccountId,
-            invoiceId,
-            tenantId,
-            options || {},
-          );
+          // TODO: Implement updateInvoiceInQuickBooks method
+          throw new Error('Invoice update not yet implemented');
           break;
 
         default:
@@ -443,8 +440,8 @@ export class QuickBooksProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `QuickBooks invoice ${operation} completed successfully`,
         metadata: { 
           accountingAccountId, 
@@ -511,9 +508,7 @@ export class QuickBooksProcessor {
       switch (operation) {
         case 'refresh_token':
           result = await this.quickBooksApiService.refreshAccessToken(
-            credentials.clientId,
-            credentials.clientSecret,
-            credentials.refreshToken,
+            credentials,
             tenantId,
           );
           break;
@@ -538,8 +533,8 @@ export class QuickBooksProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `QuickBooks auth ${operation} completed successfully`,
         metadata: { 
           accountingAccountId, 
@@ -626,8 +621,8 @@ export class QuickBooksProcessor {
       // Log success
       await this.logService.log({
         tenantId,
-        type: 'ACCOUNTING',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `QuickBooks ${reportType} report generated successfully`,
         metadata: { 
           accountingAccountId, 

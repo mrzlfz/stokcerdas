@@ -129,7 +129,7 @@ export interface WhatsAppMessage {
 
 @Injectable()
 export class WhatsAppApiService extends BaseApiService {
-  private readonly logger = new Logger(WhatsAppApiService.name);
+  protected readonly logger = new Logger(WhatsAppApiService.name);
   private readonly baseUrls = {
     production: 'https://graph.facebook.com',
     sandbox: 'https://graph.facebook.com', // Same endpoint, different phone numbers
@@ -141,29 +141,30 @@ export class WhatsAppApiService extends BaseApiService {
     protected readonly rateLimiter: RateLimiterService,
     protected readonly logService: IntegrationLogService,
   ) {
-    super(httpService, configService, rateLimiter, logService);
+    super(httpService, configService);
   }
 
   /**
    * Make API request to WhatsApp Cloud API with proper authentication and rate limiting
    */
-  async makeRequest<T = any>(
+  async makeWhatsAppRequest<T = any>(
     tenantId: string,
     channelId: string,
     config: WhatsAppConfig,
     requestConfig: WhatsAppRequestConfig,
   ): Promise<WhatsAppApiResponse<T>> {
     const startTime = Date.now();
-    const requestId = this.generateRequestId('whatsapp');
+    const requestId = this.generateRequestId();
 
     try {
       // Check rate limits (WhatsApp: 80 messages/second by default, upgradeable to 1000/second)
-      await this.rateLimiter.checkLimit(
-        tenantId,
-        channelId,
-        'whatsapp',
-        80, // Default rate limit
-        1000, // 1 second window
+      await this.rateLimiter.checkRateLimit(
+        `${tenantId}:${channelId}:whatsapp`,
+        {
+          windowSizeMs: 1000, // 1 second
+          maxRequests: 80, // Default rate limit
+          keyPrefix: 'whatsapp_rate_limit',
+        },
       );
 
       const version = config.version || 'v18.0';
@@ -181,11 +182,10 @@ export class WhatsAppApiService extends BaseApiService {
       await this.logService.logApiRequest(
         tenantId,
         channelId,
+        requestId,
         requestConfig.method,
         url,
-        requestConfig.data,
-        headers,
-        requestId,
+        { headers, data: requestConfig.data },
       );
 
       // Make HTTP request
@@ -206,10 +206,12 @@ export class WhatsAppApiService extends BaseApiService {
       await this.logService.logApiResponse(
         tenantId,
         channelId,
-        response.status,
-        response.data,
-        processingTime,
         requestId,
+        requestConfig.method,
+        url,
+        response.status,
+        processingTime,
+        { data: response.data },
       );
 
       this.logger.debug(`WhatsApp API request successful: ${requestConfig.method} ${url}`, {
@@ -241,12 +243,17 @@ export class WhatsAppApiService extends BaseApiService {
       });
 
       // Log error
-      await this.logService.logApiError(
+      await this.logService.logError(
         tenantId,
         channelId,
         error,
-        requestId,
-        processingTime,
+        {
+          requestId,
+          httpMethod: requestConfig.method,
+          httpUrl: requestConfig.endpoint,
+          httpStatus: error.response?.status,
+          metadata: { processingTime },
+        },
       );
 
       return {
@@ -270,7 +277,7 @@ export class WhatsAppApiService extends BaseApiService {
     channelId: string,
     config: WhatsAppConfig,
   ): Promise<WhatsAppApiResponse<WhatsAppAccountInfo>> {
-    return this.makeRequest<WhatsAppAccountInfo>(
+    return this.makeWhatsAppRequest<WhatsAppAccountInfo>(
       tenantId,
       channelId,
       config,
@@ -293,7 +300,7 @@ export class WhatsAppApiService extends BaseApiService {
     channelId: string,
     config: WhatsAppConfig,
   ): Promise<WhatsAppApiResponse<WhatsAppPhoneNumber>> {
-    return this.makeRequest<WhatsAppPhoneNumber>(
+    return this.makeWhatsAppRequest<WhatsAppPhoneNumber>(
       tenantId,
       channelId,
       config,
@@ -317,7 +324,7 @@ export class WhatsAppApiService extends BaseApiService {
     config: WhatsAppConfig,
     message: WhatsAppMessage,
   ): Promise<WhatsAppApiResponse<{ messages: Array<{ id: string; message_status: string }> }>> {
-    return this.makeRequest(
+    return this.makeWhatsAppRequest(
       tenantId,
       channelId,
       config,
@@ -395,7 +402,7 @@ export class WhatsAppApiService extends BaseApiService {
     config: WhatsAppConfig,
     mediaId: string,
   ): Promise<WhatsAppApiResponse<{ url: string; mime_type: string; sha256: string; file_size: number }>> {
-    return this.makeRequest(
+    return this.makeWhatsAppRequest(
       tenantId,
       channelId,
       config,
@@ -416,7 +423,7 @@ export class WhatsAppApiService extends BaseApiService {
     config: WhatsAppConfig,
     messageId: string,
   ): Promise<WhatsAppApiResponse<{ success: boolean }>> {
-    return this.makeRequest(
+    return this.makeWhatsAppRequest(
       tenantId,
       channelId,
       config,
@@ -520,9 +527,5 @@ export class WhatsAppApiService extends BaseApiService {
     return null;
   }
 
-  // Private helper methods
-
-  private generateRequestId(prefix: string): string {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
+  // Private helper methods are inherited from BaseApiService
 }

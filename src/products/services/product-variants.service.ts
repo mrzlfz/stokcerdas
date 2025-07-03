@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 
-import { ProductVariant, Product } from '../entities/product.entity';
+import { ProductVariant, Product, ProductType } from '../entities/product.entity';
 import { CreateProductVariantDto } from '../dto/create-product-variant.dto';
 import { UpdateProductVariantDto } from '../dto/update-product-variant.dto';
 
@@ -40,8 +40,8 @@ export class ProductVariantsService {
     const savedVariant = await this.variantRepository.save(variant);
 
     // Update product type menjadi VARIANT jika belum
-    if (product.type !== 'variant') {
-      await this.productRepository.update(product.id, { type: 'variant' });
+    if (product.type !== ProductType.VARIANT) {
+      await this.productRepository.update(product.id, { type: ProductType.VARIANT });
     }
 
     return savedVariant;
@@ -141,7 +141,7 @@ export class ProductVariantsService {
 
     // If no more variants, change product type back to SIMPLE
     if (remainingVariants === 0) {
-      await this.productRepository.update(variant.productId, { type: 'simple' });
+      await this.productRepository.update(variant.productId, { type: ProductType.SIMPLE });
     }
   }
 

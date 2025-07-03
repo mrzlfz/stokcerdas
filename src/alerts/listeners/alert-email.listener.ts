@@ -100,7 +100,9 @@ export class AlertEmailListener {
           tenantId: data.tenantId,
           alert: data.alert,
           customSubject: `[ACKNOWLEDGED] ${data.alert.title} - StokCerdas`,
-          customMessage: `Alert telah di-acknowledge oleh pengguna pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.\n\nAlert: ${data.alert.message}`,
+          customMessage: `Alert telah di-acknowledge oleh pengguna pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.
+
+Alert: ${data.alert.message}`,
         });
         
         this.logger.log(`Acknowledgment email sent for critical alert ${data.alert.id}`);
@@ -124,7 +126,11 @@ export class AlertEmailListener {
           tenantId: data.tenantId,
           alert: data.alert,
           customSubject: `[RESOLVED] ${data.alert.title} - StokCerdas`,
-          customMessage: `Alert telah diselesaikan pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.\n\nAlert: ${data.alert.message}\n\nCatatan Penyelesaian: ${data.alert.resolutionNotes || 'Tidak ada catatan'}`,
+          customMessage: `Alert telah diselesaikan pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.
+
+Alert: ${data.alert.message}
+
+Catatan Penyelesaian: ${data.alert.resolutionNotes || 'Tidak ada catatan'}`,
         });
         
         this.logger.log(`Resolution email sent for critical alert ${data.alert.id}`);
@@ -147,7 +153,13 @@ export class AlertEmailListener {
         tenantId: data.tenantId,
         alert: data.alert,
         customSubject: `[ESCALATED] ${data.alert.title} - StokCerdas`,
-        customMessage: `Alert telah dieskalasi pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.\n\nAlert: ${data.alert.message}\n\nAlasan Eskalasi: ${data.alert.escalationReason || 'Tidak disebutkan'}\n\nTindakan segera diperlukan.`,
+        customMessage: `Alert telah dieskalasi pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.
+
+Alert: ${data.alert.message}
+
+Alasan Eskalasi: ${data.alert.escalationReason || 'Tidak disebutkan'}
+
+Tindakan segera diperlukan.`,
       });
       
       this.logger.log(`Escalation email sent for alert ${data.alert.id}`);
@@ -170,7 +182,11 @@ export class AlertEmailListener {
           tenantId: data.tenantId,
           alert: data.alert,
           customSubject: `[REACTIVATED] ${data.alert.title} - StokCerdas`,
-          customMessage: `Alert yang sebelumnya di-snooze telah aktif kembali pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.\n\nAlert: ${data.alert.message}\n\nPerhatian diperlukan.`,
+          customMessage: `Alert yang sebelumnya di-snooze telah aktif kembali pada ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}.
+
+Alert: ${data.alert.message}
+
+Perhatian diperlukan.`,
         });
         
         this.logger.log(`Reactivation email sent for alert ${data.alert.id}`);
@@ -193,7 +209,11 @@ export class AlertEmailListener {
         tenantId: data.tenantId,
         alert: data.alert,
         customSubject: `[MAINTENANCE] ${data.alert.title} - StokCerdas`,
-        customMessage: `Pemberitahuan maintenance sistem darurat.\n\n${data.alert.message}\n\nSistem mungkin akan mengalami gangguan. Mohon maaf atas ketidaknyamanannya.`,
+        customMessage: `Pemberitahuan maintenance sistem darurat.
+
+${data.alert.message}
+
+Sistem mungkin akan mengalami gangguan. Mohon maaf atas ketidaknyamanannya.`,
       });
       
       this.logger.log(`Immediate maintenance email sent for alert ${data.alert.id}`);
@@ -226,7 +246,9 @@ export class AlertEmailListener {
 
       const subject = `Ringkasan Alert Harian - ${new Date().toLocaleDateString('id-ID')} - StokCerdas`;
       
-      let message = `Ringkasan alert untuk tanggal ${new Date().toLocaleDateString('id-ID')}:\n\n`;
+      let message = `Ringkasan alert untuk tanggal ${new Date().toLocaleDateString('id-ID')}:
+
+`;
       
       if (criticalAlerts.length > 0) {
         message += `🚨 KRITIS (${criticalAlerts.length}):\n`;

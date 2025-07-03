@@ -25,6 +25,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { GetTenant } from '../../common/decorators/tenant.decorator';
+import { UserRole } from '../../users/entities/user.entity';
+import { ProductStatus } from '../../products/entities/product.entity';
 
 import { ReportGenerationService } from '../services/report-generation.service';
 import { ReportExportService } from '../services/report-export.service';
@@ -63,7 +65,7 @@ export class ReportsController {
   ) {}
 
   @Get('inventory-valuation')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Inventory Valuation Report',
@@ -124,7 +126,7 @@ export class ReportsController {
   }
 
   @Get('stock-movement')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Stock Movement Report',
@@ -213,7 +215,7 @@ export class ReportsController {
   }
 
   @Get('low-stock')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Low Stock Report',
@@ -294,7 +296,7 @@ export class ReportsController {
   }
 
   @Get('product-performance')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Product Performance Report',
@@ -395,7 +397,7 @@ export class ReportsController {
   }
 
   @Get('summary')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get Reports Summary',
@@ -433,7 +435,7 @@ export class ReportsController {
       recentMovements,
     ] = await Promise.all([
       this.reportGenerationService['productRepository'].count({
-        where: { tenantId, status: 'active', isDeleted: false },
+        where: { tenantId, status: ProductStatus.ACTIVE, isDeleted: false },
       }),
       this.reportGenerationService['inventoryItemRepository'].count({
         where: { tenantId, isActive: true },
@@ -470,7 +472,7 @@ export class ReportsController {
   }
 
   @Post('email')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Send Report via Email',

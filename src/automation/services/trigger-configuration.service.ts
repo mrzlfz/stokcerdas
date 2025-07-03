@@ -17,6 +17,7 @@ import {
 } from '../entities/workflow.entity';
 import { 
   WorkflowExecution, 
+  WorkflowExecutionStatus,
   ExecutionTrigger 
 } from '../entities/workflow-execution.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
@@ -328,7 +329,7 @@ export class TriggerConfigurationService {
         tenantId,
         workflowId,
         executionId,
-        status: WorkflowExecution.PENDING,
+        status: WorkflowExecutionStatus.PENDING,
         trigger: this.mapTriggerType(workflow.triggerType),
         inputData: triggerData,
         triggeredByUserId: triggeredBy,
@@ -398,12 +399,12 @@ export class TriggerConfigurationService {
       for (const workflow of dueWorkflows) {
         try {
           // Check if workflow should skip if already running
-          const config = workflow.triggerConfig as ScheduledTriggerConfig;
+          const config = this.convertToScheduledTriggerConfig(workflow.triggerConfig);
           if (config.skipIfRunning) {
             const runningExecution = await this.workflowExecutionRepository.findOne({
               where: {
                 workflowId: workflow.id,
-                status: WorkflowExecution.RUNNING,
+                status: WorkflowExecutionStatus.RUNNING,
               },
             });
 
@@ -423,7 +424,7 @@ export class TriggerConfigurationService {
           );
 
           // Calculate next execution time
-          workflow.nextExecutionAt = this.calculateNextExecution(workflow.triggerConfig);
+          workflow.nextExecutionAt = this.calculateNextExecution(config);
           await this.workflowRepository.save(workflow);
 
         } catch (error) {
@@ -693,7 +694,7 @@ export class TriggerConfigurationService {
     workflow: Workflow,
     context: TriggerEvaluationContext,
   ): Promise<TriggerExecutionResult> {
-    const config = workflow.triggerConfig as ScheduledTriggerConfig;
+    const config = this.convertToScheduledTriggerConfig(workflow.triggerConfig);
     const now = context.systemTime;
 
     // Check if execution time has arrived
@@ -1102,5 +1103,19 @@ export class TriggerConfigurationService {
       await this.cacheManager.del(`${this.cachePrefix}:${tenantId}:${workflowId}`);
     }
     await this.cacheManager.del(`${this.cachePrefix}:${tenantId}`);
+  }
+
+  /**
+   * Convert raw triggerConfig JSON to ScheduledTriggerConfig with proper Date objects
+   */
+  private convertToScheduledTriggerConfig(triggerConfig: any): ScheduledTriggerConfig {
+    return {
+      cronExpression: triggerConfig.cronExpression || '0 0 * * *',
+      timezone: triggerConfig.timezone || 'Asia/Jakarta',
+      startDate: triggerConfig.startDate ? new Date(triggerConfig.startDate) : undefined,
+      endDate: triggerConfig.endDate ? new Date(triggerConfig.endDate) : undefined,
+      maxExecutions: triggerConfig.maxExecutions,
+      skipIfRunning: triggerConfig.skipIfRunning || false,
+    };
   }
 }

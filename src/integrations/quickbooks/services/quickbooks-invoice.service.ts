@@ -5,8 +5,7 @@ import { QuickBooksApiService, QuickBooksCredentials, QuickBooksInvoice, QuickBo
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { AccountingAccount } from '../../entities/accounting-account.entity';
 import { Order } from '../../../orders/entities/order.entity';
-import { OrderItem } from '../../../orders/entities/order-item.entity';
-import { Customer } from '../../../customers/entities/customer.entity';
+import { OrderItem } from '../../../orders/entities/order.entity';
 import { Product } from '../../../products/entities/product.entity';
 
 export interface InvoiceGenerationOptions {
@@ -27,7 +26,7 @@ export interface GeneratedInvoice {
   orderId: string;
   quickBooksInvoiceId: string;
   invoiceNumber: string;
-  customerId: string;
+  customerInfo?: string;
   customerName: string;
   totalAmount: number;
   taxAmount: number;
@@ -70,8 +69,6 @@ export class QuickBooksInvoiceService {
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemRepository: Repository<OrderItem>,
-    @InjectRepository(Customer)
-    private readonly customerRepository: Repository<Customer>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
   ) {}
@@ -109,8 +106,8 @@ export class QuickBooksInvoiceService {
 
       // Get order with related data
       const order = await this.orderRepository.findOne({
-        where: { id: orderId, tenantId, isDeleted: false },
-        relations: ['items', 'items.product', 'customer', 'shippingAddress', 'billingAddress'],
+        where: { id: orderId, tenantId },
+        relations: ['items'],
       });
 
       if (!order) {
@@ -122,9 +119,17 @@ export class QuickBooksInvoiceService {
       }
 
       // Ensure customer exists in QuickBooks
+      const customerData = {
+        id: order.customerInfo?.id || 'unknown',
+        name: order.customerName,
+        email: order.customerEmail,
+        phone: order.customerPhone,
+        company: order.customerInfo?.username || '',
+        address: order.shippingAddress || order.billingAddress
+      };
       const quickBooksCustomerId = await this.ensureCustomerExists(
         credentials,
-        order.customer!,
+        customerData,
         tenantId,
         accountingAccount.channelId!,
       );
@@ -171,9 +176,14 @@ export class QuickBooksInvoiceService {
       }
 
       // Update order with invoice reference
+      const updatedExternalData = {
+        ...order.externalData,
+        quickbooksInvoiceId: createdInvoice.Id,
+        quickbooksInvoiceNumber: createdInvoice.DocNumber,
+        lastSyncAt: new Date().toISOString()
+      };
       await this.orderRepository.update(orderId, {
-        externalInvoiceId: createdInvoice.Id,
-        externalInvoiceNumber: createdInvoice.DocNumber,
+        externalData: updatedExternalData,
         updatedBy: 'quickbooks_invoice_sync',
       });
 
@@ -181,8 +191,8 @@ export class QuickBooksInvoiceService {
         orderId,
         quickBooksInvoiceId: createdInvoice.Id!,
         invoiceNumber: createdInvoice.DocNumber!,
-        customerId: order.customerId!,
-        customerName: order.customer?.name || 'Unknown Customer',
+        customerInfo: order.customerInfo?.id || 'unknown',
+        customerName: order.customerName || 'Unknown Customer',
         totalAmount: createdInvoice.TotalAmt || 0,
         taxAmount: this.calculateTaxAmount(createdInvoice),
         status: 'created',
@@ -330,7 +340,21 @@ export class QuickBooksInvoiceService {
    */
   private async ensureCustomerExists(
     credentials: QuickBooksCredentials,
-    customer: Customer,
+    customer: {
+      id: string;
+      name: string;
+      email?: string;
+      phone?: string;
+      company?: string;
+      address?: {
+        name?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        country?: string;
+      };
+    },
     tenantId: string,
     channelId: string,
   ): Promise<string> {
@@ -369,11 +393,11 @@ export class QuickBooksInvoiceService {
       PrimaryEmailAddr: customer.email ? { Address: customer.email } : undefined,
       PrimaryPhone: customer.phone ? { FreeFormNumber: customer.phone } : undefined,
       BillAddr: customer.address ? {
-        Line1: customer.address.street,
-        City: customer.address.city,
+        Line1: customer.address.address || '',
+        City: customer.address.city || '',
         Country: customer.address.country || 'Indonesia',
-        CountrySubDivisionCode: customer.address.province,
-        PostalCode: customer.address.postalCode,
+        CountrySubDivisionCode: customer.address.state || '',
+        PostalCode: customer.address.postalCode || '',
       } : undefined,
       Taxable: true,
       CurrencyRef: { value: 'IDR', name: 'Indonesian Rupiah' },
@@ -409,7 +433,7 @@ export class QuickBooksInvoiceService {
     const invoice: QuickBooksInvoice = {
       CustomerRef: {
         value: quickBooksCustomerId,
-        name: order.customer?.name,
+        name: order.customerName,
       },
       TxnDate: order.orderDate.toISOString().split('T')[0],
       DueDate: options.dueDate?.toISOString().split('T')[0] || 
@@ -427,11 +451,11 @@ export class QuickBooksInvoiceService {
     // Add billing address
     if (order.billingAddress) {
       invoice.BillAddr = {
-        Line1: order.billingAddress.street,
-        Line2: order.billingAddress.street2,
+        Line1: order.billingAddress.address,
+        Line2: '',
         City: order.billingAddress.city,
         Country: order.billingAddress.country || 'Indonesia',
-        CountrySubDivisionCode: order.billingAddress.province,
+        CountrySubDivisionCode: order.billingAddress.state,
         PostalCode: order.billingAddress.postalCode,
       };
     }
@@ -439,11 +463,11 @@ export class QuickBooksInvoiceService {
     // Add shipping address
     if (order.shippingAddress) {
       invoice.ShipAddr = {
-        Line1: order.shippingAddress.street,
-        Line2: order.shippingAddress.street2,
+        Line1: order.shippingAddress.address,
+        Line2: '',
         City: order.shippingAddress.city,
         Country: order.shippingAddress.country || 'Indonesia',
-        CountrySubDivisionCode: order.shippingAddress.province,
+        CountrySubDivisionCode: order.shippingAddress.state,
         PostalCode: order.shippingAddress.postalCode,
       };
     }
@@ -462,15 +486,18 @@ export class QuickBooksInvoiceService {
           TaxCodeRef: options.defaultTaxCode ? {
             value: options.defaultTaxCode,
           } : undefined,
-        },
+        } as any,
       };
 
       // Try to map to QuickBooks item
       const quickBooksItemId = await this.getQuickBooksItemId(item.productId, order.tenantId);
       if (quickBooksItemId) {
-        lineItem.SalesItemLineDetail.ItemRef = {
-          value: quickBooksItemId,
-          name: item.product?.name,
+        lineItem.SalesItemLineDetail = {
+          ...lineItem.SalesItemLineDetail,
+          ItemRef: {
+            value: quickBooksItemId,
+            name: item.productName,
+          },
         };
       }
 
@@ -479,15 +506,15 @@ export class QuickBooksInvoiceService {
     }
 
     // Add shipping if enabled
-    if (options.includeShipping && order.shippingCost && order.shippingCost > 0) {
+    if (options.includeShipping && order.shippingAmount && order.shippingAmount > 0) {
       invoice.Line!.push({
         Id: lineNum.toString(),
         LineNum: lineNum,
-        Amount: order.shippingCost,
+        Amount: order.shippingAmount,
         DetailType: 'SalesItemLineDetail',
         SalesItemLineDetail: {
           Qty: 1,
-          UnitPrice: order.shippingCost,
+          UnitPrice: order.shippingAmount,
           // You might want to create a shipping item in QuickBooks
         },
       });

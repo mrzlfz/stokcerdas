@@ -26,6 +26,7 @@ import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
+import { UserRole } from '../../../users/entities/user.entity';
 
 import { LazadaAuthService, LazadaAuthConfig } from '../services/lazada-auth.service';
 import { LazadaProductService, ProductSyncOptions } from '../services/lazada-product.service';
@@ -115,7 +116,7 @@ export class LazadaController {
   // Authentication endpoints
 
   @Get('auth/url/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get Lazada authorization URL' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authorization URL generated successfully' })
@@ -148,7 +149,7 @@ export class LazadaController {
   }
 
   @Post('auth/token/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Exchange authorization code for access token' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiBody({
@@ -195,7 +196,7 @@ export class LazadaController {
   }
 
   @Post('auth/refresh/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Access token refreshed successfully' })
@@ -229,7 +230,7 @@ export class LazadaController {
   }
 
   @Get('auth/status/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get authentication status' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authentication status retrieved successfully' })
@@ -260,7 +261,7 @@ export class LazadaController {
   }
 
   @Post('auth/test/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test authentication with current credentials' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Authentication tested successfully' })
@@ -291,7 +292,7 @@ export class LazadaController {
   }
 
   @Delete('auth/revoke/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
@@ -324,7 +325,7 @@ export class LazadaController {
   // Product endpoints
 
   @Post('products/sync/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync products from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Product sync initiated successfully' })
@@ -380,7 +381,7 @@ export class LazadaController {
   }
 
   @Post('products/sync/:channelId/:productId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync single product to Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'productId', description: 'Product ID' })
@@ -414,7 +415,7 @@ export class LazadaController {
   }
 
   @Get('products/:channelId/:itemId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Lazada product details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'itemId', description: 'Lazada Item ID' })
@@ -450,7 +451,7 @@ export class LazadaController {
   // Order endpoints
 
   @Post('orders/sync/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync orders from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Order sync initiated successfully' })
@@ -506,7 +507,7 @@ export class LazadaController {
   }
 
   @Get('orders/:channelId/:orderNumber')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Lazada order details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'orderNumber', description: 'Lazada Order Number' })
@@ -540,7 +541,7 @@ export class LazadaController {
   }
 
   @Post('orders/ship/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Ship Lazada order items' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Order shipped successfully' })
@@ -576,7 +577,7 @@ export class LazadaController {
   }
 
   @Post('orders/cancel/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Cancel Lazada order items' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Order cancelled successfully' })
@@ -612,7 +613,7 @@ export class LazadaController {
   // Inventory endpoints
 
   @Post('inventory/sync/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync inventory from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Inventory sync initiated successfully' })
@@ -647,7 +648,7 @@ export class LazadaController {
   }
 
   @Put('inventory/stock/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Update stock in Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Stock updated successfully' })
@@ -680,7 +681,7 @@ export class LazadaController {
   }
 
   @Put('inventory/prices/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Update prices in Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Prices updated successfully' })
@@ -713,7 +714,7 @@ export class LazadaController {
   }
 
   @Get('inventory/stock/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get stock levels from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiQuery({ name: 'skus', description: 'Comma-separated seller SKUs' })

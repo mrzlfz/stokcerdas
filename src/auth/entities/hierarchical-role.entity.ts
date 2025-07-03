@@ -145,6 +145,21 @@ export class HierarchicalRole extends AuditableEntity {
   @Column({ type: 'int', nullable: true })
   approvalTimeout?: number;     // Hours until auto-approval
 
+  // IP restrictions
+  @Column({ type: 'jsonb', nullable: true })
+  ipRestrictions?: {
+    allowedIps?: string[];
+    blockedIps?: string[];
+  };
+
+  // Direct permissions for this role
+  @Column({ type: 'jsonb', nullable: true })
+  permissions?: Array<{
+    resource: string;
+    action: string;
+    conditions?: Record<string, any>;
+  }>;
+
   // Additional metadata
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, any>;
@@ -243,12 +258,62 @@ export class HierarchicalRole extends AuditableEntity {
     if (!this.allowedHours) return true;
     
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'lowercase' }) as keyof typeof this.allowedHours;
+    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase() as keyof typeof this.allowedHours;
     const schedule = this.allowedHours[dayOfWeek];
     
     if (!schedule) return false;
     
     const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
     return currentTime >= schedule.start && currentTime <= schedule.end;
+  }
+
+  // Check if IP address is allowed for this role
+  isIpAllowed(ipAddress: string): boolean {
+    if (!this.ipRestrictions) return true;
+    
+    // Check if IP is in blocked list
+    if (this.ipRestrictions.blockedIps?.includes(ipAddress)) {
+      return false;
+    }
+    
+    // Check if IP is in allowed list (if specified)
+    if (this.ipRestrictions.allowedIps?.length > 0) {
+      return this.ipRestrictions.allowedIps.some(allowedIp => {
+        // Simple IP matching - in production, use proper CIDR matching
+        return ipAddress.startsWith(allowedIp.split('/')[0]);
+      });
+    }
+    
+    return true;
+  }
+
+  // Check if role has direct permission
+  hasDirectPermission(permissionKey: string): boolean {
+    if (!this.permissions) return false;
+    
+    return this.permissions.some(permission => {
+      const key = `${permission.resource}:${permission.action}`;
+      return key === permissionKey;
+    });
+  }
+
+  // Get effective permissions including inherited ones
+  getEffectivePermissions(): string[] {
+    const permissions: string[] = [];
+    
+    // Add direct permissions
+    if (this.permissions) {
+      this.permissions.forEach(permission => {
+        permissions.push(`${permission.resource}:${permission.action}`);
+      });
+    }
+    
+    // Add inherited permissions from parent
+    if (this.inheritsPermissions && this.parent) {
+      permissions.push(...this.parent.getEffectivePermissions());
+    }
+    
+    // Remove duplicates
+    return [...new Set(permissions)];
   }
 }

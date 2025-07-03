@@ -1,6 +1,7 @@
 import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
+import { ProductCategory } from './product-category.entity';
 
 export enum ProductStatus {
   ACTIVE = 'active',
@@ -145,8 +146,11 @@ export class Product extends BaseEntity {
   @Column({ type: 'timestamp', nullable: true })
   deletedAt?: Date;
 
+  @Column({ type: 'jsonb', nullable: true })
+  metadata?: Record<string, any>;
+
   // Relations
-  @ManyToOne(() => ProductCategory, { nullable: true })
+  @ManyToOne(() => ProductCategory, (category) => category.products, { nullable: true })
   @JoinColumn({ name: 'categoryId' })
   category?: ProductCategory;
 
@@ -154,14 +158,14 @@ export class Product extends BaseEntity {
   @JoinColumn({ name: 'supplierId' })
   supplier?: Supplier;
 
-  @OneToMany(() => ProductVariant, variant => variant.product)
-  variants?: ProductVariant[];
+  @OneToMany('ProductVariant', 'product')
+  variants?: any[];
 
-  @OneToMany(() => InventoryItem, item => item.product)
-  inventoryItems?: InventoryItem[];
+  @OneToMany('InventoryItem', 'product')
+  inventoryItems?: any[];
 
-  @OneToMany(() => ReorderRule, rule => rule.product)
-  reorderRules?: ReorderRule[];
+  // @OneToMany(() => ReorderRule, rule => rule.product)
+  // reorderRules?: ReorderRule[];
 
   // Virtual fields
   get isActive(): boolean {
@@ -221,15 +225,15 @@ export class ProductCategory extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @OneToMany(() => Product, product => product.category)
-  products?: Product[];
+  @OneToMany('Product', 'category')
+  products?: any[];
 
-  @ManyToOne(() => ProductCategory, { nullable: true })
+  @ManyToOne('ProductCategory', { nullable: true })
   @JoinColumn({ name: 'parentId' })
-  parent?: ProductCategory;
+  parent?: any;
 
-  @OneToMany(() => ProductCategory, category => category.parent)
-  children?: ProductCategory[];
+  @OneToMany('ProductCategory', 'parent')
+  children?: any[];
 }
 
 @Entity('product_variants')
@@ -266,9 +270,9 @@ export class ProductVariant extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @ManyToOne(() => Product, product => product.variants)
+  @ManyToOne('Product', 'variants')
   @JoinColumn({ name: 'productId' })
-  product: Product;
+  product: any;
 }
 
 // Import types for relations (these would be defined in their respective files)

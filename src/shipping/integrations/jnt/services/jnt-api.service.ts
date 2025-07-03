@@ -121,7 +121,6 @@ export interface JntTrackingResponse {
 
 @Injectable()
 export class JntApiService extends BaseApiService {
-  private readonly logger = new Logger(JntApiService.name);
   
   constructor(
     protected readonly httpService: HttpService,
@@ -180,7 +179,6 @@ export class JntApiService extends BaseApiService {
         'apiAccount': credentials.customerCode,
         'timestamp': timestamp.toString(),
         'signature': signature,
-        ...request.headers,
       },
     };
 

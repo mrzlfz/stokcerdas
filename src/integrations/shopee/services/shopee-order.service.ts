@@ -6,7 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ShopeeApiService, ShopeeCredentials, ShopeeApiRequest } from './shopee-api.service';
 import { ShopeeAuthService } from './shopee-auth.service';
 import { Order, OrderStatus } from '../../../orders/entities/order.entity';
-import { OrderItem } from '../../../orders/entities/order-item.entity';
+import { OrderItem } from '../../../orders/entities/order.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
@@ -652,7 +652,7 @@ export class ShopeeOrderService {
       },
       notes: shopeeOrder.note || '',
       createdAt: new Date(shopeeOrder.create_time * 1000),
-      metadata: {
+      channelMetadata: {
         shopee: {
           buyerUserId: shopeeOrder.buyer_user_id,
           buyerUsername: shopeeOrder.buyer_username,
@@ -678,10 +678,10 @@ export class ShopeeOrderService {
     order.status = this.mapShopeeOrderStatus(shopeeOrder.order_status);
     order.notes = shopeeOrder.note || '';
     
-    order.metadata = {
-      ...order.metadata,
+    order.channelMetadata = {
+      ...order.channelMetadata,
       shopee: {
-        ...order.metadata?.shopee,
+        ...order.channelMetadata?.shopee,
         payTime: shopeeOrder.pay_time,
         actualShippingFee: shopeeOrder.actual_shipping_fee,
         packageList: shopeeOrder.package_list,
@@ -706,13 +706,13 @@ export class ShopeeOrderService {
       const orderItem = this.orderItemRepository.create({
         orderId: order.id,
         productName: shopeeItem.item_name,
-        productSku: shopeeItem.item_sku,
+        sku: shopeeItem.item_sku,
         variantName: shopeeItem.model_name,
-        variantSku: shopeeItem.model_sku,
+        // variantSku: shopeeItem.model_sku,
         quantity: shopeeItem.model_quantity_purchased,
         unitPrice: shopeeItem.model_discounted_price,
         totalPrice: shopeeItem.model_discounted_price * shopeeItem.model_quantity_purchased,
-        metadata: {
+        attributes: {
           shopee: {
             itemId: shopeeItem.item_id,
             modelId: shopeeItem.model_id,
@@ -722,6 +722,7 @@ export class ShopeeOrderService {
             wholesale: shopeeItem.wholesale,
             promotionType: shopeeItem.promotion_type,
             promotionId: shopeeItem.promotion_id,
+            variantSku: shopeeItem.model_sku,
           },
         },
       });
@@ -762,10 +763,10 @@ export class ShopeeOrderService {
       'TO_SHIP': OrderStatus.CONFIRMED,
       'SHIPPED': OrderStatus.SHIPPED,
       'TO_CONFIRM_RECEIVE': OrderStatus.DELIVERED,
-      'IN_CANCEL': OrderStatus.CANCELING,
-      'CANCELLED': OrderStatus.CANCELED,
+      'IN_CANCEL': OrderStatus.CANCELLED,
+      'CANCELLED': OrderStatus.CANCELLED,
       'TO_RETURN': OrderStatus.RETURNED,
-      'COMPLETED': OrderStatus.COMPLETED,
+      'COMPLETED': OrderStatus.DELIVERED,
     };
 
     return statusMap[shopeeStatus] || OrderStatus.PENDING;

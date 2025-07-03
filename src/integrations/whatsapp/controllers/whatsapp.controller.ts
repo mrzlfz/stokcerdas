@@ -26,6 +26,7 @@ import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
+import { UserRole } from '../../../users/entities/user.entity';
 
 import { WhatsAppAuthService, WhatsAppAuthConfig } from '../services/whatsapp-auth.service';
 import { WhatsAppMessageService, WhatsAppTextMessage, WhatsAppTemplateMessage, WhatsAppInteractiveMessage, WhatsAppMediaMessage, WhatsAppLocationMessage, WhatsAppContactMessage, BulkMessageRequest } from '../services/whatsapp-message.service';
@@ -136,7 +137,7 @@ export class WhatsAppController {
   // Authentication endpoints
 
   @Post('auth/setup/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Setup WhatsApp Business API credentials' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'WhatsApp credentials configured successfully' })
@@ -169,7 +170,7 @@ export class WhatsAppController {
   }
 
   @Get('auth/status/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get WhatsApp authentication status' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authentication status retrieved successfully' })
@@ -200,7 +201,7 @@ export class WhatsAppController {
   }
 
   @Post('auth/test/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test WhatsApp authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Authentication tested successfully' })
@@ -231,7 +232,7 @@ export class WhatsAppController {
   }
 
   @Delete('auth/revoke/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke WhatsApp authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
@@ -262,7 +263,7 @@ export class WhatsAppController {
   }
 
   @Put('auth/webhook/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update webhook URL and verify token' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiBody({
@@ -307,7 +308,7 @@ export class WhatsAppController {
   // Message endpoints
 
   @Post('messages/text/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send text message' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Text message sent successfully' })
@@ -340,7 +341,7 @@ export class WhatsAppController {
   }
 
   @Post('messages/template/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send template message' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Template message sent successfully' })
@@ -373,7 +374,7 @@ export class WhatsAppController {
   }
 
   @Post('messages/interactive/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send interactive message (buttons, lists, etc.)' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Interactive message sent successfully' })
@@ -406,7 +407,7 @@ export class WhatsAppController {
   }
 
   @Post('messages/media/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send media message (image, video, document, etc.)' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Media message sent successfully' })
@@ -439,7 +440,7 @@ export class WhatsAppController {
   }
 
   @Post('messages/location/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send location message' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Location message sent successfully' })
@@ -472,7 +473,7 @@ export class WhatsAppController {
   }
 
   @Post('messages/contact/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send contact message' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Contact message sent successfully' })
@@ -505,7 +506,7 @@ export class WhatsAppController {
   }
 
   @Post('messages/bulk/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Send bulk messages to multiple recipients' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Bulk messages sent successfully' })
@@ -538,7 +539,7 @@ export class WhatsAppController {
   }
 
   @Post('messages/mark-read/:channelId/:messageId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Mark message as read' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'messageId', description: 'Message ID' })
@@ -574,7 +575,7 @@ export class WhatsAppController {
   // Template endpoints
 
   @Get('templates/:channelId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get message templates' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
@@ -611,7 +612,7 @@ export class WhatsAppController {
   }
 
   @Get('templates/:channelId/:templateId')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get specific template by ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'templateId', description: 'Template ID' })
@@ -645,7 +646,7 @@ export class WhatsAppController {
   }
 
   @Post('templates/:channelId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create new message template' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Template created successfully' })
@@ -678,7 +679,7 @@ export class WhatsAppController {
   }
 
   @Delete('templates/:channelId/:templateId')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete message template' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'templateId', description: 'Template ID' })
@@ -715,7 +716,7 @@ export class WhatsAppController {
   }
 
   @Get('templates/library/list')
-  @Roles('admin', 'manager', 'staff')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get template library with pre-defined templates' })
   @ApiResponse({ status: 200, description: 'Template library retrieved successfully' })
   async getTemplateLibrary() {
@@ -739,7 +740,7 @@ export class WhatsAppController {
   }
 
   @Post('templates/library/:channelId/:templateType')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create template from library' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'templateType', description: 'Template type from library' })
@@ -776,7 +777,7 @@ export class WhatsAppController {
   }
 
   @Get('templates/stats/:channelId/:templateName')
-  @Roles('admin', 'manager')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get template usage statistics' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'templateName', description: 'Template name' })

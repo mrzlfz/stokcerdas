@@ -11,6 +11,7 @@ import { ChannelMappingService } from '../services/channel-mapping.service';
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
 
 // Job data interfaces
 export interface ChannelSyncJobData {
@@ -144,8 +145,8 @@ export class ChannelSyncProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYNC',
-        level: result.success ? 'INFO' : 'WARN',
+        type: IntegrationLogType.SYNC,
+        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
         message: `Channel sync completed: ${syncType} (${direction})`,
         metadata: {
           syncId,
@@ -211,6 +212,7 @@ export class ChannelSyncProcessor {
         success: true,
         syncId,
         startTime: new Date(),
+        endTime: null as Date | null,
         channelResults: [],
         summary: {
           totalChannels: targetChannels.length,
@@ -252,8 +254,8 @@ export class ChannelSyncProcessor {
       // Log cross-channel sync completion
       await this.logService.log({
         tenantId,
-        type: 'SYNC',
-        level: result.success ? 'INFO' : 'WARN',
+        type: IntegrationLogType.SYNC,
+        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
         message: `Cross-channel sync completed: ${result.summary.successfulChannels}/${result.summary.totalChannels} successful`,
         metadata: {
           syncId,
@@ -311,8 +313,8 @@ export class ChannelSyncProcessor {
       // Log scheduled sync start
       await this.logService.log({
         tenantId,
-        type: 'SYNC',
-        level: 'INFO',
+        type: IntegrationLogType.SYNC,
+        level: IntegrationLogLevel.INFO,
         message: `Scheduled sync started: ${scheduleId}`,
         metadata: {
           scheduleId,
@@ -396,8 +398,8 @@ export class ChannelSyncProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Health check completed: ${checkType}`,
         metadata: {
           checkType,
@@ -469,8 +471,8 @@ export class ChannelSyncProcessor {
       await this.logService.log({
         tenantId,
         channelId,
-        type: 'SYSTEM',
-        level: 'INFO',
+        type: IntegrationLogType.SYSTEM,
+        level: IntegrationLogLevel.INFO,
         message: `Maintenance completed: ${maintenanceType}`,
         metadata: {
           maintenanceType,
@@ -556,8 +558,8 @@ export class ChannelSyncProcessor {
       // Log batch rebalance completion
       await this.logService.log({
         tenantId,
-        type: 'SYSTEM',
-        level: batchResult.success ? 'INFO' : 'WARN',
+        type: IntegrationLogType.SYSTEM,
+        level: batchResult.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
         message: `Batch rebalance completed: ${successCount}/${productIds.length} successful`,
         metadata: {
           productCount: productIds.length,

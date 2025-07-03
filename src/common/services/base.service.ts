@@ -1,1 +1,110 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';\nimport { Repository, FindManyOptions, FindOneOptions } from 'typeorm';\nimport { BaseEntity } from '../entities/base.entity';\n\n@Injectable()\nexport abstract class BaseService<T extends BaseEntity> {\n  constructor(protected readonly repository: Repository<T>) {}\n\n  async findAll(tenantId: string, options?: FindManyOptions<T>): Promise<T[]> {\n    const where = this.addTenantFilter(tenantId, options?.where);\n    return this.repository.find({ ...options, where });\n  }\n\n  async findOne(tenantId: string, id: string): Promise<T> {\n    const entity = await this.repository.findOne({\n      where: this.addTenantFilter(tenantId, { id } as any),\n    });\n\n    if (!entity) {\n      throw new NotFoundException(`Entity with ID ${id} not found`);\n    }\n\n    return entity;\n  }\n\n  async findOneBy(tenantId: string, where: any): Promise<T> {\n    const entity = await this.repository.findOne({\n      where: this.addTenantFilter(tenantId, where),\n    });\n\n    if (!entity) {\n      throw new NotFoundException('Entity not found');\n    }\n\n    return entity;\n  }\n\n  async findByIds(tenantId: string, ids: string[]): Promise<T[]> {\n    if (ids.length === 0) {\n      return [];\n    }\n\n    return this.repository.find({\n      where: this.addTenantFilter(tenantId, { id: { $in: ids } } as any),\n    });\n  }\n\n  async create(tenantId: string, data: Partial<T>, userId?: string): Promise<T> {\n    const entity = this.repository.create({\n      ...data,\n      tenantId,\n      createdBy: userId,\n    } as any);\n\n    return this.repository.save(entity);\n  }\n\n  async update(tenantId: string, id: string, data: Partial<T>, userId?: string): Promise<T> {\n    const entity = await this.findOne(tenantId, id);\n    \n    Object.assign(entity, {\n      ...data,\n      updatedBy: userId,\n      updatedAt: new Date(),\n    });\n\n    return this.repository.save(entity);\n  }\n\n  async remove(tenantId: string, id: string): Promise<void> {\n    const entity = await this.findOne(tenantId, id);\n    await this.repository.remove(entity);\n  }\n\n  async softDelete(tenantId: string, id: string, userId?: string): Promise<void> {\n    const entity = await this.findOne(tenantId, id);\n    \n    if ('softDelete' in entity && typeof entity.softDelete === 'function') {\n      (entity as any).softDelete(userId);\n      await this.repository.save(entity);\n    } else {\n      throw new BadRequestException('Entity does not support soft delete');\n    }\n  }\n\n  async count(tenantId: string, where?: any): Promise<number> {\n    return this.repository.count({\n      where: this.addTenantFilter(tenantId, where),\n    });\n  }\n\n  async exists(tenantId: string, where: any): Promise<boolean> {\n    const count = await this.repository.count({\n      where: this.addTenantFilter(tenantId, where),\n    });\n    return count > 0;\n  }\n\n  protected addTenantFilter(tenantId: string, where: any = {}) {\n    if (Array.isArray(where)) {\n      return where.map(w => ({ ...w, tenantId }));\n    }\n    return { ...where, tenantId };\n  }\n\n  protected createQueryBuilder(alias: string, tenantId: string) {\n    return this.repository.createQueryBuilder(alias)\n      .where(`${alias}.tenant_id = :tenantId`, { tenantId });\n  }\n}"
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Repository, FindManyOptions, FindOneOptions } from 'typeorm';
+import { BaseEntity } from '../entities/base.entity';
+
+@Injectable()
+export abstract class BaseService<T extends BaseEntity> {
+  constructor(protected readonly repository: Repository<T>) {}
+
+  async findAll(tenantId: string, options?: FindManyOptions<T>): Promise<T[]> {
+    const where = this.addTenantFilter(tenantId, options?.where);
+    return this.repository.find({ ...options, where });
+  }
+
+  async findOne(tenantId: string, id: string): Promise<T> {
+    const entity = await this.repository.findOne({
+      where: this.addTenantFilter(tenantId, { id } as any),
+    });
+
+    if (!entity) {
+      throw new NotFoundException(`Entity with ID ${id} not found`);
+    }
+
+    return entity;
+  }
+
+  async findOneBy(tenantId: string, where: any): Promise<T> {
+    const entity = await this.repository.findOne({
+      where: this.addTenantFilter(tenantId, where),
+    });
+
+    if (!entity) {
+      throw new NotFoundException('Entity not found');
+    }
+
+    return entity;
+  }
+
+  async findByIds(tenantId: string, ids: string[]): Promise<T[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return this.repository.find({
+      where: this.addTenantFilter(tenantId, { id: { $in: ids } } as any),
+    });
+  }
+
+  async create(tenantId: string, data: Partial<T>, userId?: string): Promise<T> {
+    const entity = this.repository.create({
+      ...data,
+      tenantId,
+      createdBy: userId,
+    } as any);
+
+    return this.repository.save(entity) as unknown as Promise<T>;
+  }
+
+  async update(tenantId: string, id: string, data: Partial<T>, userId?: string): Promise<T> {
+    const entity = await this.findOne(tenantId, id);
+    
+    Object.assign(entity, {
+      ...data,
+      updatedBy: userId,
+      updatedAt: new Date(),
+    });
+
+    return this.repository.save(entity) as unknown as Promise<T>;
+  }
+
+  async remove(tenantId: string, id: string): Promise<void> {
+    const entity = await this.findOne(tenantId, id);
+    await this.repository.remove(entity);
+  }
+
+  async softDelete(tenantId: string, id: string, userId?: string): Promise<void> {
+    const entity = await this.findOne(tenantId, id);
+    
+    if ('softDelete' in entity && typeof entity.softDelete === 'function') {
+      (entity as any).softDelete(userId);
+      await this.repository.save(entity);
+    } else {
+      throw new BadRequestException('Entity does not support soft delete');
+    }
+  }
+
+  async count(tenantId: string, where?: any): Promise<number> {
+    return this.repository.count({
+      where: this.addTenantFilter(tenantId, where),
+    });
+  }
+
+  async exists(tenantId: string, where: any): Promise<boolean> {
+    const count = await this.repository.count({
+      where: this.addTenantFilter(tenantId, where),
+    });
+    return count > 0;
+  }
+
+  protected addTenantFilter(tenantId: string, where: any = {}) {
+    if (Array.isArray(where)) {
+      return where.map(w => ({ ...w, tenantId }));
+    }
+    return { ...where, tenantId };
+  }
+
+  protected createQueryBuilder(alias: string, tenantId: string) {
+    return this.repository.createQueryBuilder(alias)
+      .where(`${alias}.tenant_id = :tenantId`, { tenantId });
+  }
+}

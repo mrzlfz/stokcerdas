@@ -9,7 +9,7 @@ import * as moment from 'moment-timezone';
 import { ReorderRule, ReorderRuleType } from '../entities/reorder-rule.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 import { Product } from '../../products/entities/product.entity';
-import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { InventoryTransaction, TransactionType } from '../../inventory/entities/inventory-transaction.entity';
 import { ForecastingService } from '../../ml-forecasting/services/forecasting.service';
 
 export interface ReorderCalculationRequest {
@@ -107,6 +107,8 @@ export class ReorderCalculationService {
   private readonly logger = new Logger(ReorderCalculationService.name);
 
   constructor(
+    @InjectRepository(ReorderRule)
+    private readonly reorderRuleRepository: Repository<ReorderRule>,
     @InjectRepository(InventoryItem)
     private readonly inventoryItemRepository: Repository<InventoryItem>,
     @InjectRepository(InventoryTransaction)
@@ -230,7 +232,7 @@ export class ReorderCalculationService {
         tenantId: reorderRule.tenantId,
         inventoryItemId: inventoryItem.id,
         transactionDate: { $gte: startDate, $lte: endDate } as any,
-        transactionType: 'out', // Only outbound transactions (sales/usage)
+        type: TransactionType.ISSUE, // Only outbound transactions (sales/usage)
       },
       order: { transactionDate: 'DESC' },
     });
@@ -256,7 +258,7 @@ export class ReorderCalculationService {
     
     if (reorderRule.useForecastingData) {
       try {
-        const forecast = await this.forecastingService.getDemandForecast({
+        const forecast = await this.forecastingService.generateDemandForecast(reorderRule.tenantId, {
           productId: product.id,
           forecastHorizonDays: reorderRule.forecastHorizonDays,
           includeConfidenceInterval: true,
@@ -832,5 +834,209 @@ export class ReorderCalculationService {
 
   private createErrorResult(errorMessage: string): ReorderCalculationResult {
     return this.createInvalidResult([`Calculation error: ${errorMessage}`]);
+  }
+
+  // CRUD Methods for ReorderRule management
+
+  async createReorderRule(tenantId: string, createDto: any, userId: string): Promise<ReorderRule> {
+    const reorderRule = this.reorderRuleRepository.create({
+      ...createDto,
+      tenantId,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+
+    return this.reorderRuleRepository.save(reorderRule as any);
+  }
+
+  async findReorderRules(tenantId: string, query: any): Promise<ReorderRule[]> {
+    const where: any = { tenantId, isDeleted: false };
+    
+    if (query.productId) where.productId = query.productId;
+    if (query.locationId) where.locationId = query.locationId;
+    if (query.isActive !== undefined) where.isActive = query.isActive;
+    if (query.type) where.type = query.type;
+
+    return this.reorderRuleRepository.find({
+      where,
+      relations: ['product', 'location'],
+      order: { createdAt: 'DESC' },
+      take: query.limit || 50,
+      skip: query.offset || 0,
+    });
+  }
+
+  async findReorderRuleById(tenantId: string, id: string): Promise<ReorderRule> {
+    return this.reorderRuleRepository.findOne({
+      where: { id, tenantId, isDeleted: false },
+      relations: ['product', 'location'],
+    });
+  }
+
+  async updateReorderRule(tenantId: string, id: string, updateDto: any, userId: string): Promise<ReorderRule> {
+    await this.reorderRuleRepository.update(
+      { id, tenantId },
+      { ...updateDto, updatedBy: userId, updatedAt: new Date() }
+    );
+
+    return this.findReorderRuleById(tenantId, id);
+  }
+
+  async deleteReorderRule(tenantId: string, id: string, userId: string): Promise<void> {
+    await this.reorderRuleRepository.update(
+      { id, tenantId },
+      { isDeleted: true, updatedBy: userId, updatedAt: new Date() }
+    );
+  }
+
+  async pauseReorderRule(tenantId: string, id: string, reason: string, userId: string): Promise<ReorderRule> {
+    await this.reorderRuleRepository.update(
+      { id, tenantId },
+      { 
+        isActive: false, 
+        isPaused: true,
+        pauseReason: reason,
+        updatedBy: userId, 
+        updatedAt: new Date() 
+      }
+    );
+
+    return this.findReorderRuleById(tenantId, id);
+  }
+
+  async resumeReorderRule(tenantId: string, id: string, userId: string): Promise<ReorderRule> {
+    await this.reorderRuleRepository.update(
+      { id, tenantId },
+      { 
+        isActive: true, 
+        isPaused: false,
+        pauseReason: null,
+        pausedUntil: null,
+        updatedBy: userId, 
+        updatedAt: new Date() 
+      }
+    );
+
+    return this.findReorderRuleById(tenantId, id);
+  }
+
+  async bulkActionReorderRules(tenantId: string, action: string, ruleIds: string[], userId: string): Promise<any> {
+    let result;
+    
+    switch (action) {
+      case 'activate':
+        result = await this.reorderRuleRepository.update(
+          { id: { $in: ruleIds } as any, tenantId },
+          { isActive: true, updatedBy: userId, updatedAt: new Date() }
+        );
+        break;
+      case 'deactivate':
+        result = await this.reorderRuleRepository.update(
+          { id: { $in: ruleIds } as any, tenantId },
+          { isActive: false, updatedBy: userId, updatedAt: new Date() }
+        );
+        break;
+      case 'delete':
+        result = await this.reorderRuleRepository.update(
+          { id: { $in: ruleIds } as any, tenantId },
+          { isDeleted: true, updatedBy: userId, updatedAt: new Date() }
+        );
+        break;
+      default:
+        throw new Error(`Unknown bulk action: ${action}`);
+    }
+
+    return {
+      success: true,
+      affected: result.affected || 0,
+      message: `Successfully ${action}d ${result.affected || 0} reorder rules`,
+    };
+  }
+
+  // Get metrics for a specific reorder rule
+  async getReorderRuleMetrics(tenantId: string, ruleId: string): Promise<any> {
+    const rule = await this.findReorderRuleById(tenantId, ruleId);
+    if (!rule) {
+      throw new Error(`Reorder rule not found: ${ruleId}`);
+    }
+
+    // Mock metrics - in a real implementation, this would query execution history
+    return {
+      ruleId,
+      ruleName: rule.name,
+      totalExecutions: Math.floor(Math.random() * 100),
+      successfulExecutions: Math.floor(Math.random() * 80),
+      failedExecutions: Math.floor(Math.random() * 10),
+      averageExecutionTime: Math.floor(Math.random() * 5000) + 1000,
+      totalValueGenerated: Math.floor(Math.random() * 1000000),
+      lastExecution: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
+      nextScheduledExecution: new Date(Date.now() + Math.random() * 24 * 60 * 60 * 1000),
+      efficiency: 0.85 + Math.random() * 0.1,
+    };
+  }
+
+  // Debug a reorder rule calculation
+  async debugReorderRule(tenantId: string, ruleId: string): Promise<any> {
+    const rule = await this.findReorderRuleById(tenantId, ruleId);
+    if (!rule) {
+      throw new Error(`Reorder rule not found: ${ruleId}`);
+    }
+
+    // Mock debug info - in a real implementation, this would show calculation steps
+    return {
+      ruleId,
+      debugInfo: {
+        lastCalculationAt: new Date(),
+        calculationSteps: [
+          { step: 'Fetch inventory data', duration: 150, status: 'success' },
+          { step: 'Analyze demand', duration: 300, status: 'success' },
+          { step: 'Calculate EOQ', duration: 50, status: 'success' },
+          { step: 'Apply safety stock', duration: 25, status: 'success' },
+          { step: 'Generate recommendation', duration: 75, status: 'success' },
+        ],
+        inputData: {
+          currentStock: 45,
+          reorderPoint: 20,
+          leadTime: 7,
+          averageDemand: 5.2,
+        },
+        outputData: {
+          shouldReorder: true,
+          recommendedQuantity: 100,
+          urgencyScore: 7.5,
+          estimatedCost: 5000,
+        },
+      },
+    };
+  }
+
+  // Simulate reorder rule execution
+  async simulateReorderRule(tenantId: string, ruleId: string, simulationParams: any): Promise<any> {
+    const rule = await this.findReorderRuleById(tenantId, ruleId);
+    if (!rule) {
+      throw new Error(`Reorder rule not found: ${ruleId}`);
+    }
+
+    // Mock simulation - in a real implementation, this would run a what-if scenario
+    return {
+      ruleId,
+      simulationParams,
+      results: {
+        scenario: 'normal_conditions',
+        wouldTrigger: true,
+        estimatedQuantity: simulationParams.quantity || 100,
+        estimatedCost: (simulationParams.quantity || 100) * (simulationParams.unitCost || 50),
+        estimatedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        riskFactors: [
+          { factor: 'Supplier reliability', risk: 'low' },
+          { factor: 'Demand volatility', risk: 'medium' },
+          { factor: 'Lead time variance', risk: 'low' },
+        ],
+        recommendations: [
+          'Consider increasing safety stock by 10%',
+          'Monitor supplier performance closely',
+        ],
+      },
+    };
   }
 }

@@ -51,7 +51,24 @@ StokCerdas is an AI-powered inventory intelligence SaaS platform designed specif
 - Docker and Docker Compose
 - Git
 
-### Quick Start
+### Quick Start (Automated)
+
+🚀 **One-command setup** (recommended):
+```bash
+git clone <repository-url>
+cd stokcerdas
+./scripts/start-dev.sh
+```
+
+This script will:
+- ✅ Check for port conflicts and resolve them
+- ✅ Start all Docker services
+- ✅ Install dependencies
+- ✅ Run database migrations
+- ✅ Seed initial data
+- ✅ Show all service URLs
+
+### Manual Setup
 
 1. **Clone the repository**
    ```bash
@@ -59,27 +76,44 @@ StokCerdas is an AI-powered inventory intelligence SaaS platform designed specif
    cd stokcerdas
    ```
 
-2. **Start development environment**
+2. **Check for port conflicts**
+   ```bash
+   ./scripts/check-ports.sh --auto-kill
+   ```
+
+3. **Start development environment**
    ```bash
    docker-compose up -d
    ```
 
-3. **Install dependencies**
+4. **Install dependencies**
    ```bash
    npm install
    ```
 
-4. **Run database migrations**
+5. **Run database migrations**
    ```bash
    npm run migration:run
+   npm run seed:run
    ```
 
-5. **Start development server**
+6. **Start development server**
    ```bash
    npm run dev
    ```
 
-The API will be available at `http://localhost:3000`
+### 🌐 Service URLs
+
+After setup, access these services:
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **API Documentation** | http://localhost:3000/api/docs | - |
+| **MinIO Console** | http://localhost:9001 | admin/admin123 |
+| **RabbitMQ Management** | http://localhost:15672 | stokcerdas/stokcerdas_queue |
+| **MailHog (Email Testing)** | http://localhost:8025 | - |
+| **Kibana (Search)** | http://localhost:5601 | - |
+| **Jaeger (Tracing)** | http://localhost:16686 | - |
 
 ### Development Commands
 
@@ -238,9 +272,10 @@ npm run test:cov
 
 ## 📚 Documentation
 
-- [Product Requirements Document](./stokcerdas-prd.md)
-- [Master Development Plan](./masterplan.md)
-- [Claude AI Instructions](./CLAUDE.md)
+- [📋 Product Requirements Document](./stokcerdas-prd.md)
+- [🗺️ Master Development Plan](./masterplan.md) - 150 tasks across 12 months
+- [🤖 Claude AI Instructions](./CLAUDE.md)
+- [🛠️ **Development Guide**](./docs/DEVELOPMENT_GUIDE.md) - **Complete setup guide with troubleshooting**
 - [API Documentation](./docs/api.md) *(Coming Soon)*
 - [Architecture Guide](./docs/architecture.md) *(Coming Soon)*
 

@@ -1,1 +1,98 @@
-import {\n  Injectable,\n  NestInterceptor,\n  ExecutionContext,\n  CallHandler,\n  Logger,\n} from '@nestjs/common';\nimport { Observable } from 'rxjs';\nimport { tap } from 'rxjs/operators';\nimport { Request, Response } from 'express';\n\n@Injectable()\nexport class LoggingInterceptor implements NestInterceptor {\n  private readonly logger = new Logger(LoggingInterceptor.name);\n\n  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {\n    const ctx = context.switchToHttp();\n    const request = ctx.getRequest<Request>();\n    const response = ctx.getResponse<Response>();\n    const { method, url, headers, body, query, params } = request;\n    const userAgent = headers['user-agent'] || '';\n    const ip = headers['x-forwarded-for'] || request.connection.remoteAddress;\n    const tenantId = headers['x-tenant-id'];\n    const userId = (request as any).user?.id;\n    \n    const startTime = Date.now();\n    const requestId = headers['x-request-id'] || this.generateRequestId();\n    \n    // Set request ID in response headers\n    response.setHeader('x-request-id', requestId);\n\n    this.logger.log(\n      `→ ${method} ${url}`,\n      {\n        requestId,\n        tenantId,\n        userId,\n        ip,\n        userAgent,\n        query,\n        params,\n        body: this.sanitizeBody(body),\n      },\n    );\n\n    return next.handle().pipe(\n      tap(\n        (data) => {\n          const duration = Date.now() - startTime;\n          this.logger.log(\n            `← ${method} ${url} ${response.statusCode} - ${duration}ms`,\n            {\n              requestId,\n              tenantId,\n              userId,\n              statusCode: response.statusCode,\n              duration,\n              responseSize: JSON.stringify(data).length,\n            },\n          );\n        },\n        (error) => {\n          const duration = Date.now() - startTime;\n          this.logger.error(\n            `← ${method} ${url} ERROR - ${duration}ms`,\n            {\n              requestId,\n              tenantId,\n              userId,\n              duration,\n              error: error.message,\n              stack: error.stack,\n            },\n          );\n        },\n      ),\n    );\n  }\n\n  private generateRequestId(): string {\n    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;\n  }\n\n  private sanitizeBody(body: any): any {\n    if (!body) return body;\n    \n    const sanitized = { ...body };\n    const sensitiveFields = ['password', 'token', 'secret', 'key', 'authorization'];\n    \n    for (const field of sensitiveFields) {\n      if (sanitized[field]) {\n        sanitized[field] = '[REDACTED]';\n      }\n    }\n    \n    return sanitized;\n  }\n}"
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  Logger,
+} from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
+import { Request, Response } from 'express';
+
+@Injectable()
+export class LoggingInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(LoggingInterceptor.name);
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const ctx = context.switchToHttp();
+    const request = ctx.getRequest<Request>();
+    const response = ctx.getResponse<Response>();
+    const { method, url, headers, body, query, params } = request;
+    const userAgent = headers['user-agent'] || '';
+    const ip = headers['x-forwarded-for'] || request.connection.remoteAddress;
+    const tenantId = headers['x-tenant-id'];
+    const userId = (request as any).user?.id;
+    
+    const startTime = Date.now();
+    const requestId = headers['x-request-id'] || this.generateRequestId();
+    
+    // Set request ID in response headers
+    response.setHeader('x-request-id', requestId);
+
+    this.logger.log(
+      `→ ${method} ${url}`,
+      {
+        requestId,
+        tenantId,
+        userId,
+        ip,
+        userAgent,
+        query,
+        params,
+        body: this.sanitizeBody(body),
+      },
+    );
+
+    return next.handle().pipe(
+      tap(
+        (data) => {
+          const duration = Date.now() - startTime;
+          this.logger.log(
+            `← ${method} ${url} ${response.statusCode} - ${duration}ms`,
+            {
+              requestId,
+              tenantId,
+              userId,
+              statusCode: response.statusCode,
+              duration,
+              responseSize: JSON.stringify(data).length,
+            },
+          );
+        },
+        (error) => {
+          const duration = Date.now() - startTime;
+          this.logger.error(
+            `← ${method} ${url} ERROR - ${duration}ms`,
+            {
+              requestId,
+              tenantId,
+              userId,
+              duration,
+              error: error.message,
+              stack: error.stack,
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  private generateRequestId(): string {
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private sanitizeBody(body: any): any {
+    if (!body) return body;
+    
+    const sanitized = { ...body };
+    const sensitiveFields = ['password', 'token', 'secret', 'key', 'authorization'];
+    
+    for (const field of sensitiveFields) {
+      if (sanitized[field]) {
+        sanitized[field] = '[REDACTED]';
+      }
+    }
+    
+    return sanitized;
+  }
+}

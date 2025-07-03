@@ -6,7 +6,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { AuditableEntity } from '../../common/entities/auditable.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { ApprovalInstance } from './approval-instance.entity';
 import { ApprovalStep } from './approval-step.entity';
 import { User } from '../../users/entities/user.entity';
@@ -353,7 +353,7 @@ export class ApprovalAction extends AuditableEntity {
     return this.actionType === ApprovalActionType.ESCALATE;
   }
 
-  isSystemAction(): boolean {
+  getIsSystemAction(): boolean {
     return this.isSystemAction || this.isAutomated;
   }
 
@@ -523,9 +523,9 @@ export class ApprovalAction extends AuditableEntity {
       case ApprovalActionType.REJECT:
         return 'Rejected';
       case ApprovalActionType.DELEGATE:
-        return `Delegated to ${this.delegatedTo?.name || 'another user'}`;
+        return `Delegated to ${this.delegatedTo?.fullName || 'another user'}`;
       case ApprovalActionType.ESCALATE:
-        return `Escalated to ${this.escalatedTo?.name || 'higher authority'}`;
+        return `Escalated to ${this.escalatedTo?.fullName || 'higher authority'}`;
       case ApprovalActionType.REQUEST_INFO:
         return 'Requested additional information';
       case ApprovalActionType.PROVIDE_INFO:

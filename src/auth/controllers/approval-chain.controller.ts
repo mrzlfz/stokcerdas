@@ -10,6 +10,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
   Patch,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -79,11 +80,10 @@ export class ApprovalChainController {
       userId,
     );
 
-    return {
-      success: true,
-      message: 'Approval chain berhasil dibuat',
-      data: approvalChain as ApprovalChainResponseDto,
-    };
+    return StandardResponse.created(
+      approvalChain as ApprovalChainResponseDto,
+      'Approval chain berhasil dibuat'
+    );
   }
 
   @Get()
@@ -415,7 +415,11 @@ export class ApprovalChainController {
   ): Promise<StandardResponse<ApprovalChainTestResultDto>> {
     const testResult = await this.approvalChainService.testApprovalChain(
       id,
-      testDto.testRequest,
+      {
+        ...testDto.testRequest,
+        id: `test-${Date.now()}`,
+        submittedAt: new Date(),
+      },
       tenantId,
     );
 

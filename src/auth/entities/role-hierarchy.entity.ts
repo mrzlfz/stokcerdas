@@ -245,7 +245,7 @@ export class RoleHierarchy extends AuditableEntity {
 
     // Check allowed hours
     if (timeRestriction.allowedHours) {
-      const dayOfWeek = now.toLocaleDateString('en', { weekday: 'lowercase' });
+      const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase();
       const schedule = timeRestriction.allowedHours[dayOfWeek];
       
       if (!schedule) return false;

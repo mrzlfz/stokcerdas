@@ -4,13 +4,17 @@ import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../common
 import { HttpService } from '@nestjs/axios';
 
 export interface MokaCredentials {
-  appId: string;
-  secretKey: string;
+  clientId?: string;
+  clientSecret?: string;
   accessToken?: string;
   refreshToken?: string;
-  expiresAt?: Date;
-  redirectUri: string;
-  isSandbox?: boolean;
+  apiKey?: string;
+  secretKey?: string;
+  webhookSecret?: string;
+  sandbox?: boolean;
+  expiresAt?: string;
+  redirectUri?: string;
+  appId?: string;
 }
 
 export interface MokaApiRequest extends Omit<ApiRequest, 'headers'> {
@@ -114,7 +118,7 @@ export interface MokaInventoryUpdate {
 
 @Injectable()
 export class MokaApiService extends BaseApiService {
-  private readonly logger = new Logger(MokaApiService.name);
+  protected readonly logger = new Logger(MokaApiService.name);
   
   constructor(
     protected readonly httpService: HttpService,
@@ -127,7 +131,7 @@ export class MokaApiService extends BaseApiService {
    * Get Moka API configuration
    */
   private getApiConfig(credentials: MokaCredentials): ApiConfig {
-    const baseUrl = credentials.isSandbox 
+    const baseUrl = credentials.sandbox 
       ? 'https://api-sandbox.mokapos.com'
       : 'https://api.mokapos.com';
 
@@ -142,7 +146,7 @@ export class MokaApiService extends BaseApiService {
       authentication: {
         type: 'oauth',
         credentials: {
-          appId: credentials.appId,
+          appId: credentials.clientId,
           secretKey: credentials.secretKey,
           accessToken: credentials.accessToken,
         },
@@ -177,7 +181,6 @@ export class MokaApiService extends BaseApiService {
         ...(request.outletId 
           ? { 'X-Outlet-ID': request.outletId }
           : {}),
-        ...request.headers,
       },
     };
 
@@ -710,7 +713,8 @@ export class MokaApiService extends BaseApiService {
     
     // Check if token expires in next 5 minutes (buffer time)
     const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
-    const expiryWithBuffer = new Date(credentials.expiresAt.getTime() - bufferTime);
+    const expiryDate = new Date(credentials.expiresAt);
+    const expiryWithBuffer = new Date(expiryDate.getTime() - bufferTime);
     
     return new Date() > expiryWithBuffer;
   }
@@ -722,12 +726,12 @@ export class MokaApiService extends BaseApiService {
     credentials: MokaCredentials,
     state?: string,
   ): string {
-    const baseUrl = credentials.isSandbox 
+    const baseUrl = credentials.sandbox 
       ? 'https://api-sandbox.mokapos.com'
       : 'https://api.mokapos.com';
     
     const params = new URLSearchParams({
-      client_id: credentials.appId,
+      client_id: credentials.clientId,
       redirect_uri: credentials.redirectUri,
       response_type: 'code',
       scope: 'read_products write_products read_sales read_inventory write_inventory',
@@ -761,7 +765,7 @@ export class MokaApiService extends BaseApiService {
       endpoint: '/oauth/token',
       data: {
         grant_type: 'authorization_code',
-        client_id: credentials.appId,
+        client_id: credentials.clientId,
         client_secret: credentials.secretKey,
         code: authorizationCode,
         redirect_uri: credentials.redirectUri,
@@ -799,7 +803,7 @@ export class MokaApiService extends BaseApiService {
       endpoint: '/oauth/token',
       data: {
         grant_type: 'refresh_token',
-        client_id: credentials.appId,
+        client_id: credentials.clientId,
         client_secret: credentials.secretKey,
         refresh_token: credentials.refreshToken,
       },
@@ -826,7 +830,7 @@ export class MokaApiService extends BaseApiService {
         
         // Calculate expiry date
         const expiresIn = response.data.expires_in || 3600; // Default 1 hour
-        credentials.expiresAt = new Date(Date.now() + (expiresIn * 1000));
+        credentials.expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
         
         this.logger.log(`Successfully refreshed Moka access token for channel ${channelId}`);
       } else {
@@ -865,7 +869,7 @@ export class MokaApiService extends BaseApiService {
       endpoint: '/oauth/revoke',
       data: {
         token: credentials.accessToken,
-        client_id: credentials.appId,
+        client_id: credentials.clientId,
         client_secret: credentials.secretKey,
       },
       headers: {

@@ -54,7 +54,7 @@ export class BasePermissionSetDto {
   @ApiProperty({
     description: 'Jenis permission set',
     enum: PermissionSetType,
-    example: PermissionSetType.DEPARTMENTAL,
+    example: PermissionSetType.DEPARTMENT,
   })
   @IsEnum(PermissionSetType, { message: 'Jenis permission set tidak valid' })
   type: PermissionSetType;

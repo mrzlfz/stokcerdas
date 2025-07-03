@@ -1146,4 +1146,13 @@ export class PurchaseOrdersService {
       overdue: overdueCount,
     };
   }
+
+  // Alias method for workflow execution compatibility
+  async createPurchaseOrder(
+    tenantId: string,
+    createPurchaseOrderDto: CreatePurchaseOrderDto,
+    userId?: string,
+  ): Promise<PurchaseOrder> {
+    return this.create(tenantId, createPurchaseOrderDto, userId);
+  }
 }

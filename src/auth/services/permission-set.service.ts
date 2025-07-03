@@ -64,7 +64,7 @@ export class PermissionSetService {
       updatedBy: userId,
     });
 
-    const savedPermissionSet = await this.permissionSetRepository.save(permissionSet);
+    const savedPermissionSet = await this.permissionSetRepository.save(permissionSet) as unknown as PermissionSet;
 
     // Record usage for template
     if (inheritsFromId) {
@@ -734,6 +734,6 @@ export class PermissionSetService {
       updatedBy: userId,
     });
 
-    return this.permissionSetRepository.save(permissionSet);
+    return this.permissionSetRepository.save(permissionSet) as unknown as PermissionSet;
   }
 }

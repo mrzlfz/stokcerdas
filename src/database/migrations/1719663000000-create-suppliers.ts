@@ -302,35 +302,23 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
     );
 
     // Create indexes for suppliers table
-    await queryRunner.createIndex(
-      'suppliers',
-      new Index('IDX_suppliers_tenant_id_is_deleted', ['tenant_id', 'is_deleted']),
-    );
+    await queryRunner.query(`CREATE INDEX "IDX_suppliers_tenant_id_is_deleted" ON "suppliers" ("tenant_id", "is_deleted")`);
 
-    await queryRunner.createIndex(
-      'suppliers',
-      new Index('IDX_suppliers_tenant_id_code', ['tenant_id', 'code'], {
-        unique: true,
-        where: 'is_deleted = false',
-      }),
-    );
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX "IDX_suppliers_tenant_id_code" 
+      ON "suppliers" ("tenant_id", "code") 
+      WHERE is_deleted = false
+    `);
 
-    await queryRunner.createIndex(
-      'suppliers',
-      new Index('IDX_suppliers_tenant_id_email', ['tenant_id', 'email'], {
-        where: 'is_deleted = false',
-      }),
-    );
+    await queryRunner.query(`
+      CREATE INDEX "IDX_suppliers_tenant_id_email" 
+      ON "suppliers" ("tenant_id", "email") 
+      WHERE is_deleted = false
+    `);
 
-    await queryRunner.createIndex(
-      'suppliers',
-      new Index('IDX_suppliers_tenant_id_status', ['tenant_id', 'status']),
-    );
+    await queryRunner.query(`CREATE INDEX "IDX_suppliers_tenant_id_status" ON "suppliers" ("tenant_id", "status")`);
 
-    await queryRunner.createIndex(
-      'suppliers',
-      new Index('IDX_suppliers_tenant_id_type', ['tenant_id', 'type']),
-    );
+    await queryRunner.query(`CREATE INDEX "IDX_suppliers_tenant_id_type" ON "suppliers" ("tenant_id", "type")`);
 
     // Add supplier_id column to products table
     await queryRunner.query(
@@ -338,22 +326,14 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
     );
 
     // Create index for supplier_id in products table
-    await queryRunner.createIndex(
-      'products',
-      new Index('IDX_products_tenant_id_supplier_id', ['tenant_id', 'supplier_id']),
-    );
+    await queryRunner.query(`CREATE INDEX "IDX_products_tenant_id_supplier_id" ON "products" ("tenant_id", "supplier_id")`);
 
     // Create foreign key constraint
-    await queryRunner.createForeignKey(
-      'products',
-      new ForeignKey({
-        columnNames: ['supplier_id'],
-        referencedTableName: 'suppliers',
-        referencedColumnNames: ['id'],
-        onDelete: 'SET NULL',
-        onUpdate: 'CASCADE',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "products" 
+      ADD CONSTRAINT "FK_products_supplier_id" 
+      FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    `);
 
     // Migrate existing supplier data from products table
     await queryRunner.query(`

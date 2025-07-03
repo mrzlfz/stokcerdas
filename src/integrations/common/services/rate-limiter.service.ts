@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRedis } from '@nestjs-modules/ioredis';
+// import { InjectRedis } from '@nestjs-modules/ioredis'; // Package not found
 import Redis from 'ioredis';
 
 export interface RateLimitConfig {
@@ -22,8 +22,10 @@ export interface RateLimitResult {
 export class RateLimiterService {
   private readonly logger = new Logger(RateLimiterService.name);
 
+  private readonly redis: Redis | null = null; // Placeholder
+  
   constructor(
-    @InjectRedis() private readonly redis: Redis,
+    // @InjectRedis() private readonly redis: Redis,
     private readonly configService: ConfigService,
   ) {}
 

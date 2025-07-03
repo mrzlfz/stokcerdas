@@ -11,6 +11,7 @@ import { ShippingRate } from '../../../entities/shipping-rate.entity';
 // Services
 import { JntApiService, JntCredentials, JntBookingRequest } from './jnt-api.service';
 import { IntegrationLogService } from '../../../../integrations/common/services/integration-log.service';
+import { IntegrationLogType, IntegrationLogLevel } from '../../../../integrations/entities/integration-log.entity';
 
 // Interfaces
 export interface JntShipmentRequest {
@@ -218,8 +219,8 @@ export class JntShippingService {
       // Log successful creation
       await this.logService.log({
         tenantId,
-        type: 'SHIPPING',
-        level: 'INFO',
+        type: IntegrationLogType.SHIPPING,
+        level: IntegrationLogLevel.INFO,
         message: `J&T booking created: ${response.data.data.awbNo}`,
         metadata: {
           shippingLabelId: request.shippingLabelId,
@@ -351,8 +352,8 @@ export class JntShippingService {
         // Log tracking update
         await this.logService.log({
           tenantId,
-          type: 'TRACKING',
-          level: 'INFO',
+          type: IntegrationLogType.TRACKING,
+          level: IntegrationLogLevel.INFO,
           message: `J&T tracking updated: ${update.awbNo} - ${update.scanType}`,
           metadata: {
             awbNo: update.awbNo,
@@ -436,8 +437,8 @@ export class JntShippingService {
       // Log cancellation
       await this.logService.log({
         tenantId,
-        type: 'SHIPPING',
-        level: 'INFO',
+        type: IntegrationLogType.SHIPPING,
+        level: IntegrationLogLevel.INFO,
         message: `J&T booking cancelled: ${trackingNumber}`,
         metadata: {
           trackingNumber,
@@ -660,17 +661,12 @@ export class JntShippingService {
     tracking.sequence = (lastTracking?.sequence || 0) + 1;
 
     if (data.location) {
-      tracking.location = {
-        name: data.location,
-        city: data.location,
-        state: '',
-        country: 'ID',
-        facilityType: 'hub',
-      };
+      tracking.location = data.location;
     }
 
     if (data.carrierData) {
-      tracking.carrierData = data.carrierData;
+      tracking.carrierId = data.carrierData.id;
+      tracking.carrierName = data.carrierData.name;
     }
 
     return this.shippingTrackingRepository.save(tracking);

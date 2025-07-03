@@ -93,8 +93,8 @@ import { CommonModule } from './common/common.module';
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        store: redisStore,
+      useFactory: async (configService: ConfigService) => ({
+        store: redisStore as any,
         host: configService.get('redis.host'),
         port: configService.get('redis.port'),
         password: configService.get('redis.password'),

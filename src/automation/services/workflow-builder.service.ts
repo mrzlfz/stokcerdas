@@ -703,6 +703,55 @@ export class WorkflowBuilderService {
     return step;
   }
 
+  // Find workflows with pagination
+  async findWorkflows(query: any): Promise<[Workflow[], number]> {
+    const {
+      tenantId,
+      category,
+      status,
+      triggerType,
+      ownerId,
+      search,
+      tags,
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+    } = query;
+
+    const where: any = { tenantId, deletedAt: null };
+    
+    if (category) where.category = category;
+    if (status) where.status = status;
+    if (triggerType) where.triggerType = triggerType;
+    if (ownerId) where.ownerId = ownerId;
+    
+    const queryBuilder = this.workflowRepository.createQueryBuilder('workflow')
+      .leftJoinAndSelect('workflow.owner', 'owner')
+      .where(where);
+
+    if (search) {
+      queryBuilder.andWhere(
+        '(workflow.name ILIKE :search OR workflow.description ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (tags && tags.length > 0) {
+      queryBuilder.andWhere('workflow.tags && :tags', { tags });
+    }
+
+    const total = await queryBuilder.getCount();
+    
+    const workflows = await queryBuilder
+      .orderBy(`workflow.${sortBy}`, sortOrder as 'ASC' | 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return [workflows, total];
+  }
+
   // =============================================
   // HELPER METHODS
   // =============================================

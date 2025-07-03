@@ -7,7 +7,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { AuditableEntity } from '../../common/entities/auditable.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { Company } from './company.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -415,7 +415,7 @@ export class CompanyBilling extends AuditableEntity {
     return this.billingStatus === BillingStatus.ACTIVE;
   }
 
-  isTrial(): boolean {
+  isInTrial(): boolean {
     return this.isTrial && this.trialEndDate && new Date() <= this.trialEndDate;
   }
 

@@ -1,12 +1,9 @@
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { config } from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { join } from 'path';
 
-// ES modules compatibility
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// __dirname is available in CommonJS mode (ts-node)
 
 // Load environment variables
 config({ path: `.env.${process.env.NODE_ENV || 'development'}` });
@@ -29,6 +26,6 @@ export const AppDataSource = new DataSource({
     max: configService.get('DB_MAX_CONNECTIONS', 100),
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
+    timezone: configService.get('DB_TIMEZONE', 'Asia/Jakarta'),
   },
-  timezone: configService.get('DB_TIMEZONE', 'Asia/Jakarta'),
 });

@@ -44,7 +44,7 @@ import { IntegrationProcessor } from './processors/integration.processor';
     HttpModule.register({
       timeout: 30000,
       maxRedirects: 3,
-      retries: 3,
+      // retries: 3, // Property doesn't exist in HttpModuleOptions
     }),
     
     // Database entities
