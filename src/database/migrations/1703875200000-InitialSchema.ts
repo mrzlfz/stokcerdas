@@ -8,27 +8,27 @@ export class InitialSchema1703875200000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TYPE "user_role_enum" AS ENUM('super_admin', 'admin', 'manager', 'staff')
     `);
-    
+
     await queryRunner.query(`
       CREATE TYPE "user_status_enum" AS ENUM('active', 'inactive', 'suspended', 'pending')
     `);
-    
+
     await queryRunner.query(`
       CREATE TYPE "product_status_enum" AS ENUM('active', 'inactive', 'discontinued')
     `);
-    
+
     await queryRunner.query(`
       CREATE TYPE "product_type_enum" AS ENUM('simple', 'variant', 'bundle')
     `);
-    
+
     await queryRunner.query(`
       CREATE TYPE "location_type_enum" AS ENUM('warehouse', 'store', 'virtual', 'transit')
     `);
-    
+
     await queryRunner.query(`
       CREATE TYPE "location_status_enum" AS ENUM('active', 'inactive', 'maintenance')
     `);
-    
+
     await queryRunner.query(`
       CREATE TYPE "transaction_type_enum" AS ENUM(
         'receipt', 'issue', 'transfer_out', 'transfer_in', 
@@ -38,7 +38,7 @@ export class InitialSchema1703875200000 implements MigrationInterface {
         'allocation', 'allocation_release'
       )
     `);
-    
+
     await queryRunner.query(`
       CREATE TYPE "transaction_status_enum" AS ENUM('pending', 'completed', 'cancelled', 'failed')
     `);
@@ -298,7 +298,7 @@ export class InitialSchema1703875200000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "products"`);
     await queryRunner.query(`DROP TABLE "product_categories"`);
     await queryRunner.query(`DROP TABLE "users"`);
-    
+
     // Drop ENUM types
     await queryRunner.query(`DROP TYPE "transaction_status_enum"`);
     await queryRunner.query(`DROP TYPE "transaction_type_enum"`);

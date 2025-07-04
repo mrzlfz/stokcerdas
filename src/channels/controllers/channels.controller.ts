@@ -43,7 +43,11 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
-import { ChannelType, ChannelStatus, SyncStrategy } from '../entities/channel.entity';
+import {
+  ChannelType,
+  ChannelStatus,
+  SyncStrategy,
+} from '../entities/channel.entity';
 import { UserRole } from '../../users/entities/user.entity';
 
 // Services
@@ -274,7 +278,7 @@ export class ChannelsQueryDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => Array.isArray(value) ? value : [value])
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   tags?: string[];
 
   @IsOptional()
@@ -325,8 +329,11 @@ export class ChannelsController {
     @Query() query: ChannelsQueryDto,
   ) {
     try {
-      const result = await this.channelsService.getChannels(user.tenantId, query);
-      
+      const result = await this.channelsService.getChannels(
+        user.tenantId,
+        query,
+      );
+
       return {
         success: true,
         data: result.channels,
@@ -337,7 +344,10 @@ export class ChannelsController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get channels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get channels: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -358,8 +368,11 @@ export class ChannelsController {
     @Param('channelId') channelId: string,
   ) {
     try {
-      const channel = await this.channelsService.getChannelById(user.tenantId, channelId);
-      
+      const channel = await this.channelsService.getChannelById(
+        user.tenantId,
+        channelId,
+      );
+
       return {
         success: true,
         data: channel,
@@ -385,14 +398,20 @@ export class ChannelsController {
     @Body() createDto: CreateChannelDto,
   ) {
     try {
-      const channel = await this.channelsService.createChannel(user.tenantId, createDto);
-      
+      const channel = await this.channelsService.createChannel(
+        user.tenantId,
+        createDto,
+      );
+
       return {
         success: true,
         data: channel,
       };
     } catch (error) {
-      this.logger.error(`Failed to create channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create channel: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -419,13 +438,16 @@ export class ChannelsController {
         channelId,
         updateDto,
       );
-      
+
       return {
         success: true,
         data: channel,
       };
     } catch (error) {
-      this.logger.error(`Failed to update channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update channel: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -447,13 +469,16 @@ export class ChannelsController {
   ) {
     try {
       await this.channelsService.deleteChannel(user.tenantId, channelId);
-      
+
       return {
         success: true,
         message: 'Channel deleted successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to delete channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete channel: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -478,13 +503,16 @@ export class ChannelsController {
         user.tenantId,
         channelId,
       );
-      
+
       return {
         success: true,
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to test connection: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to test connection: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -507,20 +535,23 @@ export class ChannelsController {
   ) {
     try {
       const { testConnection, ...credentials } = credentialsDto;
-      
+
       const result = await this.channelsService.updateChannelCredentials(
         user.tenantId,
         channelId,
         credentials,
         testConnection,
       );
-      
+
       return {
         success: true,
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to update credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update credentials: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -533,7 +564,10 @@ export class ChannelsController {
 
   @Get('platform/:platformId')
   @ApiOperation({ summary: 'Get channels by platform' })
-  @ApiResponse({ status: 200, description: 'Platform channels retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Platform channels retrieved successfully',
+  })
   @ApiParam({ name: 'platformId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getChannelsByPlatform(
@@ -545,13 +579,16 @@ export class ChannelsController {
         user.tenantId,
         platformId,
       );
-      
+
       return {
         success: true,
         data: channels,
       };
     } catch (error) {
-      this.logger.error(`Failed to get platform channels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get platform channels: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -564,20 +601,26 @@ export class ChannelsController {
 
   @Get('status/active')
   @ApiOperation({ summary: 'Get all active channels' })
-  @ApiResponse({ status: 200, description: 'Active channels retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Active channels retrieved successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  async getActiveChannels(
-    @CurrentUser() user: any,
-  ) {
+  async getActiveChannels(@CurrentUser() user: any) {
     try {
-      const channels = await this.channelsService.getActiveChannels(user.tenantId);
-      
+      const channels = await this.channelsService.getActiveChannels(
+        user.tenantId,
+      );
+
       return {
         success: true,
         data: channels,
       };
     } catch (error) {
-      this.logger.error(`Failed to get active channels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get active channels: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -592,23 +635,24 @@ export class ChannelsController {
   @ApiOperation({ summary: 'Start channel synchronization' })
   @ApiResponse({ status: 200, description: 'Sync started successfully' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async startSync(
-    @CurrentUser() user: any,
-    @Body() syncDto: ChannelSyncDto,
-  ) {
+  async startSync(@CurrentUser() user: any, @Body() syncDto: ChannelSyncDto) {
     try {
-      const scheduleAt = syncDto.scheduleAt ? new Date(syncDto.scheduleAt) : undefined;
-      
+      const scheduleAt = syncDto.scheduleAt
+        ? new Date(syncDto.scheduleAt)
+        : undefined;
+
       const syncId = await this.syncService.startSync(user.tenantId, {
         ...syncDto,
         scheduleAt,
       });
-      
+
       return {
         success: true,
         data: {
           syncId,
-          message: scheduleAt ? 'Sync scheduled successfully' : 'Sync started successfully',
+          message: scheduleAt
+            ? 'Sync scheduled successfully'
+            : 'Sync started successfully',
         },
       };
     } catch (error) {
@@ -631,7 +675,8 @@ export class ChannelsController {
   async syncChannel(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
-    @Body() syncDto: {
+    @Body()
+    syncDto: {
       syncType: SyncType;
       direction: 'inbound' | 'outbound' | 'bidirectional';
       options?: any;
@@ -645,13 +690,16 @@ export class ChannelsController {
         syncDto.direction,
         syncDto.options,
       );
-      
+
       return {
         success: true,
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to sync channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync channel: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -664,7 +712,10 @@ export class ChannelsController {
 
   @Get('sync/:syncId/status')
   @ApiOperation({ summary: 'Get sync status' })
-  @ApiResponse({ status: 200, description: 'Sync status retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync status retrieved successfully',
+  })
   @ApiParam({ name: 'syncId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getSyncStatus(
@@ -673,7 +724,7 @@ export class ChannelsController {
   ) {
     try {
       const status = await this.syncService.getSyncStatus(syncId);
-      
+
       if (!status) {
         throw new HttpException(
           {
@@ -683,13 +734,16 @@ export class ChannelsController {
           HttpStatus.NOT_FOUND,
         );
       }
-      
+
       return {
         success: true,
         data: status,
       };
     } catch (error) {
-      this.logger.error(`Failed to get sync status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get sync status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -705,13 +759,10 @@ export class ChannelsController {
   @ApiResponse({ status: 200, description: 'Sync cancelled successfully' })
   @ApiParam({ name: 'syncId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async cancelSync(
-    @CurrentUser() user: any,
-    @Param('syncId') syncId: string,
-  ) {
+  async cancelSync(@CurrentUser() user: any, @Param('syncId') syncId: string) {
     try {
       await this.syncService.cancelSync(user.tenantId, syncId);
-      
+
       return {
         success: true,
         message: 'Sync cancelled successfully',
@@ -730,7 +781,10 @@ export class ChannelsController {
 
   @Get('sync/history')
   @ApiOperation({ summary: 'Get sync history' })
-  @ApiResponse({ status: 200, description: 'Sync history retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync history retrieved successfully',
+  })
   @ApiQuery({ name: 'channelId', type: 'string', required: false })
   @ApiQuery({ name: 'limit', type: 'number', required: false })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
@@ -745,13 +799,16 @@ export class ChannelsController {
         channelId,
         limit || 50,
       );
-      
+
       return {
         success: true,
         data: history,
       };
     } catch (error) {
-      this.logger.error(`Failed to get sync history: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get sync history: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

@@ -114,7 +114,10 @@ export class ShopeeController {
   @Post('auth/url')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get Shopee authorization URL' })
-  @ApiResponse({ status: 201, description: 'Authorization URL generated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Authorization URL generated successfully',
+  })
   async getAuthorizationUrl(
     @CurrentUser() user: any,
     @Body() dto: ShopeeAuthDto,
@@ -137,7 +140,10 @@ export class ShopeeController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get authorization URL: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get authorization URL: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -236,7 +242,10 @@ export class ShopeeController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get auth status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get auth status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -267,7 +276,10 @@ export class ShopeeController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -282,23 +294,26 @@ export class ShopeeController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke Shopee authentication' })
   @ApiQuery({ name: 'channelId', required: true })
-  @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication revoked successfully',
+  })
   async revokeAuthentication(
     @CurrentUser() user: any,
     @Query('channelId') channelId: string,
   ) {
     try {
-      await this.authService.revokeAuthentication(
-        user.tenantId,
-        channelId,
-      );
+      await this.authService.revokeAuthentication(user.tenantId, channelId);
 
       return {
         success: true,
         message: 'Authentication revoked successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -370,7 +385,10 @@ export class ShopeeController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Single product sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Single product sync failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -404,7 +422,10 @@ export class ShopeeController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get product details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get product details: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -421,10 +442,7 @@ export class ShopeeController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Sync orders from Shopee' })
   @ApiResponse({ status: 201, description: 'Order sync started' })
-  async syncOrders(
-    @CurrentUser() user: any,
-    @Body() dto: ShopeeOrderSyncDto,
-  ) {
+  async syncOrders(@CurrentUser() user: any, @Body() dto: ShopeeOrderSyncDto) {
     try {
       const options: any = {
         orderStatus: dto.orderStatus,
@@ -484,7 +502,10 @@ export class ShopeeController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get order details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order details: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -558,7 +579,10 @@ export class ShopeeController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to cancel order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel order: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -673,7 +697,11 @@ export class ShopeeController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get stock info from Shopee' })
   @ApiQuery({ name: 'channelId', required: true })
-  @ApiQuery({ name: 'itemIds', required: true, description: 'Comma-separated item IDs' })
+  @ApiQuery({
+    name: 'itemIds',
+    required: true,
+    description: 'Comma-separated item IDs',
+  })
   @ApiResponse({ status: 200, description: 'Stock info retrieved' })
   async getStock(
     @CurrentUser() user: any,
@@ -682,7 +710,7 @@ export class ShopeeController {
   ) {
     try {
       const itemIdArray = itemIds.split(',').map(id => parseInt(id.trim()));
-      
+
       const result = await this.inventoryService.getShopeeStock(
         user.tenantId,
         channelId,
@@ -694,7 +722,10 @@ export class ShopeeController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get stock info: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get stock info: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

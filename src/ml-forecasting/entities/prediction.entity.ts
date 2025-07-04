@@ -20,9 +20,9 @@ export enum PredictionStatus {
 }
 
 export enum ConfidenceLevel {
-  LOW = 'low',           // 60-70%
-  MEDIUM = 'medium',     // 70-85%
-  HIGH = 'high',         // 85-95%
+  LOW = 'low', // 60-70%
+  MEDIUM = 'medium', // 70-85%
+  HIGH = 'high', // 85-95%
   VERY_HIGH = 'very_high', // 95%+
 }
 
@@ -183,31 +183,43 @@ export class Prediction extends BaseEntity {
   get daysUntilTarget(): number {
     const now = new Date();
     const target = new Date(this.targetDate);
-    return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil(
+      (target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
   }
 
   get predictionAge(): number {
     const now = new Date();
-    return Math.floor((now.getTime() - this.predictionDate.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.floor(
+      (now.getTime() - this.predictionDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
   }
 
   get isAccurate(): boolean {
-    if (!this.isActualized || this.actualValue === null || this.actualValue === undefined) {
+    if (
+      !this.isActualized ||
+      this.actualValue === null ||
+      this.actualValue === undefined
+    ) {
       return false;
     }
-    
+
     // Consider prediction accurate if error rate is less than 15%
     return (this.errorRate || 100) < 15;
   }
 
   get isCritical(): boolean {
-    return this.actionableInsights?.alerts?.some(alert => alert.severity === 'critical') || false;
+    return (
+      this.actionableInsights?.alerts?.some(
+        alert => alert.severity === 'critical',
+      ) || false
+    );
   }
 
   get confidenceCategory(): string {
     if (this.confidence >= 0.95) return 'Sangat Tinggi';
     if (this.confidence >= 0.85) return 'Tinggi';
-    if (this.confidence >= 0.70) return 'Sedang';
+    if (this.confidence >= 0.7) return 'Sedang';
     return 'Rendah';
   }
 
@@ -216,10 +228,12 @@ export class Prediction extends BaseEntity {
     this.actualValue = actualValue;
     this.isActualized = true;
     this.actualizedAt = new Date();
-    
+
     // Calculate error rate
     if (this.predictedValue !== 0) {
-      this.errorRate = Math.abs((actualValue - this.predictedValue) / this.predictedValue) * 100;
+      this.errorRate =
+        Math.abs((actualValue - this.predictedValue) / this.predictedValue) *
+        100;
     }
   }
 
@@ -259,13 +273,16 @@ export class Prediction extends BaseEntity {
 
   complete(): void {
     this.status = PredictionStatus.COMPLETED;
-    
+
     // Set expiration based on prediction type and horizon
-    const expirationDays = this.predictionType === PredictionType.DEMAND_FORECAST 
-      ? Math.min(this.forecastHorizonDays, 7) // Demand forecasts expire in 7 days max
-      : 1; // Other predictions expire in 1 day
-      
-    this.expiresAt = new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000);
+    const expirationDays =
+      this.predictionType === PredictionType.DEMAND_FORECAST
+        ? Math.min(this.forecastHorizonDays, 7) // Demand forecasts expire in 7 days max
+        : 1; // Other predictions expire in 1 day
+
+    this.expiresAt = new Date(
+      Date.now() + expirationDays * 24 * 60 * 60 * 1000,
+    );
   }
 
   fail(error: string): void {
@@ -286,7 +303,7 @@ export class Prediction extends BaseEntity {
       this.confidenceLevel = ConfidenceLevel.VERY_HIGH;
     } else if (this.confidence >= 0.85) {
       this.confidenceLevel = ConfidenceLevel.HIGH;
-    } else if (this.confidence >= 0.70) {
+    } else if (this.confidence >= 0.7) {
       this.confidenceLevel = ConfidenceLevel.MEDIUM;
     } else {
       this.confidenceLevel = ConfidenceLevel.LOW;
@@ -299,7 +316,7 @@ export class Prediction extends BaseEntity {
     targetDate: Date,
     predictedDemand: number,
     confidence: number,
-    bounds?: { lower: number; upper: number }
+    bounds?: { lower: number; upper: number },
   ): Prediction {
     const prediction = new Prediction();
     prediction.modelId = modelId;
@@ -311,7 +328,7 @@ export class Prediction extends BaseEntity {
     prediction.lowerBound = bounds?.lower;
     prediction.upperBound = bounds?.upper;
     prediction.updateConfidenceLevel();
-    
+
     return prediction;
   }
 
@@ -320,7 +337,7 @@ export class Prediction extends BaseEntity {
     productId: string,
     targetDate: Date,
     riskScore: number,
-    confidence: number
+    confidence: number,
   ): Prediction {
     const prediction = new Prediction();
     prediction.modelId = modelId;
@@ -330,7 +347,7 @@ export class Prediction extends BaseEntity {
     prediction.predictedValue = riskScore;
     prediction.confidence = confidence;
     prediction.updateConfidenceLevel();
-    
+
     return prediction;
   }
 }

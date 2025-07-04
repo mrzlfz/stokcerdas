@@ -28,10 +28,25 @@ import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
 import { UserRole } from '../../../users/entities/user.entity';
 
-import { TokopediaAuthService, TokopediaAuthConfig } from '../services/tokopedia-auth.service';
-import { TokopediaProductService, ProductSyncOptions } from '../services/tokopedia-product.service';
-import { TokopediaOrderService, OrderSyncOptions, ShipmentRequest } from '../services/tokopedia-order.service';
-import { TokopediaInventoryService, InventorySyncOptions, StockUpdateRequest, PriceUpdateRequest } from '../services/tokopedia-inventory.service';
+import {
+  TokopediaAuthService,
+  TokopediaAuthConfig,
+} from '../services/tokopedia-auth.service';
+import {
+  TokopediaProductService,
+  ProductSyncOptions,
+} from '../services/tokopedia-product.service';
+import {
+  TokopediaOrderService,
+  OrderSyncOptions,
+  ShipmentRequest,
+} from '../services/tokopedia-order.service';
+import {
+  TokopediaInventoryService,
+  InventorySyncOptions,
+  StockUpdateRequest,
+  PriceUpdateRequest,
+} from '../services/tokopedia-inventory.service';
 
 // DTOs for API validation
 export class TokopediaAuthConfigDto {
@@ -129,7 +144,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get Tokopedia authorization URL' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authorization URL generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authorization URL generated successfully',
+  })
   async getAuthorizationUrl(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -147,7 +165,10 @@ export class TokopediaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get authorization URL: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get authorization URL: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -171,7 +192,10 @@ export class TokopediaController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Access token obtained successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Access token obtained successfully',
+  })
   async exchangeToken(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -195,7 +219,10 @@ export class TokopediaController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to exchange token: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to exchange token: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -210,7 +237,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Access token refreshed successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Access token refreshed successfully',
+  })
   async refreshToken(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -229,7 +259,10 @@ export class TokopediaController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to refresh token: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to refresh token: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -244,7 +277,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get authentication status' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authentication status retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication status retrieved successfully',
+  })
   async getAuthStatus(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -260,7 +296,10 @@ export class TokopediaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get auth status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get auth status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -275,7 +314,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test authentication with current credentials' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Authentication tested successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Authentication tested successfully',
+  })
   async testAuthentication(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -291,7 +333,10 @@ export class TokopediaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -306,7 +351,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication revoked successfully',
+  })
   async revokeAuthentication(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -322,7 +370,10 @@ export class TokopediaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -346,7 +397,10 @@ export class TokopediaController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'TikTok Shop migration completed successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'TikTok Shop migration completed successfully',
+  })
   async migrateTikTokShop(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -365,7 +419,10 @@ export class TokopediaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`TikTok Shop migration failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `TikTok Shop migration failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -382,7 +439,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync products from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Product sync initiated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Product sync initiated successfully',
+  })
   async syncProducts(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -390,7 +450,7 @@ export class TokopediaController {
   ) {
     try {
       const syncOptions: ProductSyncOptions = {};
-      
+
       if (options) {
         syncOptions.offset = options.offset;
         syncOptions.limit = options.limit;
@@ -398,7 +458,7 @@ export class TokopediaController {
         syncOptions.search = options.search;
         syncOptions.categoryId = options.categoryId;
         syncOptions.sku = options.sku;
-        
+
         if (options.createdAfter) {
           syncOptions.createdAfter = new Date(options.createdAfter);
         }
@@ -458,7 +518,10 @@ export class TokopediaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Single product sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Single product sync failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -474,7 +537,10 @@ export class TokopediaController {
   @ApiOperation({ summary: 'Get Tokopedia product details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'productId', description: 'Tokopedia Product ID' })
-  @ApiResponse({ status: 200, description: 'Product details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product details retrieved successfully',
+  })
   async getProductDetails(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -492,7 +558,10 @@ export class TokopediaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get product details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get product details: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -509,7 +578,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync orders from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Order sync initiated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Order sync initiated successfully',
+  })
   async syncOrders(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -517,14 +589,14 @@ export class TokopediaController {
   ) {
     try {
       const syncOptions: OrderSyncOptions = {};
-      
+
       if (options) {
         syncOptions.offset = options.offset;
         syncOptions.limit = options.limit;
         syncOptions.status = options.status;
         syncOptions.sortBy = options.sortBy;
         syncOptions.sortDirection = options.sortDirection;
-        
+
         if (options.createdAfter) {
           syncOptions.createdAfter = new Date(options.createdAfter);
         }
@@ -566,7 +638,10 @@ export class TokopediaController {
   @ApiOperation({ summary: 'Get Tokopedia order details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'orderId', description: 'Tokopedia Order ID' })
-  @ApiResponse({ status: 200, description: 'Order details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Order details retrieved successfully',
+  })
   async getOrderDetails(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -584,7 +659,10 @@ export class TokopediaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get order details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order details: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -651,7 +729,10 @@ export class TokopediaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to cancel order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel order: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -668,7 +749,10 @@ export class TokopediaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync inventory from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Inventory sync initiated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Inventory sync initiated successfully',
+  })
   async syncInventory(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -770,7 +854,10 @@ export class TokopediaController {
   @ApiOperation({ summary: 'Get stock levels from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiQuery({ name: 'skus', description: 'Comma-separated product SKUs' })
-  @ApiResponse({ status: 200, description: 'Stock levels retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stock levels retrieved successfully',
+  })
   async getStock(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -778,7 +865,7 @@ export class TokopediaController {
   ) {
     try {
       const productSkus = skus.split(',').map(sku => sku.trim());
-      
+
       const result = await this.inventoryService.getTokopediaStock(
         user.tenantId,
         channelId,
@@ -790,7 +877,10 @@ export class TokopediaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get stock levels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get stock levels: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -806,7 +896,10 @@ export class TokopediaController {
   @ApiOperation({ summary: 'Get price information from Tokopedia' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiQuery({ name: 'skus', description: 'Comma-separated product SKUs' })
-  @ApiResponse({ status: 200, description: 'Price information retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Price information retrieved successfully',
+  })
   async getPrices(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -814,7 +907,7 @@ export class TokopediaController {
   ) {
     try {
       const productSkus = skus.split(',').map(sku => sku.trim());
-      
+
       const result = await this.inventoryService.getTokopediaPrices(
         user.tenantId,
         channelId,
@@ -826,7 +919,10 @@ export class TokopediaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get price information: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get price information: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

@@ -12,10 +12,10 @@ export class SmsService {
 
   async sendSms(options: SmsOptions): Promise<void> {
     this.logger.log(`Sending SMS to ${options.to}`);
-    
+
     // TODO: Implement actual SMS sending
     // This could use Twilio, AWS SNS, or other SMS service
-    
+
     // For now, just log the SMS
     this.logger.debug('SMS content:', {
       to: options.to,
@@ -26,7 +26,7 @@ export class SmsService {
 
   async sendBulkSms(messages: SmsOptions[]): Promise<void> {
     this.logger.log(`Sending ${messages.length} SMS messages`);
-    
+
     for (const message of messages) {
       await this.sendSms(message);
     }
@@ -41,7 +41,7 @@ export class SmsService {
   formatPhoneNumber(phoneNumber: string): string {
     // Format to Indonesian standard
     let formatted = phoneNumber.replace(/\s|-/g, '');
-    
+
     if (formatted.startsWith('0')) {
       formatted = '+62' + formatted.substring(1);
     } else if (formatted.startsWith('62')) {
@@ -49,7 +49,7 @@ export class SmsService {
     } else if (!formatted.startsWith('+62')) {
       formatted = '+62' + formatted;
     }
-    
+
     return formatted;
   }
 }

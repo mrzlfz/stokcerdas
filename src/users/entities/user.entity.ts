@@ -5,7 +5,7 @@ import { BaseEntity } from '../../common/entities/base.entity';
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
-  MANAGER = 'manager', 
+  MANAGER = 'manager',
   STAFF = 'staff',
 }
 
@@ -118,16 +118,14 @@ export class User extends BaseEntity {
   // Check if user can login
   get canLogin(): boolean {
     return (
-      this.status === UserStatus.ACTIVE &&
-      !this.isLocked &&
-      !this.isDeleted
+      this.status === UserStatus.ACTIVE && !this.isLocked && !this.isDeleted
     );
   }
 
   // Increment login attempts
   incLoginAttempts(): void {
     this.loginAttempts += 1;
-    
+
     // Lock user after 5 failed attempts for 15 minutes
     if (this.loginAttempts >= 5) {
       this.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);

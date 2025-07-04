@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../../../integrations/common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../../../integrations/common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 
 export interface JneCredentials {
@@ -55,7 +60,6 @@ export interface JneTrackingResponse {
 
 @Injectable()
 export class JneApiService extends BaseApiService {
-  
   constructor(
     protected readonly httpService: HttpService,
     protected readonly configService: ConfigService,
@@ -67,7 +71,7 @@ export class JneApiService extends BaseApiService {
    * Get JNE API configuration
    */
   private getApiConfig(credentials: JneCredentials): ApiConfig {
-    const baseUrl = credentials.isSandbox 
+    const baseUrl = credentials.isSandbox
       ? 'https://api-sandbox.jne.co.id'
       : 'https://api.jne.co.id';
 
@@ -99,12 +103,12 @@ export class JneApiService extends BaseApiService {
     channelId: string,
   ): Promise<ApiResponse<T>> {
     const config = this.getApiConfig(credentials);
-    
+
     const jneRequest: ApiRequest = {
       ...request,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
     };
 
@@ -112,8 +116,8 @@ export class JneApiService extends BaseApiService {
     if (request.requiresAuth !== false) {
       jneRequest.headers = {
         ...jneRequest.headers,
-        'username': credentials.username,
-        'api_key': credentials.apiKey,
+        username: credentials.username,
+        api_key: credentials.apiKey,
       };
     }
 
@@ -165,24 +169,23 @@ export class JneApiService extends BaseApiService {
     credentials: JneCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<Array<{
-    city_code: string;
-    city_name: string;
-    province: string;
-    type: string;
-  }>>> {
+  ): Promise<
+    ApiResponse<
+      Array<{
+        city_code: string;
+        city_name: string;
+        province: string;
+        type: string;
+      }>
+    >
+  > {
     const request: JneApiRequest = {
       method: 'GET',
       endpoint: '/tarif/v1/city',
       requiresAuth: true,
     };
 
-    return this.makeJneRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJneRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -209,12 +212,7 @@ export class JneApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJneRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJneRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -253,15 +251,17 @@ export class JneApiService extends BaseApiService {
     },
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    tracking_number: string;
-    airway_bill: string;
-    label_url: string;
-    total_cost: number;
-    service_cost: number;
-    insurance_cost?: number;
-    cod_fee?: number;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      tracking_number: string;
+      airway_bill: string;
+      label_url: string;
+      total_cost: number;
+      service_cost: number;
+      insurance_cost?: number;
+      cod_fee?: number;
+    }>
+  > {
     const request: JneApiRequest = {
       method: 'POST',
       endpoint: '/booking/v1/create',
@@ -269,12 +269,7 @@ export class JneApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJneRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJneRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -292,12 +287,7 @@ export class JneApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJneRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJneRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -308,30 +298,27 @@ export class JneApiService extends BaseApiService {
     trackingNumber: string,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    tracking_number: string;
-    service: string;
-    status: string;
-    tracking_detail: Array<{
-      date: string;
-      time: string;
-      description: string;
-      location: string;
+  ): Promise<
+    ApiResponse<{
+      tracking_number: string;
+      service: string;
       status: string;
-    }>;
-  }>> {
+      tracking_detail: Array<{
+        date: string;
+        time: string;
+        description: string;
+        location: string;
+        status: string;
+      }>;
+    }>
+  > {
     const request: JneApiRequest = {
       method: 'GET',
       endpoint: `/tracking/v1/history/${trackingNumber}`,
       requiresAuth: true,
     };
 
-    return this.makeJneRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJneRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -343,11 +330,13 @@ export class JneApiService extends BaseApiService {
     reason: string,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    tracking_number: string;
-    status: string;
-    message: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      tracking_number: string;
+      status: string;
+      message: string;
+    }>
+  > {
     const request: JneApiRequest = {
       method: 'POST',
       endpoint: '/booking/v1/cancel',
@@ -358,12 +347,7 @@ export class JneApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJneRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJneRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -373,63 +357,67 @@ export class JneApiService extends BaseApiService {
     credentials: JneCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<Array<{
-    service_code: string;
-    service_name: string;
-    service_display_name: string;
-    description: string;
-    max_weight: number;
-    max_dimension: {
-      length: number;
-      width: number;
-      height: number;
-    };
-    features: {
-      cod: boolean;
-      insurance: boolean;
-      same_day: boolean;
-      next_day: boolean;
-    };
-  }>>> {
+  ): Promise<
+    ApiResponse<
+      Array<{
+        service_code: string;
+        service_name: string;
+        service_display_name: string;
+        description: string;
+        max_weight: number;
+        max_dimension: {
+          length: number;
+          width: number;
+          height: number;
+        };
+        features: {
+          cod: boolean;
+          insurance: boolean;
+          same_day: boolean;
+          next_day: boolean;
+        };
+      }>
+    >
+  > {
     const request: JneApiRequest = {
       method: 'GET',
       endpoint: '/info/v1/services',
       requiresAuth: true,
     };
 
-    return this.makeJneRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJneRequest(credentials, request, tenantId, channelId);
   }
 
   /**
    * Handle API errors specific to JNE
    */
-  handleJneError(error: any): { code: string; message: string; retryable: boolean } {
+  handleJneError(error: any): {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } {
     const errorCode = error.error_code || error.code;
-    const errorMessage = error.error_description || error.message || 'Unknown JNE API error';
+    const errorMessage =
+      error.error_description || error.message || 'Unknown JNE API error';
 
     // Map common JNE error codes
     const errorMap: Record<string, { message: string; retryable: boolean }> = {
-      'J001': { message: 'Invalid API credentials', retryable: false },
-      'J002': { message: 'Rate limit exceeded', retryable: true },
-      'J003': { message: 'Invalid origin city', retryable: false },
-      'J004': { message: 'Invalid destination city', retryable: false },
-      'J005': { message: 'Weight exceeds limit', retryable: false },
-      'J006': { message: 'Service not available for route', retryable: false },
-      'J007': { message: 'Invalid shipment data', retryable: false },
-      'J008': { message: 'Tracking number not found', retryable: false },
-      'J009': { message: 'Shipment already cancelled', retryable: false },
-      'J010': { message: 'Service temporarily unavailable', retryable: true },
-      'J011': { message: 'Insufficient balance', retryable: false },
-      'J012': { message: 'Booking expired', retryable: false },
+      J001: { message: 'Invalid API credentials', retryable: false },
+      J002: { message: 'Rate limit exceeded', retryable: true },
+      J003: { message: 'Invalid origin city', retryable: false },
+      J004: { message: 'Invalid destination city', retryable: false },
+      J005: { message: 'Weight exceeds limit', retryable: false },
+      J006: { message: 'Service not available for route', retryable: false },
+      J007: { message: 'Invalid shipment data', retryable: false },
+      J008: { message: 'Tracking number not found', retryable: false },
+      J009: { message: 'Shipment already cancelled', retryable: false },
+      J010: { message: 'Service temporarily unavailable', retryable: true },
+      J011: { message: 'Insufficient balance', retryable: false },
+      J012: { message: 'Booking expired', retryable: false },
     };
 
     const mappedError = errorMap[errorCode];
-    
+
     return {
       code: errorCode || 'JNE_API_ERROR',
       message: mappedError?.message || errorMessage,
@@ -442,14 +430,14 @@ export class JneApiService extends BaseApiService {
    */
   mapJneServiceToServiceType(jneServiceCode: string): string {
     const serviceMap: Record<string, string> = {
-      'REG': 'regular',
-      'YES': 'express', // Yakin Esok Sampai
-      'OKE': 'economy',
-      'SS': 'same_day', // Super Speed
-      'SPS': 'express', // Super Priority Service
-      'JTR': 'regular', // JNE Trucking Regular
-      'CTCYES': 'express', // City Courier YES
-      'CTCREG': 'regular', // City Courier Regular
+      REG: 'regular',
+      YES: 'express', // Yakin Esok Sampai
+      OKE: 'economy',
+      SS: 'same_day', // Super Speed
+      SPS: 'express', // Super Priority Service
+      JTR: 'regular', // JNE Trucking Regular
+      CTCYES: 'express', // City Courier YES
+      CTCREG: 'regular', // City Courier Regular
     };
 
     return serviceMap[jneServiceCode.toUpperCase()] || 'regular';
@@ -460,16 +448,16 @@ export class JneApiService extends BaseApiService {
    */
   mapJneStatusToTrackingStatus(jneStatus: string): string {
     const statusMap: Record<string, string> = {
-      'BOOKED': 'order_confirmed',
-      'MANIFESTED': 'picked_up',
+      BOOKED: 'order_confirmed',
+      MANIFESTED: 'picked_up',
       'ON TRANSIT': 'in_transit',
-      'RECEIVED': 'arrived_at_hub',
+      RECEIVED: 'arrived_at_hub',
       'WITH DELIVERY COURIER': 'out_for_delivery',
-      'DELIVERED': 'delivered',
+      DELIVERED: 'delivered',
       'RETURNED TO SHIPPER': 'returned_to_sender',
-      'CANCELLED': 'cancelled',
+      CANCELLED: 'cancelled',
       'ON HOLD': 'on_hold',
-      'EXCEPTION': 'exception',
+      EXCEPTION: 'exception',
     };
 
     return statusMap[jneStatus.toUpperCase()] || 'in_transit';
@@ -483,13 +471,14 @@ export class JneApiService extends BaseApiService {
       trackingNumber: jneTrackingData.tracking_number,
       status: this.mapJneStatusToTrackingStatus(jneTrackingData.status),
       isDelivered: jneTrackingData.result?.delivered || false,
-      events: jneTrackingData.result?.detail?.map((event: any) => ({
-        date: event.date,
-        time: event.time,
-        description: event.desc,
-        location: event.city,
-        status: this.mapJneStatusToTrackingStatus(event.desc),
-      })) || [],
+      events:
+        jneTrackingData.result?.detail?.map((event: any) => ({
+          date: event.date,
+          time: event.time,
+          description: event.desc,
+          location: event.city,
+          status: this.mapJneStatusToTrackingStatus(event.desc),
+        })) || [],
     };
   }
 
@@ -508,7 +497,7 @@ export class JneApiService extends BaseApiService {
   formatPhoneNumber(phone: string): string {
     // Remove all non-digits
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // Add +62 country code if not present
     if (cleaned.startsWith('62')) {
       return `+${cleaned}`;
@@ -522,15 +511,28 @@ export class JneApiService extends BaseApiService {
   /**
    * Calculate volumetric weight for JNE (formula: L x W x H / 6000)
    */
-  calculateVolumetricWeight(length: number, width: number, height: number): number {
+  calculateVolumetricWeight(
+    length: number,
+    width: number,
+    height: number,
+  ): number {
     return (length * width * height) / 6000; // JNE formula
   }
 
   /**
    * Get chargeable weight (higher of actual or volumetric weight)
    */
-  getChargeableWeight(actualWeight: number, length: number, width: number, height: number): number {
-    const volumetricWeight = this.calculateVolumetricWeight(length, width, height);
+  getChargeableWeight(
+    actualWeight: number,
+    length: number,
+    width: number,
+    height: number,
+  ): number {
+    const volumetricWeight = this.calculateVolumetricWeight(
+      length,
+      width,
+      height,
+    );
     return Math.max(actualWeight, volumetricWeight);
   }
 }

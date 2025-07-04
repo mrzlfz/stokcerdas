@@ -30,19 +30,23 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { Tenant } from '../../common/decorators/tenant.decorator';
-import { PermissionAction, PermissionResource } from '../../auth/entities/permission.entity';
+import {
+  PermissionAction,
+  PermissionResource,
+} from '../../auth/entities/permission.entity';
 
 @ApiTags('Product Categories')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('products/categories')
 export class ProductCategoriesController {
-  constructor(
-    private readonly categoriesService: ProductCategoriesService,
-  ) {}
+  constructor(private readonly categoriesService: ProductCategoriesService) {}
 
   @Post()
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.CREATE,
+  })
   @ApiOperation({ summary: 'Buat kategori produk baru' })
   @ApiResponse({ status: 201, description: 'Kategori berhasil dibuat' })
   @ApiResponse({ status: 400, description: 'Data tidak valid' })
@@ -52,8 +56,12 @@ export class ProductCategoriesController {
     @GetUser('id') userId: string,
     @Body() createCategoryDto: CreateProductCategoryDto,
   ) {
-    const category = await this.categoriesService.create(tenantId, createCategoryDto, userId);
-    
+    const category = await this.categoriesService.create(
+      tenantId,
+      createCategoryDto,
+      userId,
+    );
+
     return {
       success: true,
       message: 'Kategori berhasil dibuat',
@@ -62,16 +70,27 @@ export class ProductCategoriesController {
   }
 
   @Get()
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan daftar kategori produk' })
-  @ApiQuery({ name: 'includeInactive', required: false, description: 'Sertakan kategori tidak aktif', type: Boolean })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    description: 'Sertakan kategori tidak aktif',
+    type: Boolean,
+  })
   @ApiResponse({ status: 200, description: 'Daftar kategori berhasil didapat' })
   async findAll(
     @Tenant() tenantId: string,
     @Query('includeInactive') includeInactive?: boolean,
   ) {
-    const categories = await this.categoriesService.findAll(tenantId, includeInactive);
-    
+    const categories = await this.categoriesService.findAll(
+      tenantId,
+      includeInactive,
+    );
+
     return {
       success: true,
       message: 'Daftar kategori berhasil didapat',
@@ -80,16 +99,27 @@ export class ProductCategoriesController {
   }
 
   @Get('tree')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan struktur tree kategori produk' })
-  @ApiQuery({ name: 'includeInactive', required: false, description: 'Sertakan kategori tidak aktif', type: Boolean })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    description: 'Sertakan kategori tidak aktif',
+    type: Boolean,
+  })
   @ApiResponse({ status: 200, description: 'Tree kategori berhasil didapat' })
   async findTree(
     @Tenant() tenantId: string,
     @Query('includeInactive') includeInactive?: boolean,
   ) {
-    const tree = await this.categoriesService.findTree(tenantId, includeInactive);
-    
+    const tree = await this.categoriesService.findTree(
+      tenantId,
+      includeInactive,
+    );
+
     return {
       success: true,
       message: 'Tree kategori berhasil didapat',
@@ -98,12 +128,20 @@ export class ProductCategoriesController {
   }
 
   @Get('with-count')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan kategori dengan jumlah produk' })
-  @ApiResponse({ status: 200, description: 'Kategori dengan jumlah produk berhasil didapat' })
+  @ApiResponse({
+    status: 200,
+    description: 'Kategori dengan jumlah produk berhasil didapat',
+  })
   async findWithProductCount(@Tenant() tenantId: string) {
-    const categories = await this.categoriesService.getCategoryWithProductCount(tenantId);
-    
+    const categories = await this.categoriesService.getCategoryWithProductCount(
+      tenantId,
+    );
+
     return {
       success: true,
       message: 'Kategori dengan jumlah produk berhasil didapat',
@@ -112,16 +150,20 @@ export class ProductCategoriesController {
   }
 
   @Get('search')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Cari kategori berdasarkan nama' })
-  @ApiQuery({ name: 'name', required: true, description: 'Nama kategori yang dicari' })
+  @ApiQuery({
+    name: 'name',
+    required: true,
+    description: 'Nama kategori yang dicari',
+  })
   @ApiResponse({ status: 200, description: 'Hasil pencarian kategori' })
-  async search(
-    @Tenant() tenantId: string,
-    @Query('name') name: string,
-  ) {
+  async search(@Tenant() tenantId: string, @Query('name') name: string) {
     const categories = await this.categoriesService.findByName(tenantId, name);
-    
+
     return {
       success: true,
       message: 'Hasil pencarian kategori',
@@ -130,7 +172,10 @@ export class ProductCategoriesController {
   }
 
   @Get(':id')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan detail kategori produk' })
   @ApiParam({ name: 'id', description: 'ID kategori' })
   @ApiResponse({ status: 200, description: 'Detail kategori berhasil didapat' })
@@ -140,7 +185,7 @@ export class ProductCategoriesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const category = await this.categoriesService.findOne(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Detail kategori berhasil didapat',
@@ -149,7 +194,10 @@ export class ProductCategoriesController {
   }
 
   @Patch(':id')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Update kategori produk' })
   @ApiParam({ name: 'id', description: 'ID kategori' })
   @ApiResponse({ status: 200, description: 'Kategori berhasil diupdate' })
@@ -161,8 +209,13 @@ export class ProductCategoriesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCategoryDto: UpdateProductCategoryDto,
   ) {
-    const category = await this.categoriesService.update(tenantId, id, updateCategoryDto, userId);
-    
+    const category = await this.categoriesService.update(
+      tenantId,
+      id,
+      updateCategoryDto,
+      userId,
+    );
+
     return {
       success: true,
       message: 'Kategori berhasil diupdate',
@@ -171,11 +224,17 @@ export class ProductCategoriesController {
   }
 
   @Delete(':id')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.DELETE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.DELETE,
+  })
   @ApiOperation({ summary: 'Hapus kategori produk' })
   @ApiParam({ name: 'id', description: 'ID kategori' })
   @ApiResponse({ status: 200, description: 'Kategori berhasil dihapus' })
-  @ApiResponse({ status: 400, description: 'Kategori masih memiliki produk atau sub-kategori' })
+  @ApiResponse({
+    status: 400,
+    description: 'Kategori masih memiliki produk atau sub-kategori',
+  })
   @ApiResponse({ status: 404, description: 'Kategori tidak ditemukan' })
   @HttpCode(HttpStatus.OK)
   async remove(
@@ -183,7 +242,7 @@ export class ProductCategoriesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.categoriesService.remove(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Kategori berhasil dihapus',
@@ -191,7 +250,10 @@ export class ProductCategoriesController {
   }
 
   @Patch('reorder')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Ubah urutan kategori' })
   @ApiResponse({ status: 200, description: 'Urutan kategori berhasil diubah' })
   async reorder(
@@ -199,7 +261,7 @@ export class ProductCategoriesController {
     @Body('categories') categories: Array<{ id: string; sortOrder: number }>,
   ) {
     await this.categoriesService.reorderCategories(tenantId, categories);
-    
+
     return {
       success: true,
       message: 'Urutan kategori berhasil diubah',

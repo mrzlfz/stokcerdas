@@ -152,16 +152,40 @@ export class CompanyBilling extends AuditableEntity {
   @Column({ name: 'currency', length: 3, default: 'IDR' })
   currency: string;
 
-  @Column({ name: 'discount_percentage', type: 'decimal', precision: 5, scale: 2, default: 0 })
+  @Column({
+    name: 'discount_percentage',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+  })
   discountPercentage: number;
 
-  @Column({ name: 'discount_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'discount_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   discountAmount: number;
 
-  @Column({ name: 'tax_rate', type: 'decimal', precision: 5, scale: 2, default: 11 })
+  @Column({
+    name: 'tax_rate',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 11,
+  })
   taxRate: number; // PPN 11% for Indonesia
 
-  @Column({ name: 'tax_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'tax_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   taxAmount: number;
 
   @Column({ name: 'total_amount', type: 'decimal', precision: 10, scale: 2 })
@@ -183,12 +207,15 @@ export class CompanyBilling extends AuditableEntity {
   }>;
 
   @Column({ name: 'current_usage', type: 'jsonb', nullable: true })
-  currentUsage: Record<string, {
-    quantity: number;
-    lastUpdated: Date;
-    projectedMonthlyUsage?: number;
-    exceededIncluded?: boolean;
-  }>;
+  currentUsage: Record<
+    string,
+    {
+      quantity: number;
+      lastUpdated: Date;
+      projectedMonthlyUsage?: number;
+      exceededIncluded?: boolean;
+    }
+  >;
 
   // Billing cycle management
   @Column({ name: 'billing_day', type: 'integer', default: 1 })
@@ -218,29 +245,59 @@ export class CompanyBilling extends AuditableEntity {
   @Column({ name: 'payment_terms_days', type: 'integer', default: 30 })
   paymentTermsDays: number;
 
-  @Column({ name: 'credit_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'credit_limit',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   creditLimit: number;
 
-  @Column({ name: 'outstanding_balance', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  @Column({
+    name: 'outstanding_balance',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
   outstandingBalance: number;
 
   @Column({ name: 'last_payment_date', type: 'date', nullable: true })
   lastPaymentDate: Date;
 
-  @Column({ name: 'last_payment_amount', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'last_payment_amount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   lastPaymentAmount: number;
 
   // Credit and collections
   @Column({ name: 'credit_score', type: 'integer', nullable: true })
   creditScore: number; // 0-1000
 
-  @Column({ name: 'payment_history_score', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  @Column({
+    name: 'payment_history_score',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    nullable: true,
+  })
   paymentHistoryScore: number; // 0.0-1.0
 
   @Column({ name: 'days_past_due', type: 'integer', default: 0 })
   daysPastDue: number;
 
-  @Column({ name: 'overdue_amount', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  @Column({
+    name: 'overdue_amount',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
   overdueAmount: number;
 
   @Column({ name: 'collection_status', length: 50, nullable: true })
@@ -350,22 +407,58 @@ export class CompanyBilling extends AuditableEntity {
   supportTier: 'basic' | 'standard' | 'premium' | 'enterprise';
 
   // Analytics and insights
-  @Column({ name: 'lifetime_value', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  @Column({
+    name: 'lifetime_value',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
   lifetimeValue: number;
 
-  @Column({ name: 'total_payments', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  @Column({
+    name: 'total_payments',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
   totalPayments: number;
 
-  @Column({ name: 'average_monthly_revenue', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'average_monthly_revenue',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   averageMonthlyRevenue: number;
 
-  @Column({ name: 'churn_risk_score', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  @Column({
+    name: 'churn_risk_score',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    nullable: true,
+  })
   churnRiskScore: number; // 0.0-1.0
 
-  @Column({ name: 'expansion_opportunity_score', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  @Column({
+    name: 'expansion_opportunity_score',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    nullable: true,
+  })
   expansionOpportunityScore: number; // 0.0-1.0
 
-  @Column({ name: 'customer_health_score', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  @Column({
+    name: 'customer_health_score',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    nullable: true,
+  })
   customerHealthScore: number; // 0.0-1.0
 
   // Contract information
@@ -375,13 +468,31 @@ export class CompanyBilling extends AuditableEntity {
   @Column({ name: 'contract_end_date', type: 'date', nullable: true })
   contractEndDate: Date;
 
-  @Column({ name: 'contract_value', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'contract_value',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   contractValue: number;
 
-  @Column({ name: 'minimum_commitment', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'minimum_commitment',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   minimumCommitment: number;
 
-  @Column({ name: 'early_termination_fee', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'early_termination_fee',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   earlyTerminationFee: number;
 
   // Referral and partnership
@@ -394,7 +505,13 @@ export class CompanyBilling extends AuditableEntity {
   @Column({ name: 'partner_id', type: 'uuid', nullable: true })
   partnerId: string;
 
-  @Column({ name: 'partner_commission_rate', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({
+    name: 'partner_commission_rate',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
   partnerCommissionRate: number;
 
   // Custom fields and metadata
@@ -433,23 +550,23 @@ export class CompanyBilling extends AuditableEntity {
 
   getNextBillingAmount(): number {
     let amount = this.basePrice;
-    
+
     // Apply discount
     if (this.discountPercentage > 0) {
       amount = amount * (1 - this.discountPercentage / 100);
     }
     amount -= this.discountAmount;
-    
+
     // Add usage charges
     if (this.usageBasedBilling && this.currentUsage) {
       const usageCharges = this.calculateUsageCharges();
       amount += usageCharges;
     }
-    
+
     // Add tax
     const taxAmount = amount * (this.taxRate / 100);
     amount += taxAmount;
-    
+
     return Math.max(0, amount);
   }
 
@@ -457,9 +574,9 @@ export class CompanyBilling extends AuditableEntity {
     if (!this.usageBasedBilling || !this.usagePricing || !this.currentUsage) {
       return 0;
     }
-    
+
     let totalUsageCharges = 0;
-    
+
     this.usagePricing.forEach(pricing => {
       const usage = this.currentUsage[pricing.metricType];
       if (usage && usage.quantity > pricing.includedQuantity) {
@@ -467,7 +584,7 @@ export class CompanyBilling extends AuditableEntity {
         totalUsageCharges += overage * pricing.overagePrice;
       }
     });
-    
+
     return totalUsageCharges;
   }
 
@@ -475,7 +592,7 @@ export class CompanyBilling extends AuditableEntity {
     if (!this.currentUsage) {
       this.currentUsage = {};
     }
-    
+
     this.currentUsage[metricType] = {
       quantity,
       lastUpdated: new Date(),
@@ -486,7 +603,7 @@ export class CompanyBilling extends AuditableEntity {
     if (!this.currentUsage) {
       this.currentUsage = {};
     }
-    
+
     const current = this.currentUsage[metricType]?.quantity || 0;
     this.updateUsage(metricType, current + increment);
   }
@@ -503,7 +620,7 @@ export class CompanyBilling extends AuditableEntity {
   isWithinLimits(metricType: string): boolean {
     const limit = this.subscriptionLimits?.[metricType];
     if (!limit) return true;
-    
+
     const usage = this.currentUsage?.[metricType]?.quantity || 0;
     return usage < limit;
   }
@@ -511,7 +628,7 @@ export class CompanyBilling extends AuditableEntity {
   getRemainingAllowance(metricType: string): number {
     const limit = this.subscriptionLimits?.[metricType];
     if (!limit) return Infinity;
-    
+
     const usage = this.currentUsage?.[metricType]?.quantity || 0;
     return Math.max(0, limit - usage);
   }
@@ -519,7 +636,7 @@ export class CompanyBilling extends AuditableEntity {
   getUsagePercentage(metricType: string): number {
     const limit = this.subscriptionLimits?.[metricType];
     if (!limit) return 0;
-    
+
     const usage = this.currentUsage?.[metricType]?.quantity || 0;
     return Math.min(100, (usage / limit) * 100);
   }
@@ -537,19 +654,35 @@ export class CompanyBilling extends AuditableEntity {
 
   updateNextBillingDate(): void {
     const current = this.nextBillingDate || new Date();
-    
+
     switch (this.billingCycle) {
       case BillingCycle.MONTHLY:
-        this.nextBillingDate = new Date(current.getFullYear(), current.getMonth() + 1, this.billingDay);
+        this.nextBillingDate = new Date(
+          current.getFullYear(),
+          current.getMonth() + 1,
+          this.billingDay,
+        );
         break;
       case BillingCycle.QUARTERLY:
-        this.nextBillingDate = new Date(current.getFullYear(), current.getMonth() + 3, this.billingDay);
+        this.nextBillingDate = new Date(
+          current.getFullYear(),
+          current.getMonth() + 3,
+          this.billingDay,
+        );
         break;
       case BillingCycle.SEMI_ANNUALLY:
-        this.nextBillingDate = new Date(current.getFullYear(), current.getMonth() + 6, this.billingDay);
+        this.nextBillingDate = new Date(
+          current.getFullYear(),
+          current.getMonth() + 6,
+          this.billingDay,
+        );
         break;
       case BillingCycle.ANNUALLY:
-        this.nextBillingDate = new Date(current.getFullYear() + 1, current.getMonth(), this.billingDay);
+        this.nextBillingDate = new Date(
+          current.getFullYear() + 1,
+          current.getMonth(),
+          this.billingDay,
+        );
         break;
     }
   }
@@ -587,10 +720,12 @@ export class CompanyBilling extends AuditableEntity {
     if (!this.enabledFeatures.includes(featureId)) {
       this.enabledFeatures.push(featureId);
     }
-    
+
     // Remove from disabled features if present
     if (this.disabledFeatures) {
-      this.disabledFeatures = this.disabledFeatures.filter(f => f !== featureId);
+      this.disabledFeatures = this.disabledFeatures.filter(
+        f => f !== featureId,
+      );
     }
   }
 
@@ -601,7 +736,7 @@ export class CompanyBilling extends AuditableEntity {
     if (!this.disabledFeatures.includes(featureId)) {
       this.disabledFeatures.push(featureId);
     }
-    
+
     // Remove from enabled features if present
     if (this.enabledFeatures) {
       this.enabledFeatures = this.enabledFeatures.filter(f => f !== featureId);
@@ -612,7 +747,9 @@ export class CompanyBilling extends AuditableEntity {
     if (this.disabledFeatures && this.disabledFeatures.includes(featureId)) {
       return false;
     }
-    return this.enabledFeatures ? this.enabledFeatures.includes(featureId) : true;
+    return this.enabledFeatures
+      ? this.enabledFeatures.includes(featureId)
+      : true;
   }
 
   updateLifetimeValue(): void {
@@ -622,52 +759,58 @@ export class CompanyBilling extends AuditableEntity {
 
   calculateChurnRisk(): number {
     let riskScore = 0;
-    
+
     // Payment history factor
     if (this.paymentHistoryScore && this.paymentHistoryScore < 0.8) {
       riskScore += 0.3;
     }
-    
+
     // Usage trend factor
     if (this.currentUsage) {
-      const avgUsage = Object.values(this.currentUsage).reduce((sum, usage) => sum + usage.quantity, 0) / Object.keys(this.currentUsage).length;
-      if (avgUsage < 50) { // Low usage threshold
+      const avgUsage =
+        Object.values(this.currentUsage).reduce(
+          (sum, usage) => sum + usage.quantity,
+          0,
+        ) / Object.keys(this.currentUsage).length;
+      if (avgUsage < 50) {
+        // Low usage threshold
         riskScore += 0.2;
       }
     }
-    
+
     // Days past due factor
     if (this.daysPastDue > 0) {
       riskScore += Math.min(0.5, this.daysPastDue / 60);
     }
-    
+
     this.churnRiskScore = Math.min(1.0, riskScore);
     return this.churnRiskScore;
   }
 
   calculateCustomerHealthScore(): number {
     let healthScore = 1.0;
-    
+
     // Billing health
     if (this.billingStatus === BillingStatus.ACTIVE) {
       healthScore += 0.3;
     } else if (this.isOverdue()) {
       healthScore -= 0.4;
     }
-    
+
     // Payment history
     if (this.paymentHistoryScore) {
       healthScore = (healthScore + this.paymentHistoryScore) / 2;
     }
-    
+
     // Usage engagement
     if (this.currentUsage) {
-      const usageEngagement = Object.values(this.currentUsage).reduce((sum, usage) => {
-        return sum + Math.min(1.0, usage.quantity / 100); // Normalize usage
-      }, 0) / Object.keys(this.currentUsage).length;
+      const usageEngagement =
+        Object.values(this.currentUsage).reduce((sum, usage) => {
+          return sum + Math.min(1.0, usage.quantity / 100); // Normalize usage
+        }, 0) / Object.keys(this.currentUsage).length;
       healthScore = (healthScore + usageEngagement) / 2;
     }
-    
+
     this.customerHealthScore = Math.max(0.0, Math.min(1.0, healthScore));
     return this.customerHealthScore;
   }
@@ -702,7 +845,10 @@ export class CompanyBilling extends AuditableEntity {
   }
 
   reactivate(): void {
-    if (this.billingStatus === BillingStatus.SUSPENDED || this.billingStatus === BillingStatus.OVERDUE) {
+    if (
+      this.billingStatus === BillingStatus.SUSPENDED ||
+      this.billingStatus === BillingStatus.OVERDUE
+    ) {
       this.billingStatus = BillingStatus.ACTIVE;
       this.daysPastDue = 0;
       this.addCustomField('reactivated_at', new Date());
@@ -714,14 +860,14 @@ export class CompanyBilling extends AuditableEntity {
     this.lastPaymentDate = new Date();
     this.totalPayments += amount;
     this.outstandingBalance = Math.max(0, this.outstandingBalance - amount);
-    
+
     if (this.outstandingBalance === 0) {
       this.daysPastDue = 0;
       if (this.billingStatus === BillingStatus.OVERDUE) {
         this.billingStatus = BillingStatus.ACTIVE;
       }
     }
-    
+
     this.updateLifetimeValue();
     this.addCustomField('last_payment_method', paymentMethod);
   }

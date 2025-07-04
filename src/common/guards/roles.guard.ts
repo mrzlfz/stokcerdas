@@ -24,10 +24,10 @@ export class RolesGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     // Get required roles from decorator
-    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     // If no roles are specified, allow access
     if (!requiredRoles || requiredRoles.length === 0) {
@@ -38,7 +38,9 @@ export class RolesGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      this.logger.warn('No user found in request - authentication required before authorization');
+      this.logger.warn(
+        'No user found in request - authentication required before authorization',
+      );
       throw new ForbiddenException('Autentikasi diperlukan');
     }
 
@@ -53,9 +55,13 @@ export class RolesGuard implements CanActivate {
     if (!hasRole) {
       const endpoint = `${request.method} ${request.url}`;
       this.logger.warn(
-        `Access denied for user ${user.email} (role: ${user.role}) to ${endpoint}. Required roles: ${requiredRoles.join(', ')}`
+        `Access denied for user ${user.email} (role: ${
+          user.role
+        }) to ${endpoint}. Required roles: ${requiredRoles.join(', ')}`,
       );
-      throw new ForbiddenException('Anda tidak memiliki akses untuk melakukan operasi ini');
+      throw new ForbiddenException(
+        'Anda tidak memiliki akses untuk melakukan operasi ini',
+      );
     }
 
     return true;

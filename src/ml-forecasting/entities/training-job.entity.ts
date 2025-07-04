@@ -143,7 +143,11 @@ export class TrainingJob extends BaseEntity {
   @Column({ type: 'int', default: 3 })
   maxRetries: number;
 
-  @Column({ type: 'enum', enum: ['low', 'medium', 'high', 'critical'], default: 'medium' })
+  @Column({
+    type: 'enum',
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium',
+  })
   priority: 'low' | 'medium' | 'high' | 'critical';
 
   @Column({ type: 'int', nullable: true })
@@ -205,17 +209,19 @@ export class TrainingJob extends BaseEntity {
   }
 
   get canCancel(): boolean {
-    return [TrainingJobStatus.QUEUED, TrainingJobStatus.RUNNING].includes(this.status);
+    return [TrainingJobStatus.QUEUED, TrainingJobStatus.RUNNING].includes(
+      this.status,
+    );
   }
 
   get estimatedTimeRemaining(): number | null {
     if (!this.isRunning || !this.startedAt) return null;
-    
+
     const elapsed = new Date().getTime() - this.startedAt.getTime();
     const progressPercent = this.progress / 100;
-    
+
     if (progressPercent <= 0) return null;
-    
+
     const totalEstimated = elapsed / progressPercent;
     return Math.max(0, totalEstimated - elapsed);
   }
@@ -237,9 +243,11 @@ export class TrainingJob extends BaseEntity {
     this.completedAt = new Date();
     this.progress = 100;
     this.performanceMetrics = metrics;
-    
+
     if (this.startedAt) {
-      this.duration = Math.floor((this.completedAt.getTime() - this.startedAt.getTime()) / 1000);
+      this.duration = Math.floor(
+        (this.completedAt.getTime() - this.startedAt.getTime()) / 1000,
+      );
     }
   }
 
@@ -253,9 +261,11 @@ export class TrainingJob extends BaseEntity {
       step: this.currentStep,
       timestamp: new Date().toISOString(),
     };
-    
+
     if (this.startedAt) {
-      this.duration = Math.floor((this.completedAt.getTime() - this.startedAt.getTime()) / 1000);
+      this.duration = Math.floor(
+        (this.completedAt.getTime() - this.startedAt.getTime()) / 1000,
+      );
     }
   }
 
@@ -265,9 +275,11 @@ export class TrainingJob extends BaseEntity {
       this.cancelledAt = new Date();
       this.cancelledBy = userId;
       this.cancellationReason = reason;
-      
+
       if (this.startedAt) {
-        this.duration = Math.floor((this.cancelledAt.getTime() - this.startedAt.getTime()) / 1000);
+        this.duration = Math.floor(
+          (this.cancelledAt.getTime() - this.startedAt.getTime()) / 1000,
+        );
       }
     }
   }
@@ -289,7 +301,7 @@ export class TrainingJob extends BaseEntity {
   addLog(message: string): void {
     if (!this.logs) this.logs = [];
     this.logs.push(`[${new Date().toISOString()}] ${message}`);
-    
+
     // Keep only last 1000 log entries
     if (this.logs.length > 1000) {
       this.logs = this.logs.slice(-1000);
@@ -305,8 +317,14 @@ export class TrainingJob extends BaseEntity {
     this.resourceUsage = {
       ...this.resourceUsage,
       ...usage,
-      maxMemory: Math.max(this.resourceUsage?.maxMemory || 0, usage.memoryUsage || 0),
-      peakCpuUsage: Math.max(this.resourceUsage?.peakCpuUsage || 0, usage.cpuUsage || 0),
+      maxMemory: Math.max(
+        this.resourceUsage?.maxMemory || 0,
+        usage.memoryUsage || 0,
+      ),
+      peakCpuUsage: Math.max(
+        this.resourceUsage?.peakCpuUsage || 0,
+        usage.cpuUsage || 0,
+      ),
     };
   }
 

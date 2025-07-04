@@ -30,11 +30,7 @@ import { InstantDeliveryProcessor } from '../processors/instant-delivery.process
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      ShippingLabel,
-      ShippingTracking,
-      ShippingRate,
-    ]),
+    TypeOrmModule.forFeature([ShippingLabel, ShippingTracking, ShippingRate]),
     HttpModule.register({
       timeout: 30000,
       maxRedirects: 5,
@@ -56,23 +52,21 @@ import { InstantDeliveryProcessor } from '../processors/instant-delivery.process
     // API Services
     GojekApiService,
     GrabApiService,
-    
+
     // Shipping Services
     GojekShippingService,
     GrabShippingService,
-    
+
     // Main Service
     InstantDeliveryService,
-    
+
     // Processor
     InstantDeliveryProcessor,
-    
+
     // Common Services
     IntegrationLogService,
   ],
-  controllers: [
-    InstantDeliveryController,
-  ],
+  controllers: [InstantDeliveryController],
   exports: [
     InstantDeliveryService,
     GojekShippingService,

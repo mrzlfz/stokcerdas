@@ -15,8 +15,15 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { RoleType, RoleLevel, RoleStatus } from '../entities/hierarchical-role.entity';
-import { InheritanceType, HierarchyStatus } from '../entities/role-hierarchy.entity';
+import {
+  RoleType,
+  RoleLevel,
+  RoleStatus,
+} from '../entities/hierarchical-role.entity';
+import {
+  InheritanceType,
+  HierarchyStatus,
+} from '../entities/role-hierarchy.entity';
 
 // Base hierarchical role DTO
 export class BaseHierarchicalRoleDto {
@@ -45,7 +52,8 @@ export class BaseHierarchicalRoleDto {
 
   @ApiPropertyOptional({
     description: 'Deskripsi role',
-    example: 'Manager penjualan untuk wilayah regional dengan tanggung jawab tim dan target',
+    example:
+      'Manager penjualan untuk wilayah regional dengan tanggung jawab tim dan target',
   })
   @IsOptional()
   @IsString({ message: 'Deskripsi harus berupa teks' })
@@ -216,13 +224,13 @@ export class CreateHierarchicalRoleDto extends BaseHierarchicalRoleDto {
   @IsOptional()
   @IsObject({ message: 'Allowed hours harus berupa objek' })
   allowedHours?: {
-    monday?: { start: string; end: string; };
-    tuesday?: { start: string; end: string; };
-    wednesday?: { start: string; end: string; };
-    thursday?: { start: string; end: string; };
-    friday?: { start: string; end: string; };
-    saturday?: { start: string; end: string; };
-    sunday?: { start: string; end: string; };
+    monday?: { start: string; end: string };
+    tuesday?: { start: string; end: string };
+    wednesday?: { start: string; end: string };
+    thursday?: { start: string; end: string };
+    friday?: { start: string; end: string };
+    saturday?: { start: string; end: string };
+    sunday?: { start: string; end: string };
   };
 
   @ApiPropertyOptional({
@@ -235,7 +243,9 @@ export class CreateHierarchicalRoleDto extends BaseHierarchicalRoleDto {
 }
 
 // Update hierarchical role DTO
-export class UpdateHierarchicalRoleDto extends PartialType(CreateHierarchicalRoleDto) {
+export class UpdateHierarchicalRoleDto extends PartialType(
+  CreateHierarchicalRoleDto,
+) {
   @ApiPropertyOptional({
     description: 'Status role',
     enum: RoleStatus,
@@ -292,12 +302,12 @@ export class CreateRoleHierarchyDto {
     description: 'Kondisi dan pembatasan inheritance',
     example: {
       departmentRestriction: {
-        allowedDepartments: ['SALES', 'MARKETING']
+        allowedDepartments: ['SALES', 'MARKETING'],
       },
       timeRestriction: {
         validFrom: '2024-01-01',
-        validUntil: '2024-12-31'
-      }
+        validUntil: '2024-12-31',
+      },
     },
   })
   @IsOptional()
@@ -310,7 +320,7 @@ export class CreateRoleHierarchyDto {
     timeRestriction?: {
       validFrom?: string;
       validUntil?: string;
-      allowedHours?: Record<string, { start: string; end: string; }>;
+      allowedHours?: Record<string, { start: string; end: string }>;
     };
     contextRestriction?: {
       requiresSameLocation?: boolean;
@@ -471,10 +481,16 @@ export class CloneRoleDto {
 export class BulkUpdateRoleStatusDto {
   @ApiProperty({
     description: 'Array ID role',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d1-9f4e-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d1-9f4e-123456789abc',
+    ],
   })
   @IsArray({ message: 'Role IDs harus berupa array' })
-  @IsUUID('4', { each: true, message: 'Setiap ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Setiap ID harus berupa UUID yang valid',
+  })
   roleIds: string[];
 
   @ApiProperty({
@@ -557,7 +573,10 @@ export class HierarchicalRoleResponseDto {
   @ApiPropertyOptional({ description: 'Informasi role parent' })
   parent?: Partial<HierarchicalRoleResponseDto>;
 
-  @ApiPropertyOptional({ description: 'Child roles', type: [HierarchicalRoleResponseDto] })
+  @ApiPropertyOptional({
+    description: 'Child roles',
+    type: [HierarchicalRoleResponseDto],
+  })
   children?: HierarchicalRoleResponseDto[];
 
   @ApiProperty({ description: 'Kedalaman dalam hierarki' })

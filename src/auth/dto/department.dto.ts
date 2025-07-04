@@ -16,7 +16,10 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { DepartmentType, DepartmentStatus } from '../entities/department.entity';
+import {
+  DepartmentType,
+  DepartmentStatus,
+} from '../entities/department.entity';
 
 // Base department DTO
 export class BaseDepartmentDto {
@@ -150,13 +153,13 @@ export class CreateDepartmentDto extends BaseDepartmentDto {
   @IsOptional()
   @IsObject({ message: 'Jam operasional harus berupa objek' })
   businessHours?: {
-    monday?: { start: string; end: string; };
-    tuesday?: { start: string; end: string; };
-    wednesday?: { start: string; end: string; };
-    thursday?: { start: string; end: string; };
-    friday?: { start: string; end: string; };
-    saturday?: { start: string; end: string; };
-    sunday?: { start: string; end: string; };
+    monday?: { start: string; end: string };
+    tuesday?: { start: string; end: string };
+    wednesday?: { start: string; end: string };
+    thursday?: { start: string; end: string };
+    friday?: { start: string; end: string };
+    saturday?: { start: string; end: string };
+    sunday?: { start: string; end: string };
   };
 
   @ApiPropertyOptional({
@@ -285,10 +288,16 @@ export class MoveDepartmentDto {
 export class BulkUpdateStatusDto {
   @ApiProperty({
     description: 'Array ID departemen',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d1-9f4e-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d1-9f4e-123456789abc',
+    ],
   })
   @IsArray({ message: 'Department IDs harus berupa array' })
-  @IsUUID('4', { each: true, message: 'Setiap ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Setiap ID harus berupa UUID yang valid',
+  })
   departmentIds: string[];
 
   @ApiProperty({
@@ -335,7 +344,10 @@ export class DepartmentResponseDto {
   @ApiPropertyOptional({ description: 'Informasi departemen induk' })
   parent?: Partial<DepartmentResponseDto>;
 
-  @ApiPropertyOptional({ description: 'Sub-departemen', type: [DepartmentResponseDto] })
+  @ApiPropertyOptional({
+    description: 'Sub-departemen',
+    type: [DepartmentResponseDto],
+  })
   children?: DepartmentResponseDto[];
 
   @ApiProperty({ description: 'Level dalam hierarki' })
@@ -366,7 +378,7 @@ export class DepartmentResponseDto {
   phoneNumber?: string;
 
   @ApiPropertyOptional({ description: 'Jam operasional' })
-  businessHours?: Record<string, { start: string; end: string; }>;
+  businessHours?: Record<string, { start: string; end: string }>;
 
   @ApiPropertyOptional({ description: 'Metadata tambahan' })
   metadata?: Record<string, any>;

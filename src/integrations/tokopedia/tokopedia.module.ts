@@ -117,10 +117,7 @@ import { OrderItem } from '../../orders/entities/order.entity';
     TokopediaProcessor,
   ],
 
-  controllers: [
-    TokopediaController,
-    TokopediaWebhookController,
-  ],
+  controllers: [TokopediaController, TokopediaWebhookController],
 
   exports: [
     // Export services for use in other modules

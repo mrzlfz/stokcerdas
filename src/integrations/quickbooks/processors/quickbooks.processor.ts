@@ -1,4 +1,10 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -9,7 +15,10 @@ import { QuickBooksCOGSService } from '../services/quickbooks-cogs.service';
 import { QuickBooksInvoiceService } from '../services/quickbooks-invoice.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface QuickBooksWebhookJobData {
   webhookId: string;
@@ -99,15 +108,18 @@ export class QuickBooksProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`QuickBooks job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `QuickBooks job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -115,8 +127,9 @@ export class QuickBooksProcessor {
    */
   @Process('process-webhook')
   async processWebhook(job: Job<QuickBooksWebhookJobData>) {
-    const { webhookId, tenantId, channelId, eventType, realmId, isRetry } = job.data;
-    
+    const { webhookId, tenantId, channelId, eventType, realmId, isRetry } =
+      job.data;
+
     try {
       this.logger.debug(`Processing QuickBooks webhook: ${eventType}`, {
         webhookId,
@@ -128,8 +141,10 @@ export class QuickBooksProcessor {
       });
 
       // Mark webhook as processing
-      const webhook = await this.webhookHandler.markWebhookAsProcessing(webhookId);
-      
+      const webhook = await this.webhookHandler.markWebhookAsProcessing(
+        webhookId,
+      );
+
       if (!webhook) {
         throw new Error(`Webhook not found: ${webhookId}`);
       }
@@ -144,17 +159,34 @@ export class QuickBooksProcessor {
           result = await this.processItemWebhook(tenantId, channelId, payload);
           break;
         case 'Invoice':
-          result = await this.processInvoiceWebhook(tenantId, channelId, payload);
+          result = await this.processInvoiceWebhook(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
         case 'Customer':
-          result = await this.processCustomerWebhook(tenantId, channelId, payload);
+          result = await this.processCustomerWebhook(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
         case 'Account':
-          result = await this.processAccountWebhook(tenantId, channelId, payload);
+          result = await this.processAccountWebhook(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
         default:
-          this.logger.warn(`Unhandled QuickBooks webhook event type: ${eventType}`);
-          result = { success: true, message: `Event type ${eventType} acknowledged but not processed` };
+          this.logger.warn(
+            `Unhandled QuickBooks webhook event type: ${eventType}`,
+          );
+          result = {
+            success: true,
+            message: `Event type ${eventType} acknowledged but not processed`,
+          };
       }
 
       if (result.success) {
@@ -191,9 +223,11 @@ export class QuickBooksProcessor {
 
         throw new Error(result.error || 'Webhook processing failed');
       }
-
     } catch (error) {
-      this.logger.error(`QuickBooks webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `QuickBooks webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Mark webhook as failed
       await this.webhookHandler.markWebhookAsFailed(
@@ -221,8 +255,15 @@ export class QuickBooksProcessor {
    */
   @Process('item-sync')
   async processItemSync(job: Job<QuickBooksItemSyncJobData>) {
-    const { tenantId, accountingAccountId, itemId, quickBooksItemId, syncDirection, options } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      itemId,
+      quickBooksItemId,
+      syncDirection,
+      options,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing QuickBooks item sync: ${syncDirection}`, {
         tenantId,
@@ -239,7 +280,9 @@ export class QuickBooksProcessor {
           result = await this.quickBooksItemSyncService.syncFromQuickBooks(
             accountingAccountId,
             tenantId,
-            options || { itemIds: quickBooksItemId ? [quickBooksItemId] : undefined }
+            options || {
+              itemIds: quickBooksItemId ? [quickBooksItemId] : undefined,
+            },
           );
           break;
 
@@ -247,7 +290,7 @@ export class QuickBooksProcessor {
           result = await this.quickBooksItemSyncService.syncToQuickBooks(
             accountingAccountId,
             tenantId,
-            options || { productIds: itemId ? [itemId] : undefined }
+            options || { productIds: itemId ? [itemId] : undefined },
           );
           break;
 
@@ -255,7 +298,7 @@ export class QuickBooksProcessor {
           result = await this.quickBooksItemSyncService.bidirectionalSync(
             accountingAccountId,
             tenantId,
-            options || {}
+            options || {},
           );
           break;
 
@@ -284,9 +327,11 @@ export class QuickBooksProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`QuickBooks item sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `QuickBooks item sync failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
       await this.logService.logSync(
@@ -307,8 +352,15 @@ export class QuickBooksProcessor {
    */
   @Process('cogs-calculation')
   async processCOGSCalculation(job: Job<QuickBooksCOGSJobData>) {
-    const { tenantId, accountingAccountId, startDate, endDate, config, autoPost } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      startDate,
+      endDate,
+      config,
+      autoPost,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing QuickBooks COGS calculation`, {
         tenantId,
@@ -332,10 +384,10 @@ export class QuickBooksProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `QuickBooks COGS calculation completed`,
-        metadata: { 
-          accountingAccountId, 
-          startDate, 
-          endDate, 
+        metadata: {
+          accountingAccountId,
+          startDate,
+          endDate,
           result,
           entriesPosted: result.entriesPosted,
           totalCOGS: result.totalCOGS,
@@ -352,19 +404,16 @@ export class QuickBooksProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`QuickBooks COGS calculation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `QuickBooks COGS calculation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { accountingAccountId, startDate, endDate },
-        },
-      );
+      await this.logService.logError(tenantId, '', error, {
+        metadata: { accountingAccountId, startDate, endDate },
+      });
 
       throw error;
     }
@@ -375,17 +424,28 @@ export class QuickBooksProcessor {
    */
   @Process('invoice-operation')
   async processInvoiceOperation(job: Job<QuickBooksInvoiceJobData>) {
-    const { tenantId, accountingAccountId, orderId, orderIds, invoiceId, operation, options } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      orderId,
+      orderIds,
+      invoiceId,
+      operation,
+      options,
+    } = job.data;
+
     try {
-      this.logger.debug(`Processing QuickBooks invoice operation: ${operation}`, {
-        tenantId,
-        accountingAccountId,
-        orderId,
-        orderIds,
-        invoiceId,
-        operation,
-      });
+      this.logger.debug(
+        `Processing QuickBooks invoice operation: ${operation}`,
+        {
+          tenantId,
+          accountingAccountId,
+          orderId,
+          orderIds,
+          invoiceId,
+          operation,
+        },
+      );
 
       let result;
 
@@ -404,7 +464,9 @@ export class QuickBooksProcessor {
 
         case 'batch_generate':
           if (!orderIds || orderIds.length === 0) {
-            throw new Error('Order IDs are required for batch invoice generation');
+            throw new Error(
+              'Order IDs are required for batch invoice generation',
+            );
           }
           result = await this.quickBooksInvoiceService.generateInvoiceBatch(
             accountingAccountId,
@@ -443,11 +505,11 @@ export class QuickBooksProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `QuickBooks invoice ${operation} completed successfully`,
-        metadata: { 
-          accountingAccountId, 
-          orderId, 
-          orderIds, 
-          invoiceId, 
+        metadata: {
+          accountingAccountId,
+          orderId,
+          orderIds,
+          invoiceId,
           operation,
           result,
         },
@@ -465,25 +527,22 @@ export class QuickBooksProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`QuickBooks invoice operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `QuickBooks invoice operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { 
-            accountingAccountId, 
-            orderId, 
-            orderIds, 
-            invoiceId, 
-            operation,
-          },
+      await this.logService.logError(tenantId, '', error, {
+        metadata: {
+          accountingAccountId,
+          orderId,
+          orderIds,
+          invoiceId,
+          operation,
         },
-      );
+      });
 
       throw error;
     }
@@ -495,7 +554,7 @@ export class QuickBooksProcessor {
   @Process('auth-operation')
   async processAuthOperation(job: Job<QuickBooksAuthJobData>) {
     const { tenantId, accountingAccountId, operation, credentials } = job.data;
-    
+
     try {
       this.logger.debug(`Processing QuickBooks auth operation: ${operation}`, {
         tenantId,
@@ -536,8 +595,8 @@ export class QuickBooksProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `QuickBooks auth ${operation} completed successfully`,
-        metadata: { 
-          accountingAccountId, 
+        metadata: {
+          accountingAccountId,
           operation,
           result,
         },
@@ -552,19 +611,16 @@ export class QuickBooksProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`QuickBooks auth operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `QuickBooks auth operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { accountingAccountId, operation },
-        },
-      );
+      await this.logService.logError(tenantId, '', error, {
+        metadata: { accountingAccountId, operation },
+      });
 
       throw error;
     }
@@ -575,23 +631,35 @@ export class QuickBooksProcessor {
    */
   @Process('report-generation')
   async processReportGeneration(job: Job<QuickBooksReportJobData>) {
-    const { tenantId, accountingAccountId, reportType, startDate, endDate, parameters } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      reportType,
+      startDate,
+      endDate,
+      parameters,
+    } = job.data;
+
     try {
-      this.logger.debug(`Processing QuickBooks report generation: ${reportType}`, {
-        tenantId,
-        accountingAccountId,
-        reportType,
-        startDate,
-        endDate,
-      });
+      this.logger.debug(
+        `Processing QuickBooks report generation: ${reportType}`,
+        {
+          tenantId,
+          accountingAccountId,
+          reportType,
+          startDate,
+          endDate,
+        },
+      );
 
       let result;
 
       switch (reportType) {
         case 'cogs':
           if (!startDate || !endDate) {
-            throw new Error('Start date and end date are required for COGS report');
+            throw new Error(
+              'Start date and end date are required for COGS report',
+            );
           }
           result = await this.quickBooksCOGSService.generateCOGSReport(
             tenantId,
@@ -605,8 +673,8 @@ export class QuickBooksProcessor {
         case 'profit_loss':
         case 'balance_sheet':
           // These would be implemented with QuickBooks reporting API
-          result = { 
-            success: true, 
+          result = {
+            success: true,
             message: `${reportType} report generation not yet implemented`,
             reportType,
             startDate,
@@ -624,10 +692,10 @@ export class QuickBooksProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `QuickBooks ${reportType} report generated successfully`,
-        metadata: { 
-          accountingAccountId, 
-          reportType, 
-          startDate, 
+        metadata: {
+          accountingAccountId,
+          reportType,
+          startDate,
           endDate,
           result,
         },
@@ -644,24 +712,21 @@ export class QuickBooksProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`QuickBooks report generation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `QuickBooks report generation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { 
-            accountingAccountId, 
-            reportType, 
-            startDate, 
-            endDate,
-          },
+      await this.logService.logError(tenantId, '', error, {
+        metadata: {
+          accountingAccountId,
+          reportType,
+          startDate,
+          endDate,
         },
-      );
+      });
 
       throw error;
     }
@@ -669,9 +734,16 @@ export class QuickBooksProcessor {
 
   // Private helper methods for webhook processing
 
-  private async processItemWebhook(tenantId: string, channelId: string, payload: any): Promise<any> {
-    this.logger.debug(`Processing QuickBooks Item webhook`, { tenantId, payload });
-    
+  private async processItemWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+  ): Promise<any> {
+    this.logger.debug(`Processing QuickBooks Item webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process item change notification
     // This could trigger a sync or update local item data
     return {
@@ -682,9 +754,16 @@ export class QuickBooksProcessor {
     };
   }
 
-  private async processInvoiceWebhook(tenantId: string, channelId: string, payload: any): Promise<any> {
-    this.logger.debug(`Processing QuickBooks Invoice webhook`, { tenantId, payload });
-    
+  private async processInvoiceWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+  ): Promise<any> {
+    this.logger.debug(`Processing QuickBooks Invoice webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process invoice change notification
     // This could trigger status updates in local system
     return {
@@ -695,9 +774,16 @@ export class QuickBooksProcessor {
     };
   }
 
-  private async processCustomerWebhook(tenantId: string, channelId: string, payload: any): Promise<any> {
-    this.logger.debug(`Processing QuickBooks Customer webhook`, { tenantId, payload });
-    
+  private async processCustomerWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+  ): Promise<any> {
+    this.logger.debug(`Processing QuickBooks Customer webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process customer change notification
     return {
       success: true,
@@ -707,9 +793,16 @@ export class QuickBooksProcessor {
     };
   }
 
-  private async processAccountWebhook(tenantId: string, channelId: string, payload: any): Promise<any> {
-    this.logger.debug(`Processing QuickBooks Account webhook`, { tenantId, payload });
-    
+  private async processAccountWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+  ): Promise<any> {
+    this.logger.debug(`Processing QuickBooks Account webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process account change notification
     return {
       success: true,

@@ -48,12 +48,19 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
-import { ShippingServiceType, InsuranceType } from '../entities/shipping-label.entity';
+import {
+  ShippingServiceType,
+  InsuranceType,
+} from '../entities/shipping-label.entity';
 import { TrackingStatus } from '../entities/shipping-tracking.entity';
 import { UserRole } from '../../users/entities/user.entity';
 
 // Services
-import { ShippingService, ShippingQuoteRequest, CreateShippingLabelRequest } from '../services/shipping.service';
+import {
+  ShippingService,
+  ShippingQuoteRequest,
+  CreateShippingLabelRequest,
+} from '../services/shipping.service';
 import { JneShippingService } from '../integrations/jne/services/jne-shipping.service';
 import { JntShippingService } from '../integrations/jnt/services/jnt-shipping.service';
 
@@ -344,22 +351,31 @@ export class ShippingController {
 
   @Post('quotes')
   @ApiOperation({ summary: 'Get shipping quotes for a package' })
-  @ApiResponse({ status: 200, description: 'Shipping quotes retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping quotes retrieved successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getShippingQuotes(
     @CurrentUser() user: any,
     @Body() quotesDto: GetShippingQuotesDto,
   ) {
     try {
-      const quotes = await this.shippingService.getShippingQuotes(user.tenantId, quotesDto);
-      
+      const quotes = await this.shippingService.getShippingQuotes(
+        user.tenantId,
+        quotesDto,
+      );
+
       return {
         success: true,
         data: quotes,
         count: quotes.length,
       };
     } catch (error) {
-      this.logger.error(`Failed to get shipping quotes: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get shipping quotes: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -387,9 +403,24 @@ export class ShippingController {
           name: 'JNE (Jalur Nugraha Ekakurir)',
           logo: '/logos/jne.png',
           services: [
-            { code: 'REG', name: 'Regular Service', type: 'regular', estimatedDays: '2-3' },
-            { code: 'YES', name: 'Yakin Esok Sampai', type: 'express', estimatedDays: '1' },
-            { code: 'OKE', name: 'Ongkos Kirim Ekonomis', type: 'economy', estimatedDays: '3-5' },
+            {
+              code: 'REG',
+              name: 'Regular Service',
+              type: 'regular',
+              estimatedDays: '2-3',
+            },
+            {
+              code: 'YES',
+              name: 'Yakin Esok Sampai',
+              type: 'express',
+              estimatedDays: '1',
+            },
+            {
+              code: 'OKE',
+              name: 'Ongkos Kirim Ekonomis',
+              type: 'economy',
+              estimatedDays: '3-5',
+            },
           ],
           features: {
             cod: true,
@@ -405,9 +436,24 @@ export class ShippingController {
           name: 'J&T Express',
           logo: '/logos/jnt.png',
           services: [
-            { code: 'STANDARD', name: 'Standard Express', type: 'regular', estimatedDays: '2-4' },
-            { code: 'ECONOMY', name: 'Economy Express', type: 'economy', estimatedDays: '3-6' },
-            { code: 'SPECIAL', name: 'Special Goods Express', type: 'express', estimatedDays: '1-2' },
+            {
+              code: 'STANDARD',
+              name: 'Standard Express',
+              type: 'regular',
+              estimatedDays: '2-4',
+            },
+            {
+              code: 'ECONOMY',
+              name: 'Economy Express',
+              type: 'economy',
+              estimatedDays: '3-6',
+            },
+            {
+              code: 'SPECIAL',
+              name: 'Special Goods Express',
+              type: 'express',
+              estimatedDays: '1-2',
+            },
           ],
           features: {
             cod: true,
@@ -423,9 +469,24 @@ export class ShippingController {
           name: 'SiCepat Ekspres',
           logo: '/logos/sicepat.png',
           services: [
-            { code: 'REG', name: 'Regular', type: 'regular', estimatedDays: '2-4' },
-            { code: 'BEST', name: 'BEST', type: 'express', estimatedDays: '1-2' },
-            { code: 'CARGO', name: 'Cargo', type: 'cargo', estimatedDays: '3-7' },
+            {
+              code: 'REG',
+              name: 'Regular',
+              type: 'regular',
+              estimatedDays: '2-4',
+            },
+            {
+              code: 'BEST',
+              name: 'BEST',
+              type: 'express',
+              estimatedDays: '1-2',
+            },
+            {
+              code: 'CARGO',
+              name: 'Cargo',
+              type: 'cargo',
+              estimatedDays: '3-7',
+            },
           ],
           features: {
             cod: true,
@@ -438,9 +499,10 @@ export class ShippingController {
         },
       ];
 
-      const filteredCarriers = active !== undefined 
-        ? carriers.filter(carrier => carrier.isActive === active)
-        : carriers;
+      const filteredCarriers =
+        active !== undefined
+          ? carriers.filter(carrier => carrier.isActive === active)
+          : carriers;
 
       return {
         success: true,
@@ -448,7 +510,10 @@ export class ShippingController {
         count: filteredCarriers.length,
       };
     } catch (error) {
-      this.logger.error(`Failed to get carriers: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get carriers: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -463,7 +528,10 @@ export class ShippingController {
 
   @Get('labels')
   @ApiOperation({ summary: 'Get shipping labels' })
-  @ApiResponse({ status: 200, description: 'Shipping labels retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping labels retrieved successfully',
+  })
   @ApiQuery({ name: 'orderId', type: 'string', required: false })
   @ApiQuery({ name: 'trackingNumber', type: 'string', required: false })
   @ApiQuery({ name: 'carrierId', type: 'string', required: false })
@@ -523,7 +591,10 @@ export class ShippingController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get shipping labels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get shipping labels: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -536,7 +607,10 @@ export class ShippingController {
 
   @Get('labels/:labelId')
   @ApiOperation({ summary: 'Get shipping label by ID' })
-  @ApiResponse({ status: 200, description: 'Shipping label retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping label retrieved successfully',
+  })
   @ApiParam({ name: 'labelId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getShippingLabelById(
@@ -544,14 +618,20 @@ export class ShippingController {
     @Param('labelId') labelId: string,
   ) {
     try {
-      const shippingLabel = await this.shippingService.getShippingLabelById(user.tenantId, labelId);
-      
+      const shippingLabel = await this.shippingService.getShippingLabelById(
+        user.tenantId,
+        labelId,
+      );
+
       return {
         success: true,
         data: shippingLabel,
       };
     } catch (error) {
-      this.logger.error(`Failed to get shipping label: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get shipping label: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -564,22 +644,31 @@ export class ShippingController {
 
   @Post('labels')
   @ApiOperation({ summary: 'Create shipping label' })
-  @ApiResponse({ status: 201, description: 'Shipping label created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Shipping label created successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createShippingLabel(
     @CurrentUser() user: any,
     @Body() createDto: CreateShippingLabelDto,
   ) {
     try {
-      const shippingLabel = await this.shippingService.createShippingLabel(user.tenantId, createDto);
-      
+      const shippingLabel = await this.shippingService.createShippingLabel(
+        user.tenantId,
+        createDto,
+      );
+
       return {
         success: true,
         data: shippingLabel,
         message: 'Shipping label created successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to create shipping label: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create shipping label: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -592,7 +681,10 @@ export class ShippingController {
 
   @Post('labels/:labelId/generate')
   @ApiOperation({ summary: 'Generate shipping label with carrier' })
-  @ApiResponse({ status: 200, description: 'Shipping label generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping label generated successfully',
+  })
   @ApiParam({ name: 'labelId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async generateShippingLabel(
@@ -600,15 +692,21 @@ export class ShippingController {
     @Param('labelId') labelId: string,
   ) {
     try {
-      const shippingLabel = await this.shippingService.generateShippingLabel(user.tenantId, labelId);
-      
+      const shippingLabel = await this.shippingService.generateShippingLabel(
+        user.tenantId,
+        labelId,
+      );
+
       return {
         success: true,
         data: shippingLabel,
         message: 'Shipping label generated successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to generate shipping label: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate shipping label: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -629,8 +727,11 @@ export class ShippingController {
     @Param('labelId') labelId: string,
   ) {
     try {
-      const shippingLabel = await this.shippingService.getShippingLabelById(user.tenantId, labelId);
-      
+      const shippingLabel = await this.shippingService.getShippingLabelById(
+        user.tenantId,
+        labelId,
+      );
+
       if (!shippingLabel.labelUrl) {
         throw new HttpException(
           {
@@ -650,7 +751,10 @@ export class ShippingController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get label download URL: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get label download URL: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -663,7 +767,10 @@ export class ShippingController {
 
   @Delete('labels/:labelId')
   @ApiOperation({ summary: 'Cancel shipping label' })
-  @ApiResponse({ status: 200, description: 'Shipping label cancelled successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping label cancelled successfully',
+  })
   @ApiParam({ name: 'labelId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async cancelShippingLabel(
@@ -672,8 +779,11 @@ export class ShippingController {
     @Body() cancelDto: CancelShipmentDto,
   ) {
     try {
-      const shippingLabel = await this.shippingService.getShippingLabelById(user.tenantId, labelId);
-      
+      const shippingLabel = await this.shippingService.getShippingLabelById(
+        user.tenantId,
+        labelId,
+      );
+
       if (!shippingLabel.canBeCancelled) {
         throw new HttpException(
           {
@@ -711,7 +821,10 @@ export class ShippingController {
         message: 'Shipping label cancelled successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to cancel shipping label: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel shipping label: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -726,7 +839,10 @@ export class ShippingController {
 
   @Get('tracking/:trackingNumber')
   @ApiOperation({ summary: 'Get tracking information for a package' })
-  @ApiResponse({ status: 200, description: 'Tracking information retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tracking information retrieved successfully',
+  })
   @ApiParam({ name: 'trackingNumber', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getTrackingInfo(
@@ -734,12 +850,15 @@ export class ShippingController {
     @Param('trackingNumber') trackingNumber: string,
   ) {
     try {
-      const trackingHistory = await this.shippingService.getTrackingHistory(user.tenantId, trackingNumber);
-      
+      const trackingHistory = await this.shippingService.getTrackingHistory(
+        user.tenantId,
+        trackingNumber,
+      );
+
       // Get current status (latest tracking entry)
       const currentStatus = trackingHistory[0];
       const deliveryProgress = 0; // Progress calculation not implemented yet
-      
+
       return {
         success: true,
         data: {
@@ -753,7 +872,10 @@ export class ShippingController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get tracking info: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get tracking info: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -780,13 +902,16 @@ export class ShippingController {
       }));
 
       await this.shippingService.updateTracking(user.tenantId, trackingUpdates);
-      
+
       return {
         success: true,
         message: `Updated tracking for ${updates.length} packages`,
       };
     } catch (error) {
-      this.logger.error(`Failed to update tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update tracking: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -835,7 +960,10 @@ export class ShippingController {
         message: 'Tracking information refreshed',
       };
     } catch (error) {
-      this.logger.error(`Failed to refresh tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to refresh tracking: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -850,11 +978,24 @@ export class ShippingController {
 
   @Get('analytics')
   @ApiOperation({ summary: 'Get shipping analytics' })
-  @ApiResponse({ status: 200, description: 'Shipping analytics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping analytics retrieved successfully',
+  })
   @ApiQuery({ name: 'fromDate', type: 'string', required: false })
   @ApiQuery({ name: 'toDate', type: 'string', required: false })
-  @ApiQuery({ name: 'carrierIds', type: 'string', isArray: true, required: false })
-  @ApiQuery({ name: 'serviceTypes', enum: ShippingServiceType, isArray: true, required: false })
+  @ApiQuery({
+    name: 'carrierIds',
+    type: 'string',
+    isArray: true,
+    required: false,
+  })
+  @ApiQuery({
+    name: 'serviceTypes',
+    enum: ShippingServiceType,
+    isArray: true,
+    required: false,
+  })
   @ApiQuery({ name: 'includeDetails', type: 'boolean', required: false })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getShippingAnalytics(
@@ -862,19 +1003,28 @@ export class ShippingController {
     @Query() query: ShippingAnalyticsQueryDto,
   ) {
     try {
-      const dateRange = query.fromDate && query.toDate ? {
-        from: new Date(query.fromDate),
-        to: new Date(query.toDate),
-      } : undefined;
+      const dateRange =
+        query.fromDate && query.toDate
+          ? {
+              from: new Date(query.fromDate),
+              to: new Date(query.toDate),
+            }
+          : undefined;
 
-      const analytics = await this.shippingService.getShippingAnalytics(user.tenantId, dateRange);
-      
+      const analytics = await this.shippingService.getShippingAnalytics(
+        user.tenantId,
+        dateRange,
+      );
+
       return {
         success: true,
         data: analytics,
       };
     } catch (error) {
-      this.logger.error(`Failed to get shipping analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get shipping analytics: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -887,9 +1037,20 @@ export class ShippingController {
 
   @Get('analytics/costs')
   @ApiOperation({ summary: 'Get shipping cost analysis' })
-  @ApiResponse({ status: 200, description: 'Cost analysis retrieved successfully' })
-  @ApiQuery({ name: 'period', enum: ['day', 'week', 'month', 'quarter'], required: false })
-  @ApiQuery({ name: 'groupBy', enum: ['carrier', 'service', 'location'], required: false })
+  @ApiResponse({
+    status: 200,
+    description: 'Cost analysis retrieved successfully',
+  })
+  @ApiQuery({
+    name: 'period',
+    enum: ['day', 'week', 'month', 'quarter'],
+    required: false,
+  })
+  @ApiQuery({
+    name: 'groupBy',
+    enum: ['carrier', 'service', 'location'],
+    required: false,
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getShippingCostAnalysis(
     @CurrentUser() user: any,
@@ -929,7 +1090,9 @@ export class ShippingController {
         ],
         trends: {
           daily: Array.from({ length: 30 }, (_, i) => ({
-            date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000)
+              .toISOString()
+              .split('T')[0],
             cost: Math.floor(400000 + Math.random() * 200000),
             shipments: Math.floor(30 + Math.random() * 20),
           })),
@@ -941,7 +1104,10 @@ export class ShippingController {
         data: costAnalysis,
       };
     } catch (error) {
-      this.logger.error(`Failed to get cost analysis: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get cost analysis: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -954,8 +1120,15 @@ export class ShippingController {
 
   @Get('analytics/performance')
   @ApiOperation({ summary: 'Get carrier performance metrics' })
-  @ApiResponse({ status: 200, description: 'Performance metrics retrieved successfully' })
-  @ApiQuery({ name: 'period', enum: ['week', 'month', 'quarter'], required: false })
+  @ApiResponse({
+    status: 200,
+    description: 'Performance metrics retrieved successfully',
+  })
+  @ApiQuery({
+    name: 'period',
+    enum: ['week', 'month', 'quarter'],
+    required: false,
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getCarrierPerformance(
     @CurrentUser() user: any,
@@ -1016,7 +1189,10 @@ export class ShippingController {
         data: performance,
       };
     } catch (error) {
-      this.logger.error(`Failed to get carrier performance: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get carrier performance: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1045,23 +1221,38 @@ export class ShippingController {
     try {
       // Mock address validation
       const isValidPostalCode = /^[0-9]{5}$/.test(postalCode);
-      const validCities = ['Jakarta', 'Surabaya', 'Bandung', 'Medan', 'Bekasi', 'Tangerang'];
-      const isValidCity = validCities.some(validCity => 
-        city.toLowerCase().includes(validCity.toLowerCase())
+      const validCities = [
+        'Jakarta',
+        'Surabaya',
+        'Bandung',
+        'Medan',
+        'Bekasi',
+        'Tangerang',
+      ];
+      const isValidCity = validCities.some(validCity =>
+        city.toLowerCase().includes(validCity.toLowerCase()),
       );
 
       const validation = {
         isValid: isValidPostalCode && isValidCity,
         postalCode: {
           isValid: isValidPostalCode,
-          message: isValidPostalCode ? 'Valid postal code' : 'Invalid postal code format (should be 5 digits)',
+          message: isValidPostalCode
+            ? 'Valid postal code'
+            : 'Invalid postal code format (should be 5 digits)',
         },
         city: {
           isValid: isValidCity,
-          message: isValidCity ? 'Valid city' : 'City not found in coverage area',
-          suggestions: isValidCity ? [] : validCities.filter(validCity => 
-            validCity.toLowerCase().includes(city.toLowerCase().substring(0, 3))
-          ),
+          message: isValidCity
+            ? 'Valid city'
+            : 'City not found in coverage area',
+          suggestions: isValidCity
+            ? []
+            : validCities.filter(validCity =>
+                validCity
+                  .toLowerCase()
+                  .includes(city.toLowerCase().substring(0, 3)),
+              ),
         },
         coverageInfo: {
           hasRegularService: true,
@@ -1076,7 +1267,10 @@ export class ShippingController {
         data: validation,
       };
     } catch (error) {
-      this.logger.error(`Failed to validate address: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to validate address: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1088,12 +1282,15 @@ export class ShippingController {
   }
 
   @Post('calculate/dimensions')
-  @ApiOperation({ summary: 'Calculate volumetric weight and chargeable weight' })
+  @ApiOperation({
+    summary: 'Calculate volumetric weight and chargeable weight',
+  })
   @ApiResponse({ status: 200, description: 'Weight calculations completed' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async calculateWeights(
     @CurrentUser() user: any,
-    @Body() data: {
+    @Body()
+    data: {
       actualWeight: number; // in grams
       length: number; // in cm
       width: number; // in cm
@@ -1103,7 +1300,7 @@ export class ShippingController {
   ) {
     try {
       const { actualWeight, length, width, height, carrier = 'JNE' } = data;
-      
+
       // Different carriers use different volumetric formulas
       let volumetricWeight: number;
       switch (carrier.toUpperCase()) {
@@ -1129,10 +1326,14 @@ export class ShippingController {
         chargeableWeight: Math.round(chargeableWeight), // grams
         volume: Math.round(volume * 100) / 100, // liters, rounded to 2 decimals
         carrier,
-        formula: carrier.toUpperCase() === 'JNT' ? 'L × W × H ÷ 5000' : 'L × W × H ÷ 6000',
-        recommendation: chargeableWeight > actualWeight 
-          ? 'Consider optimizing package dimensions to reduce volumetric weight'
-          : 'Package dimensions are efficient',
+        formula:
+          carrier.toUpperCase() === 'JNT'
+            ? 'L × W × H ÷ 5000'
+            : 'L × W × H ÷ 6000',
+        recommendation:
+          chargeableWeight > actualWeight
+            ? 'Consider optimizing package dimensions to reduce volumetric weight'
+            : 'Package dimensions are efficient',
       };
 
       return {
@@ -1140,7 +1341,10 @@ export class ShippingController {
         data: calculations,
       };
     } catch (error) {
-      this.logger.error(`Failed to calculate weights: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to calculate weights: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

@@ -13,10 +13,14 @@ import { ChannelMapping } from './entities/channel-mapping.entity';
 // External entities
 import { Product } from '../products/entities/product.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
-import { Order } from '../orders/entities/order.entity';
+import { InventoryTransaction } from '../inventory/entities/inventory-transaction.entity';
+import { InventoryLocation } from '../inventory/entities/inventory-location.entity';
+import { Order, OrderItem } from '../orders/entities/order.entity';
 
 // Integration entities
 import { IntegrationLog } from '../integrations/entities/integration-log.entity';
+import { WebhookEvent } from '../integrations/entities/webhook-event.entity';
+import { SyncStatus } from '../integrations/entities/sync-status.entity';
 
 // Services
 import { ChannelsService } from './services/channels.service';
@@ -65,7 +69,7 @@ import { WebhookHandlerService } from '../integrations/common/services/webhook-h
   imports: [
     // Event emitter for real-time updates
     EventEmitterModule,
-    
+
     // HTTP client for external API calls
     HttpModule.register({
       timeout: 30000, // 30 seconds
@@ -74,7 +78,7 @@ import { WebhookHandlerService } from '../integrations/common/services/webhook-h
         'User-Agent': 'StokCerdas-Channel-Management/1.0',
       },
     }),
-    
+
     // Database entities
     TypeOrmModule.forFeature([
       // Channel entities
@@ -82,16 +86,21 @@ import { WebhookHandlerService } from '../integrations/common/services/webhook-h
       ChannelConfig,
       ChannelInventory,
       ChannelMapping,
-      
+
       // External entities
       Product,
       InventoryItem,
+      InventoryTransaction,
+      InventoryLocation,
       Order,
-      
+      OrderItem,
+
       // Integration entities
       IntegrationLog,
+      WebhookEvent,
+      SyncStatus,
     ]),
-    
+
     // Bull queue for async channel operations
     BullModule.registerQueue({
       name: 'channel-sync',
@@ -105,61 +114,72 @@ import { WebhookHandlerService } from '../integrations/common/services/webhook-h
         },
       },
     }),
+
+    // Bull queue for integrations (needed by WebhookHandlerService)
+    BullModule.registerQueue({
+      name: 'integrations',
+      defaultJobOptions: {
+        removeOnComplete: 25,
+        removeOnFail: 15,
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 10000,
+        },
+      },
+    }),
   ],
-  
-  controllers: [
-    ChannelsController,
-    ChannelInventoryController,
-  ],
-  
+
+  controllers: [ChannelsController, ChannelInventoryController],
+
   providers: [
     // Core channel services
     ChannelsService,
     ChannelInventoryService,
     ChannelMappingService,
     ChannelSyncService,
-    
+
     // Queue processors
     ChannelSyncProcessor,
-    
+
     // Integration services - Shopee
     ShopeeApiService,
     ShopeeAuthService,
     ShopeeProductService,
     ShopeeOrderService,
     ShopeeInventoryService,
-    
+
     // Integration services - Lazada
     LazadaApiService,
     LazadaAuthService,
     LazadaProductService,
     LazadaOrderService,
     LazadaInventoryService,
-    
+
     // Integration services - Tokopedia
     TokopediaApiService,
     TokopediaAuthService,
     TokopediaProductService,
     TokopediaOrderService,
     TokopediaInventoryService,
-    
+
     // Integration services - WhatsApp
     WhatsAppApiService,
     WhatsAppAuthService,
-    
+
     // Common integration services
     IntegrationLogService,
     RateLimiterService,
     WebhookHandlerService,
   ],
-  
+
   exports: [
     // Export core services for use by other modules
     ChannelsService,
     ChannelInventoryService,
     ChannelMappingService,
     ChannelSyncService,
-    
+
     // Export for integration modules
     IntegrationLogService,
     RateLimiterService,

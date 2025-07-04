@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../../../integrations/common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../../../integrations/common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 
 export interface GojekCredentials {
@@ -150,7 +155,6 @@ export interface GojekPriceEstimateResponse {
 
 @Injectable()
 export class GojekApiService extends BaseApiService {
-  
   constructor(
     protected readonly httpService: HttpService,
     protected readonly configService: ConfigService,
@@ -162,7 +166,7 @@ export class GojekApiService extends BaseApiService {
    * Get Gojek API configuration
    */
   private getApiConfig(credentials: GojekCredentials): ApiConfig {
-    const baseUrl = credentials.isSandbox 
+    const baseUrl = credentials.isSandbox
       ? 'https://api-sandbox.gojek.com'
       : 'https://api.gojek.com';
 
@@ -195,12 +199,12 @@ export class GojekApiService extends BaseApiService {
     channelId: string,
   ): Promise<ApiResponse<T>> {
     const config = this.getApiConfig(credentials);
-    
+
     const gojekRequest: ApiRequest = {
       ...request,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'X-API-Key': credentials.apiKey,
         'X-Merchant-ID': credentials.merchantId,
       },
@@ -211,7 +215,7 @@ export class GojekApiService extends BaseApiService {
       const accessToken = await this.getAccessToken(credentials);
       gojekRequest.headers = {
         ...gojekRequest.headers,
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       };
     }
 
@@ -240,10 +244,10 @@ export class GojekApiService extends BaseApiService {
 
     const config = this.getApiConfig(credentials);
     const response = await this.makeRequest<{ access_token: string }>(
-      config, 
-      tokenRequest, 
-      'system', 
-      'oauth'
+      config,
+      tokenRequest,
+      'system',
+      'oauth',
     );
 
     if (response.success && response.data?.access_token) {
@@ -315,12 +319,7 @@ export class GojekApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeGojekRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGojekRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -381,12 +380,7 @@ export class GojekApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeGojekRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGojekRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -404,12 +398,7 @@ export class GojekApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeGojekRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGojekRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -421,11 +410,13 @@ export class GojekApiService extends BaseApiService {
     reason: string,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    success: boolean;
-    message: string;
-    cancellationFee?: number;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      success: boolean;
+      message: string;
+      cancellationFee?: number;
+    }>
+  > {
     const apiRequest: GojekApiRequest = {
       method: 'POST',
       endpoint: `/delivery/v1/orders/${orderId}/cancel`,
@@ -435,12 +426,7 @@ export class GojekApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeGojekRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGojekRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -450,63 +436,97 @@ export class GojekApiService extends BaseApiService {
     credentials: GojekCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<Array<{
-    serviceType: string;
-    serviceName: string;
-    description: string;
-    isInstant: boolean;
-    maxWeight: number;
-    maxDimensions: {
-      length: number;
-      width: number;
-      height: number;
-    };
-    features: {
-      cod: boolean;
-      insurance: boolean;
-      tracking: boolean;
-      scheduledPickup: boolean;
-    };
-  }>>> {
+  ): Promise<
+    ApiResponse<
+      Array<{
+        serviceType: string;
+        serviceName: string;
+        description: string;
+        isInstant: boolean;
+        maxWeight: number;
+        maxDimensions: {
+          length: number;
+          width: number;
+          height: number;
+        };
+        features: {
+          cod: boolean;
+          insurance: boolean;
+          tracking: boolean;
+          scheduledPickup: boolean;
+        };
+      }>
+    >
+  > {
     const apiRequest: GojekApiRequest = {
       method: 'GET',
       endpoint: '/delivery/v1/services',
       requiresAuth: true,
     };
 
-    return this.makeGojekRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGojekRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
    * Handle API errors specific to Gojek
    */
-  handleGojekError(error: any): { code: string; message: string; retryable: boolean } {
+  handleGojekError(error: any): {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } {
     const errorCode = error.error_code || error.code || error.status;
-    const errorMessage = error.error_description || error.message || 'Unknown Gojek API error';
+    const errorMessage =
+      error.error_description || error.message || 'Unknown Gojek API error';
 
     // Map common Gojek error codes
     const errorMap: Record<string, { message: string; retryable: boolean }> = {
-      'INVALID_TOKEN': { message: 'Invalid or expired access token', retryable: true },
-      'INSUFFICIENT_BALANCE': { message: 'Insufficient merchant balance', retryable: false },
-      'INVALID_LOCATION': { message: 'Invalid pickup or dropoff location', retryable: false },
-      'SERVICE_UNAVAILABLE': { message: 'Delivery service not available in this area', retryable: false },
-      'DRIVER_NOT_FOUND': { message: 'No driver available at this time', retryable: true },
-      'ORDER_NOT_FOUND': { message: 'Order not found', retryable: false },
-      'ORDER_ALREADY_CANCELLED': { message: 'Order already cancelled', retryable: false },
-      'INVALID_PACKAGE_SIZE': { message: 'Package size exceeds limits', retryable: false },
-      'RATE_LIMIT_EXCEEDED': { message: 'API rate limit exceeded', retryable: true },
-      'MERCHANT_SUSPENDED': { message: 'Merchant account suspended', retryable: false },
-      'PAYMENT_FAILED': { message: 'Payment processing failed', retryable: false },
-      'INVALID_COD_AMOUNT': { message: 'Invalid COD amount', retryable: false },
+      INVALID_TOKEN: {
+        message: 'Invalid or expired access token',
+        retryable: true,
+      },
+      INSUFFICIENT_BALANCE: {
+        message: 'Insufficient merchant balance',
+        retryable: false,
+      },
+      INVALID_LOCATION: {
+        message: 'Invalid pickup or dropoff location',
+        retryable: false,
+      },
+      SERVICE_UNAVAILABLE: {
+        message: 'Delivery service not available in this area',
+        retryable: false,
+      },
+      DRIVER_NOT_FOUND: {
+        message: 'No driver available at this time',
+        retryable: true,
+      },
+      ORDER_NOT_FOUND: { message: 'Order not found', retryable: false },
+      ORDER_ALREADY_CANCELLED: {
+        message: 'Order already cancelled',
+        retryable: false,
+      },
+      INVALID_PACKAGE_SIZE: {
+        message: 'Package size exceeds limits',
+        retryable: false,
+      },
+      RATE_LIMIT_EXCEEDED: {
+        message: 'API rate limit exceeded',
+        retryable: true,
+      },
+      MERCHANT_SUSPENDED: {
+        message: 'Merchant account suspended',
+        retryable: false,
+      },
+      PAYMENT_FAILED: {
+        message: 'Payment processing failed',
+        retryable: false,
+      },
+      INVALID_COD_AMOUNT: { message: 'Invalid COD amount', retryable: false },
     };
 
     const mappedError = errorMap[errorCode];
-    
+
     return {
       code: errorCode || 'GOJEK_API_ERROR',
       message: mappedError?.message || errorMessage,
@@ -519,17 +539,17 @@ export class GojekApiService extends BaseApiService {
    */
   mapGojekStatusToTrackingStatus(gojekStatus: string): string {
     const statusMap: Record<string, string> = {
-      'ORDER_CREATED': 'order_confirmed',
-      'DRIVER_ASSIGNED': 'assigned_to_driver',
-      'DRIVER_EN_ROUTE_TO_PICKUP': 'driver_heading_to_pickup',
-      'DRIVER_ARRIVED_AT_PICKUP': 'driver_arrived_pickup',
-      'PACKAGE_PICKED_UP': 'picked_up',
-      'DRIVER_EN_ROUTE_TO_DROPOFF': 'in_transit',
-      'DRIVER_ARRIVED_AT_DROPOFF': 'driver_arrived_dropoff',
-      'PACKAGE_DELIVERED': 'delivered',
-      'ORDER_CANCELLED': 'cancelled',
-      'DELIVERY_FAILED': 'delivery_failed',
-      'RETURNED_TO_SENDER': 'returned_to_sender',
+      ORDER_CREATED: 'order_confirmed',
+      DRIVER_ASSIGNED: 'assigned_to_driver',
+      DRIVER_EN_ROUTE_TO_PICKUP: 'driver_heading_to_pickup',
+      DRIVER_ARRIVED_AT_PICKUP: 'driver_arrived_pickup',
+      PACKAGE_PICKED_UP: 'picked_up',
+      DRIVER_EN_ROUTE_TO_DROPOFF: 'in_transit',
+      DRIVER_ARRIVED_AT_DROPOFF: 'driver_arrived_dropoff',
+      PACKAGE_DELIVERED: 'delivered',
+      ORDER_CANCELLED: 'cancelled',
+      DELIVERY_FAILED: 'delivery_failed',
+      RETURNED_TO_SENDER: 'returned_to_sender',
     };
 
     return statusMap[gojekStatus.toUpperCase()] || 'in_transit';
@@ -543,21 +563,24 @@ export class GojekApiService extends BaseApiService {
       orderId: gojekTrackingData.orderId,
       trackingNumber: gojekTrackingData.trackingNumber,
       status: this.mapGojekStatusToTrackingStatus(gojekTrackingData.status),
-      driverInfo: gojekTrackingData.driverId ? {
-        id: gojekTrackingData.driverId,
-        name: gojekTrackingData.driverName,
-        phone: gojekTrackingData.driverPhone,
-        vehicle: gojekTrackingData.vehicleInfo,
-      } : null,
+      driverInfo: gojekTrackingData.driverId
+        ? {
+            id: gojekTrackingData.driverId,
+            name: gojekTrackingData.driverName,
+            phone: gojekTrackingData.driverPhone,
+            vehicle: gojekTrackingData.vehicleInfo,
+          }
+        : null,
       currentLocation: gojekTrackingData.currentLocation,
       estimatedArrival: gojekTrackingData.estimatedArrival,
-      timeline: gojekTrackingData.timeline?.map((event: any) => ({
-        timestamp: event.timestamp,
-        status: this.mapGojekStatusToTrackingStatus(event.status),
-        description: event.description,
-        location: event.location,
-        driverNotes: event.driverNotes,
-      })) || [],
+      timeline:
+        gojekTrackingData.timeline?.map((event: any) => ({
+          timestamp: event.timestamp,
+          status: this.mapGojekStatusToTrackingStatus(event.status),
+          description: event.description,
+          location: event.location,
+          driverNotes: event.driverNotes,
+        })) || [],
     };
   }
 
@@ -567,7 +590,7 @@ export class GojekApiService extends BaseApiService {
   formatPhoneNumber(phone: string): string {
     // Remove all non-digits
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // Add +62 country code if not present
     if (cleaned.startsWith('62')) {
       return `+${cleaned}`;
@@ -591,19 +614,22 @@ export class GojekApiService extends BaseApiService {
    * Calculate distance between two coordinates (Haversine formula)
    */
   calculateDistance(
-    lat1: number, 
-    lon1: number, 
-    lat2: number, 
-    lon2: number
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
   ): number {
     const R = 6371; // Earth's radius in kilometers
     const dLat = this.toRadians(lat2 - lat1);
     const dLon = this.toRadians(lon2 - lon1);
-    
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(lat1)) *
+        Math.cos(this.toRadians(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
@@ -621,27 +647,24 @@ export class GojekApiService extends BaseApiService {
     longitude: number,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    isServiceable: boolean;
-    availableServices: string[];
-    nearestHub?: {
-      name: string;
-      latitude: number;
-      longitude: number;
-      distance: number;
-    };
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      isServiceable: boolean;
+      availableServices: string[];
+      nearestHub?: {
+        name: string;
+        latitude: number;
+        longitude: number;
+        distance: number;
+      };
+    }>
+  > {
     const apiRequest: GojekApiRequest = {
       method: 'GET',
       endpoint: `/delivery/v1/coverage?latitude=${latitude}&longitude=${longitude}`,
       requiresAuth: true,
     };
 
-    return this.makeGojekRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGojekRequest(credentials, apiRequest, tenantId, channelId);
   }
 }

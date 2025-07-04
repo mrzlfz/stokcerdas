@@ -5,7 +5,10 @@ import { HttpModule } from '@nestjs/axios';
 
 // Entities
 import { AccountingAccount } from '../entities/accounting-account.entity';
-import { Order } from '../../orders/entities/order.entity';
+import { IntegrationLog } from '../entities/integration-log.entity';
+import { SyncStatus } from '../entities/sync-status.entity';
+import { WebhookEvent } from '../entities/webhook-event.entity';
+import { Order, OrderItem } from '../../orders/entities/order.entity';
 // import { Invoice } from '../../invoices/entities/invoice.entity'; // TODO: Create invoice entity
 import { Product } from '../../products/entities/product.entity';
 // import { Customer } from '../../customers/entities/customer.entity'; // TODO: Create customer entity
@@ -23,15 +26,19 @@ import { AccurateProcessor } from './processors/accurate.processor';
 
 // Common Services
 import { IntegrationLogService } from '../common/services/integration-log.service';
-import { WebhookHandlerService } from '../common/services/webhook-handler.service';
 import { RateLimiterService } from '../common/services/rate-limiter.service';
+import { WebhookHandlerService } from '../common/services/webhook-handler.service';
 
 @Module({
   imports: [
     // TypeORM entities
     TypeOrmModule.forFeature([
       AccountingAccount,
+      IntegrationLog,
+      SyncStatus,
+      WebhookEvent,
       Order,
+      OrderItem,
       // Invoice, // TODO: Uncomment when invoice entity is created
       Product,
       // Customer, // TODO: Uncomment when customer entity is created
@@ -44,23 +51,35 @@ import { RateLimiterService } from '../common/services/rate-limiter.service';
     }),
 
     // Bull queue for background jobs
-    BullModule.registerQueue({
-      name: 'accurate',
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
+    BullModule.registerQueue(
+      {
+        name: 'accurate',
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+          removeOnComplete: 100, // Keep last 100 completed jobs
+          removeOnFail: 50, // Keep last 50 failed jobs
         },
-        removeOnComplete: 100, // Keep last 100 completed jobs
-        removeOnFail: 50, // Keep last 50 failed jobs
       },
-    }),
+      {
+        name: 'integrations',
+        defaultJobOptions: {
+          removeOnComplete: 25,
+          removeOnFail: 15,
+          attempts: 5,
+          backoff: {
+            type: 'exponential',
+            delay: 10000,
+          },
+        },
+      },
+    ),
   ],
 
-  controllers: [
-    AccurateController,
-  ],
+  controllers: [AccurateController],
 
   providers: [
     // Core API service
@@ -75,8 +94,8 @@ import { RateLimiterService } from '../common/services/rate-limiter.service';
 
     // Common services (if not provided globally)
     IntegrationLogService,
-    WebhookHandlerService,
     RateLimiterService,
+    WebhookHandlerService,
   ],
 
   exports: [

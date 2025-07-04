@@ -5,12 +5,19 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { MokaApiService, MokaCredentials, MokaSale } from './moka-api.service';
 import { MokaAuthService } from './moka-auth.service';
-import { Order, OrderStatus, PaymentStatus } from '../../../orders/entities/order.entity';
+import {
+  Order,
+  OrderStatus,
+  PaymentStatus,
+} from '../../../orders/entities/order.entity';
 import { OrderItem } from '../../../orders/entities/order.entity';
 import { InventoryItem } from '../../../inventory/entities/inventory-item.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface SalesSyncOptions {
   fromDate?: Date;
@@ -65,8 +72,11 @@ export class MokaSalesService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -101,11 +111,13 @@ export class MokaSalesService {
           );
 
           if (!salesResponse.success || !salesResponse.data) {
-            throw new Error(`Failed to get sales data: ${salesResponse.error?.message}`);
+            throw new Error(
+              `Failed to get sales data: ${salesResponse.error?.message}`,
+            );
           }
 
           const sales = salesResponse.data.data;
-          
+
           // Process sales in this page
           for (const mokaSale of sales) {
             try {
@@ -124,10 +136,13 @@ export class MokaSalesService {
               } else if (result.duplicate) {
                 duplicateCount++;
               }
-
             } catch (error) {
-              this.logger.error(`Failed to import sale ${mokaSale.id}: ${error.message}`);
-              errors.push(`Sale ${mokaSale.receipt_number} (${mokaSale.id}): ${error.message}`);
+              this.logger.error(
+                `Failed to import sale ${mokaSale.id}: ${error.message}`,
+              );
+              errors.push(
+                `Sale ${mokaSale.receipt_number} (${mokaSale.id}): ${error.message}`,
+              );
               errorCount++;
             }
           }
@@ -135,9 +150,11 @@ export class MokaSalesService {
           // Check if there are more pages
           hasMorePages = page < salesResponse.data.pagination.total_pages;
           page++;
-
         } catch (error) {
-          this.logger.error(`Sales batch import failed for page ${page}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Sales batch import failed for page ${page}: ${error.message}`,
+            error.stack,
+          );
           errorCount += limit; // Estimate failed items
           errors.push(`Page ${page} import failed: ${error.message}`);
           break;
@@ -145,19 +162,19 @@ export class MokaSalesService {
       }
 
       const duration = Date.now() - startTime;
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
         'moka_sales_import',
         'completed',
         `Sales import completed: ${importedCount} imported, ${duplicateCount} duplicates, ${errorCount} errors`,
-        { 
-          importedCount, 
-          duplicateCount, 
-          errorCount, 
+        {
+          importedCount,
+          duplicateCount,
+          errorCount,
           inventoryUpdates,
-          duration, 
+          duration,
           totalPages: page - 1,
           dateRange: { fromDate, toDate },
         },
@@ -171,10 +188,9 @@ export class MokaSalesService {
         errors,
         inventoryUpdates,
       };
-
     } catch (error) {
       this.logger.error(`Sales import failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -222,8 +238,11 @@ export class MokaSalesService {
     error?: string;
   }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       // Get sales data for the period
       const salesResponse = await this.mokaApiService.getSales(
         credentials,
@@ -237,11 +256,13 @@ export class MokaSalesService {
       );
 
       if (!salesResponse.success || !salesResponse.data) {
-        throw new Error(`Failed to get sales data: ${salesResponse.error?.message}`);
+        throw new Error(
+          `Failed to get sales data: ${salesResponse.error?.message}`,
+        );
       }
 
       const sales = salesResponse.data.data;
-      
+
       // Calculate report metrics
       const report = this.calculateSalesReport(sales);
 
@@ -249,9 +270,11 @@ export class MokaSalesService {
         success: true,
         data: report,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate sales report: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate sales report: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -276,7 +299,10 @@ export class MokaSalesService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       // Get sales data
       const salesResponse = await this.mokaApiService.getSales(
@@ -291,13 +317,19 @@ export class MokaSalesService {
       );
 
       if (!salesResponse.success || !salesResponse.data) {
-        throw new Error(`Failed to get sales data: ${salesResponse.error?.message}`);
+        throw new Error(
+          `Failed to get sales data: ${salesResponse.error?.message}`,
+        );
       }
 
       // Process each sale for inventory deduction
       for (const sale of salesResponse.data.data) {
         try {
-          const deducted = await this.processInventoryDeduction(tenantId, channelId, sale);
+          const deducted = await this.processInventoryDeduction(
+            tenantId,
+            channelId,
+            sale,
+          );
           if (deducted) {
             updatedCount++;
           }
@@ -324,9 +356,11 @@ export class MokaSalesService {
         updatedCount,
         errors,
       };
-
     } catch (error) {
-      this.logger.error(`Inventory deduction sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Inventory deduction sync failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         updatedCount,
@@ -366,20 +400,38 @@ export class MokaSalesService {
     }
 
     // Create order from Moka sale
-    const order = await this.createOrderFromMokaSale(tenantId, channelId, mokaSale);
+    const order = await this.createOrderFromMokaSale(
+      tenantId,
+      channelId,
+      mokaSale,
+    );
     await this.orderRepository.save(order);
 
     // Create order items
-    const orderItems = await this.createOrderItemsFromMokaSale(tenantId, order.id, mokaSale);
+    const orderItems = await this.createOrderItemsFromMokaSale(
+      tenantId,
+      order.id,
+      mokaSale,
+    );
     await this.orderItemRepository.save(orderItems);
 
     // Create mapping
-    await this.saveSaleMapping(tenantId, channelId, order.id, mokaSale.id, mokaSale);
+    await this.saveSaleMapping(
+      tenantId,
+      channelId,
+      order.id,
+      mokaSale.id,
+      mokaSale,
+    );
 
     // Process inventory deduction if enabled
     let inventoryUpdated = false;
     if (options.syncInventoryDeduction && mokaSale.status === 'completed') {
-      inventoryUpdated = await this.processInventoryDeduction(tenantId, channelId, mokaSale);
+      inventoryUpdated = await this.processInventoryDeduction(
+        tenantId,
+        channelId,
+        mokaSale,
+      );
     }
 
     // Emit event
@@ -419,13 +471,13 @@ export class MokaSalesService {
       paymentStatus: PaymentStatus.PAID, // POS sales are always paid
       createdAt: this.mokaApiService.parseDateTime(mokaSale.sale_date),
       orderDate: this.mokaApiService.parseDateTime(mokaSale.sale_date),
-      
+
       // Customer information
       customerName: mokaSale.customer_name,
       customerInfo: {
         id: mokaSale.customer_id,
       },
-      
+
       // Staff information
       channelMetadata: {
         moka: {
@@ -469,7 +521,7 @@ export class MokaSalesService {
         totalPrice: item.total_price,
         discountAmount: item.discount_amount,
         taxAmount: item.tax_amount,
-        
+
         // Store Moka-specific data
         externalProductId: item.product_id,
         externalVariantId: item.variant_id,
@@ -507,7 +559,9 @@ export class MokaSalesService {
         });
 
         if (!productMapping) {
-          this.logger.warn(`Product mapping not found for Moka product ${item.product_id}`);
+          this.logger.warn(
+            `Product mapping not found for Moka product ${item.product_id}`,
+          );
           continue;
         }
 
@@ -521,13 +575,17 @@ export class MokaSalesService {
         });
 
         if (!inventoryItem) {
-          this.logger.warn(`Inventory item not found for product ${productMapping.internalId}`);
+          this.logger.warn(
+            `Inventory item not found for product ${productMapping.internalId}`,
+          );
           continue;
         }
 
         // Deduct quantity
         inventoryItem.quantityOnHand -= item.quantity;
-        inventoryItem.lastMovementAt = this.mokaApiService.parseDateTime(mokaSale.sale_date);
+        inventoryItem.lastMovementAt = this.mokaApiService.parseDateTime(
+          mokaSale.sale_date,
+        );
 
         await this.inventoryRepository.save(inventoryItem);
         hasUpdates = true;
@@ -541,9 +599,10 @@ export class MokaSalesService {
           orderId: mokaSale.id,
           receiptNumber: mokaSale.receipt_number,
         });
-
       } catch (error) {
-        this.logger.error(`Failed to deduct inventory for item ${item.product_id}: ${error.message}`);
+        this.logger.error(
+          `Failed to deduct inventory for item ${item.product_id}: ${error.message}`,
+        );
       }
     }
 
@@ -572,9 +631,9 @@ export class MokaSalesService {
 
   private mapMokaSaleStatus(mokaStatus: string): OrderStatus {
     const statusMap: Record<string, OrderStatus> = {
-      'completed': OrderStatus.DELIVERED, // Sale is complete
-      'cancelled': OrderStatus.CANCELLED,
-      'pending': OrderStatus.PENDING,
+      completed: OrderStatus.DELIVERED, // Sale is complete
+      cancelled: OrderStatus.CANCELLED,
+      pending: OrderStatus.PENDING,
     };
 
     return statusMap[mokaStatus] || OrderStatus.PENDING;
@@ -586,7 +645,10 @@ export class MokaSalesService {
       totalAmount: 0,
       totalTax: 0,
       totalDiscount: 0,
-      salesByPaymentMethod: {} as Record<string, { count: number; amount: number }>,
+      salesByPaymentMethod: {} as Record<
+        string,
+        { count: number; amount: number }
+      >,
       salesByHour: {} as Record<string, { count: number; amount: number }>,
       topProducts: [] as Array<{
         productId: string;
@@ -596,7 +658,10 @@ export class MokaSalesService {
       }>,
     };
 
-    const productStats: Record<string, { name: string; quantity: number; revenue: number }> = {};
+    const productStats: Record<
+      string,
+      { name: string; quantity: number; revenue: number }
+    > = {};
 
     for (const sale of sales) {
       // Aggregate totals
@@ -606,13 +671,20 @@ export class MokaSalesService {
 
       // Group by payment method
       if (!report.salesByPaymentMethod[sale.payment_method]) {
-        report.salesByPaymentMethod[sale.payment_method] = { count: 0, amount: 0 };
+        report.salesByPaymentMethod[sale.payment_method] = {
+          count: 0,
+          amount: 0,
+        };
       }
       report.salesByPaymentMethod[sale.payment_method].count++;
-      report.salesByPaymentMethod[sale.payment_method].amount += sale.total_amount;
+      report.salesByPaymentMethod[sale.payment_method].amount +=
+        sale.total_amount;
 
       // Group by hour
-      const hour = new Date(sale.sale_date).getHours().toString().padStart(2, '0');
+      const hour = new Date(sale.sale_date)
+        .getHours()
+        .toString()
+        .padStart(2, '0');
       if (!report.salesByHour[hour]) {
         report.salesByHour[hour] = { count: 0, amount: 0 };
       }

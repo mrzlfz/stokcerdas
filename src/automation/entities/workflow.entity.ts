@@ -1,4 +1,11 @@
-import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { AuditableEntity } from '../../common/entities/base.entity';
 import { WorkflowStep } from './workflow-step.entity';
 import { WorkflowExecution } from './workflow-execution.entity';
@@ -53,16 +60,29 @@ export class Workflow extends AuditableEntity {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ type: 'enum', enum: WorkflowCategory, default: WorkflowCategory.CUSTOM })
+  @Column({
+    type: 'enum',
+    enum: WorkflowCategory,
+    default: WorkflowCategory.CUSTOM,
+  })
   category: WorkflowCategory;
 
   @Column({ type: 'enum', enum: WorkflowStatus, default: WorkflowStatus.DRAFT })
   status: WorkflowStatus;
 
-  @Column({ type: 'enum', enum: WorkflowTriggerType, default: WorkflowTriggerType.MANUAL })
+  @Column({
+    name: 'triggerType', // Explicitly specify column name to match migration
+    type: 'enum',
+    enum: WorkflowTriggerType,
+    default: WorkflowTriggerType.MANUAL,
+  })
   triggerType: WorkflowTriggerType;
 
-  @Column({ type: 'enum', enum: WorkflowPriority, default: WorkflowPriority.NORMAL })
+  @Column({
+    type: 'enum',
+    enum: WorkflowPriority,
+    default: WorkflowPriority.NORMAL,
+  })
   priority: WorkflowPriority;
 
   // Trigger Configuration
@@ -73,11 +93,11 @@ export class Workflow extends AuditableEntity {
     timezone?: string;
     startDate?: string;
     endDate?: string;
-    
+
     // For event-based triggers
     eventType?: string;
     eventFilters?: Record<string, any>;
-    
+
     // For condition-based triggers
     conditions?: Array<{
       field: string;
@@ -85,17 +105,17 @@ export class Workflow extends AuditableEntity {
       value: any;
       logicalOperator?: 'AND' | 'OR';
     }>;
-    
+
     // For webhook triggers
     webhookUrl?: string;
     webhookSecret?: string;
     webhookHeaders?: Record<string, string>;
-    
+
     // For API triggers
     apiEndpoint?: string;
     apiMethod?: string;
     apiParameters?: Record<string, any>;
-    
+
     // Common trigger settings
     retryOnFailure?: boolean;
     maxRetries?: number;
@@ -110,21 +130,21 @@ export class Workflow extends AuditableEntity {
     allowConcurrentExecution?: boolean;
     maxConcurrentExecutions?: number;
     executionTimeout?: number;
-    
+
     // Error handling
     onErrorAction?: 'stop' | 'continue' | 'retry' | 'skip';
     maxErrorRetries?: number;
     errorNotification?: boolean;
-    
+
     // Dependencies
     dependsOnWorkflows?: string[];
     blockingWorkflows?: string[];
-    
+
     // Resource constraints
     resourceGroup?: string;
     maxMemoryUsage?: number;
     maxCpuUsage?: number;
-    
+
     // Data settings
     inputSchema?: Record<string, any>;
     outputSchema?: Record<string, any>;
@@ -142,11 +162,11 @@ export class Workflow extends AuditableEntity {
     sendOnSuccess?: boolean;
     sendOnFailure?: boolean;
     sendOnTimeout?: boolean;
-    
+
     emailRecipients?: string[];
     slackChannels?: string[];
     webhookUrls?: string[];
-    
+
     customTemplates?: {
       startTemplate?: string;
       successTemplate?: string;
@@ -157,13 +177,16 @@ export class Workflow extends AuditableEntity {
 
   // Workflow Variables and Constants
   @Column({ type: 'jsonb', nullable: true })
-  variables?: Record<string, {
-    type: 'string' | 'number' | 'boolean' | 'object' | 'array';
-    value: any;
-    description?: string;
-    required?: boolean;
-    validation?: Record<string, any>;
-  }>;
+  variables?: Record<
+    string,
+    {
+      type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+      value: any;
+      description?: string;
+      required?: boolean;
+      validation?: Record<string, any>;
+    }
+  >;
 
   // Tags and Metadata
   @Column({ type: 'jsonb', nullable: true })
@@ -268,10 +291,10 @@ export class Workflow extends AuditableEntity {
   estimatedCostPerExecution: number; // in IDR
 
   // Relationships
-  @OneToMany(() => WorkflowStep, (step) => step.workflow, { cascade: true })
+  @OneToMany(() => WorkflowStep, step => step.workflow, { cascade: true })
   steps: WorkflowStep[];
 
-  @OneToMany(() => WorkflowExecution, (execution) => execution.workflow)
+  @OneToMany(() => WorkflowExecution, execution => execution.workflow)
   executions: WorkflowExecution[];
 
   @ManyToOne(() => User, { nullable: true })
@@ -288,22 +311,26 @@ export class Workflow extends AuditableEntity {
 
   // Business Logic Methods
   canExecute(): boolean {
-    return this.isActive && 
-           !this.isPaused && 
-           this.status === WorkflowStatus.ACTIVE &&
-           (this.pausedUntil === null || this.pausedUntil < new Date()) &&
-           this.consecutiveFailures < 5; // Max 5 consecutive failures
+    return (
+      this.isActive &&
+      !this.isPaused &&
+      this.status === WorkflowStatus.ACTIVE &&
+      (this.pausedUntil === null || this.pausedUntil < new Date()) &&
+      this.consecutiveFailures < 5
+    ); // Max 5 consecutive failures
   }
 
   shouldExecuteNow(): boolean {
     if (!this.canExecute()) return false;
-    
+
     if (this.triggerType === WorkflowTriggerType.MANUAL) return false;
-    
+
     if (this.triggerType === WorkflowTriggerType.SCHEDULED) {
-      return this.nextExecutionAt !== null && this.nextExecutionAt <= new Date();
+      return (
+        this.nextExecutionAt !== null && this.nextExecutionAt <= new Date()
+      );
     }
-    
+
     return true;
   }
 
@@ -311,7 +338,7 @@ export class Workflow extends AuditableEntity {
     this.totalExecutions += 1;
     this.lastExecutionAt = new Date();
     this.lastExecutionDuration = duration;
-    
+
     if (success) {
       this.successfulExecutions += 1;
       this.consecutiveFailures = 0;
@@ -323,21 +350,25 @@ export class Workflow extends AuditableEntity {
       this.lastErrorMessage = error;
       this.lastErrorAt = new Date();
     }
-    
+
     // Update success rate
-    this.successRate = this.totalExecutions > 0 ? 
-      (this.successfulExecutions / this.totalExecutions) : 0;
-    
+    this.successRate =
+      this.totalExecutions > 0
+        ? this.successfulExecutions / this.totalExecutions
+        : 0;
+
     // Update average execution time
     this.totalProcessingTime += duration / 1000; // convert to seconds
-    this.averageExecutionTime = this.totalExecutions > 0 ? 
-      this.totalProcessingTime / this.totalExecutions : 0;
+    this.averageExecutionTime =
+      this.totalExecutions > 0
+        ? this.totalProcessingTime / this.totalExecutions
+        : 0;
   }
 
   calculateNextExecution(): Date | null {
     if (this.triggerType !== WorkflowTriggerType.SCHEDULED) return null;
     if (!this.triggerConfig?.cronExpression) return null;
-    
+
     // This would use a cron parser library to calculate next execution
     // For now, return a simple calculation
     const now = new Date();
@@ -367,31 +398,33 @@ export class Workflow extends AuditableEntity {
 
   validateConfiguration(): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
+
     // Validate basic required fields
     if (!this.name || this.name.trim().length === 0) {
       errors.push('Nama workflow tidak boleh kosong');
     }
-    
+
     // Validate trigger configuration
     if (this.triggerType === WorkflowTriggerType.SCHEDULED) {
       if (!this.triggerConfig?.cronExpression) {
         errors.push('Cron expression diperlukan untuk scheduled trigger');
       }
     }
-    
+
     // Validate steps exist
     if (!this.steps || this.steps.length === 0) {
       errors.push('Workflow harus memiliki minimal satu step');
     }
-    
+
     // Validate concurrent execution settings
-    if (this.workflowConfig?.allowConcurrentExecution && 
-        this.workflowConfig?.maxConcurrentExecutions &&
-        this.workflowConfig.maxConcurrentExecutions <= 0) {
+    if (
+      this.workflowConfig?.allowConcurrentExecution &&
+      this.workflowConfig?.maxConcurrentExecutions &&
+      this.workflowConfig.maxConcurrentExecutions <= 0
+    ) {
       errors.push('Max concurrent executions harus lebih dari 0');
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,
@@ -403,7 +436,7 @@ export class Workflow extends AuditableEntity {
     const baseStepCost = 100; // IDR per step
     const stepCount = this.steps?.length || 0;
     const complexityMultiplier = this.priority / 5; // Higher priority = higher cost
-    
+
     return baseStepCost * stepCount * complexityMultiplier;
   }
 

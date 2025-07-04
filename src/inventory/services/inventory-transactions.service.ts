@@ -1,15 +1,25 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 
-import { 
-  InventoryTransaction, 
-  TransactionType, 
-  TransactionStatus 
+import {
+  InventoryTransaction,
+  TransactionType,
+  TransactionStatus,
 } from '../entities/inventory-transaction.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
-import { InventoryTransactionQueryDto, SortOrder } from '../dto/inventory-query.dto';
-import { StockAdjustmentDto, AdjustmentReason } from '../dto/stock-adjustment.dto';
+import {
+  InventoryTransactionQueryDto,
+  SortOrder,
+} from '../dto/inventory-query.dto';
+import {
+  StockAdjustmentDto,
+  AdjustmentReason,
+} from '../dto/stock-adjustment.dto';
 import {
   CreateInventoryTransferDto,
   UpdateTransferStatusDto,
@@ -60,20 +70,29 @@ export class InventoryTransactionsService {
       .leftJoinAndSelect('transaction.location', 'location')
       .leftJoinAndSelect('transaction.inventoryItem', 'inventoryItem')
       .leftJoinAndSelect('transaction.sourceLocation', 'sourceLocation')
-      .leftJoinAndSelect('transaction.destinationLocation', 'destinationLocation')
+      .leftJoinAndSelect(
+        'transaction.destinationLocation',
+        'destinationLocation',
+      )
       .where('transaction.tenantId = :tenantId', { tenantId });
 
     // Apply filters
     if (locationId) {
-      queryBuilder.andWhere('transaction.locationId = :locationId', { locationId });
+      queryBuilder.andWhere('transaction.locationId = :locationId', {
+        locationId,
+      });
     }
 
     if (productId) {
-      queryBuilder.andWhere('transaction.productId = :productId', { productId });
+      queryBuilder.andWhere('transaction.productId = :productId', {
+        productId,
+      });
     }
 
     if (transactionType) {
-      queryBuilder.andWhere('transaction.type = :transactionType', { transactionType });
+      queryBuilder.andWhere('transaction.type = :transactionType', {
+        transactionType,
+      });
     }
 
     if (status) {
@@ -81,24 +100,36 @@ export class InventoryTransactionsService {
     }
 
     if (startDate && endDate) {
-      queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+      queryBuilder.andWhere(
+        'transaction.transactionDate BETWEEN :startDate AND :endDate',
+        {
+          startDate,
+          endDate,
+        },
+      );
+    } else if (startDate) {
+      queryBuilder.andWhere('transaction.transactionDate >= :startDate', {
         startDate,
+      });
+    } else if (endDate) {
+      queryBuilder.andWhere('transaction.transactionDate <= :endDate', {
         endDate,
       });
-    } else if (startDate) {
-      queryBuilder.andWhere('transaction.transactionDate >= :startDate', { startDate });
-    } else if (endDate) {
-      queryBuilder.andWhere('transaction.transactionDate <= :endDate', { endDate });
     }
 
     if (referenceNumber) {
-      queryBuilder.andWhere('transaction.referenceNumber ILIKE :referenceNumber', {
-        referenceNumber: `%${referenceNumber}%`,
-      });
+      queryBuilder.andWhere(
+        'transaction.referenceNumber ILIKE :referenceNumber',
+        {
+          referenceNumber: `%${referenceNumber}%`,
+        },
+      );
     }
 
     if (referenceType) {
-      queryBuilder.andWhere('transaction.referenceType = :referenceType', { referenceType });
+      queryBuilder.andWhere('transaction.referenceType = :referenceType', {
+        referenceType,
+      });
     }
 
     // Count total before pagination
@@ -142,10 +173,10 @@ export class InventoryTransactionsService {
     const transaction = await this.transactionRepository.findOne({
       where: { id, tenantId },
       relations: [
-        'product', 
-        'location', 
-        'inventoryItem', 
-        'sourceLocation', 
+        'product',
+        'location',
+        'inventoryItem',
+        'sourceLocation',
         'destinationLocation',
         'relatedTransaction',
       ],
@@ -204,7 +235,10 @@ export class InventoryTransactionsService {
     userId: string,
     adjustmentDto: StockAdjustmentDto,
   ): Promise<InventoryTransaction> {
-    const transactionType = quantityChange > 0 ? TransactionType.ADJUSTMENT_POSITIVE : TransactionType.ADJUSTMENT_NEGATIVE;
+    const transactionType =
+      quantityChange > 0
+        ? TransactionType.ADJUSTMENT_POSITIVE
+        : TransactionType.ADJUSTMENT_NEGATIVE;
 
     const transaction = this.transactionRepository.create({
       tenantId,
@@ -217,7 +251,9 @@ export class InventoryTransactionsService {
       quantityBefore,
       quantityAfter,
       unitCost: adjustmentDto.unitCost,
-      totalCost: adjustmentDto.unitCost ? Math.abs(quantityChange) * adjustmentDto.unitCost : undefined,
+      totalCost: adjustmentDto.unitCost
+        ? Math.abs(quantityChange) * adjustmentDto.unitCost
+        : undefined,
       reason: this.mapAdjustmentReasonToString(reason),
       notes,
       referenceType: adjustmentDto.referenceType,
@@ -316,23 +352,26 @@ export class InventoryTransactionsService {
     const inTransactions: InventoryTransaction[] = [];
 
     for (const item of transferDto.items) {
-      const [outTransaction, inTransaction] = InventoryTransaction.createTransferPair(
-        item.productId,
-        item.quantity,
-        transferDto.sourceLocationId,
-        transferDto.destinationLocationId,
-        tenantId,
-        userId,
-        this.mapTransferReasonToString(transferDto.reason),
-        transferDto.referenceType,
-        transferDto.referenceId,
-      );
+      const [outTransaction, inTransaction] =
+        InventoryTransaction.createTransferPair(
+          item.productId,
+          item.quantity,
+          transferDto.sourceLocationId,
+          transferDto.destinationLocationId,
+          tenantId,
+          userId,
+          this.mapTransferReasonToString(transferDto.reason),
+          transferDto.referenceType,
+          transferDto.referenceId,
+        );
 
       // Set additional properties
       outTransaction.referenceNumber = transferDto.referenceNumber;
       outTransaction.notes = transferDto.notes;
       outTransaction.unitCost = item.unitCost;
-      outTransaction.totalCost = item.unitCost ? item.quantity * item.unitCost : undefined;
+      outTransaction.totalCost = item.unitCost
+        ? item.quantity * item.unitCost
+        : undefined;
       outTransaction.batchNumber = item.batchNumber;
       outTransaction.lotNumber = item.lotNumber;
       outTransaction.serialNumber = item.serialNumber;
@@ -346,7 +385,9 @@ export class InventoryTransactionsService {
       inTransaction.referenceNumber = transferDto.referenceNumber;
       inTransaction.notes = transferDto.notes;
       inTransaction.unitCost = item.unitCost;
-      inTransaction.totalCost = item.unitCost ? item.quantity * item.unitCost : undefined;
+      inTransaction.totalCost = item.unitCost
+        ? item.quantity * item.unitCost
+        : undefined;
       inTransaction.batchNumber = item.batchNumber;
       inTransaction.lotNumber = item.lotNumber;
       inTransaction.serialNumber = item.serialNumber;
@@ -358,10 +399,14 @@ export class InventoryTransactionsService {
       };
 
       // Link transactions
-      const savedOutTransaction = await this.transactionRepository.save(outTransaction);
+      const savedOutTransaction = await this.transactionRepository.save(
+        outTransaction,
+      );
       inTransaction.relatedTransactionId = savedOutTransaction.id;
-      const savedInTransaction = await this.transactionRepository.save(inTransaction);
-      
+      const savedInTransaction = await this.transactionRepository.save(
+        inTransaction,
+      );
+
       savedOutTransaction.relatedTransactionId = savedInTransaction.id;
       await this.transactionRepository.save(savedOutTransaction);
 
@@ -399,21 +444,27 @@ export class InventoryTransactionsService {
     if (updateStatusDto.status === TransferStatus.COMPLETED) {
       transaction.processedAt = new Date();
       transaction.processedBy = userId;
-    } else if (updateStatusDto.status === TransferStatus.CANCELLED || updateStatusDto.status === TransferStatus.REJECTED) {
+    } else if (
+      updateStatusDto.status === TransferStatus.CANCELLED ||
+      updateStatusDto.status === TransferStatus.REJECTED
+    ) {
       transaction.cancelledAt = new Date();
       transaction.cancelledBy = userId;
       transaction.cancellationReason = updateStatusDto.notes;
     }
 
     if (updateStatusDto.notes) {
-      transaction.notes = transaction.notes 
+      transaction.notes = transaction.notes
         ? `${transaction.notes}
 [${new Date().toISOString()}] ${updateStatusDto.notes}`
         : updateStatusDto.notes;
     }
 
     if (updateStatusDto.metadata) {
-      transaction.metadata = { ...transaction.metadata, ...updateStatusDto.metadata };
+      transaction.metadata = {
+        ...transaction.metadata,
+        ...updateStatusDto.metadata,
+      };
     }
 
     return await this.transactionRepository.save(transaction);
@@ -455,7 +506,7 @@ export class InventoryTransactionsService {
 
     for (const receivedItem of receiptDto.receivedItems) {
       const transaction = incomingTransactions.find(
-        tx => tx.productId === receivedItem.productId
+        tx => tx.productId === receivedItem.productId,
       );
 
       if (!transaction) {
@@ -483,9 +534,12 @@ export class InventoryTransactionsService {
       transaction.processedBy = userId;
       transaction.notes = receivedItem.notes || transaction.notes;
 
-      if (receivedItem.batchNumber) transaction.batchNumber = receivedItem.batchNumber;
-      if (receivedItem.lotNumber) transaction.lotNumber = receivedItem.lotNumber;
-      if (receivedItem.serialNumber) transaction.serialNumber = receivedItem.serialNumber;
+      if (receivedItem.batchNumber)
+        transaction.batchNumber = receivedItem.batchNumber;
+      if (receivedItem.lotNumber)
+        transaction.lotNumber = receivedItem.lotNumber;
+      if (receivedItem.serialNumber)
+        transaction.serialNumber = receivedItem.serialNumber;
 
       transaction.metadata = {
         ...transaction.metadata,
@@ -494,7 +548,9 @@ export class InventoryTransactionsService {
         receiptNotes: receiptDto.notes,
       };
 
-      const savedTransaction = await this.transactionRepository.save(transaction);
+      const savedTransaction = await this.transactionRepository.save(
+        transaction,
+      );
       processedTransactions.push(savedTransaction);
 
       // Create damage transaction if any
@@ -562,14 +618,19 @@ export class InventoryTransactionsService {
       .where('transaction.tenantId = :tenantId', { tenantId });
 
     if (startDate && endDate) {
-      queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
-      });
+      queryBuilder.andWhere(
+        'transaction.transactionDate BETWEEN :startDate AND :endDate',
+        {
+          startDate,
+          endDate,
+        },
+      );
     }
 
     if (locationId) {
-      queryBuilder.andWhere('transaction.locationId = :locationId', { locationId });
+      queryBuilder.andWhere('transaction.locationId = :locationId', {
+        locationId,
+      });
     }
 
     const [
@@ -607,18 +668,22 @@ export class InventoryTransactionsService {
     }, {});
 
     // Daily transactions (last 30 days if no date range specified)
-    const dailyStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dailyStartDate =
+      startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const dailyEndDate = endDate || new Date();
 
     const dailyTransactions = await queryBuilder
-      .select("DATE(transaction.transactionDate)", 'date')
+      .select('DATE(transaction.transactionDate)', 'date')
       .addSelect('COUNT(*)', 'count')
       .addSelect('SUM(COALESCE(transaction.totalCost, 0))', 'value')
       .where('transaction.tenantId = :tenantId', { tenantId })
-      .andWhere('transaction.transactionDate BETWEEN :dailyStartDate AND :dailyEndDate', {
-        dailyStartDate,
-        dailyEndDate,
-      })
+      .andWhere(
+        'transaction.transactionDate BETWEEN :dailyStartDate AND :dailyEndDate',
+        {
+          dailyStartDate,
+          dailyEndDate,
+        },
+      )
       .groupBy('DATE(transaction.transactionDate)')
       .orderBy('DATE(transaction.transactionDate)', 'ASC')
       .getRawMany();
@@ -658,16 +723,16 @@ export class InventoryTransactionsService {
 
   private mapTransferReasonToString(reason: any): string {
     const reasonMap = {
-      'restock': 'Restocking',
-      'customer_order': 'Pesanan customer',
-      'damaged_goods': 'Barang rusak',
-      'expired_goods': 'Barang kadaluarsa',
-      'branch_request': 'Permintaan cabang',
-      'consolidation': 'Konsolidasi',
-      'emergency': 'Emergency',
-      'seasonal_adjustment': 'Penyesuaian musiman',
-      'overflow': 'Overflow',
-      'other': 'Lainnya',
+      restock: 'Restocking',
+      customer_order: 'Pesanan customer',
+      damaged_goods: 'Barang rusak',
+      expired_goods: 'Barang kadaluarsa',
+      branch_request: 'Permintaan cabang',
+      consolidation: 'Konsolidasi',
+      emergency: 'Emergency',
+      seasonal_adjustment: 'Penyesuaian musiman',
+      overflow: 'Overflow',
+      other: 'Lainnya',
     };
 
     return reasonMap[reason] || reason;

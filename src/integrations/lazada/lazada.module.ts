@@ -115,10 +115,7 @@ import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
     LazadaProcessor,
   ],
 
-  controllers: [
-    LazadaController,
-    LazadaWebhookController,
-  ],
+  controllers: [LazadaController, LazadaWebhookController],
 
   exports: [
     // Export services for use in other modules

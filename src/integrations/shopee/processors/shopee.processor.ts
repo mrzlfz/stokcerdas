@@ -1,9 +1,18 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { ShopeeWebhookService, ShopeeWebhookPayload } from '../services/shopee-webhook.service';
+import {
+  ShopeeWebhookService,
+  ShopeeWebhookPayload,
+} from '../services/shopee-webhook.service';
 import { ShopeeProductService } from '../services/shopee-product.service';
 import { ShopeeOrderService } from '../services/shopee-order.service';
 import { ShopeeInventoryService } from '../services/shopee-inventory.service';
@@ -81,15 +90,18 @@ export class ShopeeProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`Shopee job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `Shopee job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -97,8 +109,9 @@ export class ShopeeProcessor {
    */
   @Process('process-webhook')
   async processWebhook(job: Job<ShopeeWebhookJobData>) {
-    const { webhookId, tenantId, channelId, eventType, eventSource, isRetry } = job.data;
-    
+    const { webhookId, tenantId, channelId, eventType, eventSource, isRetry } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Shopee webhook: ${eventType}`, {
         webhookId,
@@ -109,8 +122,10 @@ export class ShopeeProcessor {
       });
 
       // Mark webhook as processing
-      const webhook = await this.webhookHandler.markWebhookAsProcessing(webhookId);
-      
+      const webhook = await this.webhookHandler.markWebhookAsProcessing(
+        webhookId,
+      );
+
       // Get webhook payload
       const payload = webhook.payload;
 
@@ -156,9 +171,11 @@ export class ShopeeProcessor {
 
         throw new Error(result.error || 'Webhook processing failed');
       }
-
     } catch (error) {
-      this.logger.error(`Webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Mark webhook as failed
       await this.webhookHandler.markWebhookAsFailed(
@@ -186,8 +203,9 @@ export class ShopeeProcessor {
    */
   @Process('product-sync')
   async processProductSync(job: Job<ShopeeProductSyncJobData>) {
-    const { tenantId, channelId, productId, itemId, syncDirection, options } = job.data;
-    
+    const { tenantId, channelId, productId, itemId, syncDirection, options } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Shopee product sync: ${syncDirection}`, {
         tenantId,
@@ -203,17 +221,20 @@ export class ShopeeProcessor {
         // Sync from Shopee to local system
         if (itemId) {
           // Sync specific product
-          const productDetails = await this.productService.getShopeeProductDetails(
-            tenantId,
-            channelId,
-            itemId,
-          );
+          const productDetails =
+            await this.productService.getShopeeProductDetails(
+              tenantId,
+              channelId,
+              itemId,
+            );
 
           if (productDetails.success) {
             // Process the product data
             result = { success: true, itemId, data: productDetails.data };
           } else {
-            throw new Error(`Failed to get product details: ${productDetails.error}`);
+            throw new Error(
+              `Failed to get product details: ${productDetails.error}`,
+            );
           }
         } else {
           // Sync all products
@@ -257,7 +278,6 @@ export class ShopeeProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Product sync failed: ${error.message}`, error.stack);
 
@@ -280,8 +300,9 @@ export class ShopeeProcessor {
    */
   @Process('order-sync')
   async processOrderSync(job: Job<ShopeeOrderSyncJobData>) {
-    const { tenantId, channelId, orderId, orderSn, syncDirection, options } = job.data;
-    
+    const { tenantId, channelId, orderId, orderSn, syncDirection, options } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Shopee order sync: ${syncDirection}`, {
         tenantId,
@@ -306,7 +327,9 @@ export class ShopeeProcessor {
           if (orderDetails.success) {
             result = { success: true, orderSn, data: orderDetails.data };
           } else {
-            throw new Error(`Failed to get order details: ${orderDetails.error}`);
+            throw new Error(
+              `Failed to get order details: ${orderDetails.error}`,
+            );
           }
         } else {
           // Sync all orders
@@ -323,7 +346,10 @@ export class ShopeeProcessor {
         }
 
         // This would typically involve updating order status in Shopee
-        result = { success: true, message: 'Outbound order sync not implemented yet' };
+        result = {
+          success: true,
+          message: 'Outbound order sync not implemented yet',
+        };
       }
 
       // Log success
@@ -347,7 +373,6 @@ export class ShopeeProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Order sync failed: ${error.message}`, error.stack);
 
@@ -370,8 +395,9 @@ export class ShopeeProcessor {
    */
   @Process('inventory-sync')
   async processInventorySync(job: Job<ShopeeInventorySyncJobData>) {
-    const { tenantId, channelId, productId, itemId, syncType, updates } = job.data;
-    
+    const { tenantId, channelId, productId, itemId, syncType, updates } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Shopee inventory sync: ${syncType}`, {
         tenantId,
@@ -470,7 +496,6 @@ export class ShopeeProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Inventory sync failed: ${error.message}`, error.stack);
 
@@ -492,15 +517,17 @@ export class ShopeeProcessor {
    * Process batch sync jobs
    */
   @Process('batch-sync')
-  async processBatchSync(job: Job<{
-    tenantId: string;
-    channelId: string;
-    syncType: 'products' | 'orders' | 'inventory';
-    batchData: any[];
-    options?: any;
-  }>) {
+  async processBatchSync(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+      syncType: 'products' | 'orders' | 'inventory';
+      batchData: any[];
+      options?: any;
+    }>,
+  ) {
     const { tenantId, channelId, syncType, batchData, options } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Shopee batch sync: ${syncType}`, {
         tenantId,
@@ -548,17 +575,16 @@ export class ShopeeProcessor {
 
           results.push({ item, result, success: true });
           successCount++;
-
         } catch (error) {
           this.logger.error(`Batch item sync failed: ${error.message}`, {
             item,
             error: error.message,
           });
 
-          results.push({ 
-            item, 
-            error: error.message, 
-            success: false 
+          results.push({
+            item,
+            error: error.message,
+            success: false,
           });
           errorCount++;
         }
@@ -591,7 +617,6 @@ export class ShopeeProcessor {
       });
 
       return batchResult;
-
     } catch (error) {
       this.logger.error(`Batch sync failed: ${error.message}`, error.stack);
 

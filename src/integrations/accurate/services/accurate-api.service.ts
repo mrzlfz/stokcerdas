@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 import { AccountingAccount } from '../../entities/accounting-account.entity';
 
@@ -199,7 +204,7 @@ export interface AccurateAccount {
 @Injectable()
 export class AccurateApiService extends BaseApiService {
   protected readonly logger = new Logger(AccurateApiService.name);
-  
+
   constructor(
     protected readonly httpService: HttpService,
     protected readonly configService: ConfigService,
@@ -240,14 +245,14 @@ export class AccurateApiService extends BaseApiService {
     channelId: string,
   ): Promise<ApiResponse<T>> {
     const config = this.getApiConfig(credentials);
-    
+
     const accurateRequest: ApiRequest = {
       ...request,
       headers: {
         'X-Session-ID': credentials.sessionId,
         'X-Database-ID': request.databaseId || credentials.databaseId,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'User-Agent': 'StokCerdas/1.0',
         // Custom headers handled by Accurate service
       },
@@ -303,16 +308,18 @@ export class AccurateApiService extends BaseApiService {
     password: string,
     databaseId: string,
     tenantId: string,
-  ): Promise<ApiResponse<{
-    session: string;
-    name: string;
-    email: string;
-    databases: Array<{
-      id: string;
+  ): Promise<
+    ApiResponse<{
+      session: string;
       name: string;
-      alias: string;
-    }>;
-  }>> {
+      email: string;
+      databases: Array<{
+        id: string;
+        name: string;
+        alias: string;
+      }>;
+    }>
+  > {
     const config: ApiConfig = {
       baseUrl: serverUrl,
       apiVersion: 'accurate/api',
@@ -339,28 +346,25 @@ export class AccurateApiService extends BaseApiService {
     credentials: AccurateCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    name: string;
-    address: string;
-    city: string;
-    phone: string;
-    npwp: string;
-    currencySymbol: string;
-    fiscalYear: string;
-    companyType: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      name: string;
+      address: string;
+      city: string;
+      phone: string;
+      npwp: string;
+      currencySymbol: string;
+      fiscalYear: string;
+      companyType: string;
+    }>
+  > {
     const request: AccurateApiRequest = {
       method: 'GET',
       endpoint: '/company/profile.do',
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -376,12 +380,14 @@ export class AccurateApiService extends BaseApiService {
       filter?: string;
       itemType?: 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE';
     },
-  ): Promise<ApiResponse<{
-    sp: AccurateItem[];
-    totalRows: number;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      sp: AccurateItem[];
+      totalRows: number;
+    }>
+  > {
     const params: Record<string, any> = {};
-    
+
     if (filters?.skip) params.skip = filters.skip;
     if (filters?.take) params.take = filters.take;
     if (filters?.filter) params.filter = filters.filter;
@@ -394,12 +400,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -418,12 +419,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -442,12 +438,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -466,12 +457,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -490,12 +476,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -514,12 +495,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -536,12 +512,14 @@ export class AccurateApiService extends BaseApiService {
       dateFrom?: string;
       dateTo?: string;
     },
-  ): Promise<ApiResponse<{
-    sp: AccurateInvoice[];
-    totalRows: number;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      sp: AccurateInvoice[];
+      totalRows: number;
+    }>
+  > {
     const params: Record<string, any> = {};
-    
+
     if (filters?.skip) params.skip = filters.skip;
     if (filters?.take) params.take = filters.take;
     if (filters?.filter) params.filter = filters.filter;
@@ -555,12 +533,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -579,12 +552,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -599,12 +567,14 @@ export class AccurateApiService extends BaseApiService {
       take?: number;
       filter?: string;
     },
-  ): Promise<ApiResponse<{
-    sp: AccurateCustomer[];
-    totalRows: number;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      sp: AccurateCustomer[];
+      totalRows: number;
+    }>
+  > {
     const params: Record<string, any> = {};
-    
+
     if (filters?.skip) params.skip = filters.skip;
     if (filters?.take) params.take = filters.take;
     if (filters?.filter) params.filter = filters.filter;
@@ -616,12 +586,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -631,22 +596,19 @@ export class AccurateApiService extends BaseApiService {
     credentials: AccurateCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    sp: AccurateAccount[];
-    totalRows: number;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      sp: AccurateAccount[];
+      totalRows: number;
+    }>
+  > {
     const request: AccurateApiRequest = {
       method: 'GET',
       endpoint: '/coa/list.do',
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -656,22 +618,19 @@ export class AccurateApiService extends BaseApiService {
     credentials: AccurateCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    sp: AccurateTaxRate[];
-    totalRows: number;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      sp: AccurateTaxRate[];
+      totalRows: number;
+    }>
+  > {
     const request: AccurateApiRequest = {
       method: 'GET',
       endpoint: '/tax/list.do',
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -688,12 +647,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -710,12 +664,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -737,12 +686,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -757,19 +701,14 @@ export class AccurateApiService extends BaseApiService {
     const request: AccurateApiRequest = {
       method: 'GET',
       endpoint: '/sales-invoice/print.do',
-      params: { 
+      params: {
         id: invoiceId,
-        format: 'pdf'
+        format: 'pdf',
       },
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -788,12 +727,7 @@ export class AccurateApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeAccurateRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeAccurateRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -802,51 +736,71 @@ export class AccurateApiService extends BaseApiService {
   validateNPWP(npwp: string): boolean {
     // Remove any formatting
     const cleanNPWP = npwp.replace(/[^\d]/g, '');
-    
+
     // NPWP should be 15 digits
     if (cleanNPWP.length !== 15) {
       return false;
     }
-    
+
     // Basic validation algorithm for NPWP
     const digits = cleanNPWP.split('').map(Number);
     const multipliers = [2, 4, 8, 5, 0, 7, 6, 3, 9, 1, 2, 4, 8];
-    
+
     let sum = 0;
     for (let i = 0; i < 13; i++) {
       sum += digits[i] * multipliers[i];
     }
-    
+
     const remainder = sum % 11;
     const checkDigit = remainder < 2 ? remainder : 11 - remainder;
-    
+
     return digits[13] === checkDigit;
   }
 
   /**
    * Handle Accurate API errors
    */
-  handleAccurateError(error: any): { code: string; message: string; retryable: boolean } {
+  handleAccurateError(error: any): {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } {
     const errorCode = error.errorCode || error.code;
-    const errorMessage = error.errorMessage || error.message || 'Unknown Accurate API error';
+    const errorMessage =
+      error.errorMessage || error.message || 'Unknown Accurate API error';
 
     // Map common Accurate error codes
     const errorMap: Record<string, { message: string; retryable: boolean }> = {
-      '401': { message: 'Session expired or invalid credentials', retryable: false },
-      '403': { message: 'Access denied - insufficient permissions', retryable: false },
+      '401': {
+        message: 'Session expired or invalid credentials',
+        retryable: false,
+      },
+      '403': {
+        message: 'Access denied - insufficient permissions',
+        retryable: false,
+      },
       '404': { message: 'Resource not found', retryable: false },
       '429': { message: 'Rate limit exceeded', retryable: true },
       '500': { message: 'Internal server error', retryable: true },
       '503': { message: 'Service temporarily unavailable', retryable: true },
-      'INVALID_SESSION': { message: 'Session invalid or expired', retryable: false },
-      'DATABASE_NOT_FOUND': { message: 'Database not found or access denied', retryable: false },
-      'DUPLICATE_DATA': { message: 'Duplicate data detected', retryable: false },
-      'VALIDATION_ERROR': { message: 'Data validation failed', retryable: false },
-      'INSUFFICIENT_BALANCE': { message: 'Insufficient account balance', retryable: false },
+      INVALID_SESSION: {
+        message: 'Session invalid or expired',
+        retryable: false,
+      },
+      DATABASE_NOT_FOUND: {
+        message: 'Database not found or access denied',
+        retryable: false,
+      },
+      DUPLICATE_DATA: { message: 'Duplicate data detected', retryable: false },
+      VALIDATION_ERROR: { message: 'Data validation failed', retryable: false },
+      INSUFFICIENT_BALANCE: {
+        message: 'Insufficient account balance',
+        retryable: false,
+      },
     };
 
     const mappedError = errorMap[errorCode];
-    
+
     return {
       code: errorCode || 'ACCURATE_API_ERROR',
       message: mappedError?.message || errorMessage,

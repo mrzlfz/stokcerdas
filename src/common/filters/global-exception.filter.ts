@@ -26,7 +26,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else if (typeof exceptionResponse === 'object') {
@@ -38,7 +38,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       status = HttpStatus.BAD_REQUEST;
       message = 'Database query failed';
       code = 'DATABASE_ERROR';
-      
+
       // Handle specific database errors
       if (exception.message.includes('duplicate key')) {
         message = 'Resource already exists';

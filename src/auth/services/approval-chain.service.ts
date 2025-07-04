@@ -1,7 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ApprovalChain, ApprovalType, ApprovalStatus, ApprovalMode, EscalationTrigger } from '../entities/approval-chain.entity';
+import {
+  ApprovalChain,
+  ApprovalType,
+  ApprovalStatus,
+  ApprovalMode,
+  EscalationTrigger,
+} from '../entities/approval-chain.entity';
 import { ApprovalStep } from '../entities/approval-chain.entity';
 import { HierarchicalRole } from '../entities/hierarchical-role.entity';
 import { Department } from '../entities/department.entity';
@@ -35,7 +46,13 @@ export interface ApprovalExecution {
 export interface StepExecution {
   stepId: string;
   stepOrder: number;
-  status: 'pending' | 'approved' | 'rejected' | 'skipped' | 'timeout' | 'escalated';
+  status:
+    | 'pending'
+    | 'approved'
+    | 'rejected'
+    | 'skipped'
+    | 'timeout'
+    | 'escalated';
   approverId?: string;
   approvedAt?: Date;
   comments?: string;
@@ -115,7 +132,9 @@ export class ApprovalChainService {
       updatedBy: userId,
     });
 
-    const savedChain = await this.approvalChainRepository.save(chain) as unknown as ApprovalChain;
+    const savedChain = (await this.approvalChainRepository.save(
+      chain,
+    )) as unknown as ApprovalChain;
 
     // Create steps if provided
     if (steps && steps.length > 0) {
@@ -160,8 +179,8 @@ export class ApprovalChainService {
       .andWhere('chain.isDeleted = false');
 
     if (!includeInactive) {
-      queryBuilder.andWhere('chain.status = :status', { 
-        status: ApprovalStatus.ACTIVE 
+      queryBuilder.andWhere('chain.status = :status', {
+        status: ApprovalStatus.ACTIVE,
       });
     }
 
@@ -169,7 +188,8 @@ export class ApprovalChainService {
       queryBuilder.andWhere('chain.type = :type', { type });
     }
 
-    queryBuilder.orderBy('chain.name', 'ASC')
+    queryBuilder
+      .orderBy('chain.name', 'ASC')
       .addOrderBy('steps.stepOrder', 'ASC');
 
     return queryBuilder.getMany();
@@ -227,9 +247,12 @@ export class ApprovalChainService {
       .where('chain.tenantId = :tenantId', { tenantId })
       .andWhere('chain.isDeleted = false')
       .andWhere('chain.status = :status', { status: ApprovalStatus.ACTIVE })
-      .andWhere('(chain.name ILIKE :query OR chain.code ILIKE :query OR chain.description ILIKE :query)', {
-        query: `%${query}%`,
-      })
+      .andWhere(
+        '(chain.name ILIKE :query OR chain.code ILIKE :query OR chain.description ILIKE :query)',
+        {
+          query: `%${query}%`,
+        },
+      )
       .orderBy('chain.name', 'ASC')
       .limit(limit)
       .getMany();
@@ -245,7 +268,9 @@ export class ApprovalChainService {
     const chain = await this.findById(id, tenantId);
 
     if (chain.isSystemDefined) {
-      throw new ForbiddenException('Approval chain sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Approval chain sistem tidak dapat dimodifikasi',
+      );
     }
 
     const { steps, ...updateData } = updateChainDto;
@@ -273,7 +298,9 @@ export class ApprovalChainService {
     const chain = await this.findById(chainId, tenantId);
 
     if (chain.isSystemDefined) {
-      throw new ForbiddenException('Approval chain sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Approval chain sistem tidak dapat dimodifikasi',
+      );
     }
 
     const createdSteps: ApprovalStep[] = [];
@@ -290,7 +317,9 @@ export class ApprovalChainService {
         });
 
         if (!approverRole) {
-          throw new BadRequestException(`Approver role tidak ditemukan untuk step ${stepData.stepOrder}`);
+          throw new BadRequestException(
+            `Approver role tidak ditemukan untuk step ${stepData.stepOrder}`,
+          );
         }
       }
 
@@ -305,7 +334,9 @@ export class ApprovalChainService {
         });
 
         if (!escalationRole) {
-          throw new BadRequestException(`Escalation role tidak ditemukan untuk step ${stepData.stepOrder}`);
+          throw new BadRequestException(
+            `Escalation role tidak ditemukan untuk step ${stepData.stepOrder}`,
+          );
         }
       }
 
@@ -317,7 +348,9 @@ export class ApprovalChainService {
         updatedBy: userId,
       });
 
-      const savedStep = await this.approvalStepRepository.save(step) as unknown as ApprovalStep;
+      const savedStep = (await this.approvalStepRepository.save(
+        step,
+      )) as unknown as ApprovalStep;
       createdSteps.push(savedStep);
     }
 
@@ -334,7 +367,9 @@ export class ApprovalChainService {
     const chain = await this.findById(chainId, tenantId);
 
     if (chain.isSystemDefined) {
-      throw new ForbiddenException('Approval chain sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Approval chain sistem tidak dapat dimodifikasi',
+      );
     }
 
     // Remove existing steps
@@ -357,7 +392,9 @@ export class ApprovalChainService {
     const chain = await this.findById(id, tenantId);
 
     if (chain.isSystemDefined) {
-      throw new ForbiddenException('Approval chain sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Approval chain sistem tidak dapat dimodifikasi',
+      );
     }
 
     chain.status = status;
@@ -371,12 +408,16 @@ export class ApprovalChainService {
     const chain = await this.findById(id, tenantId);
 
     if (chain.isSystemDefined) {
-      throw new BadRequestException('Approval chain sistem tidak dapat dihapus');
+      throw new BadRequestException(
+        'Approval chain sistem tidak dapat dihapus',
+      );
     }
 
     // Check if chain is being used
     if (chain.usageCount > 0) {
-      throw new BadRequestException('Approval chain masih digunakan dan tidak dapat dihapus');
+      throw new BadRequestException(
+        'Approval chain masih digunakan dan tidak dapat dihapus',
+      );
     }
 
     chain.softDelete(userId);
@@ -389,10 +430,16 @@ export class ApprovalChainService {
     tenantId: string,
   ): Promise<ApprovalExecution> {
     // Find appropriate approval chain
-    const chain = await this.findApprovalChain(request.type, request.context, tenantId);
+    const chain = await this.findApprovalChain(
+      request.type,
+      request.context,
+      tenantId,
+    );
 
     if (!chain) {
-      throw new NotFoundException('Tidak ada approval chain yang sesuai untuk request ini');
+      throw new NotFoundException(
+        'Tidak ada approval chain yang sesuai untuk request ini',
+      );
     }
 
     // Validate chain configuration
@@ -436,7 +483,9 @@ export class ApprovalChainService {
       // Set timeout
       if (step.timeoutHours || chain.defaultTimeoutHours) {
         const timeoutHours = step.timeoutHours || chain.defaultTimeoutHours;
-        stepExecution.timeoutAt = new Date(Date.now() + timeoutHours * 60 * 60 * 1000);
+        stepExecution.timeoutAt = new Date(
+          Date.now() + timeoutHours * 60 * 60 * 1000,
+        );
       }
 
       execution.stepExecutions.push(stepExecution);
@@ -469,7 +518,9 @@ export class ApprovalChainService {
     tenantId: string,
   ): Promise<ApprovalExecution> {
     // This would handle timeouts and escalations
-    throw new Error('Method not implemented - requires execution storage and scheduler');
+    throw new Error(
+      'Method not implemented - requires execution storage and scheduler',
+    );
   }
 
   // Escalate approval
@@ -494,26 +545,46 @@ export class ApprovalChainService {
       draft: chains.filter(c => c.status === ApprovalStatus.DRAFT).length,
       archived: chains.filter(c => c.status === ApprovalStatus.ARCHIVED).length,
       byType: {
-        roleAssignment: chains.filter(c => c.type === ApprovalType.ROLE_ASSIGNMENT).length,
-        permissionGrant: chains.filter(c => c.type === ApprovalType.PERMISSION_GRANT).length,
-        accessRequest: chains.filter(c => c.type === ApprovalType.ACCESS_REQUEST).length,
-        departmentTransfer: chains.filter(c => c.type === ApprovalType.DEPARTMENT_TRANSFER).length,
-        systemAccess: chains.filter(c => c.type === ApprovalType.SYSTEM_ACCESS).length,
-        dataAccess: chains.filter(c => c.type === ApprovalType.DATA_ACCESS).length,
-        budgetApproval: chains.filter(c => c.type === ApprovalType.BUDGET_APPROVAL).length,
-        purchaseOrder: chains.filter(c => c.type === ApprovalType.PURCHASE_ORDER).length,
-        expenseApproval: chains.filter(c => c.type === ApprovalType.EXPENSE_APPROVAL).length,
+        roleAssignment: chains.filter(
+          c => c.type === ApprovalType.ROLE_ASSIGNMENT,
+        ).length,
+        permissionGrant: chains.filter(
+          c => c.type === ApprovalType.PERMISSION_GRANT,
+        ).length,
+        accessRequest: chains.filter(
+          c => c.type === ApprovalType.ACCESS_REQUEST,
+        ).length,
+        departmentTransfer: chains.filter(
+          c => c.type === ApprovalType.DEPARTMENT_TRANSFER,
+        ).length,
+        systemAccess: chains.filter(c => c.type === ApprovalType.SYSTEM_ACCESS)
+          .length,
+        dataAccess: chains.filter(c => c.type === ApprovalType.DATA_ACCESS)
+          .length,
+        budgetApproval: chains.filter(
+          c => c.type === ApprovalType.BUDGET_APPROVAL,
+        ).length,
+        purchaseOrder: chains.filter(
+          c => c.type === ApprovalType.PURCHASE_ORDER,
+        ).length,
+        expenseApproval: chains.filter(
+          c => c.type === ApprovalType.EXPENSE_APPROVAL,
+        ).length,
         custom: chains.filter(c => c.type === ApprovalType.CUSTOM).length,
       },
       byMode: {
-        sequential: chains.filter(c => c.mode === ApprovalMode.SEQUENTIAL).length,
+        sequential: chains.filter(c => c.mode === ApprovalMode.SEQUENTIAL)
+          .length,
         parallel: chains.filter(c => c.mode === ApprovalMode.PARALLEL).length,
         majority: chains.filter(c => c.mode === ApprovalMode.MAJORITY).length,
         unanimous: chains.filter(c => c.mode === ApprovalMode.UNANIMOUS).length,
-        firstResponse: chains.filter(c => c.mode === ApprovalMode.FIRST_RESPONSE).length,
+        firstResponse: chains.filter(
+          c => c.mode === ApprovalMode.FIRST_RESPONSE,
+        ).length,
       },
       totalUsage: chains.reduce((sum, chain) => sum + chain.usageCount, 0),
-      averageSteps: chains.reduce((sum, chain) => sum + chain.stepCount, 0) / chains.length,
+      averageSteps:
+        chains.reduce((sum, chain) => sum + chain.stepCount, 0) / chains.length,
       escalationEnabled: chains.filter(c => c.enableEscalation).length,
     };
 
@@ -590,7 +661,7 @@ export class ApprovalChainService {
     await this.approvalChainRepository
       .createQueryBuilder()
       .update(ApprovalChain)
-      .set({ 
+      .set({
         status,
         updatedBy: userId,
         updatedAt: new Date(),
@@ -624,7 +695,10 @@ export class ApprovalChainService {
       // Department match
       if (chain.departmentId && context.department === chain.departmentId) {
         score += 10;
-      } else if (chain.departmentId && context.department !== chain.departmentId) {
+      } else if (
+        chain.departmentId &&
+        context.department !== chain.departmentId
+      ) {
         continue; // Skip if department doesn't match
       }
 
@@ -633,20 +707,30 @@ export class ApprovalChainService {
         // Amount threshold check
         if (chain.conditions.amountThresholds && context.amount) {
           const amount = context.amount;
-          if (chain.conditions.amountThresholds.step1 && amount >= chain.conditions.amountThresholds.step1) {
+          if (
+            chain.conditions.amountThresholds.step1 &&
+            amount >= chain.conditions.amountThresholds.step1
+          ) {
             score += 5;
           }
-          if (chain.conditions.amountThresholds.step2 && amount >= chain.conditions.amountThresholds.step2) {
+          if (
+            chain.conditions.amountThresholds.step2 &&
+            amount >= chain.conditions.amountThresholds.step2
+          ) {
             score += 3;
           }
-          if (chain.conditions.amountThresholds.step3 && amount >= chain.conditions.amountThresholds.step3) {
+          if (
+            chain.conditions.amountThresholds.step3 &&
+            amount >= chain.conditions.amountThresholds.step3
+          ) {
             score += 1;
           }
         }
 
         // Department rules
         if (chain.conditions.departmentRules && context.department) {
-          const deptRules = chain.conditions.departmentRules[context.department];
+          const deptRules =
+            chain.conditions.departmentRules[context.department];
           if (deptRules) {
             score += 8;
           }
@@ -711,8 +795,10 @@ export class ApprovalChainService {
     if (chain.steps && chain.steps.length > 0) {
       const orders = chain.steps.map(s => s.stepOrder).sort((a, b) => a - b);
       for (let i = 1; i < orders.length; i++) {
-        if (orders[i] !== orders[i-1] + 1) {
-          errors.push(`Gap dalam urutan step antara ${orders[i-1]} dan ${orders[i]}`);
+        if (orders[i] !== orders[i - 1] + 1) {
+          errors.push(
+            `Gap dalam urutan step antara ${orders[i - 1]} dan ${orders[i]}`,
+          );
         }
       }
     }
@@ -720,22 +806,33 @@ export class ApprovalChainService {
     // Check if all steps have valid approvers
     for (const step of chain.steps || []) {
       if (!step.isValid) {
-        errors.push(`Step ${step.stepOrder} tidak memiliki approver yang valid`);
+        errors.push(
+          `Step ${step.stepOrder} tidak memiliki approver yang valid`,
+        );
       }
 
       if (step.timeoutHours && step.timeoutHours < 1) {
-        warnings.push(`Step ${step.stepOrder} memiliki timeout yang sangat singkat (< 1 jam)`);
+        warnings.push(
+          `Step ${step.stepOrder} memiliki timeout yang sangat singkat (< 1 jam)`,
+        );
       }
     }
 
     // Check escalation configuration
     if (chain.enableEscalation) {
-      if (!chain.escalationRoleId && !chain.steps?.some(s => s.escalationRoleId)) {
-        warnings.push('Escalation diaktifkan tapi tidak ada role escalation yang dikonfigurasi');
+      if (
+        !chain.escalationRoleId &&
+        !chain.steps?.some(s => s.escalationRoleId)
+      ) {
+        warnings.push(
+          'Escalation diaktifkan tapi tidak ada role escalation yang dikonfigurasi',
+        );
       }
 
       if (!chain.escalationTimeoutHours) {
-        warnings.push('Escalation diaktifkan tapi tidak ada timeout escalation yang dikonfigurasi');
+        warnings.push(
+          'Escalation diaktifkan tapi tidak ada timeout escalation yang dikonfigurasi',
+        );
       }
     }
 
@@ -758,8 +855,11 @@ export class ApprovalChainService {
     errors?: string[];
   }> {
     try {
-      const validation = await this.validateChainConfiguration(chainId, tenantId);
-      
+      const validation = await this.validateChainConfiguration(
+        chainId,
+        tenantId,
+      );
+
       if (!validation.isValid) {
         return {
           chainId,

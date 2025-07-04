@@ -1,13 +1,29 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, LessThanOrEqual, MoreThanOrEqual, In } from 'typeorm';
+import {
+  Repository,
+  Like,
+  Between,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  In,
+} from 'typeorm';
 
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { InventoryLocation } from '../entities/inventory-location.entity';
 import { Product } from '../../products/entities/product.entity';
 import { CreateInventoryItemDto } from '../dto/create-inventory-item.dto';
 import { InventoryQueryDto, SortOrder } from '../dto/inventory-query.dto';
-import { StockAdjustmentDto, BulkStockAdjustmentDto, AdjustmentType } from '../dto/stock-adjustment.dto';
+import {
+  StockAdjustmentDto,
+  BulkStockAdjustmentDto,
+  AdjustmentType,
+} from '../dto/stock-adjustment.dto';
 
 import { InventoryTransactionsService } from './inventory-transactions.service';
 import { InventoryRealtimeService } from './inventory-realtime.service';
@@ -34,10 +50,16 @@ export class InventoryItemsService {
     userId: string,
   ): Promise<InventoryItem> {
     // Validasi produk exists
-    const product = await this.validateProduct(tenantId, createInventoryItemDto.productId);
+    const product = await this.validateProduct(
+      tenantId,
+      createInventoryItemDto.productId,
+    );
 
     // Validasi lokasi exists
-    const location = await this.validateLocation(tenantId, createInventoryItemDto.locationId);
+    const location = await this.validateLocation(
+      tenantId,
+      createInventoryItemDto.locationId,
+    );
 
     // Cek apakah kombinasi product-location sudah ada
     const existingItem = await this.inventoryItemRepository.findOne({
@@ -49,11 +71,14 @@ export class InventoryItemsService {
     });
 
     if (existingItem) {
-      throw new ConflictException('Inventory item untuk produk di lokasi ini sudah ada');
+      throw new ConflictException(
+        'Inventory item untuk produk di lokasi ini sudah ada',
+      );
     }
 
     // Calculate total value
-    const averageCost = createInventoryItemDto.averageCost || product.costPrice || 0;
+    const averageCost =
+      createInventoryItemDto.averageCost || product.costPrice || 0;
     const totalValue = createInventoryItemDto.quantityOnHand * averageCost;
 
     const inventoryItem = this.inventoryItemRepository.create({
@@ -143,37 +168,47 @@ export class InventoryItemsService {
     if (search) {
       queryBuilder.andWhere(
         '(product.name ILIKE :search OR product.sku ILIKE :search OR product.barcode ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
     if (minQuantity !== undefined) {
-      queryBuilder.andWhere('(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) >= :minQuantity', {
-        minQuantity,
-      });
+      queryBuilder.andWhere(
+        '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) >= :minQuantity',
+        {
+          minQuantity,
+        },
+      );
     }
 
     if (maxQuantity !== undefined) {
-      queryBuilder.andWhere('(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= :maxQuantity', {
-        maxQuantity,
-      });
+      queryBuilder.andWhere(
+        '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= :maxQuantity',
+        {
+          maxQuantity,
+        },
+      );
     }
 
     if (lowStock) {
       queryBuilder.andWhere(
-        '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= COALESCE(item.reorderPoint, product.reorderPoint, 0)'
+        '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= COALESCE(item.reorderPoint, product.reorderPoint, 0)',
       );
     }
 
     if (outOfStock) {
-      queryBuilder.andWhere('(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= 0');
+      queryBuilder.andWhere(
+        '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= 0',
+      );
     }
 
     if (expiringSoon) {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
       queryBuilder.andWhere('item.expiryDate IS NOT NULL');
-      queryBuilder.andWhere('item.expiryDate <= :thirtyDaysFromNow', { thirtyDaysFromNow });
+      queryBuilder.andWhere('item.expiryDate <= :thirtyDaysFromNow', {
+        thirtyDaysFromNow,
+      });
       queryBuilder.andWhere('item.expiryDate > CURRENT_DATE');
     }
 
@@ -187,11 +222,15 @@ export class InventoryItemsService {
     }
 
     if (lotNumber) {
-      queryBuilder.andWhere('item.lotNumber ILIKE :lotNumber', { lotNumber: `%${lotNumber}%` });
+      queryBuilder.andWhere('item.lotNumber ILIKE :lotNumber', {
+        lotNumber: `%${lotNumber}%`,
+      });
     }
 
     if (batchNumber) {
-      queryBuilder.andWhere('item.batchNumber ILIKE :batchNumber', { batchNumber: `%${batchNumber}%` });
+      queryBuilder.andWhere('item.batchNumber ILIKE :batchNumber', {
+        batchNumber: `%${batchNumber}%`,
+      });
     }
 
     // Count total before pagination
@@ -211,7 +250,7 @@ export class InventoryItemsService {
       if (sortBy === 'item.quantityAvailable') {
         queryBuilder.addSelect(
           '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated)',
-          'quantityAvailable'
+          'quantityAvailable',
         );
         queryBuilder.orderBy('quantityAvailable', sortOrder);
       } else {
@@ -227,11 +266,17 @@ export class InventoryItemsService {
 
     // Calculate virtual fields
     items.forEach(item => {
-      (item as any).quantityAvailable = item.quantityOnHand - item.quantityReserved - item.quantityAllocated;
+      (item as any).quantityAvailable =
+        item.quantityOnHand - item.quantityReserved - item.quantityAllocated;
       (item as any).isLowStock = item.reorderPoint
-        ? (item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= item.reorderPoint
+        ? item.quantityOnHand -
+            item.quantityReserved -
+            item.quantityAllocated <=
+          item.reorderPoint
         : false;
-      (item as any).isOutOfStock = (item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= 0;
+      (item as any).isOutOfStock =
+        item.quantityOnHand - item.quantityReserved - item.quantityAllocated <=
+        0;
     });
 
     return {
@@ -283,10 +328,22 @@ export class InventoryItemsService {
     adjustmentDto: StockAdjustmentDto,
     userId: string,
   ): Promise<InventoryItem> {
-    const { productId, locationId, adjustmentType, quantity, reason, notes, unitCost } = adjustmentDto;
+    const {
+      productId,
+      locationId,
+      adjustmentType,
+      quantity,
+      reason,
+      notes,
+      unitCost,
+    } = adjustmentDto;
 
     // Cari atau buat inventory item
-    let inventoryItem = await this.findByProductAndLocation(tenantId, productId, locationId);
+    let inventoryItem = await this.findByProductAndLocation(
+      tenantId,
+      productId,
+      locationId,
+    );
 
     if (!inventoryItem) {
       // Buat inventory item baru jika belum ada
@@ -330,7 +387,8 @@ export class InventoryItemsService {
     if (unitCost && actualAdjustment > 0) {
       inventoryItem.updateAverageCost(unitCost, actualAdjustment);
     } else {
-      inventoryItem.totalValue = inventoryItem.quantityOnHand * inventoryItem.averageCost;
+      inventoryItem.totalValue =
+        inventoryItem.quantityOnHand * inventoryItem.averageCost;
     }
 
     const savedItem = await this.inventoryItemRepository.save(inventoryItem);
@@ -367,12 +425,20 @@ export class InventoryItemsService {
   ): Promise<{
     successful: number;
     failed: number;
-    errors: Array<{ index: number; error: string; adjustment: StockAdjustmentDto }>;
+    errors: Array<{
+      index: number;
+      error: string;
+      adjustment: StockAdjustmentDto;
+    }>;
   }> {
     const result = {
       successful: 0,
       failed: 0,
-      errors: [] as Array<{ index: number; error: string; adjustment: StockAdjustmentDto }>,
+      errors: [] as Array<{
+        index: number;
+        error: string;
+        adjustment: StockAdjustmentDto;
+      }>,
     };
 
     for (let i = 0; i < bulkAdjustmentDto.adjustments.length; i++) {
@@ -406,14 +472,20 @@ export class InventoryItemsService {
     referenceType?: string,
     referenceId?: string,
   ): Promise<InventoryItem> {
-    const inventoryItem = await this.findByProductAndLocation(tenantId, productId, locationId);
+    const inventoryItem = await this.findByProductAndLocation(
+      tenantId,
+      productId,
+      locationId,
+    );
 
     if (!inventoryItem) {
       throw new NotFoundException('Inventory item tidak ditemukan');
     }
 
     if (!inventoryItem.reserveQuantity(quantity)) {
-      throw new BadRequestException('Stok tersedia tidak mencukupi untuk reservasi');
+      throw new BadRequestException(
+        'Stok tersedia tidak mencukupi untuk reservasi',
+      );
     }
 
     inventoryItem.updatedBy = userId;
@@ -449,7 +521,11 @@ export class InventoryItemsService {
     referenceType?: string,
     referenceId?: string,
   ): Promise<InventoryItem> {
-    const inventoryItem = await this.findByProductAndLocation(tenantId, productId, locationId);
+    const inventoryItem = await this.findByProductAndLocation(
+      tenantId,
+      productId,
+      locationId,
+    );
 
     if (!inventoryItem) {
       throw new NotFoundException('Inventory item tidak ditemukan');
@@ -490,7 +566,11 @@ export class InventoryItemsService {
     inventoryItem: InventoryItem;
     variance: number;
   }> {
-    const inventoryItem = await this.findByProductAndLocation(tenantId, productId, locationId);
+    const inventoryItem = await this.findByProductAndLocation(
+      tenantId,
+      productId,
+      locationId,
+    );
 
     if (!inventoryItem) {
       throw new NotFoundException('Inventory item tidak ditemukan');
@@ -503,7 +583,8 @@ export class InventoryItemsService {
 
     // Create adjustment transaction based on variance
     if (variance !== 0) {
-      const adjustmentType = variance > 0 ? AdjustmentType.POSITIVE : AdjustmentType.NEGATIVE;
+      const adjustmentType =
+        variance > 0 ? AdjustmentType.POSITIVE : AdjustmentType.NEGATIVE;
       const adjustmentDto: StockAdjustmentDto = {
         productId,
         locationId,
@@ -538,7 +619,10 @@ export class InventoryItemsService {
   /**
    * Dapatkan statistik inventory
    */
-  async getInventoryStats(tenantId: string, locationId?: string): Promise<{
+  async getInventoryStats(
+    tenantId: string,
+    locationId?: string,
+  ): Promise<{
     totalItems: number;
     totalValue: number;
     lowStockItems: number;
@@ -568,19 +652,21 @@ export class InventoryItemsService {
       expiredItems,
     ] = await Promise.all([
       queryBuilder.getCount(),
-      queryBuilder
-        .select('SUM(item.totalValue)', 'totalValue')
-        .getRawOne(),
+      queryBuilder.select('SUM(item.totalValue)', 'totalValue').getRawOne(),
       queryBuilder
         .select('SUM(item.quantityOnHand)', 'totalQuantity')
         .getRawOne(),
       queryBuilder
         .clone()
-        .andWhere('(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= COALESCE(item.reorderPoint, product.reorderPoint, 0)')
+        .andWhere(
+          '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= COALESCE(item.reorderPoint, product.reorderPoint, 0)',
+        )
         .getCount(),
       queryBuilder
         .clone()
-        .andWhere('(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= 0')
+        .andWhere(
+          '(item.quantityOnHand - item.quantityReserved - item.quantityAllocated) <= 0',
+        )
         .getCount(),
       queryBuilder
         .clone()
@@ -614,7 +700,10 @@ export class InventoryItemsService {
   }
 
   // Private helper methods
-  private async validateProduct(tenantId: string, productId: string): Promise<Product> {
+  private async validateProduct(
+    tenantId: string,
+    productId: string,
+  ): Promise<Product> {
     const product = await this.productRepository.findOne({
       where: { id: productId, tenantId, isDeleted: false },
     });
@@ -626,7 +715,10 @@ export class InventoryItemsService {
     return product;
   }
 
-  private async validateLocation(tenantId: string, locationId: string): Promise<InventoryLocation> {
+  private async validateLocation(
+    tenantId: string,
+    locationId: string,
+  ): Promise<InventoryLocation> {
     const location = await this.locationRepository.findOne({
       where: { id: locationId, tenantId, isDeleted: false },
     });
@@ -651,7 +743,7 @@ export class InventoryItemsService {
     if (locationId) {
       return this.findByProductAndLocation(tenantId, productId, locationId);
     }
-    
+
     // If no locationId provided, find first available inventory for this product
     const items = await this.findAll(tenantId, { productId, limit: 1 });
     return items.data.length > 0 ? items.data[0] : null;

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Repository, FindManyOptions, FindOneOptions } from 'typeorm';
 import { BaseEntity } from '../entities/base.entity';
 
@@ -45,7 +49,11 @@ export abstract class BaseService<T extends BaseEntity> {
     });
   }
 
-  async create(tenantId: string, data: Partial<T>, userId?: string): Promise<T> {
+  async create(
+    tenantId: string,
+    data: Partial<T>,
+    userId?: string,
+  ): Promise<T> {
     const entity = this.repository.create({
       ...data,
       tenantId,
@@ -55,9 +63,14 @@ export abstract class BaseService<T extends BaseEntity> {
     return this.repository.save(entity) as unknown as Promise<T>;
   }
 
-  async update(tenantId: string, id: string, data: Partial<T>, userId?: string): Promise<T> {
+  async update(
+    tenantId: string,
+    id: string,
+    data: Partial<T>,
+    userId?: string,
+  ): Promise<T> {
     const entity = await this.findOne(tenantId, id);
-    
+
     Object.assign(entity, {
       ...data,
       updatedBy: userId,
@@ -72,9 +85,13 @@ export abstract class BaseService<T extends BaseEntity> {
     await this.repository.remove(entity);
   }
 
-  async softDelete(tenantId: string, id: string, userId?: string): Promise<void> {
+  async softDelete(
+    tenantId: string,
+    id: string,
+    userId?: string,
+  ): Promise<void> {
     const entity = await this.findOne(tenantId, id);
-    
+
     if ('softDelete' in entity && typeof entity.softDelete === 'function') {
       (entity as any).softDelete(userId);
       await this.repository.save(entity);
@@ -104,7 +121,8 @@ export abstract class BaseService<T extends BaseEntity> {
   }
 
   protected createQueryBuilder(alias: string, tenantId: string) {
-    return this.repository.createQueryBuilder(alias)
+    return this.repository
+      .createQueryBuilder(alias)
       .where(`${alias}.tenant_id = :tenantId`, { tenantId });
   }
 }

@@ -104,12 +104,19 @@ export class WhatsAppWebhookController {
           requestId,
         });
 
-        res.status(HttpStatus.FORBIDDEN).send('Webhook verification failed: No verify token configured');
+        res
+          .status(HttpStatus.FORBIDDEN)
+          .send('Webhook verification failed: No verify token configured');
         return;
       }
 
       // Verify the webhook challenge
-      const challengeResult = this.apiService.verifyWebhookChallenge(mode, token, challenge, expectedToken);
+      const challengeResult = this.apiService.verifyWebhookChallenge(
+        mode,
+        token,
+        challenge,
+        expectedToken,
+      );
 
       const processingTime = Date.now() - startTime;
 
@@ -163,18 +170,20 @@ export class WhatsAppWebhookController {
 
         res.status(HttpStatus.FORBIDDEN).send('Webhook verification failed');
       }
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`WhatsApp webhook verification error: ${error.message}`, {
-        tenantId,
-        channelId,
-        error: error.message,
-        stack: error.stack,
-        requestId,
-        processingTime,
-      });
+
+      this.logger.error(
+        `WhatsApp webhook verification error: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          error: error.message,
+          stack: error.stack,
+          requestId,
+          processingTime,
+        },
+      );
 
       // Log error
       await this.logService.logWebhook(
@@ -191,7 +200,9 @@ export class WhatsAppWebhookController {
         },
       );
 
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server error');
+      res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .send('Internal server error');
     }
   }
 
@@ -204,7 +215,11 @@ export class WhatsAppWebhookController {
   @ApiOperation({ summary: 'Receive WhatsApp webhook events' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-hub-signature-256', description: 'Webhook signature', required: false })
+  @ApiHeader({
+    name: 'x-hub-signature-256',
+    description: 'Webhook signature',
+    required: false,
+  })
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid webhook data' })
   @ApiResponse({ status: 401, description: 'Invalid signature' })
@@ -302,10 +317,9 @@ export class WhatsAppWebhookController {
           webhookId: result.webhookId,
         });
       }
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.error(`WhatsApp webhook error: ${error.message}`, {
         tenantId,
         channelId,
@@ -347,8 +361,15 @@ export class WhatsAppWebhookController {
   @ApiOperation({ summary: 'Receive WhatsApp message webhooks' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-hub-signature-256', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Message webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-hub-signature-256',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Message webhook processed successfully',
+  })
   async handleMessageWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -384,16 +405,17 @@ export class WhatsAppWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Message webhook processed' : 'Message webhook processing failed',
+        message: result.success
+          ? 'Message webhook processed'
+          : 'Message webhook processing failed',
         requestId,
         processingTime,
         processed: result.processed,
         errors: result.errors,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.error(`Message webhook error: ${error.message}`, error.stack);
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
@@ -413,8 +435,15 @@ export class WhatsAppWebhookController {
   @ApiOperation({ summary: 'Receive WhatsApp message status webhooks' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-hub-signature-256', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Status webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-hub-signature-256',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status webhook processed successfully',
+  })
   async handleStatusWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -450,16 +479,17 @@ export class WhatsAppWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Status webhook processed' : 'Status webhook processing failed',
+        message: result.success
+          ? 'Status webhook processed'
+          : 'Status webhook processing failed',
         requestId,
         processingTime,
         processed: result.processed,
         errors: result.errors,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.error(`Status webhook error: ${error.message}`, error.stack);
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
@@ -479,8 +509,15 @@ export class WhatsAppWebhookController {
   @ApiOperation({ summary: 'Receive WhatsApp template status webhooks' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-hub-signature-256', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Template webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-hub-signature-256',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Template webhook processed successfully',
+  })
   async handleTemplateWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -516,17 +553,21 @@ export class WhatsAppWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Template webhook processed' : 'Template webhook processing failed',
+        message: result.success
+          ? 'Template webhook processed'
+          : 'Template webhook processing failed',
         requestId,
         processingTime,
         processed: result.processed,
         errors: result.errors,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Template webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Template webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -555,7 +596,9 @@ export class WhatsAppWebhookController {
   // Private helper methods
 
   private generateRequestId(): string {
-    return `whatsapp_webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `whatsapp_webhook_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
   }
 
   private getClientIpAddress(req: Request): string {
@@ -569,9 +612,11 @@ export class WhatsAppWebhookController {
     );
   }
 
-  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+  private sanitizeHeaders(
+    headers: Record<string, string>,
+  ): Record<string, string> {
     const sanitized = { ...headers };
-    
+
     // Remove sensitive headers for logging
     const sensitiveHeaders = [
       'authorization',
@@ -580,7 +625,7 @@ export class WhatsAppWebhookController {
       'cookie',
       'set-cookie',
     ];
-    
+
     sensitiveHeaders.forEach(header => {
       if (sanitized[header]) {
         sanitized[header] = '[REDACTED]';
@@ -589,26 +634,28 @@ export class WhatsAppWebhookController {
         sanitized[header.toLowerCase()] = '[REDACTED]';
       }
     });
-    
+
     return sanitized;
   }
 
   /**
    * Get verify token from channel configuration
    */
-  private async getVerifyToken(tenantId: string, channelId: string): Promise<string | null> {
+  private async getVerifyToken(
+    tenantId: string,
+    channelId: string,
+  ): Promise<string | null> {
     try {
       // This should fetch the verify token from the channel configuration
       // Implementation would involve calling the auth service or directly querying the database
       // For now, we'll return a placeholder
-      
+
       // TODO: Implement actual token retrieval
       // const credentials = await this.authService.getCredentials(tenantId, channelId);
       // return credentials?.verifyToken || null;
-      
+
       // Temporary implementation - in production this should come from database
       return 'your_verify_token_here';
-      
     } catch (error) {
       this.logger.error(`Failed to get verify token: ${error.message}`, {
         tenantId,

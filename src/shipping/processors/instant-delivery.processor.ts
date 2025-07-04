@@ -6,7 +6,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 // Services
 import { InstantDeliveryService } from '../services/instant-delivery.service';
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../integrations/entities/integration-log.entity';
 
 // Job Interfaces
 interface UpdateTrackingJob {
@@ -58,7 +61,9 @@ export class InstantDeliveryProcessor {
     const { tenantId, trackingNumber, provider } = job.data;
 
     try {
-      this.logger.debug(`Processing tracking update for ${trackingNumber} (${provider})`);
+      this.logger.debug(
+        `Processing tracking update for ${trackingNumber} (${provider})`,
+      );
 
       await this.instantDeliveryService.updateInstantDeliveryTracking(
         tenantId,
@@ -79,9 +84,11 @@ export class InstantDeliveryProcessor {
       });
 
       return { success: true, trackingNumber, provider };
-
     } catch (error) {
-      this.logger.error(`Failed to update tracking for ${trackingNumber}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update tracking for ${trackingNumber}: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.log({
         tenantId,
@@ -105,7 +112,9 @@ export class InstantDeliveryProcessor {
     const { tenantId, deliveryIds, provider } = job.data;
 
     try {
-      this.logger.debug(`Processing bulk delivery status sync for ${deliveryIds.length} deliveries`);
+      this.logger.debug(
+        `Processing bulk delivery status sync for ${deliveryIds.length} deliveries`,
+      );
 
       const results = [];
 
@@ -118,7 +127,9 @@ export class InstantDeliveryProcessor {
           );
           results.push({ deliveryId, success: true });
         } catch (error) {
-          this.logger.warn(`Failed to sync delivery ${deliveryId}: ${error.message}`);
+          this.logger.warn(
+            `Failed to sync delivery ${deliveryId}: ${error.message}`,
+          );
           results.push({ deliveryId, success: false, error: error.message });
         }
       }
@@ -138,9 +149,11 @@ export class InstantDeliveryProcessor {
       });
 
       return { success: true, results };
-
     } catch (error) {
-      this.logger.error(`Failed to sync delivery status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync delivery status: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.log({
         tenantId,
@@ -161,10 +174,19 @@ export class InstantDeliveryProcessor {
 
   @Process('notify-delivery-update')
   async handleNotifyDeliveryUpdate(job: Job<NotifyDeliveryUpdateJob>) {
-    const { tenantId, trackingNumber, provider, status, customerPhone, customerEmail } = job.data;
+    const {
+      tenantId,
+      trackingNumber,
+      provider,
+      status,
+      customerPhone,
+      customerEmail,
+    } = job.data;
 
     try {
-      this.logger.debug(`Processing delivery update notification for ${trackingNumber}`);
+      this.logger.debug(
+        `Processing delivery update notification for ${trackingNumber}`,
+      );
 
       // Emit event for notification services to handle
       this.eventEmitter.emit('instant.delivery.notification.requested', {
@@ -193,9 +215,11 @@ export class InstantDeliveryProcessor {
       });
 
       return { success: true, trackingNumber, status };
-
     } catch (error) {
-      this.logger.error(`Failed to send delivery notification: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send delivery notification: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.log({
         tenantId,
@@ -220,7 +244,9 @@ export class InstantDeliveryProcessor {
     const { tenantId, olderThanDays } = job.data;
 
     try {
-      this.logger.debug(`Processing cleanup of tracking data older than ${olderThanDays} days`);
+      this.logger.debug(
+        `Processing cleanup of tracking data older than ${olderThanDays} days`,
+      );
 
       // This would be implemented in the instant delivery service
       // For now, we'll just log the cleanup request
@@ -240,9 +266,11 @@ export class InstantDeliveryProcessor {
       });
 
       return { success: true, cutoffDate, olderThanDays };
-
     } catch (error) {
-      this.logger.error(`Failed to cleanup old tracking data: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cleanup old tracking data: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.log({
         tenantId,
@@ -265,7 +293,11 @@ export class InstantDeliveryProcessor {
     const { tenantId, dateFrom, dateTo, provider, reportType } = job.data;
 
     try {
-      this.logger.debug(`Processing delivery report generation: ${reportType} for ${provider || 'all providers'}`);
+      this.logger.debug(
+        `Processing delivery report generation: ${reportType} for ${
+          provider || 'all providers'
+        }`,
+      );
 
       // This would generate actual reports - for now we'll emit an event
       this.eventEmitter.emit('instant.delivery.report.requested', {
@@ -292,9 +324,11 @@ export class InstantDeliveryProcessor {
       });
 
       return { success: true, reportType, provider, dateFrom, dateTo };
-
     } catch (error) {
-      this.logger.error(`Failed to generate delivery report: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate delivery report: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.log({
         tenantId,
@@ -316,16 +350,20 @@ export class InstantDeliveryProcessor {
   }
 
   @Process('webhook-processing')
-  async handleWebhookProcessing(job: Job<{
-    tenantId: string;
-    provider: 'gojek' | 'grab';
-    webhookData: any;
-    signature?: string;
-  }>) {
+  async handleWebhookProcessing(
+    job: Job<{
+      tenantId: string;
+      provider: 'gojek' | 'grab';
+      webhookData: any;
+      signature?: string;
+    }>,
+  ) {
     const { tenantId, provider, webhookData, signature } = job.data;
 
     try {
-      this.logger.debug(`Processing ${provider} webhook for tenant ${tenantId}`);
+      this.logger.debug(
+        `Processing ${provider} webhook for tenant ${tenantId}`,
+      );
 
       // Verify webhook signature if provided
       if (signature) {
@@ -380,9 +418,11 @@ export class InstantDeliveryProcessor {
       });
 
       return { success: true, provider, trackingNumber, status };
-
     } catch (error) {
-      this.logger.error(`Failed to process ${provider} webhook: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to process ${provider} webhook: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.log({
         tenantId,
@@ -402,31 +442,46 @@ export class InstantDeliveryProcessor {
   }
 
   @Process('retry-failed-operation')
-  async handleRetryFailedOperation(job: Job<{
-    tenantId: string;
-    operation: 'create' | 'update' | 'cancel';
-    operationData: any;
-    provider: 'gojek' | 'grab';
-    originalJobId?: string;
-    retryCount: number;
-  }>) {
-    const { tenantId, operation, operationData, provider, originalJobId, retryCount } = job.data;
+  async handleRetryFailedOperation(
+    job: Job<{
+      tenantId: string;
+      operation: 'create' | 'update' | 'cancel';
+      operationData: any;
+      provider: 'gojek' | 'grab';
+      originalJobId?: string;
+      retryCount: number;
+    }>,
+  ) {
+    const {
+      tenantId,
+      operation,
+      operationData,
+      provider,
+      originalJobId,
+      retryCount,
+    } = job.data;
 
     try {
-      this.logger.debug(`Retrying failed ${operation} operation for ${provider} (attempt ${retryCount})`);
+      this.logger.debug(
+        `Retrying failed ${operation} operation for ${provider} (attempt ${retryCount})`,
+      );
 
       let result;
 
       switch (operation) {
         case 'create':
-          result = await this.instantDeliveryService.createInstantDelivery(tenantId, operationData);
+          result = await this.instantDeliveryService.createInstantDelivery(
+            tenantId,
+            operationData,
+          );
           break;
         case 'update':
-          result = await this.instantDeliveryService.updateInstantDeliveryTracking(
-            tenantId,
-            operationData.trackingNumber,
-            provider,
-          );
+          result =
+            await this.instantDeliveryService.updateInstantDeliveryTracking(
+              tenantId,
+              operationData.trackingNumber,
+              provider,
+            );
           break;
         case 'cancel':
           result = await this.instantDeliveryService.cancelInstantDelivery(
@@ -464,9 +519,11 @@ export class InstantDeliveryProcessor {
       });
 
       return { success: true, operation, provider, retryCount, result };
-
     } catch (error) {
-      this.logger.error(`Retry attempt ${retryCount} failed for ${operation}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Retry attempt ${retryCount} failed for ${operation}: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.log({
         tenantId,

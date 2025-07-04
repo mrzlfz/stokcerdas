@@ -28,10 +28,24 @@ import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
 import { UserRole } from '../../../users/entities/user.entity';
 
-import { LazadaAuthService, LazadaAuthConfig } from '../services/lazada-auth.service';
-import { LazadaProductService, ProductSyncOptions } from '../services/lazada-product.service';
-import { LazadaOrderService, OrderSyncOptions } from '../services/lazada-order.service';
-import { LazadaInventoryService, InventorySyncOptions, StockUpdateRequest, PriceUpdateRequest } from '../services/lazada-inventory.service';
+import {
+  LazadaAuthService,
+  LazadaAuthConfig,
+} from '../services/lazada-auth.service';
+import {
+  LazadaProductService,
+  ProductSyncOptions,
+} from '../services/lazada-product.service';
+import {
+  LazadaOrderService,
+  OrderSyncOptions,
+} from '../services/lazada-order.service';
+import {
+  LazadaInventoryService,
+  InventorySyncOptions,
+  StockUpdateRequest,
+  PriceUpdateRequest,
+} from '../services/lazada-inventory.service';
 
 // DTOs for API validation
 export class LazadaAuthConfigDto {
@@ -119,7 +133,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get Lazada authorization URL' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authorization URL generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authorization URL generated successfully',
+  })
   async getAuthorizationUrl(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -137,7 +154,10 @@ export class LazadaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get authorization URL: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get authorization URL: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -161,7 +181,10 @@ export class LazadaController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Access token obtained successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Access token obtained successfully',
+  })
   async exchangeToken(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -184,7 +207,10 @@ export class LazadaController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to exchange token: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to exchange token: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -199,7 +225,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Access token refreshed successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Access token refreshed successfully',
+  })
   async refreshToken(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -218,7 +247,10 @@ export class LazadaController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to refresh token: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to refresh token: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -233,7 +265,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get authentication status' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authentication status retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication status retrieved successfully',
+  })
   async getAuthStatus(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -249,7 +284,10 @@ export class LazadaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get auth status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get auth status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -264,7 +302,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test authentication with current credentials' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Authentication tested successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Authentication tested successfully',
+  })
   async testAuthentication(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -280,7 +321,10 @@ export class LazadaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -295,7 +339,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication revoked successfully',
+  })
   async revokeAuthentication(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -311,7 +358,10 @@ export class LazadaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -328,7 +378,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync products from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Product sync initiated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Product sync initiated successfully',
+  })
   async syncProducts(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -336,14 +389,14 @@ export class LazadaController {
   ) {
     try {
       const syncOptions: ProductSyncOptions = {};
-      
+
       if (options) {
         syncOptions.offset = options.offset;
         syncOptions.limit = options.limit;
         syncOptions.filter = options.filter;
         syncOptions.search = options.search;
         syncOptions.sku = options.sku;
-        
+
         if (options.createdAfter) {
           syncOptions.createdAfter = new Date(options.createdAfter);
         }
@@ -403,7 +456,10 @@ export class LazadaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Single product sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Single product sync failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -419,7 +475,10 @@ export class LazadaController {
   @ApiOperation({ summary: 'Get Lazada product details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'itemId', description: 'Lazada Item ID' })
-  @ApiResponse({ status: 200, description: 'Product details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Product details retrieved successfully',
+  })
   async getProductDetails(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -437,7 +496,10 @@ export class LazadaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get product details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get product details: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -454,7 +516,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync orders from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Order sync initiated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Order sync initiated successfully',
+  })
   async syncOrders(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -462,14 +527,14 @@ export class LazadaController {
   ) {
     try {
       const syncOptions: OrderSyncOptions = {};
-      
+
       if (options) {
         syncOptions.offset = options.offset;
         syncOptions.limit = options.limit;
         syncOptions.status = options.status;
         syncOptions.sortBy = options.sortBy;
         syncOptions.sortDirection = options.sortDirection;
-        
+
         if (options.createdAfter) {
           syncOptions.createdAfter = new Date(options.createdAfter);
         }
@@ -511,7 +576,10 @@ export class LazadaController {
   @ApiOperation({ summary: 'Get Lazada order details' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'orderNumber', description: 'Lazada Order Number' })
-  @ApiResponse({ status: 200, description: 'Order details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Order details retrieved successfully',
+  })
   async getOrderDetails(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -529,7 +597,10 @@ export class LazadaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get order details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order details: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -599,7 +670,10 @@ export class LazadaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to cancel order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel order: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -616,7 +690,10 @@ export class LazadaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Sync inventory from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Inventory sync initiated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Inventory sync initiated successfully',
+  })
   async syncInventory(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -718,7 +795,10 @@ export class LazadaController {
   @ApiOperation({ summary: 'Get stock levels from Lazada' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiQuery({ name: 'skus', description: 'Comma-separated seller SKUs' })
-  @ApiResponse({ status: 200, description: 'Stock levels retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stock levels retrieved successfully',
+  })
   async getStock(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -726,7 +806,7 @@ export class LazadaController {
   ) {
     try {
       const sellerSkus = skus.split(',').map(sku => sku.trim());
-      
+
       const result = await this.inventoryService.getLazadaStock(
         user.tenantId,
         channelId,
@@ -738,7 +818,10 @@ export class LazadaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get stock levels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get stock levels: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

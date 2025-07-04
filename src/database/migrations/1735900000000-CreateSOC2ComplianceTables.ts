@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateSOC2ComplianceTables1735900000000 implements MigrationInterface {
+export class CreateSOC2ComplianceTables1735900000000
+  implements MigrationInterface
+{
   name = 'CreateSOC2ComplianceTables1735900000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -955,30 +957,56 @@ export class CreateSOC2ComplianceTables1735900000000 implements MigrationInterfa
     );
 
     // Create indexes for SOC2 Controls
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_controls_tenant_id_is_deleted" ON "soc2_controls" ("tenant_id", "is_deleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_controls_control_id" ON "soc2_controls" ("control_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_controls_criteria_status" ON "soc2_controls" ("criteria", "status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_controls_tenant_id_is_deleted" ON "soc2_controls" ("tenant_id", "is_deleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_controls_control_id" ON "soc2_controls" ("control_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_controls_criteria_status" ON "soc2_controls" ("criteria", "status")`,
+    );
 
     // Create indexes for SOC2 Control Evidence
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_control_evidence_tenant_id_control_id" ON "soc2_control_evidence" ("tenant_id", "control_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_control_evidence_tenant_id_control_id" ON "soc2_control_evidence" ("tenant_id", "control_id")`,
+    );
 
     // Create indexes for SOC2 Control Tests
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_control_tests_tenant_id_control_id_test_date" ON "soc2_control_tests" ("tenant_id", "control_id", "test_date")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_control_tests_tenant_id_control_id_test_date" ON "soc2_control_tests" ("tenant_id", "control_id", "test_date")`,
+    );
 
     // Create indexes for SOC2 Audit Logs
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_logs_tenant_id_event_type_timestamp" ON "soc2_audit_logs" ("tenant_id", "event_type", "timestamp")`);
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_logs_tenant_id_user_id_timestamp" ON "soc2_audit_logs" ("tenant_id", "user_id", "timestamp")`);
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_logs_tenant_id_ip_address_timestamp" ON "soc2_audit_logs" ("tenant_id", "ip_address", "timestamp")`);
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_logs_tenant_id_severity_timestamp" ON "soc2_audit_logs" ("tenant_id", "severity", "timestamp")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_logs_session_id" ON "soc2_audit_logs" ("session_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_logs_correlation_id" ON "soc2_audit_logs" ("correlation_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_logs_tenant_id_event_type_timestamp" ON "soc2_audit_logs" ("tenant_id", "event_type", "timestamp")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_logs_tenant_id_user_id_timestamp" ON "soc2_audit_logs" ("tenant_id", "user_id", "timestamp")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_logs_tenant_id_ip_address_timestamp" ON "soc2_audit_logs" ("tenant_id", "ip_address", "timestamp")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_logs_tenant_id_severity_timestamp" ON "soc2_audit_logs" ("tenant_id", "severity", "timestamp")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_logs_session_id" ON "soc2_audit_logs" ("session_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_logs_correlation_id" ON "soc2_audit_logs" ("correlation_id")`,
+    );
 
     // Create indexes for SOC2 Audit Log Retention Rules
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_log_retention_rules_tenant_id_event_type" ON "soc2_audit_log_retention_rules" ("tenant_id", "event_type")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_log_retention_rules_tenant_id_event_type" ON "soc2_audit_log_retention_rules" ("tenant_id", "event_type")`,
+    );
 
     // Create indexes for SOC2 Audit Log Alerts
-    await queryRunner.query(`CREATE INDEX "IDX_soc2_audit_log_alerts_tenant_id_alert_type_is_active" ON "soc2_audit_log_alerts" ("tenant_id", "alert_type", "is_active")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_soc2_audit_log_alerts_tenant_id_alert_type_is_active" ON "soc2_audit_log_alerts" ("tenant_id", "alert_type", "is_active")`,
+    );
 
     // Create foreign key constraints
     await queryRunner.query(`
@@ -993,25 +1021,66 @@ export class CreateSOC2ComplianceTables1735900000000 implements MigrationInterfa
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign keys
     const auditLogsTable = await queryRunner.getTable('soc2_audit_logs');
-    const userForeignKey = auditLogsTable.foreignKeys.find(fk => fk.columnNames.indexOf('user_id') !== -1);
+    const userForeignKey = auditLogsTable.foreignKeys.find(
+      fk => fk.columnNames.indexOf('user_id') !== -1,
+    );
     if (userForeignKey) {
       await queryRunner.dropForeignKey('soc2_audit_logs', userForeignKey);
     }
 
     // Drop indexes
-    await queryRunner.dropIndex('soc2_controls', 'IDX_soc2_controls_tenant_id_is_deleted');
-    await queryRunner.dropIndex('soc2_controls', 'IDX_soc2_controls_control_id');
-    await queryRunner.dropIndex('soc2_controls', 'IDX_soc2_controls_criteria_status');
-    await queryRunner.dropIndex('soc2_control_evidence', 'IDX_soc2_control_evidence_tenant_id_control_id');
-    await queryRunner.dropIndex('soc2_control_tests', 'IDX_soc2_control_tests_tenant_id_control_id_test_date');
-    await queryRunner.dropIndex('soc2_audit_logs', 'IDX_soc2_audit_logs_tenant_id_event_type_timestamp');
-    await queryRunner.dropIndex('soc2_audit_logs', 'IDX_soc2_audit_logs_tenant_id_user_id_timestamp');
-    await queryRunner.dropIndex('soc2_audit_logs', 'IDX_soc2_audit_logs_tenant_id_ip_address_timestamp');
-    await queryRunner.dropIndex('soc2_audit_logs', 'IDX_soc2_audit_logs_tenant_id_severity_timestamp');
-    await queryRunner.dropIndex('soc2_audit_logs', 'IDX_soc2_audit_logs_session_id');
-    await queryRunner.dropIndex('soc2_audit_logs', 'IDX_soc2_audit_logs_correlation_id');
-    await queryRunner.dropIndex('soc2_audit_log_retention_rules', 'IDX_soc2_audit_log_retention_rules_tenant_id_event_type');
-    await queryRunner.dropIndex('soc2_audit_log_alerts', 'IDX_soc2_audit_log_alerts_tenant_id_alert_type_is_active');
+    await queryRunner.dropIndex(
+      'soc2_controls',
+      'IDX_soc2_controls_tenant_id_is_deleted',
+    );
+    await queryRunner.dropIndex(
+      'soc2_controls',
+      'IDX_soc2_controls_control_id',
+    );
+    await queryRunner.dropIndex(
+      'soc2_controls',
+      'IDX_soc2_controls_criteria_status',
+    );
+    await queryRunner.dropIndex(
+      'soc2_control_evidence',
+      'IDX_soc2_control_evidence_tenant_id_control_id',
+    );
+    await queryRunner.dropIndex(
+      'soc2_control_tests',
+      'IDX_soc2_control_tests_tenant_id_control_id_test_date',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_logs',
+      'IDX_soc2_audit_logs_tenant_id_event_type_timestamp',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_logs',
+      'IDX_soc2_audit_logs_tenant_id_user_id_timestamp',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_logs',
+      'IDX_soc2_audit_logs_tenant_id_ip_address_timestamp',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_logs',
+      'IDX_soc2_audit_logs_tenant_id_severity_timestamp',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_logs',
+      'IDX_soc2_audit_logs_session_id',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_logs',
+      'IDX_soc2_audit_logs_correlation_id',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_log_retention_rules',
+      'IDX_soc2_audit_log_retention_rules_tenant_id_event_type',
+    );
+    await queryRunner.dropIndex(
+      'soc2_audit_log_alerts',
+      'IDX_soc2_audit_log_alerts_tenant_id_alert_type_is_active',
+    );
 
     // Drop tables
     await queryRunner.dropTable('soc2_audit_log_alerts');

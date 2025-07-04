@@ -4,13 +4,13 @@ import { Repository, FindOptionsWhere, Between, In, Like } from 'typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { 
-  SOC2AuditLog, 
-  SOC2AuditLogRetentionRule, 
+import {
+  SOC2AuditLog,
+  SOC2AuditLogRetentionRule,
   SOC2AuditLogAlert,
   AuditEventType,
   AuditEventSeverity,
-  AuditEventOutcome 
+  AuditEventOutcome,
 } from '../entities/soc2-audit-log.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -117,7 +117,10 @@ export class SOC2AuditLogService {
   /**
    * Log an audit event
    */
-  async logEvent(tenantId: string, logEntry: AuditLogEntry): Promise<SOC2AuditLog> {
+  async logEvent(
+    tenantId: string,
+    logEntry: AuditLogEntry,
+  ): Promise<SOC2AuditLog> {
     try {
       const auditLog = this.auditLogRepository.create({
         tenantId,
@@ -142,7 +145,10 @@ export class SOC2AuditLogService {
 
       return savedLog;
     } catch (error) {
-      this.logger.error(`Error logging audit event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error logging audit event: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -157,10 +163,14 @@ export class SOC2AuditLogService {
     user?: User,
     ipAddress?: string,
     userAgent?: string,
-    additionalData?: any
+    additionalData?: any,
   ): Promise<SOC2AuditLog> {
     const severity = this.determineAuthEventSeverity(eventType, outcome);
-    const description = this.generateAuthEventDescription(eventType, outcome, user?.email);
+    const description = this.generateAuthEventDescription(
+      eventType,
+      outcome,
+      user?.email,
+    );
 
     return this.logEvent(tenantId, {
       eventType,
@@ -191,9 +201,11 @@ export class SOC2AuditLogService {
     httpMethod?: string,
     httpUrl?: string,
     outcome: AuditEventOutcome = AuditEventOutcome.SUCCESS,
-    additionalData?: any
+    additionalData?: any,
   ): Promise<SOC2AuditLog> {
-    const description = `${user.email} ${this.getActionDescription(eventType)} ${resourceType} ${resourceName || resourceId}`;
+    const description = `${user.email} ${this.getActionDescription(
+      eventType,
+    )} ${resourceType} ${resourceName || resourceId}`;
 
     return this.logEvent(tenantId, {
       eventType,
@@ -225,7 +237,7 @@ export class SOC2AuditLogService {
     outcome: AuditEventOutcome,
     previousValues?: Record<string, any>,
     newValues?: Record<string, any>,
-    additionalData?: any
+    additionalData?: any,
   ): Promise<SOC2AuditLog> {
     return this.logEvent(tenantId, {
       eventType,
@@ -253,7 +265,7 @@ export class SOC2AuditLogService {
     severity: AuditEventSeverity,
     ipAddress?: string,
     userId?: string,
-    additionalData?: any
+    additionalData?: any,
   ): Promise<SOC2AuditLog> {
     return this.logEvent(tenantId, {
       eventType,
@@ -308,7 +320,7 @@ export class SOC2AuditLogService {
       if (query.startDate || query.endDate) {
         where.timestamp = Between(
           query.startDate || new Date(0),
-          query.endDate || new Date()
+          query.endDate || new Date(),
         );
       }
 
@@ -329,7 +341,10 @@ export class SOC2AuditLogService {
 
       return { logs, total };
     } catch (error) {
-      this.logger.error(`Error querying audit logs: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error querying audit logs: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -340,7 +355,7 @@ export class SOC2AuditLogService {
   async generateSecurityAnalysis(
     tenantId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<SecurityAnalysis> {
     try {
       const logs = await this.auditLogRepository.find({
@@ -354,36 +369,48 @@ export class SOC2AuditLogService {
 
       const totalEvents = logs.length;
       const securityEvents = logs.filter(log => log.isSecurityEvent).length;
-      const privilegedActions = logs.filter(log => log.isPrivilegedAction).length;
-      const failedAttempts = logs.filter(log => log.outcome === AuditEventOutcome.FAILURE).length;
-      const suspiciousActivity = logs.filter(log => 
-        log.eventType === AuditEventType.SUSPICIOUS_ACTIVITY ||
-        log.eventType === AuditEventType.BRUTE_FORCE_ATTEMPT ||
-        log.eventType === AuditEventType.UNAUTHORIZED_ACCESS_ATTEMPT
+      const privilegedActions = logs.filter(
+        log => log.isPrivilegedAction,
+      ).length;
+      const failedAttempts = logs.filter(
+        log => log.outcome === AuditEventOutcome.FAILURE,
+      ).length;
+      const suspiciousActivity = logs.filter(
+        log =>
+          log.eventType === AuditEventType.SUSPICIOUS_ACTIVITY ||
+          log.eventType === AuditEventType.BRUTE_FORCE_ATTEMPT ||
+          log.eventType === AuditEventType.UNAUTHORIZED_ACCESS_ATTEMPT,
       ).length;
 
       // Analyze users
-      const userStats = new Map<string, {
-        userId: string;
-        userEmail: string;
-        eventCount: number;
-        riskScore: number;
-      }>();
+      const userStats = new Map<
+        string,
+        {
+          userId: string;
+          userEmail: string;
+          eventCount: number;
+          riskScore: number;
+        }
+      >();
 
       // Analyze IP addresses
-      const ipStats = new Map<string, {
-        ipAddress: string;
-        eventCount: number;
-        uniqueUsers: Set<string>;
-        riskScore: number;
-      }>();
+      const ipStats = new Map<
+        string,
+        {
+          ipAddress: string;
+          eventCount: number;
+          uniqueUsers: Set<string>;
+          riskScore: number;
+        }
+      >();
 
       // Event type and severity counters
       const eventsByType: Record<string, number> = {};
       const eventsBySeverity: Record<string, number> = {};
 
       // Risk trends by hour
-      const riskTrends: Map<number, { riskScore: number; eventCount: number }> = new Map();
+      const riskTrends: Map<number, { riskScore: number; eventCount: number }> =
+        new Map();
 
       for (const log of logs) {
         // User statistics
@@ -415,7 +442,8 @@ export class SOC2AuditLogService {
 
         // Event type counting
         eventsByType[log.eventType] = (eventsByType[log.eventType] || 0) + 1;
-        eventsBySeverity[log.severity] = (eventsBySeverity[log.severity] || 0) + 1;
+        eventsBySeverity[log.severity] =
+          (eventsBySeverity[log.severity] || 0) + 1;
 
         // Risk trends by hour
         const hour = log.timestamp.getHours();
@@ -467,12 +495,18 @@ export class SOC2AuditLogService {
         topUsers,
         topIpAddresses,
         eventsByType: eventsByType as Record<AuditEventType, number>,
-        eventsBySeverity: eventsBySeverity as Record<AuditEventSeverity, number>,
+        eventsBySeverity: eventsBySeverity as Record<
+          AuditEventSeverity,
+          number
+        >,
         riskTrends: riskTrendsArray,
         alerts,
       };
     } catch (error) {
-      this.logger.error(`Error generating security analysis: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error generating security analysis: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -498,25 +532,35 @@ export class SOC2AuditLogService {
           .delete()
           .where('eventType = :eventType', { eventType: rule.eventType })
           .andWhere('timestamp < :cutoffDate', { cutoffDate })
-          .andWhere('NOT requiresLegalHold', { requiresLegalHold: rule.requiresLegalHold })
+          .andWhere('NOT requiresLegalHold', {
+            requiresLegalHold: rule.requiresLegalHold,
+          })
           .execute();
 
         const deletedCount = deleteResult.affected || 0;
         if (deletedCount > 0) {
-          this.logger.log(`Deleted ${deletedCount} logs for event type: ${rule.eventType}`);
+          this.logger.log(
+            `Deleted ${deletedCount} logs for event type: ${rule.eventType}`,
+          );
         }
       }
 
       this.logger.log('Audit log cleanup completed');
     } catch (error) {
-      this.logger.error(`Error during audit log cleanup: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error during audit log cleanup: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
   /**
    * Check for security alerts based on audit log patterns
    */
-  private async checkAlerts(tenantId: string, log: SOC2AuditLog): Promise<void> {
+  private async checkAlerts(
+    tenantId: string,
+    log: SOC2AuditLog,
+  ): Promise<void> {
     try {
       const alerts = await this.alertRepository.find({
         where: {
@@ -528,7 +572,7 @@ export class SOC2AuditLogService {
 
       for (const alert of alerts) {
         const shouldTrigger = await this.evaluateAlertConditions(alert, log);
-        
+
         if (shouldTrigger) {
           await this.triggerAlert(alert, log);
         }
@@ -540,12 +584,15 @@ export class SOC2AuditLogService {
 
   private async evaluateAlertConditions(
     alert: SOC2AuditLogAlert,
-    log: SOC2AuditLog
+    log: SOC2AuditLog,
   ): Promise<boolean> {
     const conditions = alert.conditions;
 
     // Check event types
-    if (conditions.eventTypes && !conditions.eventTypes.includes(log.eventType)) {
+    if (
+      conditions.eventTypes &&
+      !conditions.eventTypes.includes(log.eventType)
+    ) {
       return false;
     }
 
@@ -555,13 +602,18 @@ export class SOC2AuditLogService {
     }
 
     // Check risk score threshold
-    if (conditions.riskScoreThreshold && log.riskScore < conditions.riskScoreThreshold) {
+    if (
+      conditions.riskScoreThreshold &&
+      log.riskScore < conditions.riskScoreThreshold
+    ) {
       return false;
     }
 
     // Check time window and threshold for frequency-based alerts
     if (conditions.timeWindow && conditions.threshold) {
-      const windowStart = new Date(Date.now() - conditions.timeWindow * 60 * 1000);
+      const windowStart = new Date(
+        Date.now() - conditions.timeWindow * 60 * 1000,
+      );
       const recentEvents = await this.auditLogRepository.count({
         where: {
           tenantId: log.tenantId,
@@ -579,7 +631,10 @@ export class SOC2AuditLogService {
     return true;
   }
 
-  private async triggerAlert(alert: SOC2AuditLogAlert, log: SOC2AuditLog): Promise<void> {
+  private async triggerAlert(
+    alert: SOC2AuditLogAlert,
+    log: SOC2AuditLog,
+  ): Promise<void> {
     try {
       // Update alert statistics
       alert.triggerCount++;
@@ -604,16 +659,21 @@ export class SOC2AuditLogService {
         actions: alert.actions,
       });
 
-      this.logger.warn(`Alert triggered: ${alert.alertName} for event: ${log.eventType}`);
+      this.logger.warn(
+        `Alert triggered: ${alert.alertName} for event: ${log.eventType}`,
+      );
     } catch (error) {
-      this.logger.error(`Error triggering alert: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error triggering alert: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
   private async getRecentAlerts(
     tenantId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<any[]> {
     const alerts = await this.alertRepository.find({
       where: {
@@ -644,7 +704,7 @@ export class SOC2AuditLogService {
       AuditEventOutcome.SUCCESS,
       payload.user,
       payload.ipAddress,
-      payload.userAgent
+      payload.userAgent,
     );
   }
 
@@ -657,7 +717,7 @@ export class SOC2AuditLogService {
       payload.user,
       payload.ipAddress,
       payload.userAgent,
-      { reason: payload.reason }
+      { reason: payload.reason },
     );
   }
 
@@ -670,7 +730,7 @@ export class SOC2AuditLogService {
       `User created: ${payload.user.email}`,
       AuditEventOutcome.SUCCESS,
       {},
-      payload.user
+      payload.user,
     );
   }
 
@@ -690,7 +750,7 @@ export class SOC2AuditLogService {
         previousQuantity: payload.previousQuantity,
         newQuantity: payload.newQuantity,
         reason: payload.reason,
-      }
+      },
     );
   }
 
@@ -698,7 +758,7 @@ export class SOC2AuditLogService {
 
   private determineAuthEventSeverity(
     eventType: AuditEventType,
-    outcome: AuditEventOutcome
+    outcome: AuditEventOutcome,
   ): AuditEventSeverity {
     if (outcome === AuditEventOutcome.FAILURE) {
       switch (eventType) {
@@ -709,31 +769,39 @@ export class SOC2AuditLogService {
           return AuditEventSeverity.MEDIUM;
       }
     }
-    
+
     return AuditEventSeverity.LOW;
   }
 
   private generateAuthEventDescription(
     eventType: AuditEventType,
     outcome: AuditEventOutcome,
-    userEmail?: string
+    userEmail?: string,
   ): string {
     const action = eventType.replace('_', ' ').toLowerCase();
-    const status = outcome === AuditEventOutcome.SUCCESS ? 'successful' : 'failed';
+    const status =
+      outcome === AuditEventOutcome.SUCCESS ? 'successful' : 'failed';
     const user = userEmail ? ` for ${userEmail}` : '';
-    
+
     return `${status} ${action}${user}`;
   }
 
   private getActionDescription(eventType: AuditEventType): string {
     switch (eventType) {
-      case AuditEventType.DATA_ACCESS: return 'accessed';
-      case AuditEventType.DATA_CREATE: return 'created';
-      case AuditEventType.DATA_UPDATE: return 'updated';
-      case AuditEventType.DATA_DELETE: return 'deleted';
-      case AuditEventType.DATA_EXPORT: return 'exported';
-      case AuditEventType.DATA_IMPORT: return 'imported';
-      default: return 'performed action on';
+      case AuditEventType.DATA_ACCESS:
+        return 'accessed';
+      case AuditEventType.DATA_CREATE:
+        return 'created';
+      case AuditEventType.DATA_UPDATE:
+        return 'updated';
+      case AuditEventType.DATA_DELETE:
+        return 'deleted';
+      case AuditEventType.DATA_EXPORT:
+        return 'exported';
+      case AuditEventType.DATA_IMPORT:
+        return 'imported';
+      default:
+        return 'performed action on';
     }
   }
 }

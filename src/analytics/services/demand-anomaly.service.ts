@@ -120,18 +120,21 @@ export class DemandAnomalyService {
     query: DemandAnomalyQueryDto,
   ): Promise<DemandAnomalyResponseDto> {
     const startTime = Date.now();
-    
+
     try {
       this.logger.debug(`Detecting demand anomalies for tenant ${tenantId}`);
 
       // Get date range for analysis
       const endDate = query.endDate ? new Date(query.endDate) : new Date();
-      const startDate = query.startDate 
-        ? new Date(query.startDate) 
+      const startDate = query.startDate
+        ? new Date(query.startDate)
         : new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000); // Default 90 days
 
       // Get products to analyze
-      const products = await this.getProductsForAnomalyDetection(tenantId, query);
+      const products = await this.getProductsForAnomalyDetection(
+        tenantId,
+        query,
+      );
 
       const anomalies: DemandAnomalyDto[] = [];
       let totalSpikes = 0;
@@ -148,13 +151,15 @@ export class DemandAnomalyService {
           );
 
           anomalies.push(...productAnomalies);
-          
+
           productAnomalies.forEach(anomaly => {
             if (anomaly.anomalyType === 'spike') totalSpikes++;
             if (anomaly.anomalyType === 'drop') totalDrops++;
           });
         } catch (error) {
-          this.logger.warn(`Failed to detect anomalies for product ${product.id}: ${error.message}`);
+          this.logger.warn(
+            `Failed to detect anomalies for product ${product.id}: ${error.message}`,
+          );
         }
       }
 
@@ -163,12 +168,17 @@ export class DemandAnomalyService {
         if (a.severityScore !== b.severityScore) {
           return b.severityScore - a.severityScore;
         }
-        return new Date(b.anomalyDate).getTime() - new Date(a.anomalyDate).getTime();
+        return (
+          new Date(b.anomalyDate).getTime() - new Date(a.anomalyDate).getTime()
+        );
       });
 
       // Apply pagination
       const startIndex = ((query.page || 1) - 1) * (query.limit || 50);
-      const paginatedData = anomalies.slice(startIndex, startIndex + (query.limit || 50));
+      const paginatedData = anomalies.slice(
+        startIndex,
+        startIndex + (query.limit || 50),
+      );
 
       // Calculate severity distribution
       const severityDistribution = anomalies.reduce((acc, anomaly) => {
@@ -177,9 +187,13 @@ export class DemandAnomalyService {
         return acc;
       }, {} as Record<string, number>);
 
-      const averageDeviation = anomalies.length > 0 
-        ? anomalies.reduce((sum, anomaly) => sum + Math.abs(anomaly.deviationPercent), 0) / anomalies.length
-        : 0;
+      const averageDeviation =
+        anomalies.length > 0
+          ? anomalies.reduce(
+              (sum, anomaly) => sum + Math.abs(anomaly.deviationPercent),
+              0,
+            ) / anomalies.length
+          : 0;
 
       const summary = {
         totalAnomalies: anomalies.length,
@@ -209,10 +223,14 @@ export class DemandAnomalyService {
         summary,
         insights,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to detect demand anomalies: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to detect demand anomalies: ${error.message}`);
+      this.logger.error(
+        `Failed to detect demand anomalies: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to detect demand anomalies: ${error.message}`,
+      );
     }
   }
 
@@ -224,18 +242,24 @@ export class DemandAnomalyService {
     query: SeasonalAnalysisQueryDto,
   ): Promise<SeasonalAnalysisResponseDto> {
     const startTime = Date.now();
-    
+
     try {
       this.logger.debug(`Performing seasonal analysis for tenant ${tenantId}`);
 
       // Get analysis period
       const endDate = query.endDate ? new Date(query.endDate) : new Date();
-      const startDate = query.startDate 
-        ? new Date(query.startDate) 
-        : new Date(endDate.getTime() - (query.analysisPeriodMonths || 12) * 30 * 24 * 60 * 60 * 1000);
+      const startDate = query.startDate
+        ? new Date(query.startDate)
+        : new Date(
+            endDate.getTime() -
+              (query.analysisPeriodMonths || 12) * 30 * 24 * 60 * 60 * 1000,
+          );
 
       // Get products to analyze
-      const products = await this.getProductsForSeasonalAnalysis(tenantId, query);
+      const products = await this.getProductsForSeasonalAnalysis(
+        tenantId,
+        query,
+      );
 
       const seasonalAnalyses: SeasonalAnalysisDto[] = [];
       let totalHighSeasonality = 0;
@@ -251,37 +275,48 @@ export class DemandAnomalyService {
             query,
           );
 
-          if (analysis.seasonalityStrength >= (query.minSeasonalityStrength || 0.3)) {
+          if (
+            analysis.seasonalityStrength >=
+            (query.minSeasonalityStrength || 0.3)
+          ) {
             seasonalAnalyses.push(analysis);
-            
+
             if (analysis.seasonalityStrength > 0.6) {
               totalHighSeasonality++;
             }
             totalSeasonalityStrength += analysis.seasonalityStrength;
           }
         } catch (error) {
-          this.logger.warn(`Failed to analyze seasonality for product ${product.id}: ${error.message}`);
+          this.logger.warn(
+            `Failed to analyze seasonality for product ${product.id}: ${error.message}`,
+          );
         }
       }
 
       // Sort by seasonality strength
-      seasonalAnalyses.sort((a, b) => b.seasonalityStrength - a.seasonalityStrength);
+      seasonalAnalyses.sort(
+        (a, b) => b.seasonalityStrength - a.seasonalityStrength,
+      );
 
       // Apply pagination
       const startIndex = ((query.page || 1) - 1) * (query.limit || 50);
-      const paginatedData = seasonalAnalyses.slice(startIndex, startIndex + (query.limit || 50));
+      const paginatedData = seasonalAnalyses.slice(
+        startIndex,
+        startIndex + (query.limit || 50),
+      );
 
       // Calculate summary statistics
-      const averageSeasonalityStrength = seasonalAnalyses.length > 0 
-        ? totalSeasonalityStrength / seasonalAnalyses.length 
-        : 0;
+      const averageSeasonalityStrength =
+        seasonalAnalyses.length > 0
+          ? totalSeasonalityStrength / seasonalAnalyses.length
+          : 0;
 
       // Find most common peak and low seasons
-      const peakSeasons = seasonalAnalyses.flatMap(analysis => 
-        analysis.peakSeasons.map(peak => peak.period)
+      const peakSeasons = seasonalAnalyses.flatMap(analysis =>
+        analysis.peakSeasons.map(peak => peak.period),
       );
-      const lowSeasons = seasonalAnalyses.flatMap(analysis => 
-        analysis.lowSeasons.map(low => low.period)
+      const lowSeasons = seasonalAnalyses.flatMap(analysis =>
+        analysis.lowSeasons.map(low => low.period),
       );
 
       const mostCommonPeakSeason = this.getMostCommon(peakSeasons);
@@ -315,10 +350,14 @@ export class DemandAnomalyService {
         summary,
         insights,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to perform seasonal analysis: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to perform seasonal analysis: ${error.message}`);
+      this.logger.error(
+        `Failed to perform seasonal analysis: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to perform seasonal analysis: ${error.message}`,
+      );
     }
   }
 
@@ -334,11 +373,15 @@ export class DemandAnomalyService {
       .andWhere('product.isActive = true');
 
     if (query.productId) {
-      queryBuilder.andWhere('product.id = :productId', { productId: query.productId });
+      queryBuilder.andWhere('product.id = :productId', {
+        productId: query.productId,
+      });
     }
 
     if (query.categoryId) {
-      queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId: query.categoryId });
+      queryBuilder.andWhere('product.categoryId = :categoryId', {
+        categoryId: query.categoryId,
+      });
     }
 
     return queryBuilder.getMany();
@@ -352,8 +395,13 @@ export class DemandAnomalyService {
     query: DemandAnomalyQueryDto,
   ): Promise<DemandAnomalyDto[]> {
     // Get daily sales data
-    const salesData = await this.getDailySalesData(tenantId, product.id, startDate, endDate);
-    
+    const salesData = await this.getDailySalesData(
+      tenantId,
+      product.id,
+      startDate,
+      endDate,
+    );
+
     if (salesData.length < 7) {
       return []; // Need at least 7 days of data
     }
@@ -365,25 +413,37 @@ export class DemandAnomalyService {
     for (let i = windowSize; i < salesData.length; i++) {
       const window = salesData.slice(i - windowSize, i);
       const current = salesData[i];
-      
-      const mean = window.reduce((sum, point) => sum + point.value, 0) / window.length;
-      const variance = window.reduce((sum, point) => sum + Math.pow(point.value - mean, 2), 0) / window.length;
+
+      const mean =
+        window.reduce((sum, point) => sum + point.value, 0) / window.length;
+      const variance =
+        window.reduce(
+          (sum, point) => sum + Math.pow(point.value - mean, 2),
+          0,
+        ) / window.length;
       const stdDev = Math.sqrt(variance);
-      
+
       // Calculate z-score
       const zScore = stdDev > 0 ? Math.abs(current.value - mean) / stdDev : 0;
-      
+
       // Determine if it's an anomaly
-      const threshold = this.getSensitivityThreshold(query.sensitivityLevel || 5);
+      const threshold = this.getSensitivityThreshold(
+        query.sensitivityLevel || 5,
+      );
       const isAnomaly = zScore > threshold;
-      
+
       if (isAnomaly) {
-        const deviationPercent = mean > 0 ? ((current.value - mean) / mean) * 100 : 0;
-        
+        const deviationPercent =
+          mean > 0 ? ((current.value - mean) / mean) * 100 : 0;
+
         // Filter by minimum deviation if specified
         if (Math.abs(deviationPercent) >= (query.minDeviationPercent || 25)) {
-          const anomalyType = this.determineAnomalyType(current.value, mean, deviationPercent);
-          
+          const anomalyType = this.determineAnomalyType(
+            current.value,
+            mean,
+            deviationPercent,
+          );
+
           // Apply type filters
           if (this.shouldIncludeAnomaly(anomalyType, query)) {
             const anomaly = await this.createAnomalyDto(
@@ -394,7 +454,7 @@ export class DemandAnomalyService {
               zScore,
               anomalyType,
             );
-            
+
             anomalies.push(anomaly);
           }
         }
@@ -420,10 +480,10 @@ export class DemandAnomalyService {
         endDate: endDate.toISOString(),
       })
       .select([
-        "DATE(transaction.transactionDate) as date",
+        'DATE(transaction.transactionDate) as date',
         'SUM(transaction.quantity) as totalQuantity',
       ])
-      .groupBy("DATE(transaction.transactionDate)")
+      .groupBy('DATE(transaction.transactionDate)')
       .orderBy('date', 'ASC')
       .getRawMany();
 
@@ -462,7 +522,8 @@ export class DemandAnomalyService {
     } else if (Math.abs(deviationPercent) > 25) {
       // Check if it might be seasonal (simplified check)
       const dayOfWeek = new Date().getDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) { // Weekend effect
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        // Weekend effect
         return 'seasonal_deviation';
       } else {
         return 'trend_break';
@@ -478,7 +539,8 @@ export class DemandAnomalyService {
   ): boolean {
     if (anomalyType === 'spike' && !query.detectSpikes) return false;
     if (anomalyType === 'drop' && !query.detectDrops) return false;
-    if (anomalyType === 'seasonal_deviation' && !query.includeSeasonalAnomalies) return false;
+    if (anomalyType === 'seasonal_deviation' && !query.includeSeasonalAnomalies)
+      return false;
     return true;
   }
 
@@ -494,7 +556,11 @@ export class DemandAnomalyService {
     const confidence = Math.min(1.0, Math.max(0.5, severityScore));
 
     // Generate possible causes
-    const possibleCauses = this.generatePossibleCauses(anomalyType, dataPoint.date, deviationPercent);
+    const possibleCauses = this.generatePossibleCauses(
+      anomalyType,
+      dataPoint.date,
+      deviationPercent,
+    );
 
     // Calculate business impact
     const businessImpact = this.calculateAnomalyBusinessImpact(
@@ -505,10 +571,17 @@ export class DemandAnomalyService {
     );
 
     // Generate recommendations
-    const recommendedActions = this.generateAnomalyRecommendations(anomalyType, severityScore);
+    const recommendedActions = this.generateAnomalyRecommendations(
+      anomalyType,
+      severityScore,
+    );
 
     // Analyze pattern context
-    const patternContext = await this.analyzeAnomalyPattern(product.id, dataPoint.date, anomalyType);
+    const patternContext = await this.analyzeAnomalyPattern(
+      product.id,
+      dataPoint.date,
+      anomalyType,
+    );
 
     return {
       productId: product.id,
@@ -549,7 +622,8 @@ export class DemandAnomalyService {
 
     // Month-specific effects
     const month = anomalyDate.getMonth();
-    if (month === 11 || month === 0) { // Dec or Jan
+    if (month === 11 || month === 0) {
+      // Dec or Jan
       causes.push('Year-end holiday season effect');
     }
 
@@ -575,9 +649,11 @@ export class DemandAnomalyService {
   }
 
   private checkForHoliday(date: Date): any {
-    const monthDay = `${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    return this.indonesianHolidays.find(holiday => 
-      holiday.type === 'fixed' && holiday.date === monthDay
+    const monthDay = `${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+    return this.indonesianHolidays.find(
+      holiday => holiday.type === 'fixed' && holiday.date === monthDay,
     );
   }
 
@@ -593,9 +669,9 @@ export class DemandAnomalyService {
   } {
     const sellingPrice = product.sellingPrice || 0;
     const demandDifference = actualDemand - expectedDemand;
-    
+
     const revenueImpact = demandDifference * sellingPrice;
-    
+
     let inventoryImpact = 0;
     let customerSatisfactionImpact = 0;
 
@@ -632,7 +708,7 @@ export class DemandAnomalyService {
         priority: 'high' as const,
         timeline: 'Immediate (24 hours)',
       });
-      
+
       if (severityScore > 0.7) {
         recommendations.push({
           action: 'Check inventory levels dan prepare emergency restock',
@@ -640,7 +716,7 @@ export class DemandAnomalyService {
           timeline: 'Immediate',
         });
       }
-      
+
       recommendations.push({
         action: 'Analyze customer segments untuk targeted marketing',
         priority: 'medium' as const,
@@ -652,13 +728,13 @@ export class DemandAnomalyService {
         priority: 'high' as const,
         timeline: 'Immediate (24 hours)',
       });
-      
+
       recommendations.push({
         action: 'Review marketing strategy dan promotional activities',
         priority: 'medium' as const,
         timeline: '2-5 days',
       });
-      
+
       if (severityScore > 0.7) {
         recommendations.push({
           action: 'Consider pricing adjustment atau promotional campaign',
@@ -695,19 +771,19 @@ export class DemandAnomalyService {
   }> {
     // Simplified pattern analysis - in a real implementation, this would
     // analyze historical anomalies stored in the database
-    
+
     const currentDateObj = new Date(currentDate);
     const dayOfWeek = currentDateObj.getDay();
     const dayOfMonth = currentDateObj.getDate();
-    
+
     // Check for weekly patterns
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const isMonday = dayOfWeek === 1;
-    
+
     // Check for monthly patterns
     const isMonthEnd = dayOfMonth > 25;
     const isMonthStart = dayOfMonth <= 5;
-    
+
     let isRecurring = false;
     let frequency;
     let seasonalPattern = false;
@@ -730,7 +806,9 @@ export class DemandAnomalyService {
       isRecurring,
       frequency,
       seasonalPattern,
-      lastOccurrence: isRecurring ? 'Previous occurrence detected in pattern analysis' : undefined,
+      lastOccurrence: isRecurring
+        ? 'Previous occurrence detected in pattern analysis'
+        : undefined,
     };
   }
 
@@ -741,7 +819,10 @@ export class DemandAnomalyService {
     return 'low';
   }
 
-  private generateAnomalyInsights(anomalies: DemandAnomalyDto[], summary: any): any {
+  private generateAnomalyInsights(
+    anomalies: DemandAnomalyDto[],
+    summary: any,
+  ): any {
     const commonPatterns = [];
     const triggerFactors = [];
     const preventionStrategies = [];
@@ -754,7 +835,9 @@ export class DemandAnomalyService {
     });
 
     if (weekendAnomalies.length > anomalies.length * 0.3) {
-      commonPatterns.push('Weekend patterns significantly different from weekdays');
+      commonPatterns.push(
+        'Weekend patterns significantly different from weekdays',
+      );
     }
 
     const spikeAnomalies = anomalies.filter(a => a.anomalyType === 'spike');
@@ -774,15 +857,27 @@ export class DemandAnomalyService {
 
     // Prevention strategies
     preventionStrategies.push('Implement demand sensing untuk early detection');
-    preventionStrategies.push('Develop scenario planning untuk holiday seasons');
+    preventionStrategies.push(
+      'Develop scenario planning untuk holiday seasons',
+    );
     preventionStrategies.push('Setup competitive monitoring system');
-    preventionStrategies.push('Create flexible inventory buffer untuk anomaly handling');
+    preventionStrategies.push(
+      'Create flexible inventory buffer untuk anomaly handling',
+    );
 
     // Monitoring recommendations
-    monitoringRecommendations.push('Daily anomaly detection dengan automated alerts');
-    monitoringRecommendations.push('Weekly pattern analysis untuk recurring anomalies');
-    monitoringRecommendations.push('Monthly trend review untuk structural changes');
-    monitoringRecommendations.push('Real-time dashboard untuk immediate response');
+    monitoringRecommendations.push(
+      'Daily anomaly detection dengan automated alerts',
+    );
+    monitoringRecommendations.push(
+      'Weekly pattern analysis untuk recurring anomalies',
+    );
+    monitoringRecommendations.push(
+      'Monthly trend review untuk structural changes',
+    );
+    monitoringRecommendations.push(
+      'Real-time dashboard untuk immediate response',
+    );
 
     return {
       commonPatterns,
@@ -804,11 +899,15 @@ export class DemandAnomalyService {
       .andWhere('product.isActive = true');
 
     if (query.productId) {
-      queryBuilder.andWhere('product.id = :productId', { productId: query.productId });
+      queryBuilder.andWhere('product.id = :productId', {
+        productId: query.productId,
+      });
     }
 
     if (query.categoryId) {
-      queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId: query.categoryId });
+      queryBuilder.andWhere('product.categoryId = :categoryId', {
+        categoryId: query.categoryId,
+      });
     }
 
     return queryBuilder.getMany();
@@ -822,32 +921,44 @@ export class DemandAnomalyService {
     query: SeasonalAnalysisQueryDto,
   ): Promise<SeasonalAnalysisDto> {
     // Get sales data with appropriate granularity
-    const salesData = await this.getSeasonalSalesData(tenantId, product.id, startDate, endDate);
-    
+    const salesData = await this.getSeasonalSalesData(
+      tenantId,
+      product.id,
+      startDate,
+      endDate,
+    );
+
     // Perform seasonal decomposition
     const decomposition = this.performSeasonalDecomposition(salesData);
-    
+
     // Analyze patterns
-    const weeklyPatterns = query.includeWeeklyPatterns 
+    const weeklyPatterns = query.includeWeeklyPatterns
       ? this.analyzeWeeklyPatterns(salesData)
       : [];
-    
-    const monthlyPatterns = query.includeMonthlyPatterns 
+
+    const monthlyPatterns = query.includeMonthlyPatterns
       ? this.analyzeMonthlyPatterns(salesData)
       : [];
-    
+
     // Identify peaks and lows
-    const peakSeasons = this.identifyPeakSeasons(decomposition, monthlyPatterns);
+    const peakSeasons = this.identifyPeakSeasons(
+      decomposition,
+      monthlyPatterns,
+    );
     const lowSeasons = this.identifyLowSeasons(decomposition, monthlyPatterns);
-    
+
     // Analyze holiday effects
-    const holidayEffects = query.includeHolidayEffects 
-      ? this.analyzeHolidayEffects(product, salesData, query.useIndonesianHolidays || true)
+    const holidayEffects = query.includeHolidayEffects
+      ? this.analyzeHolidayEffects(
+          product,
+          salesData,
+          query.useIndonesianHolidays || true,
+        )
       : [];
-    
+
     // Generate forecasting insights
     const forecastingInsights = this.generateForecastingInsights(decomposition);
-    
+
     // Create strategic recommendations
     const strategicRecommendations = this.generateStrategicRecommendations(
       product,
@@ -904,7 +1015,9 @@ export class DemandAnomalyService {
     }));
   }
 
-  private performSeasonalDecomposition(data: TimeSeriesDataPoint[]): SeasonalDecomposition {
+  private performSeasonalDecomposition(
+    data: TimeSeriesDataPoint[],
+  ): SeasonalDecomposition {
     if (data.length < 12) {
       // Not enough data for proper seasonal decomposition
       return {
@@ -926,12 +1039,17 @@ export class DemandAnomalyService {
       const start = Math.max(0, i - Math.floor(windowSize / 2));
       const end = Math.min(data.length, i + Math.floor(windowSize / 2) + 1);
       const window = data.slice(start, end);
-      const trendValue = window.reduce((sum, point) => sum + point.value, 0) / window.length;
+      const trendValue =
+        window.reduce((sum, point) => sum + point.value, 0) / window.length;
       trend.push(trendValue);
 
       // Calculate seasonal component (simplified - using weekly cycle)
       const seasonalIndex = i % 52; // Assuming weekly data for yearly seasonality
-      const seasonalAverage = this.calculateSeasonalAverage(data, seasonalIndex, 52);
+      const seasonalAverage = this.calculateSeasonalAverage(
+        data,
+        seasonalIndex,
+        52,
+      );
       const seasonalValue = seasonalAverage - trendValue;
       seasonal.push(seasonalValue);
 
@@ -943,7 +1061,8 @@ export class DemandAnomalyService {
     // Calculate seasonality strength
     const seasonalVariance = this.calculateVariance(seasonal);
     const totalVariance = this.calculateVariance(data.map(d => d.value));
-    const seasonalityStrength = totalVariance > 0 ? Math.min(1, seasonalVariance / totalVariance) : 0;
+    const seasonalityStrength =
+      totalVariance > 0 ? Math.min(1, seasonalVariance / totalVariance) : 0;
 
     return {
       trend,
@@ -953,13 +1072,18 @@ export class DemandAnomalyService {
     };
   }
 
-  private calculateSeasonalAverage(data: TimeSeriesDataPoint[], index: number, period: number): number {
+  private calculateSeasonalAverage(
+    data: TimeSeriesDataPoint[],
+    index: number,
+    period: number,
+  ): number {
     const seasonalPoints = [];
     for (let i = index; i < data.length; i += period) {
       seasonalPoints.push(data[i].value);
     }
-    return seasonalPoints.length > 0 
-      ? seasonalPoints.reduce((sum, val) => sum + val, 0) / seasonalPoints.length 
+    return seasonalPoints.length > 0
+      ? seasonalPoints.reduce((sum, val) => sum + val, 0) /
+          seasonalPoints.length
       : 0;
   }
 
@@ -974,7 +1098,15 @@ export class DemandAnomalyService {
     averageMultiplier: number;
     variance: number;
   }> {
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayNames = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
     const weeklyData = new Map<number, number[]>();
 
     // Group data by day of week
@@ -988,10 +1120,12 @@ export class DemandAnomalyService {
     });
 
     // Calculate overall average
-    const overallAverage = data.reduce((sum, point) => sum + point.value, 0) / data.length;
+    const overallAverage =
+      data.reduce((sum, point) => sum + point.value, 0) / data.length;
 
     return Array.from(weeklyData.entries()).map(([dayOfWeek, values]) => {
-      const dayAverage = values.reduce((sum, val) => sum + val, 0) / values.length;
+      const dayAverage =
+        values.reduce((sum, val) => sum + val, 0) / values.length;
       const multiplier = overallAverage > 0 ? dayAverage / overallAverage : 1;
       const variance = this.calculateVariance(values);
 
@@ -1009,8 +1143,18 @@ export class DemandAnomalyService {
     variance: number;
   }> {
     const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     const monthlyData = new Map<number, number[]>();
 
@@ -1025,10 +1169,12 @@ export class DemandAnomalyService {
     });
 
     // Calculate overall average
-    const overallAverage = data.reduce((sum, point) => sum + point.value, 0) / data.length;
+    const overallAverage =
+      data.reduce((sum, point) => sum + point.value, 0) / data.length;
 
     return Array.from(monthlyData.entries()).map(([month, values]) => {
-      const monthAverage = values.reduce((sum, val) => sum + val, 0) / values.length;
+      const monthAverage =
+        values.reduce((sum, val) => sum + val, 0) / values.length;
       const multiplier = overallAverage > 0 ? monthAverage / overallAverage : 1;
       const variance = this.calculateVariance(values);
 
@@ -1093,11 +1239,12 @@ export class DemandAnomalyService {
     if (!useIndonesianHolidays) return [];
 
     const categoryName = product.category?.name?.toLowerCase() || '';
-    
+
     // Filter holidays relevant to this product category
-    const relevantHolidays = this.indonesianHolidays.filter(holiday =>
-      holiday.categories.includes('all') || 
-      holiday.categories.some(cat => categoryName.includes(cat))
+    const relevantHolidays = this.indonesianHolidays.filter(
+      holiday =>
+        holiday.categories.includes('all') ||
+        holiday.categories.some(cat => categoryName.includes(cat)),
     );
 
     return relevantHolidays.map(holiday => ({
@@ -1116,7 +1263,7 @@ export class DemandAnomalyService {
   } {
     let bestModelType = 'ARIMA';
     let forecastReliability: 'high' | 'medium' | 'low' = 'medium';
-    
+
     if (decomposition.seasonalityStrength > 0.6) {
       bestModelType = 'Prophet';
       forecastReliability = 'high';
@@ -1125,8 +1272,12 @@ export class DemandAnomalyService {
       forecastReliability = 'low';
     }
 
-    const modelAccuracy = Math.max(0.7, 0.9 - (0.2 * (1 - decomposition.seasonalityStrength)));
-    const recommendedForecastHorizon = decomposition.seasonalityStrength > 0.5 ? 90 : 30;
+    const modelAccuracy = Math.max(
+      0.7,
+      0.9 - 0.2 * (1 - decomposition.seasonalityStrength),
+    );
+    const recommendedForecastHorizon =
+      decomposition.seasonalityStrength > 0.5 ? 90 : 30;
 
     return {
       bestModelType,
@@ -1152,7 +1303,8 @@ export class DemandAnomalyService {
     if (decomposition.seasonalityStrength > 0.5) {
       // High seasonality products
       recommendations.push({
-        recommendation: 'Implement seasonal inventory planning dengan safety stock adjustment',
+        recommendation:
+          'Implement seasonal inventory planning dengan safety stock adjustment',
         category: 'inventory' as const,
         impact: 'high' as const,
         implementation: 'Increase inventory 2-3 bulan sebelum peak season',
@@ -1160,7 +1312,9 @@ export class DemandAnomalyService {
 
       if (peakSeasons.length > 0) {
         recommendations.push({
-          recommendation: `Optimize pricing strategy untuk peak seasons: ${peakSeasons.map(p => p.period).join(', ')}`,
+          recommendation: `Optimize pricing strategy untuk peak seasons: ${peakSeasons
+            .map(p => p.period)
+            .join(', ')}`,
           category: 'pricing' as const,
           impact: 'high' as const,
           implementation: 'Increase prices 5-15% during peak periods',
@@ -1168,7 +1322,8 @@ export class DemandAnomalyService {
       }
 
       recommendations.push({
-        recommendation: 'Develop targeted marketing campaigns untuk seasonal peaks',
+        recommendation:
+          'Develop targeted marketing campaigns untuk seasonal peaks',
         category: 'marketing' as const,
         impact: 'medium' as const,
         implementation: 'Pre-season marketing 4-6 minggu sebelum peak',
@@ -1177,14 +1332,18 @@ export class DemandAnomalyService {
 
     if (lowSeasons.length > 0) {
       recommendations.push({
-        recommendation: 'Plan promotional activities during low seasons untuk boost demand',
+        recommendation:
+          'Plan promotional activities during low seasons untuk boost demand',
         category: 'marketing' as const,
         impact: 'medium' as const,
-        implementation: `Promotional campaigns selama ${lowSeasons.map(l => l.period).join(', ')}`,
+        implementation: `Promotional campaigns selama ${lowSeasons
+          .map(l => l.period)
+          .join(', ')}`,
       });
 
       recommendations.push({
-        recommendation: 'Optimize procurement scheduling untuk avoid excess inventory',
+        recommendation:
+          'Optimize procurement scheduling untuk avoid excess inventory',
         category: 'procurement' as const,
         impact: 'medium' as const,
         implementation: 'Reduce orders 20-30% during low season periods',
@@ -1194,17 +1353,21 @@ export class DemandAnomalyService {
     return recommendations;
   }
 
-  private determineTrendDirection(trend: number[]): 'increasing' | 'decreasing' | 'stable' {
+  private determineTrendDirection(
+    trend: number[],
+  ): 'increasing' | 'decreasing' | 'stable' {
     if (trend.length < 2) return 'stable';
-    
+
     const firstHalf = trend.slice(0, Math.floor(trend.length / 2));
     const secondHalf = trend.slice(Math.floor(trend.length / 2));
-    
-    const firstAvg = firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
-    const secondAvg = secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
-    
+
+    const firstAvg =
+      firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
+    const secondAvg =
+      secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
+
     const change = (secondAvg - firstAvg) / firstAvg;
-    
+
     if (change > 0.05) return 'increasing';
     if (change < -0.05) return 'decreasing';
     return 'stable';
@@ -1212,17 +1375,22 @@ export class DemandAnomalyService {
 
   private getMostCommon(items: string[]): string {
     if (items.length === 0) return 'N/A';
-    
+
     const frequency = items.reduce((acc, item) => {
       acc[item] = (acc[item] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
-    return Object.entries(frequency).reduce((max, [item, count]) => 
-      count > max.count ? { item, count } : max, { item: 'N/A', count: 0 }).item;
+
+    return Object.entries(frequency).reduce(
+      (max, [item, count]) => (count > max.count ? { item, count } : max),
+      { item: 'N/A', count: 0 },
+    ).item;
   }
 
-  private generateSeasonalInsights(analyses: SeasonalAnalysisDto[], summary: any): any {
+  private generateSeasonalInsights(
+    analyses: SeasonalAnalysisDto[],
+    summary: any,
+  ): any {
     const seasonalStrategy = [];
     const inventoryPlanning = [];
     const marketingOpportunities = [];
@@ -1230,27 +1398,45 @@ export class DemandAnomalyService {
 
     // Seasonal strategy insights
     if (summary.highSeasonalityProducts > 0) {
-      seasonalStrategy.push(`${summary.highSeasonalityProducts} produk memiliki high seasonality (>60%)`);
-      seasonalStrategy.push('Implement differentiated strategy untuk seasonal vs non-seasonal products');
+      seasonalStrategy.push(
+        `${summary.highSeasonalityProducts} produk memiliki high seasonality (>60%)`,
+      );
+      seasonalStrategy.push(
+        'Implement differentiated strategy untuk seasonal vs non-seasonal products',
+      );
     }
 
-    seasonalStrategy.push(`Peak season dominan: ${summary.mostCommonPeakSeason}`);
+    seasonalStrategy.push(
+      `Peak season dominan: ${summary.mostCommonPeakSeason}`,
+    );
     seasonalStrategy.push(`Low season dominan: ${summary.mostCommonLowSeason}`);
 
     // Inventory planning
     inventoryPlanning.push('Build inventory 2-3 months sebelum peak season');
-    inventoryPlanning.push('Implement dynamic safety stock berdasarkan seasonal patterns');
+    inventoryPlanning.push(
+      'Implement dynamic safety stock berdasarkan seasonal patterns',
+    );
     inventoryPlanning.push('Plan clearance activities during low seasons');
 
     // Marketing opportunities
-    marketingOpportunities.push('Pre-season marketing campaigns untuk build awareness');
-    marketingOpportunities.push('Off-season promotions untuk maintain engagement');
+    marketingOpportunities.push(
+      'Pre-season marketing campaigns untuk build awareness',
+    );
+    marketingOpportunities.push(
+      'Off-season promotions untuk maintain engagement',
+    );
     marketingOpportunities.push('Holiday-specific product bundling strategies');
 
     // Forecasting improvements
-    forecastingImprovements.push('Use seasonal decomposition models untuk high-seasonality products');
-    forecastingImprovements.push('Incorporate holiday calendar dalam forecasting models');
-    forecastingImprovements.push('Regular model validation dengan seasonal holdout testing');
+    forecastingImprovements.push(
+      'Use seasonal decomposition models untuk high-seasonality products',
+    );
+    forecastingImprovements.push(
+      'Incorporate holiday calendar dalam forecasting models',
+    );
+    forecastingImprovements.push(
+      'Regular model validation dengan seasonal holdout testing',
+    );
 
     return {
       seasonalStrategy,

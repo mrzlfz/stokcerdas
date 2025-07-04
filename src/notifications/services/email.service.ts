@@ -21,10 +21,10 @@ export class EmailService {
 
   async sendEmail(options: EmailOptions): Promise<void> {
     this.logger.log(`Sending email to ${options.to}: ${options.subject}`);
-    
+
     // TODO: Implement actual email sending
     // This could use NodeMailer, SendGrid, or other email service
-    
+
     // For now, just log the email
     this.logger.debug('Email content:', {
       to: options.to,
@@ -36,7 +36,7 @@ export class EmailService {
 
   async sendBulkEmail(emails: EmailOptions[]): Promise<void> {
     this.logger.log(`Sending ${emails.length} bulk emails`);
-    
+
     for (const email of emails) {
       await this.sendEmail(email);
     }

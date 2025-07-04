@@ -1,19 +1,40 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Between } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { ShippingLabel, ShippingLabelStatus, ShippingServiceType, InsuranceType } from '../entities/shipping-label.entity';
-import { ShippingTracking, TrackingStatus, TrackingEventType } from '../entities/shipping-tracking.entity';
+import {
+  ShippingLabel,
+  ShippingLabelStatus,
+  ShippingServiceType,
+  InsuranceType,
+} from '../entities/shipping-label.entity';
+import {
+  ShippingTracking,
+  TrackingStatus,
+  TrackingEventType,
+} from '../entities/shipping-tracking.entity';
 import { ShippingRate, RateType } from '../entities/shipping-rate.entity';
-import { Order, OrderStatus, FulfillmentStatus } from '../../orders/entities/order.entity';
+import {
+  Order,
+  OrderStatus,
+  FulfillmentStatus,
+} from '../../orders/entities/order.entity';
 import { UpdateOrderDto } from '../../orders/dto/update-order.dto';
 
 // Services
 import { OrdersService } from '../../orders/services/orders.service';
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../integrations/entities/integration-log.entity';
 
 // Interfaces
 export interface ShippingQuoteRequest {
@@ -144,11 +165,14 @@ export interface ShippingAnalytics {
       cost: number;
       onTimeRate: number;
     }>;
-    serviceTypes: Record<ShippingServiceType, {
-      count: number;
-      totalCost: number;
-      onTimeRate: number;
-    }>;
+    serviceTypes: Record<
+      ShippingServiceType,
+      {
+        count: number;
+        totalCost: number;
+        onTimeRate: number;
+      }
+    >;
   };
 }
 
@@ -175,9 +199,15 @@ export class ShippingService {
   /**
    * Get shipping quotes for a package
    */
-  async getShippingQuotes(tenantId: string, request: ShippingQuoteRequest): Promise<ShippingQuote[]> {
+  async getShippingQuotes(
+    tenantId: string,
+    request: ShippingQuoteRequest,
+  ): Promise<ShippingQuote[]> {
     try {
-      this.logger.debug(`Getting shipping quotes for tenant ${tenantId}`, request);
+      this.logger.debug(
+        `Getting shipping quotes for tenant ${tenantId}`,
+        request,
+      );
 
       // Find available rates for the route
       const rates = await this.shippingRateRepository.find({
@@ -198,12 +228,21 @@ export class ShippingService {
         // Validate package against rate constraints
         const validation = rate.isValidForPackage(request.packageInfo);
         if (!validation.valid) {
-          this.logger.debug(`Rate ${rate.id} invalid for package: ${validation.reasons.join(', ')}`);
+          this.logger.debug(
+            `Rate ${rate.id} invalid for package: ${validation.reasons.join(
+              ', ',
+            )}`,
+          );
           continue;
         }
 
         // Filter by service type if specified
-        if (request.serviceTypes && !request.serviceTypes.includes(this.convertRateTypeToServiceType(rate.rateType))) {
+        if (
+          request.serviceTypes &&
+          !request.serviceTypes.includes(
+            this.convertRateTypeToServiceType(rate.rateType),
+          )
+        ) {
           continue;
         }
 
@@ -211,7 +250,7 @@ export class ShippingService {
         const costCalculation = rate.calculateShippingCost(
           request.packageInfo.weight,
           rate.distanceKm,
-          request.includeInsurance ? request.packageInfo.value : undefined
+          request.includeInsurance ? request.packageInfo.value : undefined,
         );
 
         // Add COD fee if requested
@@ -240,7 +279,8 @@ export class ShippingService {
             sameDay: rate.features?.sameDay,
             nextDay: rate.features?.nextDay,
           },
-          restrictions: validation.reasons.length > 0 ? validation.reasons : undefined,
+          restrictions:
+            validation.reasons.length > 0 ? validation.reasons : undefined,
           rateId: rate.id,
         };
 
@@ -252,9 +292,11 @@ export class ShippingService {
 
       this.logger.debug(`Found ${quotes.length} shipping quotes`);
       return quotes;
-
     } catch (error) {
-      this.logger.error(`Failed to get shipping quotes: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get shipping quotes: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -262,17 +304,25 @@ export class ShippingService {
   /**
    * Create shipping label for an order
    */
-  async createShippingLabel(tenantId: string, request: CreateShippingLabelRequest): Promise<ShippingLabel> {
+  async createShippingLabel(
+    tenantId: string,
+    request: CreateShippingLabelRequest,
+  ): Promise<ShippingLabel> {
     try {
       this.logger.debug(`Creating shipping label for order ${request.orderId}`);
 
       // Validate order exists and can be shipped
-      const order = await this.ordersService.getOrderById(tenantId, request.orderId);
+      const order = await this.ordersService.getOrderById(
+        tenantId,
+        request.orderId,
+      );
       if (!order) {
         throw new NotFoundException('Order not found');
       }
 
-      if (![OrderStatus.CONFIRMED, OrderStatus.PROCESSING].includes(order.status)) {
+      if (
+        ![OrderStatus.CONFIRMED, OrderStatus.PROCESSING].includes(order.status)
+      ) {
         throw new BadRequestException('Order is not ready for shipping');
       }
 
@@ -282,7 +332,9 @@ export class ShippingService {
       });
 
       if (existingLabel && existingLabel.isActive) {
-        throw new BadRequestException('Shipping label already exists for this order');
+        throw new BadRequestException(
+          'Shipping label already exists for this order',
+        );
       }
 
       // Get shipping rate
@@ -326,10 +378,13 @@ export class ShippingService {
       const costCalculation = rate.calculateShippingCost(
         request.packageInfo.weight,
         rate.distanceKm,
-        request.insuredValue
+        request.insuredValue,
       );
 
-      shippingLabel.shippingCost = costCalculation.baseCost + costCalculation.weightCost + costCalculation.distanceCost;
+      shippingLabel.shippingCost =
+        costCalculation.baseCost +
+        costCalculation.weightCost +
+        costCalculation.distanceCost;
       shippingLabel.insuranceCost = costCalculation.insuranceCost;
       shippingLabel.adminFee = costCalculation.adminFee;
       shippingLabel.codAmount = request.codAmount || 0;
@@ -341,13 +396,15 @@ export class ShippingService {
 
       // Set service features
       shippingLabel.isCod = request.isCod || false;
-      shippingLabel.requiresSignature = request.requiresSignature || rate.requiresSignature;
+      shippingLabel.requiresSignature =
+        request.requiresSignature || rate.requiresSignature;
       shippingLabel.isFragile = request.isFragile || false;
 
       // Set delivery estimates
       const pickupDate = new Date();
       shippingLabel.estimatedPickupDate = pickupDate;
-      shippingLabel.estimatedDeliveryDate = rate.getEstimatedDeliveryDate(pickupDate);
+      shippingLabel.estimatedDeliveryDate =
+        rate.getEstimatedDeliveryDate(pickupDate);
 
       // Additional fields
       shippingLabel.notes = request.notes;
@@ -388,9 +445,11 @@ export class ShippingService {
       });
 
       return savedLabel;
-
     } catch (error) {
-      this.logger.error(`Failed to create shipping label: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create shipping label: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -398,31 +457,41 @@ export class ShippingService {
   /**
    * Generate shipping label (call carrier API)
    */
-  async generateShippingLabel(tenantId: string, shippingLabelId: string): Promise<ShippingLabel> {
+  async generateShippingLabel(
+    tenantId: string,
+    shippingLabelId: string,
+  ): Promise<ShippingLabel> {
     try {
       this.logger.debug(`Generating shipping label ${shippingLabelId}`);
 
-      const shippingLabel = await this.getShippingLabelById(tenantId, shippingLabelId);
-      
+      const shippingLabel = await this.getShippingLabelById(
+        tenantId,
+        shippingLabelId,
+      );
+
       if (shippingLabel.status !== ShippingLabelStatus.DRAFT) {
         throw new BadRequestException('Shipping label is not in draft status');
       }
 
       // TODO: Call carrier API to generate label and get tracking number
       // This would be implemented in carrier-specific services (JNE, J&T, etc.)
-      
+
       // For now, simulate label generation
-      const trackingNumber = this.generateTrackingNumber(shippingLabel.carrierId);
-      
+      const trackingNumber = this.generateTrackingNumber(
+        shippingLabel.carrierId,
+      );
+
       shippingLabel.trackingNumber = trackingNumber;
       shippingLabel.status = ShippingLabelStatus.GENERATED;
       shippingLabel.generatedAt = new Date();
-      
+
       // Simulate label URL (would be returned by carrier API)
       shippingLabel.labelUrl = `https://api.carrier.com/labels/${trackingNumber}.pdf`;
       shippingLabel.labelFormat = 'PDF';
 
-      const updatedLabel = await this.shippingLabelRepository.save(shippingLabel);
+      const updatedLabel = await this.shippingLabelRepository.save(
+        shippingLabel,
+      );
 
       // Create initial tracking entry
       await this.createTrackingEntry(tenantId, {
@@ -458,9 +527,11 @@ export class ShippingService {
       });
 
       return updatedLabel;
-
     } catch (error) {
-      this.logger.error(`Failed to generate shipping label: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate shipping label: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -468,7 +539,10 @@ export class ShippingService {
   /**
    * Get shipping label by ID
    */
-  async getShippingLabelById(tenantId: string, shippingLabelId: string): Promise<ShippingLabel> {
+  async getShippingLabelById(
+    tenantId: string,
+    shippingLabelId: string,
+  ): Promise<ShippingLabel> {
     const shippingLabel = await this.shippingLabelRepository.findOne({
       where: { tenantId, id: shippingLabelId },
       relations: ['order'],
@@ -484,7 +558,10 @@ export class ShippingService {
   /**
    * Get shipping labels for an order
    */
-  async getShippingLabelsByOrder(tenantId: string, orderId: string): Promise<ShippingLabel[]> {
+  async getShippingLabelsByOrder(
+    tenantId: string,
+    orderId: string,
+  ): Promise<ShippingLabel[]> {
     return this.shippingLabelRepository.find({
       where: { tenantId, orderId },
       order: { createdAt: 'DESC' },
@@ -494,7 +571,10 @@ export class ShippingService {
   /**
    * Update tracking information
    */
-  async updateTracking(tenantId: string, updates: TrackingUpdate[]): Promise<void> {
+  async updateTracking(
+    tenantId: string,
+    updates: TrackingUpdate[],
+  ): Promise<void> {
     try {
       this.logger.debug(`Updating tracking for ${updates.length} packages`);
 
@@ -511,9 +591,11 @@ export class ShippingService {
         // Update shipping label status if needed
         await this.updateShippingLabelFromTracking(tenantId, update);
       }
-
     } catch (error) {
-      this.logger.error(`Failed to update tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update tracking: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -521,7 +603,10 @@ export class ShippingService {
   /**
    * Get tracking history for a package
    */
-  async getTrackingHistory(tenantId: string, trackingNumber: string): Promise<ShippingTracking[]> {
+  async getTrackingHistory(
+    tenantId: string,
+    trackingNumber: string,
+  ): Promise<ShippingTracking[]> {
     return this.shippingTrackingRepository.find({
       where: { tenantId, trackingNumber },
       order: { eventTime: 'DESC', sequence: 'DESC' },
@@ -531,7 +616,10 @@ export class ShippingService {
   /**
    * Get shipping analytics
    */
-  async getShippingAnalytics(tenantId: string, dateRange?: { from: Date; to: Date }): Promise<ShippingAnalytics> {
+  async getShippingAnalytics(
+    tenantId: string,
+    dateRange?: { from: Date; to: Date },
+  ): Promise<ShippingAnalytics> {
     try {
       this.logger.debug(`Getting shipping analytics for tenant ${tenantId}`);
 
@@ -547,19 +635,28 @@ export class ShippingService {
 
       // Calculate summary metrics
       const totalShipments = shipments.length;
-      const totalCost = shipments.reduce((sum, s) => sum + Number(s.totalCost), 0);
+      const totalCost = shipments.reduce(
+        (sum, s) => sum + Number(s.totalCost),
+        0,
+      );
       const averageCost = totalShipments > 0 ? totalCost / totalShipments : 0;
 
-      const deliveredShipments = shipments.filter(s => s.status === ShippingLabelStatus.SHIPPED).length;
-      const pendingShipments = shipments.filter(s => [
-        ShippingLabelStatus.DRAFT,
-        ShippingLabelStatus.GENERATED,
-        ShippingLabelStatus.PRINTED
-      ].includes(s.status)).length;
+      const deliveredShipments = shipments.filter(
+        s => s.status === ShippingLabelStatus.SHIPPED,
+      ).length;
+      const pendingShipments = shipments.filter(s =>
+        [
+          ShippingLabelStatus.DRAFT,
+          ShippingLabelStatus.GENERATED,
+          ShippingLabelStatus.PRINTED,
+        ].includes(s.status),
+      ).length;
 
       // On-time delivery calculation (simplified)
-      const onTimeDeliveryRate = deliveredShipments > 0 ? 
-        (deliveredShipments * 0.95) / deliveredShipments * 100 : 0; // Simulate 95% on-time rate
+      const onTimeDeliveryRate =
+        deliveredShipments > 0
+          ? ((deliveredShipments * 0.95) / deliveredShipments) * 100
+          : 0; // Simulate 95% on-time rate
 
       // Carrier performance
       const carrierPerformance = this.calculateCarrierPerformance(shipments);
@@ -583,24 +680,29 @@ export class ShippingService {
         carrierPerformance,
         trends,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get shipping analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get shipping analytics: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   // Private helper methods
 
-  private async createTrackingEntry(tenantId: string, data: {
-    shippingLabelId?: string;
-    trackingNumber: string;
-    status: TrackingStatus;
-    description: string;
-    location?: any;
-    eventTime: Date;
-    additionalData?: any;
-  }): Promise<ShippingTracking> {
+  private async createTrackingEntry(
+    tenantId: string,
+    data: {
+      shippingLabelId?: string;
+      trackingNumber: string;
+      status: TrackingStatus;
+      description: string;
+      location?: any;
+      eventTime: Date;
+      additionalData?: any;
+    },
+  ): Promise<ShippingTracking> {
     let shippingLabelId = data.shippingLabelId;
 
     // Find shipping label if not provided
@@ -612,7 +714,9 @@ export class ShippingService {
     }
 
     if (!shippingLabelId) {
-      throw new NotFoundException(`Shipping label not found for tracking number: ${data.trackingNumber}`);
+      throw new NotFoundException(
+        `Shipping label not found for tracking number: ${data.trackingNumber}`,
+      );
     }
 
     // Get sequence number
@@ -644,7 +748,10 @@ export class ShippingService {
     return this.shippingTrackingRepository.save(tracking);
   }
 
-  private async updateShippingLabelFromTracking(tenantId: string, update: TrackingUpdate): Promise<void> {
+  private async updateShippingLabelFromTracking(
+    tenantId: string,
+    update: TrackingUpdate,
+  ): Promise<void> {
     const shippingLabel = await this.shippingLabelRepository.findOne({
       where: { tenantId, trackingNumber: update.trackingNumber },
     });
@@ -691,7 +798,9 @@ export class ShippingService {
     return `${prefix}${timestamp}${random}`;
   }
 
-  private calculateCarrierPerformance(shipments: ShippingLabel[]): ShippingAnalytics['carrierPerformance'] {
+  private calculateCarrierPerformance(
+    shipments: ShippingLabel[],
+  ): ShippingAnalytics['carrierPerformance'] {
     const carrierStats = shipments.reduce((acc, shipment) => {
       const carrierId = shipment.carrierId;
       if (!acc[carrierId]) {
@@ -718,7 +827,9 @@ export class ShippingService {
     }));
   }
 
-  private calculateDailyTrends(shipments: ShippingLabel[]): ShippingAnalytics['trends']['daily'] {
+  private calculateDailyTrends(
+    shipments: ShippingLabel[],
+  ): ShippingAnalytics['trends']['daily'] {
     // Simplified daily trends calculation
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
@@ -734,7 +845,9 @@ export class ShippingService {
     }));
   }
 
-  private calculateServiceTypeTrends(shipments: ShippingLabel[]): ShippingAnalytics['trends']['serviceTypes'] {
+  private calculateServiceTypeTrends(
+    shipments: ShippingLabel[],
+  ): ShippingAnalytics['trends']['serviceTypes'] {
     return shipments.reduce((acc, shipment) => {
       const serviceType = shipment.serviceType;
       if (!acc[serviceType]) {
@@ -749,7 +862,9 @@ export class ShippingService {
   /**
    * Convert RateType to ShippingServiceType
    */
-  private convertRateTypeToServiceType(rateType: RateType): ShippingServiceType {
+  private convertRateTypeToServiceType(
+    rateType: RateType,
+  ): ShippingServiceType {
     const mapping: Record<RateType, ShippingServiceType> = {
       [RateType.STANDARD]: ShippingServiceType.REGULAR,
       [RateType.EXPRESS]: ShippingServiceType.EXPRESS,
@@ -759,7 +874,7 @@ export class ShippingService {
       [RateType.NEXT_DAY]: ShippingServiceType.NEXT_DAY,
       [RateType.INSTANT]: ShippingServiceType.INSTANT,
     };
-    
+
     return mapping[rateType] || ShippingServiceType.REGULAR;
   }
 }

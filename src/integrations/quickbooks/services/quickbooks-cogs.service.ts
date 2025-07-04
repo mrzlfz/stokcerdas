@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuickBooksApiService, QuickBooksCredentials } from './quickbooks-api.service';
+import {
+  QuickBooksApiService,
+  QuickBooksCredentials,
+} from './quickbooks-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { AccountingAccount } from '../../entities/accounting-account.entity';
 import { Product } from '../../../products/entities/product.entity';
@@ -130,7 +133,9 @@ export class QuickBooksCOGSService {
     errors: string[];
   }> {
     try {
-      this.logger.log(`Calculating COGS for period ${startDate.toISOString()} to ${endDate.toISOString()}`);
+      this.logger.log(
+        `Calculating COGS for period ${startDate.toISOString()} to ${endDate.toISOString()}`,
+      );
 
       // Get accounting account with credentials
       const accountingAccount = await this.accountingAccountRepository.findOne({
@@ -147,18 +152,24 @@ export class QuickBooksCOGSService {
         accessToken: accountingAccount.accessToken!,
         refreshToken: accountingAccount.refreshToken!,
         realmId: accountingAccount.platformConfig?.realmId!,
-        environment: accountingAccount.platformConfig?.environment || 'production',
+        environment:
+          accountingAccount.platformConfig?.environment || 'production',
         expiresAt: accountingAccount.tokenExpiresAt,
       };
 
       // Calculate COGS entries
-      const cogsEntries = await this.calculateCOGSEntries(tenantId, startDate, endDate, config);
-      
+      const cogsEntries = await this.calculateCOGSEntries(
+        tenantId,
+        startDate,
+        endDate,
+        config,
+      );
+
       this.logger.log(`Found ${cogsEntries.length} COGS entries to post`);
 
       // Group entries by date for journal entry posting
       const entriesByDate = this.groupEntriesByDate(cogsEntries);
-      
+
       let entriesPosted = 0;
       let totalCOGS = 0;
       const errors: string[] = [];
@@ -166,25 +177,35 @@ export class QuickBooksCOGSService {
       // Post journal entries to QuickBooks
       for (const [date, entries] of entriesByDate) {
         try {
-          const journalEntry = this.createCOGSJournalEntry(entries, config, date);
-          const dayTotal = entries.reduce((sum, entry) => sum + entry.totalCost, 0);
-          
-          const response = await this.quickBooksApiService.makeQuickBooksRequest(
-            credentials,
-            {
-              method: 'POST',
-              endpoint: '/journalentries',
-              data: { JournalEntry: journalEntry },
-              requiresAuth: true,
-            },
-            tenantId,
-            accountingAccount.channelId!,
+          const journalEntry = this.createCOGSJournalEntry(
+            entries,
+            config,
+            date,
           );
+          const dayTotal = entries.reduce(
+            (sum, entry) => sum + entry.totalCost,
+            0,
+          );
+
+          const response =
+            await this.quickBooksApiService.makeQuickBooksRequest(
+              credentials,
+              {
+                method: 'POST',
+                endpoint: '/journalentries',
+                data: { JournalEntry: journalEntry },
+                requiresAuth: true,
+              },
+              tenantId,
+              accountingAccount.channelId!,
+            );
 
           if (response.success) {
             entriesPosted += entries.length;
             totalCOGS += dayTotal;
-            this.logger.debug(`Posted COGS journal entry for ${date}: $${dayTotal.toFixed(2)}`);
+            this.logger.debug(
+              `Posted COGS journal entry for ${date}: $${dayTotal.toFixed(2)}`,
+            );
           } else {
             const error = `Failed to post COGS for ${date}: ${response.error?.message}`;
             errors.push(error);
@@ -197,7 +218,11 @@ export class QuickBooksCOGSService {
         }
       }
 
-      this.logger.log(`COGS posting completed: ${entriesPosted} entries, total $${totalCOGS.toFixed(2)}`);
+      this.logger.log(
+        `COGS posting completed: ${entriesPosted} entries, total $${totalCOGS.toFixed(
+          2,
+        )}`,
+      );
 
       return {
         success: errors.length === 0,
@@ -205,7 +230,6 @@ export class QuickBooksCOGSService {
         totalCOGS,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`COGS calculation failed: ${error.message}`);
       throw error;
@@ -231,20 +255,22 @@ export class QuickBooksCOGSService {
 
     // Filter by transaction types that affect COGS
     const cogsTransactionTypes = ['sale'];
-    
+
     if (config.includeAdjustments) {
       cogsTransactionTypes.push('adjustment_negative');
     }
-    
+
     if (config.includeTransfers) {
       cogsTransactionTypes.push('transfer_out');
     }
-    
+
     if (config.includeReturns) {
       cogsTransactionTypes.push('return');
     }
 
-    queryBuilder.andWhere('transaction.type IN (:...types)', { types: cogsTransactionTypes });
+    queryBuilder.andWhere('transaction.type IN (:...types)', {
+      types: cogsTransactionTypes,
+    });
 
     // Only negative quantity transactions (outbound) affect COGS
     queryBuilder.andWhere('transaction.quantity < 0');
@@ -271,7 +297,10 @@ export class QuickBooksCOGSService {
         totalCost: Math.abs(transaction.quantity) * unitCost,
         transactionDate: transaction.transactionDate,
         transactionType: this.mapTransactionTypeToCOGSType(transaction.type),
-        orderId: transaction.referenceId && transaction.referenceType === 'order' ? transaction.referenceId : undefined,
+        orderId:
+          transaction.referenceId && transaction.referenceType === 'order'
+            ? transaction.referenceId
+            : undefined,
         locationId: transaction.locationId,
         notes: transaction.notes,
       };
@@ -322,7 +351,10 @@ export class QuickBooksCOGSService {
   ): Promise<number> {
     const result = await this.inventoryTransactionRepository
       .createQueryBuilder('transaction')
-      .select('SUM(transaction.quantity * transaction.unitCost) / SUM(transaction.quantity)', 'averageCost')
+      .select(
+        'SUM(transaction.quantity * transaction.unitCost) / SUM(transaction.quantity)',
+        'averageCost',
+      )
       .where('transaction.tenantId = :tenantId', { tenantId })
       .andWhere('transaction.productId = :productId', { productId })
       .andWhere('transaction.transactionDate <= :asOfDate', { asOfDate })
@@ -395,11 +427,11 @@ export class QuickBooksCOGSService {
 
     for (const entry of entries) {
       const dateKey = entry.transactionDate.toISOString().split('T')[0];
-      
+
       if (!grouped.has(dateKey)) {
         grouped.set(dateKey, []);
       }
-      
+
       grouped.get(dateKey)!.push(entry);
     }
 
@@ -415,7 +447,7 @@ export class QuickBooksCOGSService {
     date: string,
   ): COGSJournalEntry {
     const totalCOGS = entries.reduce((sum, entry) => sum + entry.totalCost, 0);
-    
+
     const journalEntry: COGSJournalEntry = {
       txnDate: date,
       privateNote: `COGS entry for ${entries.length} transactions on ${date}`,
@@ -430,12 +462,16 @@ export class QuickBooksCOGSService {
             accountRef: {
               value: config.cogsAccountId,
             },
-            classRef: config.defaultClassId ? {
-              value: config.defaultClassId,
-            } : undefined,
-            departmentRef: config.defaultDepartmentId ? {
-              value: config.defaultDepartmentId,
-            } : undefined,
+            classRef: config.defaultClassId
+              ? {
+                  value: config.defaultClassId,
+                }
+              : undefined,
+            departmentRef: config.defaultDepartmentId
+              ? {
+                  value: config.defaultDepartmentId,
+                }
+              : undefined,
           },
         },
         // Credit Inventory Asset account
@@ -448,12 +484,16 @@ export class QuickBooksCOGSService {
             accountRef: {
               value: config.inventoryAssetAccountId,
             },
-            classRef: config.defaultClassId ? {
-              value: config.defaultClassId,
-            } : undefined,
-            departmentRef: config.defaultDepartmentId ? {
-              value: config.defaultDepartmentId,
-            } : undefined,
+            classRef: config.defaultClassId
+              ? {
+                  value: config.defaultClassId,
+                }
+              : undefined,
+            departmentRef: config.defaultDepartmentId
+              ? {
+                  value: config.defaultDepartmentId,
+                }
+              : undefined,
           },
         },
       ],
@@ -465,7 +505,9 @@ export class QuickBooksCOGSService {
   /**
    * Map inventory transaction type to COGS type
    */
-  private mapTransactionTypeToCOGSType(transactionType: string): COGSEntry['transactionType'] {
+  private mapTransactionTypeToCOGSType(
+    transactionType: string,
+  ): COGSEntry['transactionType'] {
     const mapping: Record<string, COGSEntry['transactionType']> = {
       sale: 'sale',
       adjustment_negative: 'adjustment',
@@ -485,23 +527,31 @@ export class QuickBooksCOGSService {
     endDate: Date,
     config: COGSConfiguration,
   ): Promise<COGSReport> {
-    const entries = await this.calculateCOGSEntries(tenantId, startDate, endDate, config);
-    
+    const entries = await this.calculateCOGSEntries(
+      tenantId,
+      startDate,
+      endDate,
+      config,
+    );
+
     const totalCOGS = entries.reduce((sum, entry) => sum + entry.totalCost, 0);
-    
+
     // Group by product
-    const byProduct = new Map<string, {
-      productId: string;
-      productName: string;
-      sku?: string;
-      quantitySold: number;
-      totalCost: number;
-    }>();
+    const byProduct = new Map<
+      string,
+      {
+        productId: string;
+        productName: string;
+        sku?: string;
+        quantitySold: number;
+        totalCost: number;
+      }
+    >();
 
     for (const entry of entries) {
       const key = entry.productId;
       const existing = byProduct.get(key);
-      
+
       if (existing) {
         existing.quantitySold += entry.quantity;
         existing.totalCost += entry.totalCost;
@@ -518,7 +568,8 @@ export class QuickBooksCOGSService {
 
     const byProductArray = Array.from(byProduct.values()).map(item => ({
       ...item,
-      averageCost: item.quantitySold > 0 ? item.totalCost / item.quantitySold : 0,
+      averageCost:
+        item.quantitySold > 0 ? item.totalCost / item.quantitySold : 0,
     }));
 
     // For location grouping, we'd need location data
@@ -565,7 +616,12 @@ export class QuickBooksCOGSService {
       includeReturns: true,
     };
 
-    const entries = await this.calculateCOGSEntries(tenantId, startDate, endDate, config);
+    const entries = await this.calculateCOGSEntries(
+      tenantId,
+      startDate,
+      endDate,
+      config,
+    );
     const localCOGS = entries.reduce((sum, entry) => sum + entry.totalCost, 0);
 
     // Get QuickBooks COGS from P&L report
@@ -583,16 +639,18 @@ export class QuickBooksCOGSService {
       accessToken: accountingAccount.accessToken!,
       refreshToken: accountingAccount.refreshToken!,
       realmId: accountingAccount.platformConfig?.realmId!,
-      environment: accountingAccount.platformConfig?.environment || 'production',
+      environment:
+        accountingAccount.platformConfig?.environment || 'production',
       expiresAt: accountingAccount.tokenExpiresAt,
     };
 
     // This would require implementing a P&L report API call
     // For now, we'll return a placeholder
     const quickBooksCOGS = 0; // TODO: Implement P&L report retrieval
-    
+
     const variance = localCOGS - quickBooksCOGS;
-    const variancePercent = quickBooksCOGS > 0 ? (variance / quickBooksCOGS) * 100 : 0;
+    const variancePercent =
+      quickBooksCOGS > 0 ? (variance / quickBooksCOGS) * 100 : 0;
     const isAccurate = Math.abs(variancePercent) <= 5; // 5% tolerance
 
     return {

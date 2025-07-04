@@ -1,4 +1,11 @@
-import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 
 export enum OrderStatus {
@@ -41,7 +48,9 @@ export enum FulfillmentStatus {
 @Index(['tenantId', 'channelId'])
 @Index(['tenantId', 'status'])
 @Index(['tenantId', 'orderDate'])
-@Index(['tenantId', 'externalOrderId'], { where: 'externalOrderId IS NOT NULL' })
+@Index(['tenantId', 'externalOrderId'], {
+  where: 'externalOrderId IS NOT NULL',
+})
 export class Order extends BaseEntity {
   @Column({ type: 'varchar', length: 50 })
   orderNumber: string;
@@ -281,11 +290,15 @@ export class Order extends BaseEntity {
   calculateTotals(): void {
     if (this.items && this.items.length > 0) {
       this.subtotalAmount = this.items.reduce(
-        (sum, item) => sum + (item.unitPrice * item.quantity),
-        0
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0,
       );
-      
-      this.totalAmount = this.subtotalAmount + this.taxAmount + this.shippingAmount - this.discountAmount;
+
+      this.totalAmount =
+        this.subtotalAmount +
+        this.taxAmount +
+        this.shippingAmount -
+        this.discountAmount;
     }
   }
 
@@ -371,7 +384,7 @@ export class OrderItem extends BaseEntity {
   // Methods
   calculateTotals(): void {
     this.totalPrice = this.unitPrice * this.quantity;
-    this.taxAmount = this.totalPrice * (this.taxRate || 0) / 100;
+    this.taxAmount = (this.totalPrice * (this.taxRate || 0)) / 100;
   }
 }
 

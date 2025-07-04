@@ -15,14 +15,20 @@ import {
   ValidationPipe,
   UsePipes,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { 
-  IsEnum, 
-  IsOptional, 
-  IsString, 
-  IsDateString, 
-  IsNumber, 
-  IsBoolean, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsNumber,
+  IsBoolean,
   ValidateNested,
   IsArray,
   IsEmail,
@@ -34,7 +40,10 @@ import { Type, Transform } from 'class-transformer';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { EnterprisePermissionsGuard } from '../../auth/guards/enterprise-permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionResource, PermissionAction } from '../../auth/entities/permission.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../../auth/entities/permission.entity';
 
 // Services
 import { PrivacyConsentService } from '../services/privacy-consent.service';
@@ -402,7 +411,10 @@ export class PrivacyManagementController {
   @Post('consent/collect')
   @ApiOperation({ summary: 'Collect user consent for data processing' })
   @ApiResponse({ status: 201, description: 'Consent collected successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.CREATE,
+  })
   @HttpCode(HttpStatus.CREATED)
   async collectConsent(
     @Request() req: any,
@@ -433,7 +445,10 @@ export class PrivacyManagementController {
   @Put('consent/:userId/:purpose/withdraw')
   @ApiOperation({ summary: 'Withdraw user consent for specific purpose' })
   @ApiResponse({ status: 200, description: 'Consent withdrawn successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.UPDATE,
+  })
   async withdrawConsent(
     @Request() req: any,
     @Param('userId') userId: string,
@@ -466,8 +481,14 @@ export class PrivacyManagementController {
 
   @Get('consent')
   @ApiOperation({ summary: 'Query consent records with filtering' })
-  @ApiResponse({ status: 200, description: 'Consent records retrieved successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Consent records retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
   @UsePipes(new ValidationPipe({ transform: true }))
   async queryConsents(
     @Request() req: any,
@@ -503,8 +524,14 @@ export class PrivacyManagementController {
 
   @Get('consent/user/:userId')
   @ApiOperation({ summary: 'Get all consents for specific user' })
-  @ApiResponse({ status: 200, description: 'User consents retrieved successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'User consents retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
   async getUserConsents(
     @Request() req: any,
     @Param('userId') userId: string,
@@ -514,7 +541,7 @@ export class PrivacyManagementController {
     data: any[];
   }> {
     const tenantId = req.user.tenantId;
-    const includePurposes = purposes 
+    const includePurposes = purposes
       ? purposes.split(',').map(p => p.trim() as ProcessingPurpose)
       : undefined;
 
@@ -532,8 +559,14 @@ export class PrivacyManagementController {
 
   @Get('consent/analytics')
   @ApiOperation({ summary: 'Generate consent analytics and metrics' })
-  @ApiResponse({ status: 200, description: 'Consent analytics generated successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Consent analytics generated successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
   async getConsentAnalytics(
     @Request() req: any,
     @Query('startDate') startDate?: string,
@@ -557,8 +590,14 @@ export class PrivacyManagementController {
 
   @Get('consent/check/:userId/:purpose')
   @ApiOperation({ summary: 'Check if user has valid consent for purpose' })
-  @ApiResponse({ status: 200, description: 'Consent status checked successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Consent status checked successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
   async checkConsentValidity(
     @Request() req: any,
     @Param('userId') userId: string,
@@ -594,8 +633,14 @@ export class PrivacyManagementController {
 
   @Post('data-subject-requests')
   @ApiOperation({ summary: 'Submit a data subject rights request' })
-  @ApiResponse({ status: 201, description: 'Data subject request submitted successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.CREATE })
+  @ApiResponse({
+    status: 201,
+    description: 'Data subject request submitted successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.CREATE,
+  })
   @HttpCode(HttpStatus.CREATED)
   async submitDataSubjectRequest(
     @Request() req: any,
@@ -625,8 +670,14 @@ export class PrivacyManagementController {
 
   @Get('data-subject-requests')
   @ApiOperation({ summary: 'Get data subject requests with filtering' })
-  @ApiResponse({ status: 200, description: 'Data subject requests retrieved successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Data subject requests retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
   @UsePipes(new ValidationPipe({ transform: true }))
   async getDataSubjectRequests(
     @Request() req: any,
@@ -662,8 +713,14 @@ export class PrivacyManagementController {
 
   @Post('data-subject-requests/:requestId/process-access')
   @ApiOperation({ summary: 'Process data access request (Right to Access)' })
-  @ApiResponse({ status: 200, description: 'Data access request processed successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.UPDATE })
+  @ApiResponse({
+    status: 200,
+    description: 'Data access request processed successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.UPDATE,
+  })
   async processAccessRequest(
     @Request() req: any,
     @Param('requestId') requestId: string,
@@ -673,11 +730,12 @@ export class PrivacyManagementController {
     message: string;
   }> {
     const tenantId = req.user.tenantId;
-    const portabilityReport = await this.dataSubjectRightsService.processAccessRequest(
-      tenantId,
-      requestId,
-      req.user.id,
-    );
+    const portabilityReport =
+      await this.dataSubjectRightsService.processAccessRequest(
+        tenantId,
+        requestId,
+        req.user.id,
+      );
 
     return {
       success: true,
@@ -687,9 +745,17 @@ export class PrivacyManagementController {
   }
 
   @Post('data-subject-requests/:requestId/process-erasure')
-  @ApiOperation({ summary: 'Process data erasure request (Right to be Forgotten)' })
-  @ApiResponse({ status: 200, description: 'Data erasure request processed successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.DELETE })
+  @ApiOperation({
+    summary: 'Process data erasure request (Right to be Forgotten)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data erasure request processed successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.DELETE,
+  })
   async processErasureRequest(
     @Request() req: any,
     @Param('requestId') requestId: string,
@@ -699,11 +765,12 @@ export class PrivacyManagementController {
     message: string;
   }> {
     const tenantId = req.user.tenantId;
-    const deletionResult = await this.dataSubjectRightsService.processErasureRequest(
-      tenantId,
-      requestId,
-      req.user.id,
-    );
+    const deletionResult =
+      await this.dataSubjectRightsService.processErasureRequest(
+        tenantId,
+        requestId,
+        req.user.id,
+      );
 
     return {
       success: true,
@@ -713,9 +780,17 @@ export class PrivacyManagementController {
   }
 
   @Post('data-subject-requests/:requestId/process-rectification')
-  @ApiOperation({ summary: 'Process data rectification request (Right to Rectification)' })
-  @ApiResponse({ status: 200, description: 'Data rectification request processed successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.UPDATE })
+  @ApiOperation({
+    summary: 'Process data rectification request (Right to Rectification)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data rectification request processed successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.UPDATE,
+  })
   async processRectificationRequest(
     @Request() req: any,
     @Param('requestId') requestId: string,
@@ -740,8 +815,14 @@ export class PrivacyManagementController {
 
   @Put('data-subject-requests/:requestId/status')
   @ApiOperation({ summary: 'Update data subject request status' })
-  @ApiResponse({ status: 200, description: 'Request status updated successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.UPDATE })
+  @ApiResponse({
+    status: 200,
+    description: 'Request status updated successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.UPDATE,
+  })
   async updateRequestStatus(
     @Request() req: any,
     @Param('requestId') requestId: string,
@@ -764,8 +845,14 @@ export class PrivacyManagementController {
 
   @Post('retention-policies')
   @ApiOperation({ summary: 'Create a new data retention policy' })
-  @ApiResponse({ status: 201, description: 'Retention policy created successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.CREATE })
+  @ApiResponse({
+    status: 201,
+    description: 'Retention policy created successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.CREATE,
+  })
   @HttpCode(HttpStatus.CREATED)
   async createRetentionPolicy(
     @Request() req: any,
@@ -780,8 +867,12 @@ export class PrivacyManagementController {
       tenantId,
       {
         ...policyDto,
-        effectiveDate: policyDto.effectiveDate ? new Date(policyDto.effectiveDate) : undefined,
-        expiryDate: policyDto.expiryDate ? new Date(policyDto.expiryDate) : undefined,
+        effectiveDate: policyDto.effectiveDate
+          ? new Date(policyDto.effectiveDate)
+          : undefined,
+        expiryDate: policyDto.expiryDate
+          ? new Date(policyDto.expiryDate)
+          : undefined,
       },
       req.user.id,
     );
@@ -795,8 +886,14 @@ export class PrivacyManagementController {
 
   @Get('retention-policies')
   @ApiOperation({ summary: 'Get retention policies with filtering' })
-  @ApiResponse({ status: 200, description: 'Retention policies retrieved successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Retention policies retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
   @UsePipes(new ValidationPipe({ transform: true }))
   async getRetentionPolicies(
     @Request() req: any,
@@ -806,7 +903,10 @@ export class PrivacyManagementController {
     data: any[];
   }> {
     const tenantId = req.user.tenantId;
-    const policies = await this.dataRetentionService.getRetentionPolicies(tenantId, query);
+    const policies = await this.dataRetentionService.getRetentionPolicies(
+      tenantId,
+      query,
+    );
 
     return {
       success: true,
@@ -816,16 +916,21 @@ export class PrivacyManagementController {
 
   @Get('retention/lifecycle-analysis')
   @ApiOperation({ summary: 'Analyze data lifecycle status for tenant' })
-  @ApiResponse({ status: 200, description: 'Data lifecycle analysis completed successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
-  async analyzeDataLifecycle(
-    @Request() req: any,
-  ): Promise<{
+  @ApiResponse({
+    status: 200,
+    description: 'Data lifecycle analysis completed successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
+  async analyzeDataLifecycle(@Request() req: any): Promise<{
     success: boolean;
     data: any[];
   }> {
     const tenantId = req.user.tenantId;
-    const lifecycleStatus = await this.dataRetentionService.analyzeDataLifecycle(tenantId);
+    const lifecycleStatus =
+      await this.dataRetentionService.analyzeDataLifecycle(tenantId);
 
     return {
       success: true,
@@ -835,8 +940,14 @@ export class PrivacyManagementController {
 
   @Get('retention/report')
   @ApiOperation({ summary: 'Generate comprehensive retention report' })
-  @ApiResponse({ status: 200, description: 'Retention report generated successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Retention report generated successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
   async generateRetentionReport(
     @Request() req: any,
     @Query('includePredictions') includePredictions?: string,
@@ -857,9 +968,17 @@ export class PrivacyManagementController {
   }
 
   @Post('retention/archive')
-  @ApiOperation({ summary: 'Archive expired data according to retention policies' })
-  @ApiResponse({ status: 200, description: 'Data archival completed successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.UPDATE })
+  @ApiOperation({
+    summary: 'Archive expired data according to retention policies',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data archival completed successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.UPDATE,
+  })
   async archiveExpiredData(
     @Request() req: any,
     @Body() archiveDto: ArchiveDataDto,
@@ -878,7 +997,7 @@ export class PrivacyManagementController {
     return {
       success: true,
       data: archivalResult,
-      message: archiveDto.dryRun 
+      message: archiveDto.dryRun
         ? 'Dry run completed - no data was actually archived'
         : 'Data archival completed successfully',
     };
@@ -886,8 +1005,14 @@ export class PrivacyManagementController {
 
   @Post('retention/purge')
   @ApiOperation({ summary: 'Permanently purge expired data' })
-  @ApiResponse({ status: 200, description: 'Data purge completed successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.DELETE })
+  @ApiResponse({
+    status: 200,
+    description: 'Data purge completed successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.DELETE,
+  })
   async purgeExpiredData(
     @Request() req: any,
     @Body() purgeDto: PurgeDataDto,
@@ -907,7 +1032,7 @@ export class PrivacyManagementController {
     return {
       success: true,
       data: purgeResult,
-      message: purgeDto.dryRun 
+      message: purgeDto.dryRun
         ? 'Dry run completed - no data was actually purged'
         : 'Data purge completed successfully',
     };
@@ -917,11 +1042,15 @@ export class PrivacyManagementController {
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get UU PDP compliance dashboard data' })
-  @ApiResponse({ status: 200, description: 'Privacy compliance dashboard data retrieved successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
-  async getPrivacyDashboard(
-    @Request() req: any,
-  ): Promise<{
+  @ApiResponse({
+    status: 200,
+    description: 'Privacy compliance dashboard data retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
+  async getPrivacyDashboard(@Request() req: any): Promise<{
     success: boolean;
     data: {
       consentMetrics: any;
@@ -933,18 +1062,30 @@ export class PrivacyManagementController {
     const tenantId = req.user.tenantId;
 
     // Get metrics from all services
-    const [consentAnalytics, retentionReport, requestsResult] = await Promise.all([
-      this.consentService.generateConsentAnalytics(tenantId),
-      this.dataRetentionService.generateRetentionReport(tenantId),
-      this.dataSubjectRightsService.getRequests(tenantId, { limit: 10 }),
-    ]);
+    const [consentAnalytics, retentionReport, requestsResult] =
+      await Promise.all([
+        this.consentService.generateConsentAnalytics(tenantId),
+        this.dataRetentionService.generateRetentionReport(tenantId),
+        this.dataSubjectRightsService.getRequests(tenantId, { limit: 10 }),
+      ]);
 
     // Calculate overall compliance status
     const complianceStatus = {
-      overall: 'compliant' as 'compliant' | 'partially_compliant' | 'non_compliant',
-      consentCompliance: consentAnalytics.activeConsents > 0 ? 'compliant' : 'needs_attention',
-      retentionCompliance: retentionReport.retentionMetrics.complianceRate > 95 ? 'compliant' : 'needs_attention',
-      requestCompliance: requestsResult.requests.filter(r => r.status === RequestStatus.OVERDUE).length === 0 ? 'compliant' : 'needs_attention',
+      overall: 'compliant' as
+        | 'compliant'
+        | 'partially_compliant'
+        | 'non_compliant',
+      consentCompliance:
+        consentAnalytics.activeConsents > 0 ? 'compliant' : 'needs_attention',
+      retentionCompliance:
+        retentionReport.retentionMetrics.complianceRate > 95
+          ? 'compliant'
+          : 'needs_attention',
+      requestCompliance:
+        requestsResult.requests.filter(r => r.status === RequestStatus.OVERDUE)
+          .length === 0
+          ? 'compliant'
+          : 'needs_attention',
       lastUpdated: new Date(),
     };
 
@@ -967,16 +1108,27 @@ export class PrivacyManagementController {
           activeConsents: consentAnalytics.activeConsents,
           withdrawnConsents: consentAnalytics.withdrawnConsents,
           expiringConsents: consentAnalytics.riskIndicators.expiringConsents,
-          complianceRate: consentAnalytics.totalConsents > 0 
-            ? (consentAnalytics.activeConsents / consentAnalytics.totalConsents) * 100 
-            : 100,
+          complianceRate:
+            consentAnalytics.totalConsents > 0
+              ? (consentAnalytics.activeConsents /
+                  consentAnalytics.totalConsents) *
+                100
+              : 100,
         },
         dataSubjectRequests: {
           totalRequests: requestsResult.total,
-          pendingRequests: requestsResult.requests.filter(r => r.status === RequestStatus.PENDING).length,
-          inProgressRequests: requestsResult.requests.filter(r => r.status === RequestStatus.IN_PROGRESS).length,
-          completedRequests: requestsResult.requests.filter(r => r.status === RequestStatus.COMPLETED).length,
-          overdueRequests: requestsResult.requests.filter(r => r.status === RequestStatus.OVERDUE).length,
+          pendingRequests: requestsResult.requests.filter(
+            r => r.status === RequestStatus.PENDING,
+          ).length,
+          inProgressRequests: requestsResult.requests.filter(
+            r => r.status === RequestStatus.IN_PROGRESS,
+          ).length,
+          completedRequests: requestsResult.requests.filter(
+            r => r.status === RequestStatus.COMPLETED,
+          ).length,
+          overdueRequests: requestsResult.requests.filter(
+            r => r.status === RequestStatus.OVERDUE,
+          ).length,
         },
         retentionMetrics: {
           totalRecords: retentionReport.summary.totalRecords,
@@ -992,11 +1144,15 @@ export class PrivacyManagementController {
 
   @Get('health')
   @ApiOperation({ summary: 'Get UU PDP compliance health status' })
-  @ApiResponse({ status: 200, description: 'Privacy compliance health status retrieved successfully' })
-  @Permissions({ resource: PermissionResource.PRIVACY, action: PermissionAction.READ })
-  async getPrivacyHealth(
-    @Request() req: any,
-  ): Promise<{
+  @ApiResponse({
+    status: 200,
+    description: 'Privacy compliance health status retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.PRIVACY,
+    action: PermissionAction.READ,
+  })
+  async getPrivacyHealth(@Request() req: any): Promise<{
     success: boolean;
     data: {
       status: 'healthy' | 'warning' | 'critical';
@@ -1014,35 +1170,44 @@ export class PrivacyManagementController {
     const tenantId = req.user.tenantId;
 
     // Get health metrics from all services
-    const [consentAnalytics, retentionReport, requestsResult] = await Promise.all([
-      this.consentService.generateConsentAnalytics(tenantId),
-      this.dataRetentionService.generateRetentionReport(tenantId),
-      this.dataSubjectRightsService.getRequests(tenantId, { limit: 100 }),
-    ]);
+    const [consentAnalytics, retentionReport, requestsResult] =
+      await Promise.all([
+        this.consentService.generateConsentAnalytics(tenantId),
+        this.dataRetentionService.generateRetentionReport(tenantId),
+        this.dataSubjectRightsService.getRequests(tenantId, { limit: 100 }),
+      ]);
 
     const issues: string[] = [];
     const recommendations: string[] = [];
     let status: 'healthy' | 'warning' | 'critical' = 'healthy';
 
     // Check consent coverage
-    const consentCoverage = consentAnalytics.totalConsents > 0 
-      ? (consentAnalytics.activeConsents / consentAnalytics.totalConsents) * 100 
-      : 0;
+    const consentCoverage =
+      consentAnalytics.totalConsents > 0
+        ? (consentAnalytics.activeConsents / consentAnalytics.totalConsents) *
+          100
+        : 0;
 
     if (consentCoverage < 80) {
-      issues.push('Low consent coverage - less than 80% of users have active consents');
-      recommendations.push('Implement consent collection workflows for new and existing users');
+      issues.push(
+        'Low consent coverage - less than 80% of users have active consents',
+      );
+      recommendations.push(
+        'Implement consent collection workflows for new and existing users',
+      );
       status = 'warning';
     }
 
     // Check data request response time
-    const overdueRequests = requestsResult.requests.filter(r => 
-      r.status === 'pending' && new Date() > new Date(r.dueDate)
+    const overdueRequests = requestsResult.requests.filter(
+      r => r.status === 'pending' && new Date() > new Date(r.dueDate),
     ).length;
 
     if (overdueRequests > 0) {
       issues.push(`${overdueRequests} data subject requests are overdue`);
-      recommendations.push('Assign dedicated staff to process data subject requests within 30-day deadline');
+      recommendations.push(
+        'Assign dedicated staff to process data subject requests within 30-day deadline',
+      );
       status = 'critical';
     }
 
@@ -1055,16 +1220,25 @@ export class PrivacyManagementController {
     }
 
     // Calculate overall score
-    const overallScore = (consentCoverage + retentionCompliance + (overdueRequests === 0 ? 100 : 80)) / 3;
+    const overallScore =
+      (consentCoverage +
+        retentionCompliance +
+        (overdueRequests === 0 ? 100 : 80)) /
+      3;
 
     // Response time calculation (simplified)
-    const completedRequests = requestsResult.requests.filter(r => r.status === 'completed');
-    const averageResponseTime = completedRequests.length > 0 
-      ? completedRequests.reduce((sum, req) => {
-          const responseTime = new Date(req.completedAt!).getTime() - new Date(req.createdAt).getTime();
-          return sum + (responseTime / (1000 * 60 * 60 * 24)); // Convert to days
-        }, 0) / completedRequests.length
-      : 0;
+    const completedRequests = requestsResult.requests.filter(
+      r => r.status === 'completed',
+    );
+    const averageResponseTime =
+      completedRequests.length > 0
+        ? completedRequests.reduce((sum, req) => {
+            const responseTime =
+              new Date(req.completedAt!).getTime() -
+              new Date(req.createdAt).getTime();
+            return sum + responseTime / (1000 * 60 * 60 * 24); // Convert to days
+          }, 0) / completedRequests.length
+        : 0;
 
     return {
       success: true,

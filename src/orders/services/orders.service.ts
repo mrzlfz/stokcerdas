@@ -1,18 +1,32 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, In, Between, Like } from 'typeorm';
+import { Repository, FindOptionsWhere, In, Between, Like, Not } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { Order, OrderStatus, OrderType, PaymentStatus, FulfillmentStatus } from '../entities/order.entity';
-import { OrderItem } from '../entities/order-item.entity';
-import { OrderStatusHistory } from '../entities/order-status.entity';
+import {
+  Order,
+  OrderStatus,
+  OrderType,
+  PaymentStatus,
+  FulfillmentStatus,
+  OrderItem,
+  OrderStatusHistory,
+} from '../entities/order.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogLevel, IntegrationLogType } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogLevel,
+  IntegrationLogType,
+} from '../../integrations/entities/integration-log.entity';
 
 // Channel services
 import { ChannelsService } from '../../channels/services/channels.service';
@@ -25,30 +39,30 @@ export interface CreateOrderDto {
   channelName?: string;
   type?: OrderType;
   orderDate?: Date;
-  
+
   // Customer information
   customerName: string;
   customerEmail?: string;
   customerPhone?: string;
   customerInfo?: any;
-  
+
   // Shipping information
   shippingAddress?: any;
   billingAddress?: any;
   shippingMethod?: string;
   shippingCarrier?: string;
-  
+
   // Payment information
   paymentMethod?: string;
   paymentReference?: string;
   currency?: string;
-  
+
   // Order details
   items: CreateOrderItemDto[];
   taxAmount?: number;
   shippingAmount?: number;
   discountAmount?: number;
-  
+
   // Additional information
   notes?: string;
   internalNotes?: string;
@@ -79,13 +93,13 @@ export interface UpdateOrderDto {
   status?: OrderStatus;
   paymentStatus?: PaymentStatus;
   fulfillmentStatus?: FulfillmentStatus;
-  
+
   // Customer information
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
   customerInfo?: any;
-  
+
   // Shipping information
   shippingAddress?: any;
   billingAddress?: any;
@@ -96,15 +110,19 @@ export interface UpdateOrderDto {
   estimatedDeliveryDate?: Date;
   actualDeliveryDate?: Date;
   deliveredAt?: Date;
-  
+
   // Payment information
   paymentMethod?: string;
   paymentReference?: string;
   paidAt?: Date;
-  
+
   // Processing information
   processingLocationId?: string;
-  
+
+  // Financial information
+  taxAmount?: number;
+  discountAmount?: number;
+
   // Additional information
   notes?: string;
   internalNotes?: string;
@@ -122,41 +140,41 @@ export interface OrderListQuery {
   channelId?: string;
   channelName?: string;
   externalOrderId?: string;
-  
+
   // Date filters
   orderDateFrom?: Date;
   orderDateTo?: Date;
   createdFrom?: Date;
   createdTo?: Date;
-  
+
   // Customer filters
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
-  
+
   // Search
   search?: string;
   orderNumber?: string;
-  
+
   // Financial filters
   minAmount?: number;
   maxAmount?: number;
   currency?: string;
-  
+
   // Tags and priority
   tags?: string[];
   priority?: number;
-  
+
   // External platform filters
   hasExternalOrderId?: boolean;
   syncStatus?: 'pending' | 'synced' | 'failed';
-  
+
   // Pagination and sorting
   limit?: number;
   offset?: number;
   sortBy?: 'orderDate' | 'createdAt' | 'totalAmount' | 'status' | 'priority';
   sortOrder?: 'ASC' | 'DESC';
-  
+
   // Include relations
   includeItems?: boolean;
   includeStatusHistory?: boolean;
@@ -200,11 +218,11 @@ export class OrdersService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(InventoryItem)
     private readonly inventoryRepository: Repository<InventoryItem>,
-    
+
     // Channel services
     private readonly channelsService: ChannelsService,
     private readonly channelInventoryService: ChannelInventoryService,
-    
+
     // Common services
     private readonly logService: IntegrationLogService,
     private readonly eventEmitter: EventEmitter2,
@@ -213,12 +231,16 @@ export class OrdersService {
   /**
    * Create a new order
    */
-  async createOrder(tenantId: string, createDto: CreateOrderDto): Promise<Order> {
+  async createOrder(
+    tenantId: string,
+    createDto: CreateOrderDto,
+  ): Promise<Order> {
     try {
       this.logger.debug(`Creating order for tenant ${tenantId}`, { createDto });
 
       // Generate order number if not provided
-      const orderNumber = createDto.orderNumber || await this.generateOrderNumber(tenantId);
+      const orderNumber =
+        createDto.orderNumber || (await this.generateOrderNumber(tenantId));
 
       // Validate order data
       await this.validateOrderData(tenantId, createDto);
@@ -240,13 +262,15 @@ export class OrdersService {
       });
 
       // Create order items
-      order.items = createDto.items.map(itemDto => 
+      order.items = createDto.items.map(itemDto =>
         this.orderItemRepository.create({
           ...itemDto,
           tenantId,
           totalPrice: itemDto.unitPrice * itemDto.quantity,
-          taxAmount: (itemDto.unitPrice * itemDto.quantity * (itemDto.taxRate || 0)) / 100,
-        })
+          taxAmount:
+            (itemDto.unitPrice * itemDto.quantity * (itemDto.taxRate || 0)) /
+            100,
+        }),
       );
 
       // Calculate totals
@@ -256,7 +280,13 @@ export class OrdersService {
       const savedOrder = await this.orderRepository.save(order);
 
       // Create initial status history
-      await this.createStatusHistory(tenantId, savedOrder.id, OrderStatus.PENDING, null, 'Order created');
+      await this.createStatusHistory(
+        tenantId,
+        savedOrder.id,
+        OrderStatus.PENDING,
+        null,
+        'Order created',
+      );
 
       // Reserve inventory if needed
       if (createDto.channelId) {
@@ -266,10 +296,10 @@ export class OrdersService {
       // Log creation
       await this.logService.log({
         tenantId,
-        type: 'ORDER',
-        level: 'INFO',
+        type: IntegrationLogType.ORDER,
+        level: IntegrationLogLevel.INFO,
         message: `Order created: ${orderNumber}`,
-        metadata: { 
+        metadata: {
           orderId: savedOrder.id,
           orderNumber,
           totalAmount: savedOrder.totalAmount,
@@ -285,9 +315,11 @@ export class OrdersService {
       });
 
       return savedOrder;
-
     } catch (error) {
-      this.logger.error(`Failed to create order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create order: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, null, error, {
         metadata: { action: 'create_order', createDto },
       });
@@ -298,7 +330,10 @@ export class OrdersService {
   /**
    * Get all orders for a tenant
    */
-  async getOrders(tenantId: string, query: OrderListQuery = {}): Promise<{
+  async getOrders(
+    tenantId: string,
+    query: OrderListQuery = {},
+  ): Promise<{
     orders: Order[];
     total: number;
     summary?: OrderSummary;
@@ -308,13 +343,19 @@ export class OrdersService {
 
       // Status filters
       if (query.status) {
-        where.status = Array.isArray(query.status) ? In(query.status) : query.status;
+        where.status = Array.isArray(query.status)
+          ? In(query.status)
+          : query.status;
       }
       if (query.paymentStatus) {
-        where.paymentStatus = Array.isArray(query.paymentStatus) ? In(query.paymentStatus) : query.paymentStatus;
+        where.paymentStatus = Array.isArray(query.paymentStatus)
+          ? In(query.paymentStatus)
+          : query.paymentStatus;
       }
       if (query.fulfillmentStatus) {
-        where.fulfillmentStatus = Array.isArray(query.fulfillmentStatus) ? In(query.fulfillmentStatus) : query.fulfillmentStatus;
+        where.fulfillmentStatus = Array.isArray(query.fulfillmentStatus)
+          ? In(query.fulfillmentStatus)
+          : query.fulfillmentStatus;
       }
 
       // Basic filters
@@ -331,7 +372,8 @@ export class OrdersService {
         where.orderNumber = query.orderNumber;
       }
 
-      const queryBuilder = this.orderRepository.createQueryBuilder('order')
+      const queryBuilder = this.orderRepository
+        .createQueryBuilder('order')
         .where(where);
 
       // Date range filters
@@ -343,10 +385,13 @@ export class OrdersService {
       }
 
       if (query.createdFrom || query.createdTo) {
-        queryBuilder.andWhere('order.createdAt BETWEEN :createdFrom AND :createdTo', {
-          createdFrom: query.createdFrom || new Date('1900-01-01'),
-          createdTo: query.createdTo || new Date(),
-        });
+        queryBuilder.andWhere(
+          'order.createdAt BETWEEN :createdFrom AND :createdTo',
+          {
+            createdFrom: query.createdFrom || new Date('1900-01-01'),
+            createdTo: query.createdTo || new Date(),
+          },
+        );
       }
 
       // Customer filters
@@ -375,21 +420,26 @@ export class OrdersService {
 
       // Financial filters
       if (query.minAmount || query.maxAmount) {
-        queryBuilder.andWhere('order.totalAmount BETWEEN :minAmount AND :maxAmount', {
-          minAmount: query.minAmount || 0,
-          maxAmount: query.maxAmount || Number.MAX_SAFE_INTEGER,
-        });
+        queryBuilder.andWhere(
+          'order.totalAmount BETWEEN :minAmount AND :maxAmount',
+          {
+            minAmount: query.minAmount || 0,
+            maxAmount: query.maxAmount || Number.MAX_SAFE_INTEGER,
+          },
+        );
       }
 
       if (query.currency) {
-        queryBuilder.andWhere('order.currency = :currency', { currency: query.currency });
+        queryBuilder.andWhere('order.currency = :currency', {
+          currency: query.currency,
+        });
       }
 
       // Search filter
       if (query.search) {
         queryBuilder.andWhere(
           '(order.orderNumber ILIKE :search OR order.customerName ILIKE :search OR order.customerEmail ILIKE :search OR order.notes ILIKE :search)',
-          { search: `%${query.search}%` }
+          { search: `%${query.search}%` },
         );
       }
 
@@ -400,7 +450,9 @@ export class OrdersService {
 
       // Priority filter
       if (query.priority !== undefined) {
-        queryBuilder.andWhere('order.priority = :priority', { priority: query.priority });
+        queryBuilder.andWhere('order.priority = :priority', {
+          priority: query.priority,
+        });
       }
 
       // External order ID existence filter
@@ -414,9 +466,12 @@ export class OrdersService {
 
       // Sync status filter
       if (query.syncStatus) {
-        queryBuilder.andWhere(`order.externalData->>'syncStatus' = :syncStatus`, {
-          syncStatus: query.syncStatus,
-        });
+        queryBuilder.andWhere(
+          `order.externalData->>'syncStatus' = :syncStatus`,
+          {
+            syncStatus: query.syncStatus,
+          },
+        );
       }
 
       // Include relations
@@ -455,7 +510,6 @@ export class OrdersService {
       }
 
       return result;
-
     } catch (error) {
       this.logger.error(`Failed to get orders: ${error.message}`, error.stack);
       throw error;
@@ -465,7 +519,11 @@ export class OrdersService {
   /**
    * Get a specific order by ID
    */
-  async getOrderById(tenantId: string, orderId: string, includeRelations = true): Promise<Order> {
+  async getOrderById(
+    tenantId: string,
+    orderId: string,
+    includeRelations = true,
+  ): Promise<Order> {
     try {
       const relations = [];
       if (includeRelations) {
@@ -482,7 +540,6 @@ export class OrdersService {
       }
 
       return order;
-
     } catch (error) {
       this.logger.error(`Failed to get order: ${error.message}`, error.stack);
       throw error;
@@ -492,7 +549,10 @@ export class OrdersService {
   /**
    * Get order by order number
    */
-  async getOrderByNumber(tenantId: string, orderNumber: string): Promise<Order> {
+  async getOrderByNumber(
+    tenantId: string,
+    orderNumber: string,
+  ): Promise<Order> {
     try {
       const order = await this.orderRepository.findOne({
         where: { tenantId, orderNumber },
@@ -500,13 +560,17 @@ export class OrdersService {
       });
 
       if (!order) {
-        throw new NotFoundException(`Order with number ${orderNumber} not found`);
+        throw new NotFoundException(
+          `Order with number ${orderNumber} not found`,
+        );
       }
 
       return order;
-
     } catch (error) {
-      this.logger.error(`Failed to get order by number: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order by number: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -514,7 +578,10 @@ export class OrdersService {
   /**
    * Get order by external order ID
    */
-  async getOrderByExternalId(tenantId: string, externalOrderId: string): Promise<Order | null> {
+  async getOrderByExternalId(
+    tenantId: string,
+    externalOrderId: string,
+  ): Promise<Order | null> {
     try {
       const order = await this.orderRepository.findOne({
         where: { tenantId, externalOrderId },
@@ -522,9 +589,11 @@ export class OrdersService {
       });
 
       return order;
-
     } catch (error) {
-      this.logger.error(`Failed to get order by external ID: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order by external ID: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -532,7 +601,12 @@ export class OrdersService {
   /**
    * Update an order
    */
-  async updateOrder(tenantId: string, orderId: string, updateDto: UpdateOrderDto, userId?: string): Promise<Order> {
+  async updateOrder(
+    tenantId: string,
+    orderId: string,
+    updateDto: UpdateOrderDto,
+    userId?: string,
+  ): Promise<Order> {
     try {
       const order = await this.getOrderById(tenantId, orderId);
       const originalStatus = order.status;
@@ -543,7 +617,7 @@ export class OrdersService {
       // Handle status changes
       if (updateDto.status && updateDto.status !== originalStatus) {
         order.updateStatus(updateDto.status, userId);
-        
+
         // Create status history record
         await this.createStatusHistory(
           tenantId,
@@ -556,7 +630,11 @@ export class OrdersService {
       }
 
       // Recalculate totals if amounts changed
-      if (updateDto.taxAmount !== undefined || updateDto.shippingAmount !== undefined || updateDto.discountAmount !== undefined) {
+      if (
+        updateDto.taxAmount !== undefined ||
+        updateDto.shippingAmount !== undefined ||
+        updateDto.discountAmount !== undefined
+      ) {
         order.calculateTotals();
       }
 
@@ -565,10 +643,10 @@ export class OrdersService {
       // Log update
       await this.logService.log({
         tenantId,
-        type: 'ORDER',
-        level: 'INFO',
+        type: IntegrationLogType.ORDER,
+        level: IntegrationLogLevel.INFO,
         message: `Order updated: ${order.orderNumber}`,
-        metadata: { 
+        metadata: {
           orderId,
           updates: updateDto,
           originalStatus,
@@ -596,9 +674,11 @@ export class OrdersService {
       }
 
       return updatedOrder;
-
     } catch (error) {
-      this.logger.error(`Failed to update order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update order: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, null, error, {
         metadata: { action: 'update_order', orderId, updateDto },
       });
@@ -609,12 +689,19 @@ export class OrdersService {
   /**
    * Cancel an order
    */
-  async cancelOrder(tenantId: string, orderId: string, reason: string, userId?: string): Promise<Order> {
+  async cancelOrder(
+    tenantId: string,
+    orderId: string,
+    reason: string,
+    userId?: string,
+  ): Promise<Order> {
     try {
       const order = await this.getOrderById(tenantId, orderId);
 
       if (!order.canBeCancelled) {
-        throw new BadRequestException(`Order ${order.orderNumber} cannot be cancelled in its current status: ${order.status}`);
+        throw new BadRequestException(
+          `Order ${order.orderNumber} cannot be cancelled in its current status: ${order.status}`,
+        );
       }
 
       // Update order status
@@ -639,10 +726,10 @@ export class OrdersService {
       // Log cancellation
       await this.logService.log({
         tenantId,
-        type: 'ORDER',
-        level: 'INFO',
+        type: IntegrationLogType.ORDER,
+        level: IntegrationLogLevel.INFO,
         message: `Order cancelled: ${order.orderNumber}`,
-        metadata: { 
+        metadata: {
           orderId,
           reason,
           originalStatus,
@@ -660,9 +747,11 @@ export class OrdersService {
       });
 
       return updatedOrder;
-
     } catch (error) {
-      this.logger.error(`Failed to cancel order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel order: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, null, error, {
         metadata: { action: 'cancel_order', orderId, reason },
       });
@@ -673,7 +762,11 @@ export class OrdersService {
   /**
    * Get orders by channel
    */
-  async getOrdersByChannel(tenantId: string, channelId: string, query: OrderListQuery = {}): Promise<Order[]> {
+  async getOrdersByChannel(
+    tenantId: string,
+    channelId: string,
+    query: OrderListQuery = {},
+  ): Promise<Order[]> {
     const channelQuery = { ...query, channelId };
     const result = await this.getOrders(tenantId, channelQuery);
     return result.orders;
@@ -682,19 +775,27 @@ export class OrdersService {
   /**
    * Get order summary statistics
    */
-  async getOrderSummary(tenantId: string, filters: OrderListQuery = {}): Promise<OrderSummary> {
+  async getOrderSummary(
+    tenantId: string,
+    filters: OrderListQuery = {},
+  ): Promise<OrderSummary> {
     try {
-      const baseQuery = this.orderRepository.createQueryBuilder('order')
+      const baseQuery = this.orderRepository
+        .createQueryBuilder('order')
         .where('order.tenantId = :tenantId', { tenantId });
 
       // Apply same filters as getOrders
       this.applyFiltersToQuery(baseQuery, filters);
 
       // Get basic metrics
-      const [totalOrders, orders] = await baseQuery.getManyAndCount();
-      
-      const totalAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
-      const averageOrderValue = totalOrders > 0 ? totalAmount / totalOrders : 0;
+      const [orders, totalOrdersCount] = await baseQuery.getManyAndCount();
+
+      const totalAmount = orders.reduce(
+        (sum, order) => sum + Number(order.totalAmount),
+        0,
+      );
+      const averageOrderValue =
+        totalOrdersCount > 0 ? totalAmount / totalOrdersCount : 0;
 
       // Status breakdowns
       const statusBreakdown = orders.reduce((acc, order) => {
@@ -722,7 +823,7 @@ export class OrdersService {
       const topProducts = [];
 
       return {
-        totalOrders,
+        totalOrders: totalOrdersCount,
         totalAmount,
         statusBreakdown,
         paymentStatusBreakdown,
@@ -731,9 +832,11 @@ export class OrdersService {
         averageOrderValue,
         topProducts,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get order summary: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order summary: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -741,14 +844,20 @@ export class OrdersService {
   /**
    * Perform bulk operations on orders
    */
-  async bulkAction(tenantId: string, action: BulkOrderAction, userId?: string): Promise<{
+  async bulkAction(
+    tenantId: string,
+    action: BulkOrderAction,
+    userId?: string,
+  ): Promise<{
     success: boolean;
     processedCount: number;
     failedCount: number;
     errors: string[];
   }> {
     try {
-      this.logger.debug(`Performing bulk action: ${action.action} on ${action.orderIds.length} orders`);
+      this.logger.debug(
+        `Performing bulk action: ${action.action} on ${action.orderIds.length} orders`,
+      );
 
       let processedCount = 0;
       let failedCount = 0;
@@ -758,26 +867,44 @@ export class OrdersService {
         try {
           switch (action.action) {
             case 'update_status':
-              await this.updateOrder(tenantId, orderId, { status: action.params.status }, userId);
+              await this.updateOrder(
+                tenantId,
+                orderId,
+                { status: action.params.status },
+                userId,
+              );
               break;
 
             case 'assign_location':
-              await this.updateOrder(tenantId, orderId, { processingLocationId: action.params.locationId }, userId);
+              await this.updateOrder(
+                tenantId,
+                orderId,
+                { processingLocationId: action.params.locationId },
+                userId,
+              );
               break;
 
             case 'add_tags':
               const order = await this.getOrderById(tenantId, orderId, false);
               const currentTags = order.tags || [];
-              const newTags = [...new Set([...currentTags, ...action.params.tags])];
-              await this.updateOrder(tenantId, orderId, { tags: newTags }, userId);
+              const newTags = [
+                ...new Set([...currentTags, ...action.params.tags]),
+              ];
+              await this.updateOrder(
+                tenantId,
+                orderId,
+                { tags: newTags },
+                userId,
+              );
               break;
 
             default:
-              throw new BadRequestException(`Unsupported bulk action: ${action.action}`);
+              throw new BadRequestException(
+                `Unsupported bulk action: ${action.action}`,
+              );
           }
 
           processedCount++;
-
         } catch (error) {
           failedCount++;
           errors.push(`Order ${orderId}: ${error.message}`);
@@ -788,9 +915,10 @@ export class OrdersService {
       await this.logService.log({
         tenantId,
         type: IntegrationLogType.ORDER,
-        level: failedCount > 0 ? IntegrationLogLevel.WARN : IntegrationLogLevel.INFO,
+        level:
+          failedCount > 0 ? IntegrationLogLevel.WARN : IntegrationLogLevel.INFO,
         message: `Bulk action completed: ${action.action}`,
-        metadata: { 
+        metadata: {
           action: action.action,
           totalOrders: action.orderIds.length,
           processedCount,
@@ -804,9 +932,11 @@ export class OrdersService {
         failedCount,
         errors,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to perform bulk action: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to perform bulk action: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -816,7 +946,7 @@ export class OrdersService {
   private async generateOrderNumber(tenantId: string): Promise<string> {
     const today = new Date();
     const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
-    
+
     const count = await this.orderRepository.count({
       where: {
         tenantId,
@@ -828,13 +958,21 @@ export class OrdersService {
     return `${datePrefix}${sequence}`;
   }
 
-  private async validateOrderData(tenantId: string, createDto: CreateOrderDto): Promise<void> {
+  private async validateOrderData(
+    tenantId: string,
+    createDto: CreateOrderDto,
+  ): Promise<void> {
     // Validate channel exists if provided
     if (createDto.channelId) {
       try {
-        await this.channelsService.getChannelById(tenantId, createDto.channelId);
+        await this.channelsService.getChannelById(
+          tenantId,
+          createDto.channelId,
+        );
       } catch (error) {
-        throw new BadRequestException(`Invalid channel ID: ${createDto.channelId}`);
+        throw new BadRequestException(
+          `Invalid channel ID: ${createDto.channelId}`,
+        );
       }
     }
 
@@ -849,7 +987,10 @@ export class OrdersService {
     }
   }
 
-  private async validateProductAvailability(tenantId: string, items: CreateOrderItemDto[]): Promise<void> {
+  private async validateProductAvailability(
+    tenantId: string,
+    items: CreateOrderItemDto[],
+  ): Promise<void> {
     for (const item of items) {
       // Check if product exists
       const product = await this.productRepository.findOne({
@@ -862,12 +1003,12 @@ export class OrdersService {
 
       // Check inventory availability (basic check)
       const inventory = await this.inventoryRepository.findOne({
-        where: { tenantId, productId: item.productId, variantId: item.variantId },
+        where: { tenantId, productId: item.productId },
       });
 
       if (inventory && inventory.quantityAvailable < item.quantity) {
         throw new BadRequestException(
-          `Insufficient inventory for product ${item.productName}: ${inventory.quantityAvailable} available, ${item.quantity} requested`
+          `Insufficient inventory for product ${item.productName}: ${inventory.quantityAvailable} available, ${item.quantity} requested`,
         );
       }
     }
@@ -895,7 +1036,10 @@ export class OrdersService {
     await this.statusHistoryRepository.save(statusHistory);
   }
 
-  private async reserveInventoryForOrder(tenantId: string, order: Order): Promise<void> {
+  private async reserveInventoryForOrder(
+    tenantId: string,
+    order: Order,
+  ): Promise<void> {
     // This would integrate with inventory service to reserve items
     // For now, just emit an event
     this.eventEmitter.emit('order.inventory.reserve', {
@@ -906,7 +1050,10 @@ export class OrdersService {
     });
   }
 
-  private async releaseInventoryForOrder(tenantId: string, order: Order): Promise<void> {
+  private async releaseInventoryForOrder(
+    tenantId: string,
+    order: Order,
+  ): Promise<void> {
     // This would integrate with inventory service to release reserved items
     // For now, just emit an event
     this.eventEmitter.emit('order.inventory.release', {
@@ -917,11 +1064,16 @@ export class OrdersService {
     });
   }
 
-  private applyFiltersToQuery(queryBuilder: any, filters: OrderListQuery): void {
+  private applyFiltersToQuery(
+    queryBuilder: any,
+    filters: OrderListQuery,
+  ): void {
     // Apply various filters to the query builder
     // This is a helper method to avoid code duplication
     if (filters.status) {
-      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+      const statuses = Array.isArray(filters.status)
+        ? filters.status
+        : [filters.status];
       queryBuilder.andWhere('order.status IN (:...statuses)', { statuses });
     }
 

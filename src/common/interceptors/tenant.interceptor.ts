@@ -18,15 +18,11 @@ export class TenantInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<Request>();
-    
+
     // Check if tenant check should be skipped (for health endpoints, auth, etc.)
-    const skipTenantCheck = this.reflector.get<boolean>(
-      SKIP_TENANT_CHECK,
-      context.getHandler(),
-    ) || this.reflector.get<boolean>(
-      SKIP_TENANT_CHECK,
-      context.getClass(),
-    );
+    const skipTenantCheck =
+      this.reflector.get<boolean>(SKIP_TENANT_CHECK, context.getHandler()) ||
+      this.reflector.get<boolean>(SKIP_TENANT_CHECK, context.getClass());
 
     if (skipTenantCheck) {
       return next.handle();
@@ -34,7 +30,7 @@ export class TenantInterceptor implements NestInterceptor {
 
     // Extract tenant ID from headers
     const tenantId = request.headers['x-tenant-id'] as string;
-    
+
     if (!tenantId) {
       throw new BadRequestException({
         code: 'TENANT_ID_REQUIRED',
@@ -43,7 +39,8 @@ export class TenantInterceptor implements NestInterceptor {
     }
 
     // Validate tenant ID format (UUID)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(tenantId)) {
       throw new BadRequestException({
         code: 'INVALID_TENANT_ID',

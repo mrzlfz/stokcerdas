@@ -6,8 +6,16 @@ import { Queue } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as moment from 'moment-timezone';
 
-import { ReorderRule, ReorderTrigger, ReorderStatus } from '../entities/reorder-rule.entity';
-import { AutomationSchedule, ScheduleType, ScheduleStatus } from '../entities/automation-schedule.entity';
+import {
+  ReorderRule,
+  ReorderTrigger,
+  ReorderStatus,
+} from '../entities/reorder-rule.entity';
+import {
+  AutomationSchedule,
+  ScheduleType,
+  ScheduleStatus,
+} from '../entities/automation-schedule.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 import { Product } from '../../products/entities/product.entity';
 import { AutomatedPurchasingService } from './automated-purchasing.service';
@@ -95,43 +103,59 @@ export class AutomationRuleEngine {
   /**
    * Main entry point for processing automation rules
    */
-  async processAutomationRules(tenantId: string, context?: Partial<RuleEvaluationContext>): Promise<RuleEngineMetrics> {
+  async processAutomationRules(
+    tenantId: string,
+    context?: Partial<RuleEvaluationContext>,
+  ): Promise<RuleEngineMetrics> {
     const startTime = Date.now();
-    
+
     // Prevent concurrent processing for the same tenant
     if (this.processingState.get(tenantId)) {
-      this.logger.warn(`Automation rules already processing for tenant ${tenantId}`);
+      this.logger.warn(
+        `Automation rules already processing for tenant ${tenantId}`,
+      );
       return this.createEmptyMetrics();
     }
 
     this.processingState.set(tenantId, true);
 
     try {
-      this.logger.log(`Starting automation rule processing for tenant ${tenantId}`);
+      this.logger.log(
+        `Starting automation rule processing for tenant ${tenantId}`,
+      );
 
       // Build evaluation context
-      const evaluationContext = await this.buildEvaluationContext(tenantId, context);
+      const evaluationContext = await this.buildEvaluationContext(
+        tenantId,
+        context,
+      );
 
       // Get active reorder rules
       const activeRules = await this.getActiveReorderRules(tenantId);
-      
+
       if (activeRules.length === 0) {
         this.logger.log(`No active reorder rules found for tenant ${tenantId}`);
         return this.createEmptyMetrics();
       }
 
       // Evaluate each rule for trigger conditions
-      const triggerResults = await this.evaluateReorderTriggers(activeRules, evaluationContext);
-      
+      const triggerResults = await this.evaluateReorderTriggers(
+        activeRules,
+        evaluationContext,
+      );
+
       // Create execution plan
-      const executionPlan = this.createExecutionPlan(triggerResults, evaluationContext);
-      
+      const executionPlan = this.createExecutionPlan(
+        triggerResults,
+        evaluationContext,
+      );
+
       // Execute rules according to plan
       const executionResults = await this.executeRulePlan(executionPlan);
-      
+
       // Calculate and return metrics
       const metrics = this.calculateMetrics(executionResults, startTime);
-      
+
       // Emit completion event
       this.eventEmitter.emit('automation.rules.processed', {
         tenantId,
@@ -139,13 +163,17 @@ export class AutomationRuleEngine {
         executionPlan,
       });
 
-      this.logger.log(`Automation rule processing completed for tenant ${tenantId}. Processed: ${metrics.totalRulesProcessed}, Triggered: ${metrics.triggeredRules}`);
-      
-      return metrics;
+      this.logger.log(
+        `Automation rule processing completed for tenant ${tenantId}. Processed: ${metrics.totalRulesProcessed}, Triggered: ${metrics.triggeredRules}`,
+      );
 
+      return metrics;
     } catch (error) {
-      this.logger.error(`Error processing automation rules for tenant ${tenantId}: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Error processing automation rules for tenant ${tenantId}: ${error.message}`,
+        error.stack,
+      );
+
       // Emit error event
       this.eventEmitter.emit('automation.rules.error', {
         tenantId,
@@ -153,7 +181,6 @@ export class AutomationRuleEngine {
       });
 
       return this.createErrorMetrics(error.message);
-      
     } finally {
       this.processingState.delete(tenantId);
     }
@@ -165,7 +192,7 @@ export class AutomationRuleEngine {
   async processScheduledAutomation(scheduleId?: string): Promise<void> {
     try {
       let schedules: AutomationSchedule[];
-      
+
       if (scheduleId) {
         const schedule = await this.automationScheduleRepository.findOne({
           where: { id: scheduleId },
@@ -184,9 +211,11 @@ export class AutomationRuleEngine {
       for (const schedule of schedules) {
         await this.executeScheduledJob(schedule);
       }
-
     } catch (error) {
-      this.logger.error(`Error processing scheduled automation: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error processing scheduled automation: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -195,7 +224,7 @@ export class AutomationRuleEngine {
    */
   private async evaluateReorderTriggers(
     rules: ReorderRule[],
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): Promise<TriggerEvaluationResult[]> {
     const results: TriggerEvaluationResult[] = [];
 
@@ -225,7 +254,7 @@ export class AutomationRuleEngine {
    */
   private async evaluateSingleRuleTrigger(
     rule: ReorderRule,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): Promise<TriggerEvaluationResult> {
     this.logger.debug(`Evaluating trigger for rule ${rule.id} (${rule.name})`);
 
@@ -265,14 +294,26 @@ export class AutomationRuleEngine {
     }
 
     // Evaluate specific trigger conditions
-    const triggerEvaluation = await this.evaluateTriggerConditions(rule, inventoryItem, context);
-    
+    const triggerEvaluation = await this.evaluateTriggerConditions(
+      rule,
+      inventoryItem,
+      context,
+    );
+
     // Calculate urgency level
-    const urgencyLevel = this.calculateUrgencyLevel(rule, inventoryItem, context);
-    
+    const urgencyLevel = this.calculateUrgencyLevel(
+      rule,
+      inventoryItem,
+      context,
+    );
+
     // Calculate confidence
-    const confidence = this.calculateTriggerConfidence(rule, inventoryItem, triggerEvaluation);
-    
+    const confidence = this.calculateTriggerConfidence(
+      rule,
+      inventoryItem,
+      triggerEvaluation,
+    );
+
     // Estimate order value
     const estimatedValue = this.estimateOrderValue(rule, inventoryItem);
 
@@ -285,7 +326,10 @@ export class AutomationRuleEngine {
       estimatedValue,
       blockers: triggerEvaluation.blockers,
       warnings: triggerEvaluation.warnings,
-      nextEvaluationTime: this.calculateNextEvaluationTime(rule, triggerEvaluation),
+      nextEvaluationTime: this.calculateNextEvaluationTime(
+        rule,
+        triggerEvaluation,
+      ),
     };
   }
 
@@ -294,8 +338,13 @@ export class AutomationRuleEngine {
    */
   private checkRuleEligibility(
     rule: ReorderRule,
-    context: RuleEvaluationContext
-  ): { eligible: boolean; reason: string; blockers: string[]; warnings: string[] } {
+    context: RuleEvaluationContext,
+  ): {
+    eligible: boolean;
+    reason: string;
+    blockers: string[];
+    warnings: string[];
+  } {
     const blockers: string[] = [];
     const warnings: string[] = [];
 
@@ -339,7 +388,10 @@ export class AutomationRuleEngine {
     }
 
     // Time-based restrictions (business hours, maintenance windows, etc.)
-    const timeRestrictions = this.checkTimeRestrictions(rule, context.currentTime);
+    const timeRestrictions = this.checkTimeRestrictions(
+      rule,
+      context.currentTime,
+    );
     if (timeRestrictions.blocked) {
       blockers.push(timeRestrictions.reason);
     }
@@ -358,7 +410,7 @@ export class AutomationRuleEngine {
   private async evaluateTriggerConditions(
     rule: ReorderRule,
     inventoryItem: InventoryItem,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): Promise<{
     shouldTrigger: boolean;
     reason: string;
@@ -374,35 +426,54 @@ export class AutomationRuleEngine {
 
     switch (rule.trigger) {
       case ReorderTrigger.STOCK_LEVEL:
-        const stockEvaluation = this.evaluateStockLevelTrigger(rule, inventoryItem, context);
+        const stockEvaluation = this.evaluateStockLevelTrigger(
+          rule,
+          inventoryItem,
+          context,
+        );
         shouldTrigger = stockEvaluation.triggered;
         reason = stockEvaluation.reason;
         details.stockLevel = stockEvaluation.details;
         break;
 
       case ReorderTrigger.DAYS_OF_SUPPLY:
-        const daysSupplyEvaluation = this.evaluateDaysOfSupplyTrigger(rule, inventoryItem, context);
+        const daysSupplyEvaluation = this.evaluateDaysOfSupplyTrigger(
+          rule,
+          inventoryItem,
+          context,
+        );
         shouldTrigger = daysSupplyEvaluation.triggered;
         reason = daysSupplyEvaluation.reason;
         details.daysOfSupply = daysSupplyEvaluation.details;
         break;
 
       case ReorderTrigger.SCHEDULED:
-        const scheduledEvaluation = this.evaluateScheduledTrigger(rule, context);
+        const scheduledEvaluation = this.evaluateScheduledTrigger(
+          rule,
+          context,
+        );
         shouldTrigger = scheduledEvaluation.triggered;
         reason = scheduledEvaluation.reason;
         details.schedule = scheduledEvaluation.details;
         break;
 
       case ReorderTrigger.DEMAND_FORECAST:
-        const forecastEvaluation = await this.evaluateDemandForecastTrigger(rule, inventoryItem, context);
+        const forecastEvaluation = await this.evaluateDemandForecastTrigger(
+          rule,
+          inventoryItem,
+          context,
+        );
         shouldTrigger = forecastEvaluation.triggered;
         reason = forecastEvaluation.reason;
         details.forecast = forecastEvaluation.details;
         break;
 
       case ReorderTrigger.COMBINED:
-        const combinedEvaluation = await this.evaluateCombinedTrigger(rule, inventoryItem, context);
+        const combinedEvaluation = await this.evaluateCombinedTrigger(
+          rule,
+          inventoryItem,
+          context,
+        );
         shouldTrigger = combinedEvaluation.triggered;
         reason = combinedEvaluation.reason;
         details.combined = combinedEvaluation.details;
@@ -419,16 +490,20 @@ export class AutomationRuleEngine {
   private evaluateStockLevelTrigger(
     rule: ReorderRule,
     inventoryItem: InventoryItem,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): { triggered: boolean; reason: string; details: any } {
     const currentStock = inventoryItem.quantityAvailable;
     const reorderPoint = rule.reorderPoint;
-    
+
     if (currentStock <= 0) {
       return {
         triggered: true,
         reason: 'Stock depleted - critical reorder needed',
-        details: { currentStock, reorderPoint, deficit: Math.abs(currentStock) },
+        details: {
+          currentStock,
+          reorderPoint,
+          deficit: Math.abs(currentStock),
+        },
       };
     }
 
@@ -436,13 +511,19 @@ export class AutomationRuleEngine {
       return {
         triggered: true,
         reason: `Stock level (${currentStock}) below reorder point (${reorderPoint})`,
-        details: { currentStock, reorderPoint, deficit: reorderPoint - currentStock },
+        details: {
+          currentStock,
+          reorderPoint,
+          deficit: reorderPoint - currentStock,
+        },
       };
     }
 
     // Check critical and warning levels
-    const criticalLevel = reorderPoint * (1 + context.inventoryThresholds.criticalLevel / 100);
-    const warningLevel = reorderPoint * (1 + context.inventoryThresholds.warningLevel / 100);
+    const criticalLevel =
+      reorderPoint * (1 + context.inventoryThresholds.criticalLevel / 100);
+    const warningLevel =
+      reorderPoint * (1 + context.inventoryThresholds.warningLevel / 100);
 
     if (currentStock <= criticalLevel) {
       return {
@@ -456,7 +537,12 @@ export class AutomationRuleEngine {
       return {
         triggered: false, // Warning level - don't trigger yet but log
         reason: `Stock approaching warning level (${currentStock} <= ${warningLevel})`,
-        details: { currentStock, reorderPoint, warningLevel, urgency: 'medium' },
+        details: {
+          currentStock,
+          reorderPoint,
+          warningLevel,
+          urgency: 'medium',
+        },
       };
     }
 
@@ -470,39 +556,54 @@ export class AutomationRuleEngine {
   private evaluateDaysOfSupplyTrigger(
     rule: ReorderRule,
     inventoryItem: InventoryItem,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): { triggered: boolean; reason: string; details: any } {
     const currentStock = inventoryItem.quantityAvailable;
     const dailyDemand = rule.annualDemand ? rule.annualDemand / 365 : 1;
-    const daysOfSupply = dailyDemand > 0 ? currentStock / dailyDemand : Infinity;
+    const daysOfSupply =
+      dailyDemand > 0 ? currentStock / dailyDemand : Infinity;
     const targetDaysOfSupply = rule.safetyStockDays || 14;
 
     if (daysOfSupply <= 0) {
       return {
         triggered: true,
         reason: 'No days of supply remaining - immediate reorder required',
-        details: { daysOfSupply: 0, targetDaysOfSupply, dailyDemand, currentStock },
+        details: {
+          daysOfSupply: 0,
+          targetDaysOfSupply,
+          dailyDemand,
+          currentStock,
+        },
       };
     }
 
     if (daysOfSupply <= targetDaysOfSupply) {
       return {
         triggered: true,
-        reason: `Days of supply (${daysOfSupply.toFixed(1)}) below target (${targetDaysOfSupply})`,
-        details: { daysOfSupply, targetDaysOfSupply, dailyDemand, currentStock },
+        reason: `Days of supply (${daysOfSupply.toFixed(
+          1,
+        )}) below target (${targetDaysOfSupply})`,
+        details: {
+          daysOfSupply,
+          targetDaysOfSupply,
+          dailyDemand,
+          currentStock,
+        },
       };
     }
 
     return {
       triggered: false,
-      reason: `Days of supply adequate (${daysOfSupply.toFixed(1)} > ${targetDaysOfSupply})`,
+      reason: `Days of supply adequate (${daysOfSupply.toFixed(
+        1,
+      )} > ${targetDaysOfSupply})`,
       details: { daysOfSupply, targetDaysOfSupply, dailyDemand, currentStock },
     };
   }
 
   private evaluateScheduledTrigger(
     rule: ReorderRule,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): { triggered: boolean; reason: string; details: any } {
     if (!rule.nextReviewDate) {
       return {
@@ -517,7 +618,7 @@ export class AutomationRuleEngine {
 
     return {
       triggered: isScheduled,
-      reason: isScheduled 
+      reason: isScheduled
         ? `Scheduled review time reached (${rule.nextReviewDate.toISOString()})`
         : `Not yet scheduled (next review: ${rule.nextReviewDate.toISOString()})`,
       details: {
@@ -531,7 +632,7 @@ export class AutomationRuleEngine {
   private async evaluateDemandForecastTrigger(
     rule: ReorderRule,
     inventoryItem: InventoryItem,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): Promise<{ triggered: boolean; reason: string; details: any }> {
     if (!rule.useForecastingData) {
       return {
@@ -546,20 +647,23 @@ export class AutomationRuleEngine {
     const currentStock = inventoryItem.quantityAvailable;
     const forecastHorizon = rule.forecastHorizonDays || 30;
     const leadTimeDays = rule.leadTimeDays || 7;
-    
+
     // Simulate forecast demand (in real implementation, this would come from ML service)
-    const simulatedForecastDemand = rule.annualDemand 
+    const simulatedForecastDemand = rule.annualDemand
       ? (rule.annualDemand / 365) * (leadTimeDays + forecastHorizon)
       : currentStock * 0.5; // Fallback simulation
 
-    const forecastThreshold = simulatedForecastDemand * rule.forecastConfidenceThreshold;
+    const forecastThreshold =
+      simulatedForecastDemand * rule.forecastConfidenceThreshold;
 
     const triggered = currentStock <= forecastThreshold;
 
     return {
       triggered,
       reason: triggered
-        ? `Forecasted demand (${simulatedForecastDemand.toFixed(1)}) exceeds available stock`
+        ? `Forecasted demand (${simulatedForecastDemand.toFixed(
+            1,
+          )}) exceeds available stock`
         : `Stock adequate for forecasted demand`,
       details: {
         currentStock,
@@ -574,22 +678,34 @@ export class AutomationRuleEngine {
   private async evaluateCombinedTrigger(
     rule: ReorderRule,
     inventoryItem: InventoryItem,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): Promise<{ triggered: boolean; reason: string; details: any }> {
     // Evaluate multiple trigger conditions and combine results
-    const stockLevel = this.evaluateStockLevelTrigger(rule, inventoryItem, context);
-    const daysSupply = this.evaluateDaysOfSupplyTrigger(rule, inventoryItem, context);
+    const stockLevel = this.evaluateStockLevelTrigger(
+      rule,
+      inventoryItem,
+      context,
+    );
+    const daysSupply = this.evaluateDaysOfSupplyTrigger(
+      rule,
+      inventoryItem,
+      context,
+    );
     const scheduled = this.evaluateScheduledTrigger(rule, context);
-    const forecast = await this.evaluateDemandForecastTrigger(rule, inventoryItem, context);
+    const forecast = await this.evaluateDemandForecastTrigger(
+      rule,
+      inventoryItem,
+      context,
+    );
 
     const triggers = [stockLevel, daysSupply, scheduled, forecast];
     const activeTriggers = triggers.filter(t => t.triggered);
-    
+
     // Combined trigger fires if any condition is met
     const triggered = activeTriggers.length > 0;
-    
+
     const reasons = activeTriggers.map(t => t.reason);
-    const combinedReason = triggered 
+    const combinedReason = triggered
       ? `Multiple triggers active: ${reasons.join('; ')}`
       : 'No trigger conditions met';
 
@@ -610,13 +726,15 @@ export class AutomationRuleEngine {
   // Helper methods
   private async buildEvaluationContext(
     tenantId: string,
-    context?: Partial<RuleEvaluationContext>
+    context?: Partial<RuleEvaluationContext>,
   ): Promise<RuleEvaluationContext> {
     // Get current system metrics
     const systemLoad = {
       cpuUsage: 45, // Would be actual system metrics
       memoryUsage: 60,
-      activeJobs: await this.automationQueue.getActive().then(jobs => jobs.length),
+      activeJobs: await this.automationQueue
+        .getActive()
+        .then(jobs => jobs.length),
     };
 
     // Get budget information for tenant
@@ -631,7 +749,7 @@ export class AutomationRuleEngine {
       currentTime: new Date(),
       inventoryThresholds: {
         criticalLevel: 10, // 10% above reorder point
-        warningLevel: 25,  // 25% above reorder point
+        warningLevel: 25, // 25% above reorder point
       },
       systemLoad,
       budgetConstraints,
@@ -639,7 +757,9 @@ export class AutomationRuleEngine {
     };
   }
 
-  private async getActiveReorderRules(tenantId: string): Promise<ReorderRule[]> {
+  private async getActiveReorderRules(
+    tenantId: string,
+  ): Promise<ReorderRule[]> {
     return this.reorderRuleRepository
       .createQueryBuilder('rule')
       .leftJoinAndSelect('rule.product', 'product')
@@ -655,7 +775,7 @@ export class AutomationRuleEngine {
   private calculateUrgencyLevel(
     rule: ReorderRule,
     inventoryItem: InventoryItem,
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): number {
     let urgency = 1; // Base urgency
 
@@ -677,7 +797,8 @@ export class AutomationRuleEngine {
 
     // Days of supply urgency
     const dailyDemand = rule.annualDemand ? rule.annualDemand / 365 : 1;
-    const daysOfSupply = dailyDemand > 0 ? currentStock / dailyDemand : Infinity;
+    const daysOfSupply =
+      dailyDemand > 0 ? currentStock / dailyDemand : Infinity;
     const leadTimeDays = rule.leadTimeDays || 7;
 
     if (daysOfSupply <= leadTimeDays) {
@@ -689,8 +810,9 @@ export class AutomationRuleEngine {
     // Time-based urgency (end of business day, weekend, etc.)
     const hour = context.currentTime.getHours();
     const dayOfWeek = context.currentTime.getDay();
-    
-    if (hour >= 16 || dayOfWeek === 5) { // After 4 PM or Friday
+
+    if (hour >= 16 || dayOfWeek === 5) {
+      // After 4 PM or Friday
       urgency += 1; // Slight urgency increase for timing
     }
 
@@ -700,7 +822,7 @@ export class AutomationRuleEngine {
   private calculateTriggerConfidence(
     rule: ReorderRule,
     inventoryItem: InventoryItem,
-    triggerEvaluation: any
+    triggerEvaluation: any,
   ): number {
     let confidence = 0.8; // Base confidence
 
@@ -720,10 +842,10 @@ export class AutomationRuleEngine {
     }
 
     // Adjust based on data quality
-    const dataAge = rule.lastExecutedAt 
+    const dataAge = rule.lastExecutedAt
       ? (Date.now() - rule.lastExecutedAt.getTime()) / (24 * 60 * 60 * 1000) // days
       : 365;
-    
+
     if (dataAge > 30) {
       confidence *= 0.9; // Reduce for old data
     }
@@ -731,7 +853,10 @@ export class AutomationRuleEngine {
     return Math.min(1, Math.max(0.1, confidence));
   }
 
-  private estimateOrderValue(rule: ReorderRule, inventoryItem: InventoryItem): number {
+  private estimateOrderValue(
+    rule: ReorderRule,
+    inventoryItem: InventoryItem,
+  ): number {
     const orderQuantity = rule.reorderQuantity;
     const unitCost = rule.unitCost || 0;
     return orderQuantity * unitCost;
@@ -743,7 +868,7 @@ export class AutomationRuleEngine {
 
   private calculateNextEvaluationTime(
     rule: ReorderRule,
-    triggerEvaluation: any
+    triggerEvaluation: any,
   ): Date | undefined {
     if (triggerEvaluation.shouldTrigger) {
       return undefined; // No next evaluation needed if triggered
@@ -775,7 +900,7 @@ export class AutomationRuleEngine {
 
   private checkTimeRestrictions(
     rule: ReorderRule,
-    currentTime: Date
+    currentTime: Date,
   ): { blocked: boolean; reason: string } {
     // Implement business hours, maintenance windows, etc.
     const hour = currentTime.getHours();
@@ -790,7 +915,10 @@ export class AutomationRuleEngine {
     }
 
     // Example: Block on weekends for non-active rules
-    if ((dayOfWeek === 0 || dayOfWeek === 6) && rule.status !== ReorderStatus.ACTIVE) {
+    if (
+      (dayOfWeek === 0 || dayOfWeek === 6) &&
+      rule.status !== ReorderStatus.ACTIVE
+    ) {
       return {
         blocked: true,
         reason: 'Weekend restriction for inactive rules',
@@ -802,10 +930,12 @@ export class AutomationRuleEngine {
 
   private createExecutionPlan(
     triggerResults: TriggerEvaluationResult[],
-    context: RuleEvaluationContext
+    context: RuleEvaluationContext,
   ): RuleExecutionPlan {
-    const eligibleRules = triggerResults.filter(r => r.shouldTrigger && r.blockers.length === 0);
-    
+    const eligibleRules = triggerResults.filter(
+      r => r.shouldTrigger && r.blockers.length === 0,
+    );
+
     // Sort by urgency and confidence
     eligibleRules.sort((a, b) => {
       const scoreA = a.urgencyLevel * a.confidence;
@@ -814,7 +944,10 @@ export class AutomationRuleEngine {
     });
 
     const executionOrder = eligibleRules.map(r => r.ruleId);
-    const estimatedTotalValue = eligibleRules.reduce((sum, r) => sum + (r.estimatedValue || 0), 0);
+    const estimatedTotalValue = eligibleRules.reduce(
+      (sum, r) => sum + (r.estimatedValue || 0),
+      0,
+    );
     const estimatedExecutionTime = eligibleRules.length * 30000; // 30 seconds per rule estimate
 
     const highRiskRules = eligibleRules
@@ -834,8 +967,11 @@ export class AutomationRuleEngine {
       },
       riskAssessment: {
         highRiskRules,
-        budgetExceedanceRisk: context.budgetConstraints.remainingBudget 
-          ? Math.min(1, estimatedTotalValue / context.budgetConstraints.remainingBudget)
+        budgetExceedanceRisk: context.budgetConstraints.remainingBudget
+          ? Math.min(
+              1,
+              estimatedTotalValue / context.budgetConstraints.remainingBudget,
+            )
           : 0,
         systemOverloadRisk: context.systemLoad.activeJobs / 100, // Assume 100 is max capacity
       },
@@ -847,19 +983,22 @@ export class AutomationRuleEngine {
 
     // Execute rules in batches to control system load
     const batchSize = Math.min(3, plan.resourceRequirements.maxConcurrentJobs);
-    
+
     for (let i = 0; i < plan.executionOrder.length; i += batchSize) {
       const batch = plan.executionOrder.slice(i, i + batchSize);
-      
-      const batchPromises = batch.map(async (ruleId) => {
+
+      const batchPromises = batch.map(async ruleId => {
         try {
-          const result = await this.automatedPurchasingService.executeAutomatedPurchase({
-            reorderRuleId: ruleId,
-            tenantId: plan.tenantId,
-          });
+          const result =
+            await this.automatedPurchasingService.executeAutomatedPurchase({
+              reorderRuleId: ruleId,
+              tenantId: plan.tenantId,
+            });
           return result;
         } catch (error) {
-          this.logger.error(`Failed to execute rule ${ruleId}: ${error.message}`);
+          this.logger.error(
+            `Failed to execute rule ${ruleId}: ${error.message}`,
+          );
           return { success: false, ruleId, error: error.message };
         }
       });
@@ -876,8 +1015,12 @@ export class AutomationRuleEngine {
     return results;
   }
 
-  private async executeScheduledJob(schedule: AutomationSchedule): Promise<void> {
-    this.logger.log(`Executing scheduled automation job: ${schedule.name} (${schedule.type})`);
+  private async executeScheduledJob(
+    schedule: AutomationSchedule,
+  ): Promise<void> {
+    this.logger.log(
+      `Executing scheduled automation job: ${schedule.name} (${schedule.type})`,
+    );
 
     try {
       // Update schedule execution status
@@ -903,23 +1046,29 @@ export class AutomationRuleEngine {
       }
 
       // Mark as successful
-      schedule.updateExecutionStats(Date.now() - schedule.lastExecution!.getTime(), true);
+      schedule.updateExecutionStats(
+        Date.now() - schedule.lastExecution!.getTime(),
+        true,
+      );
       await this.automationScheduleRepository.save(schedule);
-
     } catch (error) {
-      this.logger.error(`Scheduled job ${schedule.id} failed: ${error.message}`);
-      
+      this.logger.error(
+        `Scheduled job ${schedule.id} failed: ${error.message}`,
+      );
+
       // Mark as failed
       schedule.updateExecutionStats(
         Date.now() - schedule.lastExecution!.getTime(),
         false,
-        error.message
+        error.message,
       );
       await this.automationScheduleRepository.save(schedule);
     }
   }
 
-  private async executeReorderCheckJob(schedule: AutomationSchedule): Promise<void> {
+  private async executeReorderCheckJob(
+    schedule: AutomationSchedule,
+  ): Promise<void> {
     // Execute automation rules for specified tenants or products
     const tenantId = schedule.jobParameters?.tenantId;
     if (!tenantId) {
@@ -929,39 +1078,51 @@ export class AutomationRuleEngine {
     await this.processAutomationRules(tenantId, schedule.jobParameters);
   }
 
-  private async executeInventoryReviewJob(schedule: AutomationSchedule): Promise<void> {
+  private async executeInventoryReviewJob(
+    schedule: AutomationSchedule,
+  ): Promise<void> {
     // Implement inventory review logic
     this.logger.log('Executing inventory review job');
   }
 
-  private async executeDemandForecastJob(schedule: AutomationSchedule): Promise<void> {
+  private async executeDemandForecastJob(
+    schedule: AutomationSchedule,
+  ): Promise<void> {
     // Implement demand forecast update logic
     this.logger.log('Executing demand forecast job');
   }
 
-  private async executeSupplierEvaluationJob(schedule: AutomationSchedule): Promise<void> {
+  private async executeSupplierEvaluationJob(
+    schedule: AutomationSchedule,
+  ): Promise<void> {
     // Implement supplier evaluation logic
     this.logger.log('Executing supplier evaluation job');
   }
 
-  private calculateMetrics(executionResults: any[], startTime: number): RuleEngineMetrics {
+  private calculateMetrics(
+    executionResults: any[],
+    startTime: number,
+  ): RuleEngineMetrics {
     const totalRulesProcessed = executionResults.length;
     const successfulExecutions = executionResults.filter(r => r.success).length;
     const failedExecutions = executionResults.filter(r => !r.success).length;
-    const triggeredRules = executionResults.filter(r => r.shouldCreatePurchaseOrder).length;
-    const skippedRules = totalRulesProcessed - triggeredRules - failedExecutions;
+    const triggeredRules = executionResults.filter(
+      r => r.shouldCreatePurchaseOrder,
+    ).length;
+    const skippedRules =
+      totalRulesProcessed - triggeredRules - failedExecutions;
 
     const totalValueGenerated = executionResults
       .filter(r => r.success && r.estimatedValue)
       .reduce((sum, r) => sum + r.estimatedValue, 0);
 
-    const averageProcessingTime = totalRulesProcessed > 0 
-      ? (Date.now() - startTime) / totalRulesProcessed 
-      : 0;
+    const averageProcessingTime =
+      totalRulesProcessed > 0
+        ? (Date.now() - startTime) / totalRulesProcessed
+        : 0;
 
-    const systemEfficiency = totalRulesProcessed > 0 
-      ? successfulExecutions / totalRulesProcessed 
-      : 0;
+    const systemEfficiency =
+      totalRulesProcessed > 0 ? successfulExecutions / totalRulesProcessed : 0;
 
     return {
       totalRulesProcessed,
@@ -1003,7 +1164,11 @@ export class AutomationRuleEngine {
 
   // CRUD Methods for AutomationSchedule management
 
-  async createAutomationSchedule(tenantId: string, createDto: any, userId: string): Promise<AutomationSchedule> {
+  async createAutomationSchedule(
+    tenantId: string,
+    createDto: any,
+    userId: string,
+  ): Promise<AutomationSchedule> {
     const schedule = this.automationScheduleRepository.create({
       ...createDto,
       tenantId,
@@ -1014,9 +1179,12 @@ export class AutomationRuleEngine {
     return this.automationScheduleRepository.save(schedule as any);
   }
 
-  async findAutomationSchedules(tenantId: string, query: any): Promise<AutomationSchedule[]> {
+  async findAutomationSchedules(
+    tenantId: string,
+    query: any,
+  ): Promise<AutomationSchedule[]> {
     const where: any = { tenantId, isDeleted: false };
-    
+
     if (query.type) where.type = query.type;
     if (query.status) where.status = query.status;
     if (query.isActive !== undefined) where.isActive = query.isActive;
@@ -1029,80 +1197,116 @@ export class AutomationRuleEngine {
     });
   }
 
-  async findAutomationScheduleById(tenantId: string, id: string): Promise<AutomationSchedule> {
+  async findAutomationScheduleById(
+    tenantId: string,
+    id: string,
+  ): Promise<AutomationSchedule> {
     return this.automationScheduleRepository.findOne({
       where: { id, tenantId, isDeleted: false },
     });
   }
 
-  async updateAutomationSchedule(tenantId: string, id: string, updateDto: any, userId: string): Promise<AutomationSchedule> {
+  async updateAutomationSchedule(
+    tenantId: string,
+    id: string,
+    updateDto: any,
+    userId: string,
+  ): Promise<AutomationSchedule> {
     await this.automationScheduleRepository.update(
       { id, tenantId },
-      { ...updateDto, updatedBy: userId, updatedAt: new Date() }
+      { ...updateDto, updatedBy: userId, updatedAt: new Date() },
     );
 
     return this.findAutomationScheduleById(tenantId, id);
   }
 
-  async deleteAutomationSchedule(tenantId: string, id: string, userId: string): Promise<void> {
+  async deleteAutomationSchedule(
+    tenantId: string,
+    id: string,
+    userId: string,
+  ): Promise<void> {
     await this.automationScheduleRepository.update(
       { id, tenantId },
-      { isDeleted: true, updatedBy: userId, updatedAt: new Date() }
+      { isDeleted: true, updatedBy: userId, updatedAt: new Date() },
     );
   }
 
-  async pauseAutomationSchedule(tenantId: string, id: string, reason: string, userId: string): Promise<AutomationSchedule> {
+  async pauseAutomationSchedule(
+    tenantId: string,
+    id: string,
+    reason: string,
+    userId: string,
+  ): Promise<AutomationSchedule> {
     await this.automationScheduleRepository.update(
       { id, tenantId },
-      { 
-        isActive: false, 
+      {
+        isActive: false,
         status: ScheduleStatus.PAUSED,
         pauseReason: reason,
         pausedAt: new Date(),
-        updatedBy: userId, 
-        updatedAt: new Date() 
-      }
+        updatedBy: userId,
+        updatedAt: new Date(),
+      },
     );
 
     return this.findAutomationScheduleById(tenantId, id);
   }
 
-  async resumeAutomationSchedule(tenantId: string, id: string, userId: string): Promise<AutomationSchedule> {
+  async resumeAutomationSchedule(
+    tenantId: string,
+    id: string,
+    userId: string,
+  ): Promise<AutomationSchedule> {
     await this.automationScheduleRepository.update(
       { id, tenantId },
-      { 
-        isActive: true, 
+      {
+        isActive: true,
         status: ScheduleStatus.ACTIVE,
         pauseReason: null,
         pausedAt: null,
-        updatedBy: userId, 
-        updatedAt: new Date() 
-      }
+        updatedBy: userId,
+        updatedAt: new Date(),
+      },
     );
 
     return this.findAutomationScheduleById(tenantId, id);
   }
 
-  async bulkScheduleAction(tenantId: string, action: string, scheduleIds: string[], userId: string): Promise<any> {
+  async bulkScheduleAction(
+    tenantId: string,
+    action: string,
+    scheduleIds: string[],
+    userId: string,
+  ): Promise<any> {
     let result;
-    
+
     switch (action) {
       case 'activate':
         result = await this.automationScheduleRepository.update(
           { id: { $in: scheduleIds } as any, tenantId },
-          { isActive: true, status: ScheduleStatus.ACTIVE, updatedBy: userId, updatedAt: new Date() }
+          {
+            isActive: true,
+            status: ScheduleStatus.ACTIVE,
+            updatedBy: userId,
+            updatedAt: new Date(),
+          },
         );
         break;
       case 'pause':
         result = await this.automationScheduleRepository.update(
           { id: { $in: scheduleIds } as any, tenantId },
-          { isActive: false, status: ScheduleStatus.PAUSED, updatedBy: userId, updatedAt: new Date() }
+          {
+            isActive: false,
+            status: ScheduleStatus.PAUSED,
+            updatedBy: userId,
+            updatedAt: new Date(),
+          },
         );
         break;
       case 'delete':
         result = await this.automationScheduleRepository.update(
           { id: { $in: scheduleIds } as any, tenantId },
-          { isDeleted: true, updatedBy: userId, updatedAt: new Date() }
+          { isDeleted: true, updatedBy: userId, updatedAt: new Date() },
         );
         break;
       default:
@@ -1112,17 +1316,28 @@ export class AutomationRuleEngine {
     return {
       success: true,
       affected: result.affected || 0,
-      message: `Successfully ${action}d ${result.affected || 0} automation schedules`,
+      message: `Successfully ${action}d ${
+        result.affected || 0
+      } automation schedules`,
     };
   }
 
   // Alias for bulk actions (controller expects this method name)
-  async bulkActionAutomationSchedules(tenantId: string, action: string, scheduleIds: string[], userId: string): Promise<any> {
+  async bulkActionAutomationSchedules(
+    tenantId: string,
+    action: string,
+    scheduleIds: string[],
+    userId: string,
+  ): Promise<any> {
     return this.bulkScheduleAction(tenantId, action, scheduleIds, userId);
   }
 
   // Execute a specific automation schedule manually
-  async executeAutomationSchedule(tenantId: string, id: string, executeDto: any): Promise<any> {
+  async executeAutomationSchedule(
+    tenantId: string,
+    id: string,
+    executeDto: any,
+  ): Promise<any> {
     const schedule = await this.findAutomationScheduleById(tenantId, id);
     if (!schedule) {
       throw new Error(`Automation schedule not found: ${id}`);
@@ -1140,10 +1355,17 @@ export class AutomationRuleEngine {
   }
 
   // Get execution history for a schedule
-  async getScheduleExecutions(tenantId: string, scheduleId: string, query: any): Promise<any[]> {
+  async getScheduleExecutions(
+    tenantId: string,
+    scheduleId: string,
+    query: any,
+  ): Promise<any[]> {
     // This would typically query a separate ScheduleExecution entity
     // For now, return mock data based on the schedule
-    const schedule = await this.findAutomationScheduleById(tenantId, scheduleId);
+    const schedule = await this.findAutomationScheduleById(
+      tenantId,
+      scheduleId,
+    );
     if (!schedule) {
       return [];
     }
@@ -1156,7 +1378,10 @@ export class AutomationRuleEngine {
         executedAt: schedule.lastExecution,
         duration: schedule.averageExecutionTimeMs,
         success: schedule.successfulExecutions > schedule.failedExecutions,
-        result: schedule.successfulExecutions > schedule.failedExecutions ? 'Completed successfully' : 'Failed',
+        result:
+          schedule.successfulExecutions > schedule.failedExecutions
+            ? 'Completed successfully'
+            : 'Failed',
       },
     ];
   }
@@ -1169,8 +1394,12 @@ export class AutomationRuleEngine {
 
     const activeSchedules = schedules.filter(s => s.isActive).length;
     const totalSchedules = schedules.length;
-    const successfulExecutions = schedules.filter(s => s.successfulExecutions > s.failedExecutions).length;
-    const failedExecutions = schedules.filter(s => s.failedExecutions > s.successfulExecutions).length;
+    const successfulExecutions = schedules.filter(
+      s => s.successfulExecutions > s.failedExecutions,
+    ).length;
+    const failedExecutions = schedules.filter(
+      s => s.failedExecutions > s.successfulExecutions,
+    ).length;
 
     return {
       totalSchedules,
@@ -1178,7 +1407,9 @@ export class AutomationRuleEngine {
       pausedSchedules: totalSchedules - activeSchedules,
       successfulExecutions,
       failedExecutions,
-      averageExecutionTime: schedules.reduce((sum, s) => sum + (s.averageExecutionTimeMs || 0), 0) / Math.max(schedules.length, 1),
+      averageExecutionTime:
+        schedules.reduce((sum, s) => sum + (s.averageExecutionTimeMs || 0), 0) /
+        Math.max(schedules.length, 1),
       lastUpdated: new Date(),
     };
   }
@@ -1191,10 +1422,17 @@ export class AutomationRuleEngine {
 
     const activeCount = schedules.filter(s => s.isActive).length;
     const totalCount = schedules.length;
-    const failedCount = schedules.filter(s => s.failedExecutions > s.successfulExecutions).length;
+    const failedCount = schedules.filter(
+      s => s.failedExecutions > s.successfulExecutions,
+    ).length;
 
     return {
-      overall: failedCount === 0 ? 'healthy' : failedCount < totalCount * 0.1 ? 'warning' : 'critical',
+      overall:
+        failedCount === 0
+          ? 'healthy'
+          : failedCount < totalCount * 0.1
+          ? 'warning'
+          : 'critical',
       systemLoad: {
         cpuUsage: Math.floor(Math.random() * 30) + 20, // 20-50%
         memoryUsage: Math.floor(Math.random() * 40) + 30, // 30-70%
@@ -1204,7 +1442,10 @@ export class AutomationRuleEngine {
         totalSchedules: totalCount,
         activeSchedules: activeCount,
         failedSchedules: failedCount,
-        successRate: totalCount > 0 ? ((totalCount - failedCount) / totalCount * 100).toFixed(2) : '100',
+        successRate:
+          totalCount > 0
+            ? (((totalCount - failedCount) / totalCount) * 100).toFixed(2)
+            : '100',
       },
       performance: {
         averageResponseTime: Math.floor(Math.random() * 500) + 100, // 100-600ms
@@ -1212,8 +1453,12 @@ export class AutomationRuleEngine {
         uptime: '99.9%',
       },
       alerts: [
-        ...(failedCount > 0 ? [`${failedCount} schedules have failed execution`] : []),
-        ...(activeCount < totalCount * 0.5 ? ['More than 50% of schedules are inactive'] : []),
+        ...(failedCount > 0
+          ? [`${failedCount} schedules have failed execution`]
+          : []),
+        ...(activeCount < totalCount * 0.5
+          ? ['More than 50% of schedules are inactive']
+          : []),
       ],
       lastUpdated: new Date(),
     };

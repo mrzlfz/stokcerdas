@@ -42,10 +42,15 @@ export class OptimisticUpdatesService {
   /**
    * Apply optimistic update - immediately show change in UI before server confirms
    */
-  async applyOptimisticUpdate(update: Omit<OptimisticUpdate, 'id' | 'timestamp' | 'status' | 'retryCount'>): Promise<string> {
+  async applyOptimisticUpdate(
+    update: Omit<
+      OptimisticUpdate,
+      'id' | 'timestamp' | 'status' | 'retryCount'
+    >,
+  ): Promise<string> {
     const updateId = this.generateUpdateId();
     const timestamp = Date.now();
-    
+
     const optimisticUpdate: OptimisticUpdate = {
       ...update,
       id: updateId,
@@ -57,7 +62,7 @@ export class OptimisticUpdatesService {
 
     // Store the pending update
     this.pendingUpdates.set(updateId, optimisticUpdate);
-    
+
     // Track user's pending updates
     const userKey = `${update.tenantId}:${update.userId}`;
     if (!this.userPendingUpdates.has(userKey)) {
@@ -77,18 +82,25 @@ export class OptimisticUpdatesService {
       timestamp,
     });
 
-    this.logger.debug(`🔄 Applied optimistic update ${updateId} for ${update.resourceType}:${update.resourceId}`);
-    
+    this.logger.debug(
+      `🔄 Applied optimistic update ${updateId} for ${update.resourceType}:${update.resourceId}`,
+    );
+
     return updateId;
   }
 
   /**
    * Confirm optimistic update - server has processed the change successfully
    */
-  async confirmOptimisticUpdate(updateId: string, serverData?: any): Promise<void> {
+  async confirmOptimisticUpdate(
+    updateId: string,
+    serverData?: any,
+  ): Promise<void> {
     const update = this.pendingUpdates.get(updateId);
     if (!update) {
-      this.logger.warn(`⚠️ Attempted to confirm non-existent update: ${updateId}`);
+      this.logger.warn(
+        `⚠️ Attempted to confirm non-existent update: ${updateId}`,
+      );
       return;
     }
 
@@ -109,16 +121,24 @@ export class OptimisticUpdatesService {
     // Clean up the update
     this.removePendingUpdate(updateId);
 
-    this.logger.debug(`✅ Confirmed optimistic update ${updateId} for ${update.resourceType}:${update.resourceId}`);
+    this.logger.debug(
+      `✅ Confirmed optimistic update ${updateId} for ${update.resourceType}:${update.resourceId}`,
+    );
   }
 
   /**
    * Reject optimistic update - server rejected the change, revert UI
    */
-  async rejectOptimisticUpdate(updateId: string, reason: string, shouldRetry = false): Promise<void> {
+  async rejectOptimisticUpdate(
+    updateId: string,
+    reason: string,
+    shouldRetry = false,
+  ): Promise<void> {
     const update = this.pendingUpdates.get(updateId);
     if (!update) {
-      this.logger.warn(`⚠️ Attempted to reject non-existent update: ${updateId}`);
+      this.logger.warn(
+        `⚠️ Attempted to reject non-existent update: ${updateId}`,
+      );
       return;
     }
 
@@ -126,7 +146,7 @@ export class OptimisticUpdatesService {
       // Retry the update
       update.retryCount++;
       update.timestamp = Date.now(); // Reset timestamp for retry
-      
+
       this.eventEmitter.emit('optimistic.update.retry', {
         updateId,
         tenantId: update.tenantId,
@@ -138,7 +158,9 @@ export class OptimisticUpdatesService {
         reason,
       });
 
-      this.logger.debug(`🔁 Retrying optimistic update ${updateId} (attempt ${update.retryCount}/${update.maxRetries})`);
+      this.logger.debug(
+        `🔁 Retrying optimistic update ${updateId} (attempt ${update.retryCount}/${update.maxRetries})`,
+      );
       return;
     }
 
@@ -160,32 +182,47 @@ export class OptimisticUpdatesService {
     // Clean up the update
     this.removePendingUpdate(updateId);
 
-    this.logger.warn(`❌ Rejected optimistic update ${updateId} for ${update.resourceType}:${update.resourceId}: ${reason}`);
+    this.logger.warn(
+      `❌ Rejected optimistic update ${updateId} for ${update.resourceType}:${update.resourceId}: ${reason}`,
+    );
   }
 
   /**
    * Handle conflict between optimistic update and server state
    */
-  async handleConflict(updateId: string, serverData: any): Promise<ConflictResolution> {
+  async handleConflict(
+    updateId: string,
+    serverData: any,
+  ): Promise<ConflictResolution> {
     const update = this.pendingUpdates.get(updateId);
     if (!update) {
-      this.logger.warn(`⚠️ Attempted to handle conflict for non-existent update: ${updateId}`);
+      this.logger.warn(
+        `⚠️ Attempted to handle conflict for non-existent update: ${updateId}`,
+      );
       return { updateId, resolution: 'server_wins' };
     }
 
     // Use state service for conflict resolution (only for supported resource types)
     let conflictResolution: ConflictResolution;
-    
-    if (['inventory_item', 'location', 'product'].includes(update.resourceType)) {
-      const resolution = await this.stateService.resolveConflict(update.tenantId, {
-        resourceType: update.resourceType as 'inventory_item' | 'location' | 'product',
-        resourceId: update.resourceId,
-        localVersion: update.version,
-        serverVersion: serverData.version || update.version + 1,
-        localChanges: update.localChanges,
-        serverChanges: serverData,
-      });
-      
+
+    if (
+      ['inventory_item', 'location', 'product'].includes(update.resourceType)
+    ) {
+      const resolution = await this.stateService.resolveConflict(
+        update.tenantId,
+        {
+          resourceType: update.resourceType as
+            | 'inventory_item'
+            | 'location'
+            | 'product',
+          resourceId: update.resourceId,
+          localVersion: update.version,
+          serverVersion: serverData.version || update.version + 1,
+          localChanges: update.localChanges,
+          serverChanges: serverData,
+        },
+      );
+
       conflictResolution = {
         updateId,
         resolution: resolution.resolution,
@@ -223,35 +260,45 @@ export class OptimisticUpdatesService {
         // Keep optimistic update, ignore server data
         await this.confirmOptimisticUpdate(updateId, update.localChanges);
         break;
-        
+
       case 'server_wins':
         // Revert optimistic update, use server data
         await this.rejectOptimisticUpdate(updateId, 'Server has newer data');
         break;
-        
+
       case 'merge':
         // Apply merged data
-        await this.confirmOptimisticUpdate(updateId, conflictResolution.resolvedData);
+        await this.confirmOptimisticUpdate(
+          updateId,
+          conflictResolution.resolvedData,
+        );
         break;
-        
+
       case 'manual_required':
         // Keep as conflict status, require user intervention
-        this.logger.warn(`🤝 Manual conflict resolution required for update ${updateId}`);
+        this.logger.warn(
+          `🤝 Manual conflict resolution required for update ${updateId}`,
+        );
         break;
     }
 
-    this.logger.debug(`⚖️ Handled conflict for update ${updateId}: ${conflictResolution.resolution}`);
-    
+    this.logger.debug(
+      `⚖️ Handled conflict for update ${updateId}: ${conflictResolution.resolution}`,
+    );
+
     return conflictResolution;
   }
 
   /**
    * Get pending updates for a user
    */
-  getPendingUpdatesForUser(tenantId: string, userId: string): OptimisticUpdate[] {
+  getPendingUpdatesForUser(
+    tenantId: string,
+    userId: string,
+  ): OptimisticUpdate[] {
     const userKey = `${tenantId}:${userId}`;
     const userUpdateIds = this.userPendingUpdates.get(userKey) || new Set();
-    
+
     const updates: OptimisticUpdate[] = [];
     for (const updateId of userUpdateIds) {
       const update = this.pendingUpdates.get(updateId);
@@ -259,22 +306,28 @@ export class OptimisticUpdatesService {
         updates.push(update);
       }
     }
-    
+
     return updates.sort((a, b) => a.timestamp - b.timestamp);
   }
 
   /**
    * Get pending updates for a specific resource
    */
-  getPendingUpdatesForResource(resourceType: string, resourceId: string): OptimisticUpdate[] {
+  getPendingUpdatesForResource(
+    resourceType: string,
+    resourceId: string,
+  ): OptimisticUpdate[] {
     const updates: OptimisticUpdate[] = [];
-    
+
     for (const update of this.pendingUpdates.values()) {
-      if (update.resourceType === resourceType && update.resourceId === resourceId) {
+      if (
+        update.resourceType === resourceType &&
+        update.resourceId === resourceId
+      ) {
         updates.push(update);
       }
     }
-    
+
     return updates.sort((a, b) => a.timestamp - b.timestamp);
   }
 
@@ -312,8 +365,9 @@ export class OptimisticUpdatesService {
     conflictCount: number;
     averageAge: number;
   } {
-    const relevantUpdates = Array.from(this.pendingUpdates.values())
-      .filter(update => !tenantId || update.tenantId === tenantId);
+    const relevantUpdates = Array.from(this.pendingUpdates.values()).filter(
+      update => !tenantId || update.tenantId === tenantId,
+    );
 
     const now = Date.now();
     const stats = {
@@ -329,26 +383,27 @@ export class OptimisticUpdatesService {
     }
 
     let totalAge = 0;
-    
+
     for (const update of relevantUpdates) {
       // Count by type
-      stats.pendingByType[update.resourceType] = (stats.pendingByType[update.resourceType] || 0) + 1;
-      
+      stats.pendingByType[update.resourceType] =
+        (stats.pendingByType[update.resourceType] || 0) + 1;
+
       // Count by user
       const userKey = `${update.tenantId}:${update.userId}`;
       stats.pendingByUser[userKey] = (stats.pendingByUser[userKey] || 0) + 1;
-      
+
       // Count conflicts
       if (update.status === 'conflict') {
         stats.conflictCount++;
       }
-      
+
       // Calculate age
-      totalAge += (now - update.timestamp);
+      totalAge += now - update.timestamp;
     }
 
     stats.averageAge = totalAge / relevantUpdates.length;
-    
+
     return stats;
   }
 
@@ -379,8 +434,12 @@ export class OptimisticUpdatesService {
 
     for (const [updateId, update] of this.pendingUpdates.entries()) {
       if (now - update.timestamp > maxAge) {
-        this.logger.warn(`🧹 Cleaning up expired optimistic update ${updateId} (age: ${Math.round((now - update.timestamp) / 1000)}s)`);
-        
+        this.logger.warn(
+          `🧹 Cleaning up expired optimistic update ${updateId} (age: ${Math.round(
+            (now - update.timestamp) / 1000,
+          )}s)`,
+        );
+
         // Emit expiration event
         this.eventEmitter.emit('optimistic.update.expired', {
           updateId,
@@ -397,21 +456,28 @@ export class OptimisticUpdatesService {
     }
 
     if (cleanedCount > 0) {
-      this.logger.log(`🧹 Cleaned up ${cleanedCount} expired optimistic updates`);
+      this.logger.log(
+        `🧹 Cleaned up ${cleanedCount} expired optimistic updates`,
+      );
     }
   }
 
   /**
    * Force sync all pending updates for a user (useful on reconnection)
    */
-  async forceSyncPendingUpdates(tenantId: string, userId: string): Promise<void> {
+  async forceSyncPendingUpdates(
+    tenantId: string,
+    userId: string,
+  ): Promise<void> {
     const pendingUpdates = this.getPendingUpdatesForUser(tenantId, userId);
-    
+
     if (pendingUpdates.length === 0) {
       return;
     }
 
-    this.logger.log(`🔄 Force syncing ${pendingUpdates.length} pending updates for user ${userId} in tenant ${tenantId}`);
+    this.logger.log(
+      `🔄 Force syncing ${pendingUpdates.length} pending updates for user ${userId} in tenant ${tenantId}`,
+    );
 
     // Emit force sync event
     this.eventEmitter.emit('optimistic.updates.force_sync', {

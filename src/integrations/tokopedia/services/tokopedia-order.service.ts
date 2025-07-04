@@ -3,14 +3,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { Order, OrderStatus, PaymentStatus } from '../../../orders/entities/order.entity';
+import {
+  Order,
+  OrderStatus,
+  PaymentStatus,
+} from '../../../orders/entities/order.entity';
 import { OrderItem } from '../../../orders/entities/order.entity';
 import { Channel } from '../../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { TokopediaApiService, TokopediaConfig } from './tokopedia-api.service';
 import { TokopediaAuthService } from './tokopedia-auth.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface OrderSyncOptions {
   offset?: number;
@@ -108,15 +115,15 @@ export class TokopediaOrderService {
 
   // Tokopedia order status mapping to local status
   private readonly statusMapping: TokopediaOrderStatusMapping = {
-    'waiting_payment': OrderStatus.PENDING,
-    'payment_verified': OrderStatus.CONFIRMED,
-    'processing': OrderStatus.PROCESSING,
-    'shipped': OrderStatus.SHIPPED,
-    'delivered': OrderStatus.DELIVERED,
-    'cancelled': OrderStatus.CANCELLED,
-    'return_requested': OrderStatus.RETURNED,
-    'returned': OrderStatus.RETURNED,
-    'refunded': OrderStatus.REFUNDED,
+    waiting_payment: OrderStatus.PENDING,
+    payment_verified: OrderStatus.CONFIRMED,
+    processing: OrderStatus.PROCESSING,
+    shipped: OrderStatus.SHIPPED,
+    delivered: OrderStatus.DELIVERED,
+    cancelled: OrderStatus.CANCELLED,
+    return_requested: OrderStatus.RETURNED,
+    returned: OrderStatus.RETURNED,
+    refunded: OrderStatus.REFUNDED,
   };
 
   constructor(
@@ -160,7 +167,10 @@ export class TokopediaOrderService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -210,22 +220,19 @@ export class TokopediaOrderService {
           total_pages: number;
           total_orders: number;
         };
-      }>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'GET',
-          endpoint: '/v1/orders',
-          params,
-          requiresAuth: true,
-        },
-      );
+      }>(tenantId, channelId, config, {
+        method: 'GET',
+        endpoint: '/v1/orders',
+        params,
+        requiresAuth: true,
+      });
 
       if (!result.success || !result.data?.orders) {
-        const errorMessage = typeof result.error === 'string' 
-          ? result.error 
-          : this.extractErrorMessage(result.error) || 'Failed to fetch orders from Tokopedia';
+        const errorMessage =
+          typeof result.error === 'string'
+            ? result.error
+            : this.extractErrorMessage(result.error) ||
+              'Failed to fetch orders from Tokopedia';
         throw new Error(errorMessage);
       }
 
@@ -243,7 +250,10 @@ export class TokopediaOrderService {
           await this.processInboundOrder(tenantId, channelId, tokopediaOrder);
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to process order ${tokopediaOrder.order_id}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to process order ${tokopediaOrder.order_id}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Order ${tokopediaOrder.order_id}: ${error.message}`);
           errorCount++;
         }
@@ -289,11 +299,13 @@ export class TokopediaOrderService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Tokopedia order sync failed: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Tokopedia order sync failed: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.logSync(
         tenantId,
@@ -326,7 +338,10 @@ export class TokopediaOrderService {
     error?: string;
   }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -359,15 +374,19 @@ export class TokopediaOrderService {
       } else {
         return {
           success: false,
-          error: typeof result.error === 'string' 
-            ? result.error 
-            : this.extractErrorMessage(result.error) || 'Failed to get order details',
+          error:
+            typeof result.error === 'string'
+              ? result.error
+              : this.extractErrorMessage(result.error) ||
+                'Failed to get order details',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Tokopedia order details: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to get Tokopedia order details: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: false,
         error: error.message,
@@ -394,7 +413,10 @@ export class TokopediaOrderService {
         orderItemIds: shipmentRequest.order_item_ids,
       });
 
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -411,22 +433,23 @@ export class TokopediaOrderService {
       const shipmentData = {
         order_item_ids: shipmentRequest.order_item_ids,
         shipping_service: shipmentRequest.shipping_service,
-        shipping_date: shipmentRequest.shipping_date?.toISOString() || new Date().toISOString(),
-        ...(shipmentRequest.tracking_number && { tracking_number: shipmentRequest.tracking_number }),
+        shipping_date:
+          shipmentRequest.shipping_date?.toISOString() ||
+          new Date().toISOString(),
+        ...(shipmentRequest.tracking_number && {
+          tracking_number: shipmentRequest.tracking_number,
+        }),
         ...(shipmentRequest.notes && { notes: shipmentRequest.notes }),
       };
 
-      const result = await this.apiService.makeTokopediaRequest<{ shipment_id: string }>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'POST',
-          endpoint: '/v1/orders/ship',
-          data: shipmentData,
-          requiresAuth: true,
-        },
-      );
+      const result = await this.apiService.makeTokopediaRequest<{
+        shipment_id: string;
+      }>(tenantId, channelId, config, {
+        method: 'POST',
+        endpoint: '/v1/orders/ship',
+        data: shipmentData,
+        requiresAuth: true,
+      });
 
       if (result.success) {
         this.logger.log(`Order items shipped successfully`, {
@@ -454,21 +477,22 @@ export class TokopediaOrderService {
           shipment_id: result.data?.shipment_id,
         };
       } else {
-        const errorMessage = typeof result.error === 'string' 
-          ? result.error 
-          : this.extractErrorMessage(result.error) || 'Failed to ship order items';
+        const errorMessage =
+          typeof result.error === 'string'
+            ? result.error
+            : this.extractErrorMessage(result.error) ||
+              'Failed to ship order items';
         throw new Error(errorMessage);
       }
-
     } catch (error) {
-      this.logger.error(`Failed to ship Tokopedia order: ${error.message}`, error.stack);
-
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { metadata: { orderItemIds: shipmentRequest.order_item_ids } },
+      this.logger.error(
+        `Failed to ship Tokopedia order: ${error.message}`,
+        error.stack,
       );
+
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { orderItemIds: shipmentRequest.order_item_ids },
+      });
 
       return {
         success: false,
@@ -497,7 +521,10 @@ export class TokopediaOrderService {
         cancelReason,
       });
 
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -547,21 +574,22 @@ export class TokopediaOrderService {
 
         return { success: true };
       } else {
-        const errorMessage = typeof result.error === 'string' 
-          ? result.error 
-          : this.extractErrorMessage(result.error) || 'Failed to cancel order items';
+        const errorMessage =
+          typeof result.error === 'string'
+            ? result.error
+            : this.extractErrorMessage(result.error) ||
+              'Failed to cancel order items';
         throw new Error(errorMessage);
       }
-
     } catch (error) {
-      this.logger.error(`Failed to cancel Tokopedia order: ${error.message}`, error.stack);
-
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { metadata: { orderItemIds } },
+      this.logger.error(
+        `Failed to cancel Tokopedia order: ${error.message}`,
+        error.stack,
       );
+
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { orderItemIds },
+      });
 
       return {
         success: false,
@@ -584,7 +612,10 @@ export class TokopediaOrderService {
     error?: string;
   }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -621,15 +652,19 @@ export class TokopediaOrderService {
       } else {
         return {
           success: false,
-          error: typeof result.error === 'string' 
-            ? result.error 
-            : this.extractErrorMessage(result.error) || 'Failed to update tracking',
+          error:
+            typeof result.error === 'string'
+              ? result.error
+              : this.extractErrorMessage(result.error) ||
+                'Failed to update tracking',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to update order tracking: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to update order tracking: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: false,
         error: error.message,
@@ -645,7 +680,7 @@ export class TokopediaOrderService {
     tokopediaOrder: TokopediaOrder,
   ): Promise<void> {
     // Check if we already have a mapping for this order
-    let mapping = await this.mappingRepository.findOne({
+    const mapping = await this.mappingRepository.findOne({
       where: {
         tenantId,
         channelId,
@@ -675,12 +710,16 @@ export class TokopediaOrderService {
     // Map Tokopedia order data to local order
     order.orderNumber = tokopediaOrder.invoice_number;
     order.channelId = channelId;
-    order.status = this.statusMapping[tokopediaOrder.order_status] || OrderStatus.PENDING;
+    order.status =
+      this.statusMapping[tokopediaOrder.order_status] || OrderStatus.PENDING;
     order.totalAmount = tokopediaOrder.total_amount;
     order.shippingAmount = tokopediaOrder.shipping.shipping_cost;
     order.orderDate = new Date(tokopediaOrder.created_at);
     order.paymentMethod = tokopediaOrder.payment.payment_method;
-    order.paymentStatus = tokopediaOrder.payment.payment_status === 'paid' ? PaymentStatus.PAID : PaymentStatus.PENDING;
+    order.paymentStatus =
+      tokopediaOrder.payment.payment_status === 'paid'
+        ? PaymentStatus.PAID
+        : PaymentStatus.PENDING;
 
     // Customer information
     order.customerName = tokopediaOrder.buyer.name;

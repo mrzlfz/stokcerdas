@@ -31,7 +31,10 @@ import { PermissionsGuard } from '../guards/permissions.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { CurrentTenant } from '../decorators/current-tenant.decorator';
 import { Permissions } from '../decorators/permissions.decorator';
-import { PermissionResource, PermissionAction } from '../entities/permission.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../entities/permission.entity';
 import { StandardResponse } from '../../common/dto/standard-response.dto';
 
 // DTOs for enterprise auth operations
@@ -135,14 +138,20 @@ export class EnterpriseAuthController {
   @Post('assign-role')
   @ApiOperation({
     summary: 'Assign hierarchical role to user',
-    description: 'Assigns a hierarchical role to a user with optional approval workflow',
+    description:
+      'Assigns a hierarchical role to a user with optional approval workflow',
   })
   @ApiCreatedResponse({
     description: 'Role assignment successful or approval workflow initiated',
   })
   @ApiBadRequestResponse({ description: 'Invalid user or role ID' })
-  @ApiForbiddenResponse({ description: 'Insufficient permissions to assign role' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions to assign role',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async assignHierarchicalRole(
     @Body() assignRoleDto: AssignHierarchicalRoleDto,
     @CurrentTenant() tenantId: string,
@@ -158,12 +167,12 @@ export class EnterpriseAuthController {
 
     return {
       success: true,
-      message: assignRoleDto.requiresApproval 
+      message: assignRoleDto.requiresApproval
         ? 'Role assignment submitted for approval'
         : 'Hierarchical role berhasil diberikan kepada user',
       data: {
         requiresApproval: assignRoleDto.requiresApproval || false,
-        message: assignRoleDto.requiresApproval 
+        message: assignRoleDto.requiresApproval
           ? 'Assignment will be processed after approval'
           : 'Role assigned immediately',
       },
@@ -173,14 +182,21 @@ export class EnterpriseAuthController {
   @Post('assign-permission-set')
   @ApiOperation({
     summary: 'Assign permission set to user',
-    description: 'Assigns a permission set to a user with optional approval workflow',
+    description:
+      'Assigns a permission set to a user with optional approval workflow',
   })
   @ApiCreatedResponse({
-    description: 'Permission set assignment successful or approval workflow initiated',
+    description:
+      'Permission set assignment successful or approval workflow initiated',
   })
   @ApiBadRequestResponse({ description: 'Invalid user or permission set ID' })
-  @ApiForbiddenResponse({ description: 'Insufficient permissions to assign permission set' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions to assign permission set',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async assignPermissionSet(
     @Body() assignPermissionSetDto: AssignPermissionSetDto,
     @CurrentTenant() tenantId: string,
@@ -196,12 +212,12 @@ export class EnterpriseAuthController {
 
     return {
       success: true,
-      message: assignPermissionSetDto.requiresApproval 
+      message: assignPermissionSetDto.requiresApproval
         ? 'Permission set assignment submitted for approval'
         : 'Permission set berhasil diberikan kepada user',
       data: {
         requiresApproval: assignPermissionSetDto.requiresApproval || false,
-        message: assignPermissionSetDto.requiresApproval 
+        message: assignPermissionSetDto.requiresApproval
           ? 'Assignment will be processed after approval'
           : 'Permission set assigned immediately',
       },
@@ -211,14 +227,20 @@ export class EnterpriseAuthController {
   @Post('assign-department')
   @ApiOperation({
     summary: 'Assign user to department',
-    description: 'Assigns a user to a department with optional role and access settings',
+    description:
+      'Assigns a user to a department with optional role and access settings',
   })
   @ApiCreatedResponse({
     description: 'Department assignment successful',
   })
   @ApiBadRequestResponse({ description: 'Invalid user or department ID' })
-  @ApiForbiddenResponse({ description: 'Insufficient permissions to assign department' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions to assign department',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async assignDepartment(
     @Body() assignDepartmentDto: AssignDepartmentDto,
     @CurrentTenant() tenantId: string,
@@ -238,19 +260,26 @@ export class EnterpriseAuthController {
   @Get('users/:userId/permission-summary')
   @ApiOperation({
     summary: 'Get user permission summary',
-    description: 'Retrieves comprehensive permission summary for a user including all sources',
+    description:
+      'Retrieves comprehensive permission summary for a user including all sources',
   })
   @ApiParam({ name: 'userId', description: 'ID of the user' })
   @ApiOkResponse({
     description: 'User permission summary retrieved successfully',
   })
   @ApiNotFoundResponse({ description: 'User not found' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getUserPermissionSummary(
     @Param('userId', ParseUUIDPipe) userId: string,
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<UserPermissionSummaryDto>> {
-    const summary = await this.enterpriseAuthService.getUserPermissionSummary(userId, tenantId);
+    const summary = await this.enterpriseAuthService.getUserPermissionSummary(
+      userId,
+      tenantId,
+    );
 
     return {
       success: true,
@@ -265,13 +294,17 @@ export class EnterpriseAuthController {
   @Post('check-permission')
   @ApiOperation({
     summary: 'Check user permission',
-    description: 'Checks if a user has a specific permission using enterprise logic',
+    description:
+      'Checks if a user has a specific permission using enterprise logic',
   })
   @ApiOkResponse({
     description: 'Permission check completed',
   })
   @ApiBadRequestResponse({ description: 'Invalid permission check request' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async checkPermission(
     @Body() checkRequest: PermissionCheckRequestDto,
     @CurrentTenant() tenantId: string,
@@ -293,15 +326,27 @@ export class EnterpriseAuthController {
   @Get('users/:userId/assignments')
   @ApiOperation({
     summary: 'Get user assignments',
-    description: 'Retrieves all role, permission set, and department assignments for a user',
+    description:
+      'Retrieves all role, permission set, and department assignments for a user',
   })
   @ApiParam({ name: 'userId', description: 'ID of the user' })
-  @ApiQuery({ name: 'type', required: false, description: 'Filter by assignment type' })
-  @ApiQuery({ name: 'active', required: false, description: 'Filter by active status' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filter by assignment type',
+  })
+  @ApiQuery({
+    name: 'active',
+    required: false,
+    description: 'Filter by active status',
+  })
   @ApiOkResponse({
     description: 'User assignments retrieved successfully',
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getUserAssignments(
     @Param('userId', ParseUUIDPipe) userId: string,
     @CurrentTenant() tenantId: string,
@@ -326,14 +371,20 @@ export class EnterpriseAuthController {
   @Delete('users/:userId/assignments/:assignmentId')
   @ApiOperation({
     summary: 'Remove user assignment',
-    description: 'Removes a role, permission set, or department assignment from a user',
+    description:
+      'Removes a role, permission set, or department assignment from a user',
   })
   @ApiParam({ name: 'userId', description: 'ID of the user' })
   @ApiParam({ name: 'assignmentId', description: 'ID of the assignment' })
   @ApiNoContentResponse({ description: 'Assignment removed successfully' })
   @ApiNotFoundResponse({ description: 'Assignment not found' })
-  @ApiForbiddenResponse({ description: 'Insufficient permissions to remove assignment' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions to remove assignment',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async removeAssignment(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
@@ -357,7 +408,10 @@ export class EnterpriseAuthController {
   @ApiOkResponse({
     description: 'Department access check completed',
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async checkDepartmentAccess(
     @Param('departmentId', ParseUUIDPipe) departmentId: string,
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -374,7 +428,9 @@ export class EnterpriseAuthController {
       message: 'Department access check selesai',
       data: {
         hasAccess,
-        reason: hasAccess ? 'User has access to department' : 'User does not have access to department',
+        reason: hasAccess
+          ? 'User has access to department'
+          : 'User does not have access to department',
       },
     };
   }
@@ -388,10 +444,16 @@ export class EnterpriseAuthController {
     description: 'Bulk role assignment completed',
   })
   @ApiBadRequestResponse({ description: 'Invalid bulk assignment request' })
-  @ApiForbiddenResponse({ description: 'Insufficient permissions for bulk assignment' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions for bulk assignment',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async bulkAssignRoles(
-    @Body() bulkAssignDto: {
+    @Body()
+    bulkAssignDto: {
       assignments: Array<{
         userId: string;
         roleId: string;
@@ -400,12 +462,14 @@ export class EnterpriseAuthController {
     },
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') assignedBy: string,
-  ): Promise<StandardResponse<{
-    successful: number;
-    failed: number;
-    pending: number;
-    errors: Array<{ userId: string; error: string }>;
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      successful: number;
+      failed: number;
+      pending: number;
+      errors: Array<{ userId: string; error: string }>;
+    }>
+  > {
     let successful = 0;
     let failed = 0;
     let pending = 0;
@@ -453,31 +517,50 @@ export class EnterpriseAuthController {
     description: 'Retrieves audit trail of permission changes for a user',
   })
   @ApiParam({ name: 'userId', description: 'ID of the user' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Start date for audit trail' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'End date for audit trail' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Limit number of results' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Start date for audit trail',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'End date for audit trail',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Limit number of results',
+  })
   @ApiOkResponse({
     description: 'Audit trail retrieved successfully',
   })
-  @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.ANALYTICS,
+    action: PermissionAction.READ,
+  })
   async getUserAuditTrail(
     @Param('userId', ParseUUIDPipe) userId: string,
     @CurrentTenant() tenantId: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('limit') limit: number = 100,
-  ): Promise<StandardResponse<Array<{
-    id: string;
-    userId: string;
-    action: string;
-    entityType: string;
-    entityId: string;
-    changes: Record<string, any>;
-    performedBy: string;
-    performedAt: Date;
-    ipAddress?: string;
-    metadata?: Record<string, any>;
-  }>>> {
+  ): Promise<
+    StandardResponse<
+      Array<{
+        id: string;
+        userId: string;
+        action: string;
+        entityType: string;
+        entityId: string;
+        changes: Record<string, any>;
+        performedBy: string;
+        performedAt: Date;
+        ipAddress?: string;
+        metadata?: Record<string, any>;
+      }>
+    >
+  > {
     // This would be implemented with actual audit trail retrieval
     const auditTrail = [];
 
@@ -498,21 +581,27 @@ export class EnterpriseAuthController {
   @Post('validate-permissions')
   @ApiOperation({
     summary: 'Validate user permissions configuration',
-    description: 'Validates and reports on user permission configuration issues',
+    description:
+      'Validates and reports on user permission configuration issues',
   })
   @ApiOkResponse({
     description: 'Permission validation completed',
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async validateUserPermissions(
     @Body() validationRequest: { userId: string },
     @CurrentTenant() tenantId: string,
-  ): Promise<StandardResponse<{
-    isValid: boolean;
-    warnings: string[];
-    errors: string[];
-    recommendations: string[];
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      isValid: boolean;
+      warnings: string[];
+      errors: string[];
+      recommendations: string[];
+    }>
+  > {
     // This would implement comprehensive permission validation
     return {
       success: true,

@@ -44,7 +44,10 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
-import { AllocationStrategy, AllocationStatus } from '../entities/channel-inventory.entity';
+import {
+  AllocationStrategy,
+  AllocationStatus,
+} from '../entities/channel-inventory.entity';
 import { UserRole } from '../../users/entities/user.entity';
 
 // Services
@@ -110,12 +113,12 @@ export class CreateChannelInventoryDto {
 
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value ? new Date(value) : value)
+  @Transform(({ value }) => (value ? new Date(value) : value))
   discountStartDate?: Date;
 
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value ? new Date(value) : value)
+  @Transform(({ value }) => (value ? new Date(value) : value))
   discountEndDate?: Date;
 
   @IsOptional()
@@ -191,12 +194,12 @@ export class UpdateChannelInventoryDto {
 
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value ? new Date(value) : value)
+  @Transform(({ value }) => (value ? new Date(value) : value))
   discountStartDate?: Date;
 
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value ? new Date(value) : value)
+  @Transform(({ value }) => (value ? new Date(value) : value))
   discountEndDate?: Date;
 
   @IsOptional()
@@ -340,17 +343,22 @@ export class ChannelInventoryQueryDto {
 export class ChannelInventoryController {
   private readonly logger = new Logger(ChannelInventoryController.name);
 
-  constructor(
-    private readonly inventoryService: ChannelInventoryService,
-  ) {}
+  constructor(private readonly inventoryService: ChannelInventoryService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get channel inventory allocations' })
-  @ApiResponse({ status: 200, description: 'Allocations retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Allocations retrieved successfully',
+  })
   @ApiQuery({ name: 'channelId', type: 'string', required: false })
   @ApiQuery({ name: 'productId', type: 'string', required: false })
   @ApiQuery({ name: 'status', enum: AllocationStatus, required: false })
-  @ApiQuery({ name: 'allocationStrategy', enum: AllocationStrategy, required: false })
+  @ApiQuery({
+    name: 'allocationStrategy',
+    enum: AllocationStrategy,
+    required: false,
+  })
   @ApiQuery({ name: 'isVisible', type: 'boolean', required: false })
   @ApiQuery({ name: 'isOutOfStock', type: 'boolean', required: false })
   @ApiQuery({ name: 'isLowStock', type: 'boolean', required: false })
@@ -364,8 +372,11 @@ export class ChannelInventoryController {
     @Query() query: ChannelInventoryQueryDto,
   ) {
     try {
-      const result = await this.inventoryService.getChannelInventory(user.tenantId, query);
-      
+      const result = await this.inventoryService.getChannelInventory(
+        user.tenantId,
+        query,
+      );
+
       return {
         success: true,
         data: result.allocations,
@@ -376,7 +387,10 @@ export class ChannelInventoryController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get channel inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get channel inventory: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -400,13 +414,16 @@ export class ChannelInventoryController {
         user.tenantId,
         createDto,
       );
-      
+
       return {
         success: true,
         data: allocation,
       };
     } catch (error) {
-      this.logger.error(`Failed to create channel inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create channel inventory: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -433,13 +450,16 @@ export class ChannelInventoryController {
         allocationId,
         updateDto,
       );
-      
+
       return {
         success: true,
         data: allocation,
       };
     } catch (error) {
-      this.logger.error(`Failed to update channel inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update channel inventory: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -460,14 +480,20 @@ export class ChannelInventoryController {
     @Param('allocationId') allocationId: string,
   ) {
     try {
-      await this.inventoryService.deleteChannelInventory(user.tenantId, allocationId);
-      
+      await this.inventoryService.deleteChannelInventory(
+        user.tenantId,
+        allocationId,
+      );
+
       return {
         success: true,
         message: 'Allocation deleted successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to delete channel inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete channel inventory: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -480,7 +506,10 @@ export class ChannelInventoryController {
 
   @Post('rebalance')
   @ApiOperation({ summary: 'Rebalance inventory allocations' })
-  @ApiResponse({ status: 200, description: 'Rebalancing completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rebalancing completed successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async rebalanceAllocations(
     @CurrentUser() user: any,
@@ -491,13 +520,16 @@ export class ChannelInventoryController {
         user.tenantId,
         rebalanceDto,
       );
-      
+
       return {
         success: true,
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to rebalance allocations: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to rebalance allocations: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -510,7 +542,10 @@ export class ChannelInventoryController {
 
   @Post('sync')
   @ApiOperation({ summary: 'Sync channel inventory' })
-  @ApiResponse({ status: 200, description: 'Inventory sync completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory sync completed successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async syncInventory(
     @CurrentUser() user: any,
@@ -521,13 +556,16 @@ export class ChannelInventoryController {
         user.tenantId,
         syncDto,
       );
-      
+
       return {
         success: true,
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to sync inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync inventory: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -554,13 +592,18 @@ export class ChannelInventoryController {
         reserveDto.quantity,
         reserveDto.variantId,
       );
-      
+
       return {
         success,
-        message: success ? 'Inventory reserved successfully' : 'Insufficient inventory',
+        message: success
+          ? 'Inventory reserved successfully'
+          : 'Insufficient inventory',
       };
     } catch (error) {
-      this.logger.error(`Failed to reserve inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to reserve inventory: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -573,7 +616,10 @@ export class ChannelInventoryController {
 
   @Post('release')
   @ApiOperation({ summary: 'Release inventory reservation' })
-  @ApiResponse({ status: 200, description: 'Reservation released successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reservation released successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async releaseReservation(
     @CurrentUser() user: any,
@@ -587,13 +633,16 @@ export class ChannelInventoryController {
         releaseDto.quantity,
         releaseDto.variantId,
       );
-      
+
       return {
         success: true,
         message: 'Reservation released successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to release reservation: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to release reservation: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -628,32 +677,60 @@ export class ChannelInventoryController {
       // Calculate summary analytics
       const summary = {
         totalAllocations: allocations.length,
-        totalAllocatedStock: allocations.reduce((sum, alloc) => sum + alloc.allocatedQuantity, 0),
-        totalAvailableStock: allocations.reduce((sum, alloc) => sum + alloc.availableQuantity, 0),
-        totalReservedStock: allocations.reduce((sum, alloc) => sum + alloc.reservedQuantity, 0),
+        totalAllocatedStock: allocations.reduce(
+          (sum, alloc) => sum + alloc.allocatedQuantity,
+          0,
+        ),
+        totalAvailableStock: allocations.reduce(
+          (sum, alloc) => sum + alloc.availableQuantity,
+          0,
+        ),
+        totalReservedStock: allocations.reduce(
+          (sum, alloc) => sum + alloc.reservedQuantity,
+          0,
+        ),
         outOfStockCount: allocations.filter(alloc => alloc.isOutOfStock).length,
         lowStockCount: allocations.filter(alloc => alloc.isLowStock).length,
-        needsRebalancingCount: allocations.filter(alloc => alloc.needsRebalancing).length,
+        needsRebalancingCount: allocations.filter(
+          alloc => alloc.needsRebalancing,
+        ).length,
         byStrategy: {
-          percentage: allocations.filter(a => a.allocationStrategy === AllocationStrategy.PERCENTAGE).length,
-          fixed: allocations.filter(a => a.allocationStrategy === AllocationStrategy.FIXED_AMOUNT).length,
-          dynamic: allocations.filter(a => a.allocationStrategy === AllocationStrategy.DYNAMIC).length,
-          priority: allocations.filter(a => a.allocationStrategy === AllocationStrategy.PRIORITY).length,
+          percentage: allocations.filter(
+            a => a.allocationStrategy === AllocationStrategy.PERCENTAGE,
+          ).length,
+          fixed: allocations.filter(
+            a => a.allocationStrategy === AllocationStrategy.FIXED_AMOUNT,
+          ).length,
+          dynamic: allocations.filter(
+            a => a.allocationStrategy === AllocationStrategy.DYNAMIC,
+          ).length,
+          priority: allocations.filter(
+            a => a.allocationStrategy === AllocationStrategy.PRIORITY,
+          ).length,
         },
         byStatus: {
-          active: allocations.filter(a => a.status === AllocationStatus.ACTIVE).length,
-          paused: allocations.filter(a => a.status === AllocationStatus.PAUSED).length,
-          outOfStock: allocations.filter(a => a.status === AllocationStatus.OUT_OF_STOCK).length,
-          discontinued: allocations.filter(a => a.status === AllocationStatus.DISCONTINUED).length,
+          active: allocations.filter(a => a.status === AllocationStatus.ACTIVE)
+            .length,
+          paused: allocations.filter(a => a.status === AllocationStatus.PAUSED)
+            .length,
+          outOfStock: allocations.filter(
+            a => a.status === AllocationStatus.OUT_OF_STOCK,
+          ).length,
+          discontinued: allocations.filter(
+            a => a.status === AllocationStatus.DISCONTINUED,
+          ).length,
         },
       };
-      
+
       return {
         success: true,
         data: summary,
       };
     } catch (error) {
-      this.logger.error(`Failed to get allocation summary: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get allocation summary: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -666,7 +743,10 @@ export class ChannelInventoryController {
 
   @Get('analytics/performance')
   @ApiOperation({ summary: 'Get channel inventory performance analytics' })
-  @ApiResponse({ status: 200, description: 'Performance analytics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Performance analytics retrieved successfully',
+  })
   @ApiQuery({ name: 'channelId', type: 'string', required: false })
   @ApiQuery({ name: 'days', type: 'number', required: false })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
@@ -686,14 +766,27 @@ export class ChannelInventoryController {
 
       // Calculate performance metrics
       const analytics = {
-        totalSales: allocations.reduce((sum, alloc) => sum + (alloc.metrics?.totalSales || 0), 0),
-        totalRevenue: allocations.reduce((sum, alloc) => sum + (alloc.metrics?.totalRevenue || 0), 0),
-        averageConversionRate: allocations.length > 0
-          ? allocations.reduce((sum, alloc) => sum + (alloc.metrics?.conversionRate || 0), 0) / allocations.length
-          : 0,
+        totalSales: allocations.reduce(
+          (sum, alloc) => sum + (alloc.metrics?.totalSales || 0),
+          0,
+        ),
+        totalRevenue: allocations.reduce(
+          (sum, alloc) => sum + (alloc.metrics?.totalRevenue || 0),
+          0,
+        ),
+        averageConversionRate:
+          allocations.length > 0
+            ? allocations.reduce(
+                (sum, alloc) => sum + (alloc.metrics?.conversionRate || 0),
+                0,
+              ) / allocations.length
+            : 0,
         topPerformingProducts: allocations
           .filter(alloc => alloc.metrics?.totalRevenue)
-          .sort((a, b) => (b.metrics?.totalRevenue || 0) - (a.metrics?.totalRevenue || 0))
+          .sort(
+            (a, b) =>
+              (b.metrics?.totalRevenue || 0) - (a.metrics?.totalRevenue || 0),
+          )
           .slice(0, 10)
           .map(alloc => ({
             productId: alloc.productId,
@@ -704,7 +797,10 @@ export class ChannelInventoryController {
           })),
         lowPerformingProducts: allocations
           .filter(alloc => alloc.metrics?.stockTurnover !== undefined)
-          .sort((a, b) => (a.metrics?.stockTurnover || 0) - (b.metrics?.stockTurnover || 0))
+          .sort(
+            (a, b) =>
+              (a.metrics?.stockTurnover || 0) - (b.metrics?.stockTurnover || 0),
+          )
           .slice(0, 10)
           .map(alloc => ({
             productId: alloc.productId,
@@ -713,13 +809,16 @@ export class ChannelInventoryController {
             outOfStockDays: alloc.metrics?.outOfStockDays || 0,
           })),
       };
-      
+
       return {
         success: true,
         data: analytics,
       };
     } catch (error) {
-      this.logger.error(`Failed to get performance analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get performance analytics: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

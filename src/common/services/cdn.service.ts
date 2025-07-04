@@ -9,7 +9,7 @@ import { createHash } from 'crypto';
 
 /**
  * CDN Service for StokCerdas
- * 
+ *
  * Comprehensive static asset management and optimization:
  * 1. Multi-region CloudFront distribution
  * 2. Intelligent image processing and optimization
@@ -17,7 +17,7 @@ import { createHash } from 'crypto';
  * 4. Indonesian business context optimization
  * 5. Mobile-first image delivery
  * 6. Performance monitoring and analytics
- * 
+ *
  * Key Features:
  * - Automatic image optimization for Indonesian mobile users
  * - Multi-format support (WebP, AVIF, JPEG)
@@ -90,9 +90,9 @@ export class CDNService {
 
   // Indonesian business context
   private readonly indonesianRegions = {
-    'WIB': ['jakarta', 'surabaya', 'bandung', 'medan', 'semarang'],
-    'WITA': ['makassar', 'denpasar', 'balikpapan', 'banjarmasin'],
-    'WIT': ['jayapura', 'manado', 'ambon']
+    WIB: ['jakarta', 'surabaya', 'bandung', 'medan', 'semarang'],
+    WITA: ['makassar', 'denpasar', 'balikpapan', 'banjarmasin'],
+    WIT: ['jayapura', 'manado', 'ambon'],
   };
 
   // Mobile optimization settings for Indonesian users
@@ -104,8 +104,14 @@ export class CDNService {
   };
 
   constructor(private readonly configService: ConfigService) {
-    this.region = this.configService.get<string>('AWS_REGION', 'ap-southeast-1'); // Singapore for Indonesia
-    this.bucketName = this.configService.get<string>('CDN_BUCKET_NAME', 'stokcerdas-cdn');
+    this.region = this.configService.get<string>(
+      'AWS_REGION',
+      'ap-southeast-1',
+    ); // Singapore for Indonesia
+    this.bucketName = this.configService.get<string>(
+      'CDN_BUCKET_NAME',
+      'stokcerdas-cdn',
+    );
     this.cdnBaseUrl = this.configService.get<string>('CDN_BASE_URL', '');
 
     // Initialize S3 client
@@ -125,7 +131,7 @@ export class CDNService {
     file: Buffer,
     originalName: string,
     tenantId: string,
-    options: AssetUploadOptions
+    options: AssetUploadOptions,
   ): Promise<ProcessedAsset> {
     const startTime = Date.now();
 
@@ -134,7 +140,12 @@ export class CDNService {
       const fileExtension = path.extname(originalName).toLowerCase();
       const baseName = path.basename(originalName, fileExtension);
       const sanitizedName = this.sanitizeFileName(baseName);
-      const uniqueKey = this.generateAssetKey(tenantId, options.category, sanitizedName, fileExtension);
+      const uniqueKey = this.generateAssetKey(
+        tenantId,
+        options.category,
+        sanitizedName,
+        fileExtension,
+      );
 
       // Detect file type and process accordingly
       const isImage = this.isImageFile(fileExtension);
@@ -143,7 +154,11 @@ export class CDNService {
       if (isImage) {
         processedAsset = await this.processImageAsset(file, uniqueKey, options);
       } else {
-        processedAsset = await this.processDocumentAsset(file, uniqueKey, options);
+        processedAsset = await this.processDocumentAsset(
+          file,
+          uniqueKey,
+          options,
+        );
       }
 
       // Calculate analytics
@@ -154,12 +169,14 @@ export class CDNService {
         processingTime,
         originalSize: file.length,
         optimizedSize: processedAsset.original.size,
-        compressionRatio: ((file.length - processedAsset.original.size) / file.length) * 100,
+        compressionRatio:
+          ((file.length - processedAsset.original.size) / file.length) * 100,
       };
 
-      this.logger.log(`Asset uploaded successfully: ${uniqueKey} (${processingTime}ms)`);
+      this.logger.log(
+        `Asset uploaded successfully: ${uniqueKey} (${processingTime}ms)`,
+      );
       return processedAsset;
-
     } catch (error) {
       this.logger.error(`Asset upload failed for tenant ${tenantId}:`, error);
       throw new BadRequestException(`Failed to upload asset: ${error.message}`);
@@ -178,7 +195,7 @@ export class CDNService {
 
     if (transforms) {
       const params = new URLSearchParams();
-      
+
       if (transforms.width) params.append('w', transforms.width.toString());
       if (transforms.height) params.append('h', transforms.height.toString());
       if (transforms.quality) params.append('q', transforms.quality.toString());
@@ -205,16 +222,40 @@ export class CDNService {
   } {
     return {
       // Standard JPEG formats
-      mobile: this.generateImageUrl(key, { width: 400, quality: 75, format: 'jpeg' }),
-      tablet: this.generateImageUrl(key, { width: 800, quality: 80, format: 'jpeg' }),
-      desktop: this.generateImageUrl(key, { width: 1200, quality: 85, format: 'jpeg' }),
-      
+      mobile: this.generateImageUrl(key, {
+        width: 400,
+        quality: 75,
+        format: 'jpeg',
+      }),
+      tablet: this.generateImageUrl(key, {
+        width: 800,
+        quality: 80,
+        format: 'jpeg',
+      }),
+      desktop: this.generateImageUrl(key, {
+        width: 1200,
+        quality: 85,
+        format: 'jpeg',
+      }),
+
       // WebP formats for better compression
       webp: {
-        mobile: this.generateImageUrl(key, { width: 400, quality: 70, format: 'webp' }),
-        tablet: this.generateImageUrl(key, { width: 800, quality: 75, format: 'webp' }),
-        desktop: this.generateImageUrl(key, { width: 1200, quality: 80, format: 'webp' }),
-      }
+        mobile: this.generateImageUrl(key, {
+          width: 400,
+          quality: 70,
+          format: 'webp',
+        }),
+        tablet: this.generateImageUrl(key, {
+          width: 800,
+          quality: 75,
+          format: 'webp',
+        }),
+        desktop: this.generateImageUrl(key, {
+          width: 1200,
+          quality: 80,
+          format: 'webp',
+        }),
+      },
     };
   }
 
@@ -230,10 +271,12 @@ export class CDNService {
     etag: string;
   }> {
     try {
-      const response = await this.s3.headObject({
-        Bucket: this.bucketName,
-        Key: key,
-      }).promise();
+      const response = await this.s3
+        .headObject({
+          Bucket: this.bucketName,
+          Key: key,
+        })
+        .promise();
 
       return {
         metadata: response.Metadata || {},
@@ -244,7 +287,9 @@ export class CDNService {
         etag: response.ETag || '',
       };
     } catch (error) {
-      throw new BadRequestException(`Failed to get asset metadata: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get asset metadata: ${error.message}`,
+      );
     }
   }
 
@@ -254,10 +299,12 @@ export class CDNService {
   async deleteAsset(key: string): Promise<void> {
     try {
       // Delete original asset
-      await this.s3.deleteObject({
-        Bucket: this.bucketName,
-        Key: key,
-      }).promise();
+      await this.s3
+        .deleteObject({
+          Bucket: this.bucketName,
+          Key: key,
+        })
+        .promise();
 
       // Delete all variants (thumbnails, mobile versions, etc.)
       const baseKey = key.replace(/\.[^/.]+$/, ''); // Remove extension
@@ -270,17 +317,19 @@ export class CDNService {
       ];
 
       const deletePromises = variants.map(variantKey =>
-        this.s3.deleteObject({
-          Bucket: this.bucketName,
-          Key: variantKey,
-        }).promise().catch(() => {
-          // Ignore errors for variants that don't exist
-        })
+        this.s3
+          .deleteObject({
+            Bucket: this.bucketName,
+            Key: variantKey,
+          })
+          .promise()
+          .catch(() => {
+            // Ignore errors for variants that don't exist
+          }),
       );
 
       await Promise.all(deletePromises);
       this.logger.log(`Asset deleted: ${key} and all variants`);
-
     } catch (error) {
       this.logger.error(`Failed to delete asset ${key}:`, error);
       throw new BadRequestException(`Failed to delete asset: ${error.message}`);
@@ -290,7 +339,10 @@ export class CDNService {
   /**
    * Get CDN analytics and performance metrics
    */
-  async getCDNAnalytics(tenantId?: string, dateRange?: { start: Date; end: Date }): Promise<CDNAnalytics> {
+  async getCDNAnalytics(
+    tenantId?: string,
+    dateRange?: { start: Date; end: Date },
+  ): Promise<CDNAnalytics> {
     // This would integrate with CloudFront analytics API
     // For now, return mock data structure
     return {
@@ -300,11 +352,11 @@ export class CDNService {
       averageResponseTime: 45, // Target <50ms from CDN
       topRequestedAssets: [],
       geographicDistribution: {
-        'Jakarta': 35,
-        'Surabaya': 20,
-        'Bandung': 15,
-        'Medan': 10,
-        'Other': 20,
+        Jakarta: 35,
+        Surabaya: 20,
+        Bandung: 15,
+        Medan: 10,
+        Other: 20,
       },
       mobileVsDesktop: {
         mobile: 85, // 85% mobile traffic typical for Indonesian SMBs
@@ -319,15 +371,17 @@ export class CDNService {
   async preloadAssets(assetKeys: string[]): Promise<void> {
     // Implementation would warm up CDN cache for critical assets
     this.logger.log(`Preloading ${assetKeys.length} critical assets`);
-    
+
     // This could trigger CloudFront cache warming
-    const preloadPromises = assetKeys.map(async (key) => {
+    const preloadPromises = assetKeys.map(async key => {
       try {
         // Make a HEAD request to warm the cache
-        await this.s3.headObject({
-          Bucket: this.bucketName,
-          Key: key,
-        }).promise();
+        await this.s3
+          .headObject({
+            Bucket: this.bucketName,
+            Key: key,
+          })
+          .promise();
       } catch (error) {
         this.logger.warn(`Failed to preload asset ${key}:`, error.message);
       }
@@ -341,7 +395,7 @@ export class CDNService {
   private async processImageAsset(
     file: Buffer,
     baseKey: string,
-    options: AssetUploadOptions
+    options: AssetUploadOptions,
   ): Promise<ProcessedAsset> {
     // TODO: Uncomment when sharp is installed
     // const image = sharp(file);
@@ -356,17 +410,25 @@ export class CDNService {
 
     // Upload original
     const originalKey = baseKey;
-    await this.uploadToS3(optimizedOriginal, originalKey, 'image/jpeg', options.cacheControl);
+    await this.uploadToS3(
+      optimizedOriginal,
+      originalKey,
+      'image/jpeg',
+      options.cacheControl,
+    );
 
     const result: ProcessedAsset = {
       original: {
         url: this.generateImageUrl(originalKey),
         key: originalKey,
         size: optimizedOriginal.length,
-        dimensions: metadata.width && metadata.height ? {
-          width: metadata.width,
-          height: metadata.height,
-        } : undefined,
+        dimensions:
+          metadata.width && metadata.height
+            ? {
+                width: metadata.width,
+                height: metadata.height,
+              }
+            : undefined,
       },
       analytics: {
         uploadTime: 0,
@@ -379,12 +441,20 @@ export class CDNService {
 
     // Generate thumbnails if requested
     if (options.generateThumbnails) {
-      result.thumbnails = await this.generateThumbnails(image, baseKey, options.cacheControl);
+      result.thumbnails = await this.generateThumbnails(
+        image,
+        baseKey,
+        options.cacheControl,
+      );
     }
 
     // Generate mobile optimized versions
     if (options.optimizeForMobile) {
-      result.mobile = await this.generateMobileVersions(image, baseKey, options.cacheControl);
+      result.mobile = await this.generateMobileVersions(
+        image,
+        baseKey,
+        options.cacheControl,
+      );
     }
 
     return result;
@@ -393,10 +463,10 @@ export class CDNService {
   private async processDocumentAsset(
     file: Buffer,
     key: string,
-    options: AssetUploadOptions
+    options: AssetUploadOptions,
   ): Promise<ProcessedAsset> {
     const contentType = this.getContentType(key);
-    
+
     await this.uploadToS3(file, key, contentType, options.cacheControl);
 
     return {
@@ -418,7 +488,7 @@ export class CDNService {
   private async generateThumbnails(
     image: any, // TODO: Change to sharp.Sharp when sharp is installed
     baseKey: string,
-    cacheControl?: string
+    cacheControl?: string,
   ): Promise<ProcessedAsset['thumbnails']> {
     const thumbnailSizes = [
       { suffix: '_thumb_small', width: 150, height: 150 },
@@ -440,11 +510,19 @@ export class CDNService {
         .toBuffer();
 
       const thumbnailKey = baseKey.replace(/\.[^/.]+$/, `${suffix}.jpg`);
-      await this.uploadToS3(thumbnailBuffer, thumbnailKey, 'image/jpeg', cacheControl);
+      await this.uploadToS3(
+        thumbnailBuffer,
+        thumbnailKey,
+        'image/jpeg',
+        cacheControl,
+      );
 
-      const sizeKey = suffix.includes('small') ? 'small' : 
-                    suffix.includes('medium') ? 'medium' : 'large';
-      
+      const sizeKey = suffix.includes('small')
+        ? 'small'
+        : suffix.includes('medium')
+        ? 'medium'
+        : 'large';
+
       thumbnails[sizeKey] = {
         url: this.generateImageUrl(thumbnailKey),
         key: thumbnailKey,
@@ -458,7 +536,7 @@ export class CDNService {
   private async generateMobileVersions(
     image: any, // TODO: Change to sharp.Sharp when sharp is installed
     baseKey: string,
-    cacheControl?: string
+    cacheControl?: string,
   ): Promise<ProcessedAsset['mobile']> {
     const mobileWidth = this.mobileOptimization.maxWidth;
     const mobileQuality = this.mobileOptimization.defaultQuality;
@@ -501,41 +579,49 @@ export class CDNService {
 
   private async optimizeImage(
     image: any, // TODO: Change to sharp.Sharp when sharp is installed
-    options: { quality: number; format: 'jpeg' | 'webp' | 'png' }
+    options: { quality: number; format: 'jpeg' | 'webp' | 'png' },
   ): Promise<Buffer> {
     let optimized = image.clone();
 
     // Add watermark if configured
     if (this.watermarkBuffer) {
-      optimized = optimized.composite([{
-        input: this.watermarkBuffer,
-        gravity: 'southeast',
-        blend: 'over',
-      }]);
+      optimized = optimized.composite([
+        {
+          input: this.watermarkBuffer,
+          gravity: 'southeast',
+          blend: 'over',
+        },
+      ]);
     }
 
     // Apply format-specific optimization
     switch (options.format) {
       case 'jpeg':
-        return optimized.jpeg({ 
-          quality: options.quality,
-          progressive: true,
-          mozjpeg: true,
-        }).toBuffer();
-        
+        return optimized
+          .jpeg({
+            quality: options.quality,
+            progressive: true,
+            mozjpeg: true,
+          })
+          .toBuffer();
+
       case 'webp':
-        return optimized.webp({ 
-          quality: options.quality,
-          effort: 6, // Higher effort for better compression
-        }).toBuffer();
-        
+        return optimized
+          .webp({
+            quality: options.quality,
+            effort: 6, // Higher effort for better compression
+          })
+          .toBuffer();
+
       case 'png':
-        return optimized.png({ 
-          quality: options.quality,
-          compressionLevel: 9,
-          progressive: true,
-        }).toBuffer();
-        
+        return optimized
+          .png({
+            quality: options.quality,
+            compressionLevel: 9,
+            progressive: true,
+          })
+          .toBuffer();
+
       default:
         return optimized.jpeg({ quality: options.quality }).toBuffer();
     }
@@ -545,7 +631,7 @@ export class CDNService {
     buffer: Buffer,
     key: string,
     contentType: string,
-    cacheControl?: string
+    cacheControl?: string,
   ): Promise<void> {
     const params: S3.PutObjectRequest = {
       Bucket: this.bucketName,
@@ -563,12 +649,15 @@ export class CDNService {
     tenantId: string,
     category: string,
     fileName: string,
-    extension: string
+    extension: string,
   ): string {
     const timestamp = Date.now();
     const random = crypto.randomBytes(4).toString('hex');
-    const hash = createHash('md5').update(`${tenantId}${fileName}${timestamp}`).digest('hex').substring(0, 8);
-    
+    const hash = createHash('md5')
+      .update(`${tenantId}${fileName}${timestamp}`)
+      .digest('hex')
+      .substring(0, 8);
+
     return `${category}/${tenantId}/${hash}_${timestamp}_${random}${extension}`;
   }
 
@@ -581,7 +670,16 @@ export class CDNService {
   }
 
   private isImageFile(extension: string): boolean {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.svg'];
+    const imageExtensions = [
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.webp',
+      '.bmp',
+      '.tiff',
+      '.svg',
+    ];
     return imageExtensions.includes(extension.toLowerCase());
   }
 
@@ -596,18 +694,23 @@ export class CDNService {
       '.svg': 'image/svg+xml',
       '.pdf': 'application/pdf',
       '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.docx':
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       '.xls': 'application/vnd.ms-excel',
-      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.xlsx':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     };
-    
+
     return contentTypes[extension] || 'application/octet-stream';
   }
 
   private getDefaultCacheControl(contentType: string): string {
     if (contentType.startsWith('image/')) {
       return 'public, max-age=31536000, immutable'; // 1 year for images
-    } else if (contentType.includes('pdf') || contentType.includes('document')) {
+    } else if (
+      contentType.includes('pdf') ||
+      contentType.includes('document')
+    ) {
       return 'public, max-age=86400'; // 1 day for documents
     }
     return 'public, max-age=3600'; // 1 hour default

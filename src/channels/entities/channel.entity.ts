@@ -1,4 +1,11 @@
-import { Entity, Column, Index, OneToMany, OneToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  OneToMany,
+  OneToOne,
+  JoinColumn,
+} from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 
 export enum ChannelType {
@@ -28,7 +35,10 @@ export enum SyncStrategy {
 @Entity('channels')
 @Index(['tenantId', 'channelType'])
 @Index(['tenantId', 'status'])
-@Index(['tenantId', 'platformId'], { unique: true, where: 'platformId IS NOT NULL' })
+@Index(['tenantId', 'platformId'], {
+  unique: true,
+  where: 'platformId IS NOT NULL',
+})
 export class Channel extends BaseEntity {
   @Column({ type: 'varchar', length: 100 })
   name: string;
@@ -121,17 +131,17 @@ export class Channel extends BaseEntity {
     autoInventorySync?: boolean;
     inventoryBuffer?: number; // Percentage buffer for safety stock
     negativeStockHandling?: 'hide' | 'show_zero' | 'allow_backorder';
-    
+
     // Order settings
     autoOrderImport?: boolean;
     orderStatusMapping?: Record<string, string>;
     paymentMethodMapping?: Record<string, string>;
-    
+
     // Product settings
     autoProductSync?: boolean;
     priceMarkup?: number; // Percentage markup
     categoryMapping?: Record<string, string>;
-    
+
     // Shipping settings
     shippingMethods?: Array<{
       id: string;
@@ -139,7 +149,7 @@ export class Channel extends BaseEntity {
       cost: number;
       estimatedDays: number;
     }>;
-    
+
     // Business rules
     businessRules?: {
       minOrderValue?: number;
@@ -231,13 +241,16 @@ export class Channel extends BaseEntity {
   // Methods
   updateStatus(newStatus: ChannelStatus, reason?: string): void {
     this.status = newStatus;
-    
+
     if (newStatus === ChannelStatus.ACTIVE) {
       this.enabledAt = new Date();
       this.disabledAt = null;
       this.disabledReason = null;
       this.consecutiveErrors = 0;
-    } else if (newStatus === ChannelStatus.SUSPENDED || newStatus === ChannelStatus.ERROR) {
+    } else if (
+      newStatus === ChannelStatus.SUSPENDED ||
+      newStatus === ChannelStatus.ERROR
+    ) {
       this.disabledAt = new Date();
       this.disabledReason = reason;
     }
@@ -247,7 +260,7 @@ export class Channel extends BaseEntity {
     this.lastError = error;
     this.lastErrorAt = new Date();
     this.consecutiveErrors += 1;
-    
+
     // Auto-suspend after 10 consecutive errors
     if (this.consecutiveErrors >= 10) {
       this.updateStatus(ChannelStatus.SUSPENDED, 'Too many consecutive errors');
@@ -258,7 +271,7 @@ export class Channel extends BaseEntity {
     this.lastError = null;
     this.lastErrorAt = null;
     this.consecutiveErrors = 0;
-    
+
     if (this.status === ChannelStatus.ERROR) {
       this.updateStatus(ChannelStatus.ACTIVE);
     }
@@ -266,7 +279,7 @@ export class Channel extends BaseEntity {
 
   updateSyncTimestamp(): void {
     this.lastSyncAt = new Date();
-    
+
     // Calculate next sync based on frequency
     if (this.syncFrequency && this.syncStrategy === SyncStrategy.SCHEDULED) {
       // This would use a cron parser to calculate next execution
@@ -280,7 +293,7 @@ export class Channel extends BaseEntity {
       ...this.apiCredentials,
       ...credentials,
     };
-    
+
     if (credentials.accessToken) {
       this.clearErrors();
       if (this.status === ChannelStatus.SETUP_PENDING) {

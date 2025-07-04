@@ -85,7 +85,9 @@ export class TokopediaApiService extends BaseApiService {
       // Check rate limits (Tokopedia: 1000 requests per minute)
       // Rate limiting would be implemented here if needed
 
-      const baseUrl = config.sandbox ? this.baseUrls.sandbox : this.baseUrls.production;
+      const baseUrl = config.sandbox
+        ? this.baseUrls.sandbox
+        : this.baseUrls.production;
       url = `${baseUrl}${requestConfig.endpoint}`;
 
       // Prepare headers
@@ -127,7 +129,9 @@ export class TokopediaApiService extends BaseApiService {
         requestId,
       });
 
-      const response = await firstValueFrom(this.httpService.request(axiosConfig));
+      const response = await firstValueFrom(
+        this.httpService.request(axiosConfig),
+      );
       const processingTime = Date.now() - startTime;
 
       // Log the response
@@ -164,7 +168,6 @@ export class TokopediaApiService extends BaseApiService {
         requestId,
         processingTime,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
 
@@ -178,20 +181,15 @@ export class TokopediaApiService extends BaseApiService {
       });
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        {
-          requestId,
-          httpMethod: requestConfig.method,
-          httpUrl: url,
-          httpStatus: error.response?.status || 0,
-          metadata: {
-            processingTime,
-          },
+      await this.logService.logError(tenantId, channelId, error, {
+        requestId,
+        httpMethod: requestConfig.method,
+        httpUrl: url,
+        httpStatus: error.response?.status || 0,
+        metadata: {
+          processingTime,
         },
-      );
+      });
 
       return {
         success: false,
@@ -232,7 +230,7 @@ export class TokopediaApiService extends BaseApiService {
   ): Promise<TokopediaApiResponse<{ status: string; shop_id: string }>> {
     try {
       const shopInfo = await this.getShopInfo(tenantId, channelId, config);
-      
+
       if (shopInfo.success) {
         return {
           success: true,
@@ -247,10 +245,12 @@ export class TokopediaApiService extends BaseApiService {
           error: shopInfo.error || 'Connection test failed',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Tokopedia connection test failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Tokopedia connection test failed: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: false,
         error: `Connection test failed: ${error.message}`,
@@ -266,16 +266,11 @@ export class TokopediaApiService extends BaseApiService {
     channelId: string,
     config: TokopediaConfig,
   ): Promise<TokopediaApiResponse<any[]>> {
-    return this.makeTokopediaRequest(
-      tenantId,
-      channelId,
-      config,
-      {
-        method: 'GET',
-        endpoint: '/v1/products/categories',
-        requiresAuth: true,
-      },
-    );
+    return this.makeTokopediaRequest(tenantId, channelId, config, {
+      method: 'GET',
+      endpoint: '/v1/products/categories',
+      requiresAuth: true,
+    });
   }
 
   /**
@@ -289,26 +284,21 @@ export class TokopediaApiService extends BaseApiService {
     endDate?: Date,
   ): Promise<TokopediaApiResponse<any[]>> {
     const params: Record<string, any> = {};
-    
+
     if (startDate) {
       params.start_date = startDate.toISOString();
     }
-    
+
     if (endDate) {
       params.end_date = endDate.toISOString();
     }
 
-    return this.makeTokopediaRequest(
-      tenantId,
-      channelId,
-      config,
-      {
-        method: 'GET',
-        endpoint: '/v1/webhook/events',
-        params,
-        requiresAuth: true,
-      },
-    );
+    return this.makeTokopediaRequest(tenantId, channelId, config, {
+      method: 'GET',
+      endpoint: '/v1/webhook/events',
+      params,
+      requiresAuth: true,
+    });
   }
 
   // Private helper methods
@@ -349,7 +339,9 @@ export class TokopediaApiService extends BaseApiService {
     }
 
     if (errorData?.error) {
-      return typeof errorData.error === 'string' ? errorData.error : errorData.error.message;
+      return typeof errorData.error === 'string'
+        ? errorData.error
+        : errorData.error.message;
     }
 
     if (errorData?.errors && Array.isArray(errorData.errors)) {
@@ -363,16 +355,17 @@ export class TokopediaApiService extends BaseApiService {
    * Generate HMAC signature for webhook verification
    */
   generateWebhookSignature(payload: string, secret: string): string {
-    return crypto
-      .createHmac('sha256', secret)
-      .update(payload)
-      .digest('hex');
+    return crypto.createHmac('sha256', secret).update(payload).digest('hex');
   }
 
   /**
    * Verify webhook signature
    */
-  verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+  verifyWebhookSignature(
+    payload: string,
+    signature: string,
+    secret: string,
+  ): boolean {
     const expectedSignature = this.generateWebhookSignature(payload, secret);
     return crypto.timingSafeEqual(
       Buffer.from(signature),

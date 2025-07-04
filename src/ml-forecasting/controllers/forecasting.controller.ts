@@ -22,7 +22,17 @@ import {
   ApiParam,
   ApiProperty,
 } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsNumber, Min, Max, IsBoolean, IsObject, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  Min,
+  Max,
+  IsBoolean,
+  IsObject,
+  IsDateString,
+} from 'class-validator';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -46,7 +56,9 @@ class EnhancedDemandForecastDto {
 
   @ApiProperty({ description: 'Forecast horizon in days (30, 60, or 90)' })
   @IsNumber()
-  @IsEnum([30, 60, 90], { message: 'Forecast horizon must be 30, 60, or 90 days' })
+  @IsEnum([30, 60, 90], {
+    message: 'Forecast horizon must be 30, 60, or 90 days',
+  })
   forecastHorizonDays: number;
 
   @ApiProperty({ description: 'Include confidence intervals in forecast' })
@@ -143,16 +155,15 @@ class ForecastComparisonDto {
 export class ForecastingController {
   private readonly logger = new Logger(ForecastingController.name);
 
-  constructor(
-    private readonly forecastingService: ForecastingService,
-  ) {}
+  constructor(private readonly forecastingService: ForecastingService) {}
 
   @Post('demand-forecast/enhanced')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enhanced Demand Forecast',
-    description: 'Generate advanced demand forecast with 30/60/90 day options, confidence intervals, and seasonality analysis',
+    description:
+      'Generate advanced demand forecast with 30/60/90 day options, confidence intervals, and seasonality analysis',
   })
   @ApiResponse({
     status: 200,
@@ -206,7 +217,10 @@ export class ForecastingController {
               },
             },
             seasonalityStrength: { type: 'number' },
-            trendDirection: { type: 'string', enum: ['increasing', 'decreasing', 'stable'] },
+            trendDirection: {
+              type: 'string',
+              enum: ['increasing', 'decreasing', 'stable'],
+            },
           },
         },
         overallConfidence: { type: 'number' },
@@ -272,7 +286,10 @@ export class ForecastingController {
       granularity: forecastDto.granularity || 'daily',
     };
 
-    const result = await this.forecastingService.generateDemandForecast(tenantId, request);
+    const result = await this.forecastingService.generateDemandForecast(
+      tenantId,
+      request,
+    );
 
     if (!result.success) {
       throw new BadRequestException(result.error);
@@ -286,7 +303,8 @@ export class ForecastingController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'New Product Forecast',
-    description: 'Generate forecast for new products based on category analysis and similar products',
+    description:
+      'Generate forecast for new products based on category analysis and similar products',
   })
   @ApiResponse({
     status: 200,
@@ -377,12 +395,17 @@ export class ForecastingController {
       productName: forecastDto.productName,
       categoryId: forecastDto.categoryId,
       attributes: forecastDto.attributes || {},
-      launchDate: forecastDto.launchDate ? new Date(forecastDto.launchDate) : undefined,
+      launchDate: forecastDto.launchDate
+        ? new Date(forecastDto.launchDate)
+        : undefined,
       marketingBudget: forecastDto.marketingBudget,
       forecastHorizonDays: forecastDto.forecastHorizonDays,
     };
 
-    const result = await this.forecastingService.generateNewProductForecast(tenantId, request);
+    const result = await this.forecastingService.generateNewProductForecast(
+      tenantId,
+      request,
+    );
 
     if (!result.success) {
       throw new BadRequestException(result.error);
@@ -444,7 +467,10 @@ export class ForecastingController {
           properties: {
             strongestSeasonality: { type: 'string' },
             bestPerformingPeriods: { type: 'array', items: { type: 'string' } },
-            worstPerformingPeriods: { type: 'array', items: { type: 'string' } },
+            worstPerformingPeriods: {
+              type: 'array',
+              items: { type: 'string' },
+            },
             recommendations: { type: 'array', items: { type: 'string' } },
           },
         },
@@ -474,13 +500,13 @@ export class ForecastingController {
         ],
         monthlyPattern: [
           { month: 'Januari', averageMultiplier: 0.9, confidence: 0.82 },
-          { month: 'Februari', averageMultiplier: 0.8, confidence: 0.80 },
+          { month: 'Februari', averageMultiplier: 0.8, confidence: 0.8 },
           { month: 'Maret', averageMultiplier: 1.1, confidence: 0.85 },
           { month: 'April', averageMultiplier: 1.0, confidence: 0.87 },
           { month: 'Mei', averageMultiplier: 1.2, confidence: 0.89 },
           { month: 'Juni', averageMultiplier: 1.3, confidence: 0.91 },
           { month: 'Juli', averageMultiplier: 1.4, confidence: 0.88 },
-          { month: 'Agustus', averageMultiplier: 1.5, confidence: 0.90 },
+          { month: 'Agustus', averageMultiplier: 1.5, confidence: 0.9 },
           { month: 'September', averageMultiplier: 1.2, confidence: 0.86 },
           { month: 'Oktober', averageMultiplier: 1.1, confidence: 0.84 },
           { month: 'November', averageMultiplier: 1.0, confidence: 0.83 },
@@ -522,26 +548,33 @@ export class ForecastingController {
     @Body() comparisonDto: ForecastComparisonDto,
   ): Promise<any> {
     if (comparisonDto.productIds.length > 10) {
-      throw new BadRequestException('Maximum 10 products allowed for comparison');
+      throw new BadRequestException(
+        'Maximum 10 products allowed for comparison',
+      );
     }
 
     if (comparisonDto.productIds.length < 2) {
-      throw new BadRequestException('At least 2 products required for comparison');
+      throw new BadRequestException(
+        'At least 2 products required for comparison',
+      );
     }
 
     // Generate comparisons for each product
     const comparisons = [];
-    
+
     for (const productId of comparisonDto.productIds) {
       try {
-        const forecast = await this.forecastingService.generateDemandForecast(tenantId, {
-          productId,
-          forecastHorizonDays: comparisonDto.forecastHorizonDays,
-          includeConfidenceInterval: true,
-          includeSeasonality: true,
-          includeTrendDecomposition: false,
-          granularity: 'daily',
-        });
+        const forecast = await this.forecastingService.generateDemandForecast(
+          tenantId,
+          {
+            productId,
+            forecastHorizonDays: comparisonDto.forecastHorizonDays,
+            includeConfidenceInterval: true,
+            includeSeasonality: true,
+            includeTrendDecomposition: false,
+            granularity: 'daily',
+          },
+        );
 
         if (forecast.success) {
           comparisons.push({
@@ -550,26 +583,41 @@ export class ForecastingController {
             averageDemand: forecast.insights.averageDailyDemand,
             volatility: forecast.insights.demandVolatility,
             confidence: forecast.overallConfidence,
-            seasonalityStrength: forecast.seasonalDecomposition?.seasonalityStrength || 0,
-            trendDirection: forecast.seasonalDecomposition?.trendDirection || 'stable',
+            seasonalityStrength:
+              forecast.seasonalDecomposition?.seasonalityStrength || 0,
+            trendDirection:
+              forecast.seasonalDecomposition?.trendDirection || 'stable',
           });
         }
       } catch (error) {
-        this.logger.error(`Forecast comparison failed for product ${productId}: ${error.message}`);
+        this.logger.error(
+          `Forecast comparison failed for product ${productId}: ${error.message}`,
+        );
       }
     }
 
     // Calculate summary statistics
     const summary = {
       totalProducts: comparisons.length,
-      highestDemand: comparisons.reduce((max, curr) => 
-        curr.totalDemand > max.totalDemand ? curr : max, comparisons[0]),
-      lowestDemand: comparisons.reduce((min, curr) => 
-        curr.totalDemand < min.totalDemand ? curr : min, comparisons[0]),
-      averageVolatility: comparisons.reduce((sum, curr) => sum + curr.volatility, 0) / comparisons.length,
-      averageConfidence: comparisons.reduce((sum, curr) => sum + curr.confidence, 0) / comparisons.length,
-      mostSeasonal: comparisons.reduce((max, curr) => 
-        curr.seasonalityStrength > max.seasonalityStrength ? curr : max, comparisons[0]),
+      highestDemand: comparisons.reduce(
+        (max, curr) => (curr.totalDemand > max.totalDemand ? curr : max),
+        comparisons[0],
+      ),
+      lowestDemand: comparisons.reduce(
+        (min, curr) => (curr.totalDemand < min.totalDemand ? curr : min),
+        comparisons[0],
+      ),
+      averageVolatility:
+        comparisons.reduce((sum, curr) => sum + curr.volatility, 0) /
+        comparisons.length,
+      averageConfidence:
+        comparisons.reduce((sum, curr) => sum + curr.confidence, 0) /
+        comparisons.length,
+      mostSeasonal: comparisons.reduce(
+        (max, curr) =>
+          curr.seasonalityStrength > max.seasonalityStrength ? curr : max,
+        comparisons[0],
+      ),
     };
 
     return {
@@ -581,17 +629,27 @@ export class ForecastingController {
       insights: {
         recommendations: [
           `Produk dengan permintaan tertinggi: ${summary.highestDemand?.productId}`,
-          `Produk paling stabil: ${comparisons.find(c => c.volatility === Math.min(...comparisons.map(comp => comp.volatility)))?.productId}`,
+          `Produk paling stabil: ${
+            comparisons.find(
+              c =>
+                c.volatility ===
+                Math.min(...comparisons.map(comp => comp.volatility)),
+            )?.productId
+          }`,
           `Produk dengan pola musiman terkuat: ${summary.mostSeasonal?.productId}`,
         ],
-        alerts: summary.averageConfidence < 0.7 ? [
-          {
-            type: 'low_confidence',
-            severity: 'medium',
-            message: 'Tingkat kepercayaan rata-rata forecast rendah',
-            actionRequired: 'Review kualitas data historis dan pertimbangkan retraining model',
-          },
-        ] : [],
+        alerts:
+          summary.averageConfidence < 0.7
+            ? [
+                {
+                  type: 'low_confidence',
+                  severity: 'medium',
+                  message: 'Tingkat kepercayaan rata-rata forecast rendah',
+                  actionRequired:
+                    'Review kualitas data historis dan pertimbangkan retraining model',
+                },
+              ]
+            : [],
       },
     };
   }
@@ -621,9 +679,11 @@ export class ForecastingController {
     @Query('days') days: string = '30',
   ): Promise<any> {
     const analysisDays = parseInt(days, 10);
-    
+
     if (analysisDays < 7 || analysisDays > 365) {
-      throw new BadRequestException('Analysis period must be between 7 and 365 days');
+      throw new BadRequestException(
+        'Analysis period must be between 7 and 365 days',
+      );
     }
 
     // This would calculate actual forecast accuracy by comparing predictions with actual values
@@ -634,8 +694,8 @@ export class ForecastingController {
       analysisPeriod: analysisDays,
       metrics: {
         mape: 12.5, // Mean Absolute Percentage Error
-        rmse: 8.3,  // Root Mean Square Error
-        mae: 6.1,   // Mean Absolute Error
+        rmse: 8.3, // Root Mean Square Error
+        mae: 6.1, // Mean Absolute Error
         bias: -2.1, // Forecast bias
         accuracy: 87.5, // Overall accuracy percentage
       },

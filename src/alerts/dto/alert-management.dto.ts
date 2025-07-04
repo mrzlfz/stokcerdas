@@ -1,4 +1,13 @@
-import { IsString, IsOptional, IsNumber, IsArray, IsEnum, IsBoolean, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsArray,
+  IsEnum,
+  IsBoolean,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { AlertStatus, AlertPriority } from '../entities/alert-instance.entity';
@@ -47,9 +56,9 @@ export class EscalateAlertDto {
 }
 
 export class UpdateAlertPriorityDto {
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'New alert priority',
-    enum: AlertPriority
+    enum: AlertPriority,
   })
   @IsEnum(AlertPriority)
   priority: AlertPriority;
@@ -78,9 +87,9 @@ export class BulkAlertActionDto {
   @IsString({ each: true })
   alertIds: string[];
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Action to perform',
-    enum: ['acknowledge', 'resolve', 'dismiss', 'snooze']
+    enum: ['acknowledge', 'resolve', 'dismiss', 'snooze'],
   })
   @IsEnum(['acknowledge', 'resolve', 'dismiss', 'snooze'])
   action: string;
@@ -147,12 +156,18 @@ export class AlertQueryDto {
   @IsBoolean()
   resolved?: boolean;
 
-  @ApiPropertyOptional({ description: 'Show only active alerts', default: false })
+  @ApiPropertyOptional({
+    description: 'Show only active alerts',
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   activeOnly?: boolean;
 
-  @ApiPropertyOptional({ description: 'Show only unviewed alerts', default: false })
+  @ApiPropertyOptional({
+    description: 'Show only unviewed alerts',
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   unviewedOnly?: boolean;
@@ -222,7 +237,10 @@ export class CreateSystemMaintenanceAlertDto {
   @IsString()
   severity?: string;
 
-  @ApiPropertyOptional({ description: 'Send immediate notification', default: true })
+  @ApiPropertyOptional({
+    description: 'Send immediate notification',
+    default: true,
+  })
   @IsOptional()
   @IsBoolean()
   sendImmediately?: boolean;

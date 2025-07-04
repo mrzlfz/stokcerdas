@@ -32,7 +32,10 @@ export enum InsuranceType {
 @Index(['tenantId', 'carrierId'])
 @Index(['tenantId', 'status'])
 @Index(['tenantId', 'createdAt'])
-@Index(['trackingNumber'], { unique: true, where: 'trackingNumber IS NOT NULL' })
+@Index(['trackingNumber'], {
+  unique: true,
+  where: 'trackingNumber IS NOT NULL',
+})
 export class ShippingLabel extends BaseEntity {
   @Column({ type: 'uuid' })
   orderId: string;
@@ -252,7 +255,11 @@ export class ShippingLabel extends BaseEntity {
   }
 
   get canBeCancelled(): boolean {
-    return [ShippingLabelStatus.DRAFT, ShippingLabelStatus.GENERATED, ShippingLabelStatus.PRINTED].includes(this.status);
+    return [
+      ShippingLabelStatus.DRAFT,
+      ShippingLabelStatus.GENERATED,
+      ShippingLabelStatus.PRINTED,
+    ].includes(this.status);
   }
 
   get totalVolume(): number {
@@ -272,7 +279,11 @@ export class ShippingLabel extends BaseEntity {
   }
 
   // Methods
-  updateStatus(newStatus: ShippingLabelStatus, userId?: string, reason?: string): void {
+  updateStatus(
+    newStatus: ShippingLabelStatus,
+    userId?: string,
+    reason?: string,
+  ): void {
     this.status = newStatus;
     this.updatedBy = userId;
 
@@ -300,31 +311,54 @@ export class ShippingLabel extends BaseEntity {
   }
 
   validateAddresses(): boolean {
-    const requiredFields = ['name', 'address', 'city', 'state', 'postalCode', 'phone'];
-    
-    const senderValid = requiredFields.every(field => 
-      this.senderAddress[field] && this.senderAddress[field].trim().length > 0
+    const requiredFields = [
+      'name',
+      'address',
+      'city',
+      'state',
+      'postalCode',
+      'phone',
+    ];
+
+    const senderValid = requiredFields.every(
+      field =>
+        this.senderAddress[field] &&
+        this.senderAddress[field].trim().length > 0,
     );
-    
-    const recipientValid = requiredFields.every(field => 
-      this.recipientAddress[field] && this.recipientAddress[field].trim().length > 0
+
+    const recipientValid = requiredFields.every(
+      field =>
+        this.recipientAddress[field] &&
+        this.recipientAddress[field].trim().length > 0,
     );
-    
+
     return senderValid && recipientValid;
   }
 
   validatePackageInfo(): boolean {
     const { weight, length, width, height, content } = this.packageInfo;
-    return weight > 0 && length > 0 && width > 0 && height > 0 && content && content.trim().length > 0;
+    return (
+      weight > 0 &&
+      length > 0 &&
+      width > 0 &&
+      height > 0 &&
+      content &&
+      content.trim().length > 0
+    );
   }
 
   isExpressService(): boolean {
-    return [ShippingServiceType.EXPRESS, ShippingServiceType.SAME_DAY, ShippingServiceType.NEXT_DAY, ShippingServiceType.INSTANT].includes(this.serviceType);
+    return [
+      ShippingServiceType.EXPRESS,
+      ShippingServiceType.SAME_DAY,
+      ShippingServiceType.NEXT_DAY,
+      ShippingServiceType.INSTANT,
+    ].includes(this.serviceType);
   }
 
   getDaysToDelivery(): number | null {
     if (!this.estimatedDeliveryDate) return null;
-    
+
     const now = new Date();
     const diffTime = this.estimatedDeliveryDate.getTime() - now.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));

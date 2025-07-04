@@ -15,12 +15,20 @@ export class PurchaseOrderPdfService {
     try {
       const html = this.generateHtml(purchaseOrder);
       const pdfBuffer = await this.htmlToPdf(html);
-      const filePath = await this.savePdfFile(pdfBuffer, purchaseOrder.poNumber);
+      const filePath = await this.savePdfFile(
+        pdfBuffer,
+        purchaseOrder.poNumber,
+      );
 
-      this.logger.log(`PDF generated for PO ${purchaseOrder.poNumber}: ${filePath}`);
+      this.logger.log(
+        `PDF generated for PO ${purchaseOrder.poNumber}: ${filePath}`,
+      );
       return filePath;
     } catch (error) {
-      this.logger.error(`Failed to generate PDF for PO ${purchaseOrder.poNumber}`, error.stack);
+      this.logger.error(
+        `Failed to generate PDF for PO ${purchaseOrder.poNumber}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -51,29 +59,29 @@ export class PurchaseOrderPdfService {
 
     const getStatusBadge = (status: string): string => {
       const statusColors = {
-        'draft': '#6b7280',
-        'pending_approval': '#f59e0b',
-        'approved': '#10b981',
-        'rejected': '#ef4444',
-        'sent_to_supplier': '#3b82f6',
-        'acknowledged': '#8b5cf6',
-        'partially_received': '#f97316',
-        'received': '#059669',
-        'closed': '#374151',
-        'cancelled': '#dc2626',
+        draft: '#6b7280',
+        pending_approval: '#f59e0b',
+        approved: '#10b981',
+        rejected: '#ef4444',
+        sent_to_supplier: '#3b82f6',
+        acknowledged: '#8b5cf6',
+        partially_received: '#f97316',
+        received: '#059669',
+        closed: '#374151',
+        cancelled: '#dc2626',
       };
 
       const statusNames = {
-        'draft': 'Draft',
-        'pending_approval': 'Menunggu Approval',
-        'approved': 'Disetujui',
-        'rejected': 'Ditolak',
-        'sent_to_supplier': 'Dikirim ke Supplier',
-        'acknowledged': 'Dikonfirmasi Supplier',
-        'partially_received': 'Sebagian Diterima',
-        'received': 'Diterima',
-        'closed': 'Ditutup',
-        'cancelled': 'Dibatalkan',
+        draft: 'Draft',
+        pending_approval: 'Menunggu Approval',
+        approved: 'Disetujui',
+        rejected: 'Ditolak',
+        sent_to_supplier: 'Dikirim ke Supplier',
+        acknowledged: 'Dikonfirmasi Supplier',
+        partially_received: 'Sebagian Diterima',
+        received: 'Diterima',
+        closed: 'Ditutup',
+        cancelled: 'Dibatalkan',
       };
 
       const color = statusColors[status] || '#6b7280';
@@ -255,7 +263,9 @@ export class PurchaseOrderPdfService {
               </div>
             </div>
             <div class="po-title">PURCHASE ORDER</div>
-            <div class="text-center">${getStatusBadge(purchaseOrder.status)}</div>
+            <div class="text-center">${getStatusBadge(
+              purchaseOrder.status,
+            )}</div>
           </div>
 
           <div class="po-info">
@@ -267,15 +277,21 @@ export class PurchaseOrderPdfService {
               </div>
               <div class="detail-row">
                 <span class="detail-label">Tanggal Order:</span>
-                <span class="detail-value">${formatDate(purchaseOrder.orderDate)}</span>
+                <span class="detail-value">${formatDate(
+                  purchaseOrder.orderDate,
+                )}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Tanggal Pengiriman:</span>
-                <span class="detail-value">${formatDate(purchaseOrder.expectedDeliveryDate)}</span>
+                <span class="detail-value">${formatDate(
+                  purchaseOrder.expectedDeliveryDate,
+                )}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Payment Terms:</span>
-                <span class="detail-value">${purchaseOrder.paymentTerms?.replace('_', ' ').toUpperCase()}</span>
+                <span class="detail-value">${purchaseOrder.paymentTerms
+                  ?.replace('_', ' ')
+                  .toUpperCase()}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Prioritas:</span>
@@ -287,23 +303,33 @@ export class PurchaseOrderPdfService {
               <h3>Detail Supplier</h3>
               <div class="detail-row">
                 <span class="detail-label">Nama:</span>
-                <span class="detail-value">${purchaseOrder.supplier?.name || '-'}</span>
+                <span class="detail-value">${
+                  purchaseOrder.supplier?.name || '-'
+                }</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Kode:</span>
-                <span class="detail-value">${purchaseOrder.supplier?.code || '-'}</span>
+                <span class="detail-value">${
+                  purchaseOrder.supplier?.code || '-'
+                }</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Email:</span>
-                <span class="detail-value">${purchaseOrder.supplier?.email || '-'}</span>
+                <span class="detail-value">${
+                  purchaseOrder.supplier?.email || '-'
+                }</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Telepon:</span>
-                <span class="detail-value">${purchaseOrder.supplier?.phone || '-'}</span>
+                <span class="detail-value">${
+                  purchaseOrder.supplier?.phone || '-'
+                }</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Alamat:</span>
-                <span class="detail-value">${purchaseOrder.supplier?.address || '-'}</span>
+                <span class="detail-value">${
+                  purchaseOrder.supplier?.address || '-'
+                }</span>
               </div>
             </div>
           </div>
@@ -321,20 +347,31 @@ export class PurchaseOrderPdfService {
               </tr>
             </thead>
             <tbody>
-              ${purchaseOrder.items?.map((item, index) => `
+              ${
+                purchaseOrder.items
+                  ?.map(
+                    (item, index) => `
                 <tr>
                   <td class="text-center">${index + 1}</td>
                   <td>${item.sku}</td>
                   <td>
                     <strong>${item.productName}</strong>
-                    ${item.description ? `<br><small style="color: #6b7280;">${item.description}</small>` : ''}
+                    ${
+                      item.description
+                        ? `<br><small style="color: #6b7280;">${item.description}</small>`
+                        : ''
+                    }
                   </td>
                   <td>${item.unit || 'pcs'}</td>
                   <td class="text-center">${item.orderedQuantity}</td>
                   <td class="text-right">${formatCurrency(item.unitPrice)}</td>
                   <td class="text-right">${formatCurrency(item.finalPrice)}</td>
                 </tr>
-              `).join('') || '<tr><td colspan="7" class="text-center">Tidak ada item</td></tr>'}
+              `,
+                  )
+                  .join('') ||
+                '<tr><td colspan="7" class="text-center">Tidak ada item</td></tr>'
+              }
             </tbody>
           </table>
 
@@ -343,37 +380,61 @@ export class PurchaseOrderPdfService {
               <span>Subtotal:</span>
               <span>${formatCurrency(purchaseOrder.subtotalAmount)}</span>
             </div>
-            ${purchaseOrder.discountAmount > 0 ? `
+            ${
+              purchaseOrder.discountAmount > 0
+                ? `
               <div class="totals-row">
                 <span>Diskon:</span>
                 <span>-${formatCurrency(purchaseOrder.discountAmount)}</span>
               </div>
-            ` : ''}
-            ${purchaseOrder.taxAmount > 0 ? `
+            `
+                : ''
+            }
+            ${
+              purchaseOrder.taxAmount > 0
+                ? `
               <div class="totals-row">
                 <span>Pajak (${purchaseOrder.taxRate}%):</span>
                 <span>${formatCurrency(purchaseOrder.taxAmount)}</span>
               </div>
-            ` : ''}
-            ${purchaseOrder.shippingAmount > 0 ? `
+            `
+                : ''
+            }
+            ${
+              purchaseOrder.shippingAmount > 0
+                ? `
               <div class="totals-row">
                 <span>Biaya Pengiriman:</span>
                 <span>${formatCurrency(purchaseOrder.shippingAmount)}</span>
               </div>
-            ` : ''}
+            `
+                : ''
+            }
             <div class="totals-row total">
               <span>TOTAL:</span>
               <span>${formatCurrency(purchaseOrder.totalAmount)}</span>
             </div>
           </div>
 
-          ${purchaseOrder.notes || purchaseOrder.supplierInstructions ? `
+          ${
+            purchaseOrder.notes || purchaseOrder.supplierInstructions
+              ? `
             <div class="notes">
               <h4>Catatan & Instruksi</h4>
-              ${purchaseOrder.notes ? `<p><strong>Catatan:</strong> ${purchaseOrder.notes}</p>` : ''}
-              ${purchaseOrder.supplierInstructions ? `<p><strong>Instruksi untuk Supplier:</strong> ${purchaseOrder.supplierInstructions}</p>` : ''}
+              ${
+                purchaseOrder.notes
+                  ? `<p><strong>Catatan:</strong> ${purchaseOrder.notes}</p>`
+                  : ''
+              }
+              ${
+                purchaseOrder.supplierInstructions
+                  ? `<p><strong>Instruksi untuk Supplier:</strong> ${purchaseOrder.supplierInstructions}</p>`
+                  : ''
+              }
             </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <div class="footer">
             <p>Purchase Order ini dibuat secara otomatis oleh sistem StokCerdas</p>
@@ -387,7 +448,7 @@ export class PurchaseOrderPdfService {
 
   private async htmlToPdf(html: string): Promise<Buffer> {
     let browser;
-    
+
     try {
       browser = await puppeteer.launch({
         headless: true,
@@ -416,7 +477,10 @@ export class PurchaseOrderPdfService {
     }
   }
 
-  private async savePdfFile(pdfBuffer: Buffer, poNumber: string): Promise<string> {
+  private async savePdfFile(
+    pdfBuffer: Buffer,
+    poNumber: string,
+  ): Promise<string> {
     const uploadsDir = this.configService.get('UPLOADS_DIR', './uploads');
     const poDir = path.join(uploadsDir, 'purchase-orders');
 

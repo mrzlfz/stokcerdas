@@ -41,15 +41,13 @@ import { SOC2ComplianceModule } from './soc2-compliance.module';
       PrivacyBreachLog,
       DataProcessingActivity,
     ]),
-    
+
     // Import required modules with forward references to avoid circular dependencies
     forwardRef(() => AuthModule),
     forwardRef(() => UsersModule),
     forwardRef(() => SOC2ComplianceModule),
   ],
-  controllers: [
-    PrivacyManagementController,
-  ],
+  controllers: [PrivacyManagementController],
   providers: [
     PrivacyConsentService,
     DataSubjectRightsService,

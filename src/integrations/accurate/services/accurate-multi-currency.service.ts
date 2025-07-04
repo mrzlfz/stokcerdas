@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AccurateApiService, AccurateCredentials } from './accurate-api.service';
+import {
+  AccurateApiService,
+  AccurateCredentials,
+} from './accurate-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { AccountingAccount } from '../../entities/accounting-account.entity';
 import { Order } from '../../../orders/entities/order.entity';
@@ -144,7 +147,9 @@ export class AccurateMultiCurrencyService {
     config: CurrencyConfiguration,
   ): Promise<{ success: boolean; errors: string[] }> {
     try {
-      this.logger.log(`Configuring multi-currency settings for tenant ${tenantId}`);
+      this.logger.log(
+        `Configuring multi-currency settings for tenant ${tenantId}`,
+      );
 
       // Validate configuration
       const validationErrors = this.validateCurrencyConfiguration(config);
@@ -174,17 +179,30 @@ export class AccurateMultiCurrencyService {
 
       // Sync currencies with Accurate
       const credentials = this.getCredentials(accountingAccount);
-      await this.syncCurrenciesWithAccurate(credentials, config, tenantId, accountingAccount.channelId!);
+      await this.syncCurrenciesWithAccurate(
+        credentials,
+        config,
+        tenantId,
+        accountingAccount.channelId!,
+      );
 
       // Initialize exchange rates for enabled currencies
-      await this.initializeExchangeRates(config, credentials, tenantId, accountingAccount.channelId!);
+      await this.initializeExchangeRates(
+        config,
+        credentials,
+        tenantId,
+        accountingAccount.channelId!,
+      );
 
-      this.logger.log(`Successfully configured multi-currency settings for tenant ${tenantId}`);
+      this.logger.log(
+        `Successfully configured multi-currency settings for tenant ${tenantId}`,
+      );
 
       return { success: true, errors: [] };
-
     } catch (error) {
-      this.logger.error(`Failed to configure currency settings: ${error.message}`);
+      this.logger.error(
+        `Failed to configure currency settings: ${error.message}`,
+      );
       return { success: false, errors: [error.message] };
     }
   }
@@ -200,8 +218,10 @@ export class AccurateMultiCurrencyService {
     date?: Date,
   ): Promise<ExchangeRate> {
     try {
-      const cacheKey = `${fromCurrency}_${toCurrency}_${date?.toISOString() || 'current'}`;
-      
+      const cacheKey = `${fromCurrency}_${toCurrency}_${
+        date?.toISOString() || 'current'
+      }`;
+
       // Check cache first
       const cached = this.exchangeRateCache.get(cacheKey);
       if (cached && Date.now() - cached.date.getTime() < this.CACHE_TTL) {
@@ -217,7 +237,7 @@ export class AccurateMultiCurrencyService {
       }
 
       const credentials = this.getCredentials(accountingAccount);
-      
+
       // Get exchange rate from Accurate
       const response = await this.accurateApiService.getExchangeRates(
         credentials,
@@ -227,13 +247,16 @@ export class AccurateMultiCurrencyService {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to fetch exchange rates: ${response.error?.message}`);
+        throw new Error(
+          `Failed to fetch exchange rates: ${response.error?.message}`,
+        );
       }
 
       // Find the specific rate
       const rates = response.data || [];
-      const rateData = rates.find((r: any) => 
-        r.fromCurrency === fromCurrency && r.toCurrency === toCurrency
+      const rateData = rates.find(
+        (r: any) =>
+          r.fromCurrency === fromCurrency && r.toCurrency === toCurrency,
       );
 
       if (!rateData) {
@@ -256,7 +279,6 @@ export class AccurateMultiCurrencyService {
       this.exchangeRateCache.set(cacheKey, exchangeRate);
 
       return exchangeRate;
-
     } catch (error) {
       this.logger.error(`Failed to get exchange rate: ${error.message}`);
       throw error;
@@ -310,7 +332,6 @@ export class AccurateMultiCurrencyService {
         conversionDate: date || new Date(),
         source: exchangeRate.source,
       };
-
     } catch (error) {
       this.logger.error(`Currency conversion failed: ${error.message}`);
       throw error;
@@ -355,10 +376,12 @@ export class AccurateMultiCurrencyService {
       }
 
       const credentials = this.getCredentials(accountingAccount);
-      const config = (accountingAccount.platformConfig as any)?.currencyConfig as CurrencyConfiguration;
-      
+      const config = (accountingAccount.platformConfig as any)
+        ?.currencyConfig as CurrencyConfiguration;
+
       const baseCurrency = config?.baseCurrency || 'IDR';
-      const invoiceCurrency = targetCurrency || invoice.currency || baseCurrency;
+      const invoiceCurrency =
+        targetCurrency || invoice.currency || baseCurrency;
 
       // Convert amounts if needed
       let exchangeRate = 1;
@@ -378,18 +401,23 @@ export class AccurateMultiCurrencyService {
 
       // Create Accurate invoice with currency
       const accurateInvoice = {
-        customerId: await this.getAccurateCustomerId(invoice.customerId!, credentials, tenantId),
+        customerId: await this.getAccurateCustomerId(
+          invoice.customerId!,
+          credentials,
+          tenantId,
+        ),
         transactionDate: invoice.invoiceDate.toISOString().split('T')[0],
         currencyCode: invoiceCurrency,
         exchangeRate: exchangeRate,
         totalAmount: convertedAmount,
-        detailItem: invoice.items?.map(item => ({
-          itemId: undefined, // Would need mapping
-          itemName: item.product?.name,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice * exchangeRate,
-          amount: item.quantity * item.unitPrice * exchangeRate,
-        })) || [],
+        detailItem:
+          invoice.items?.map(item => ({
+            itemId: undefined, // Would need mapping
+            itemName: item.product?.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice * exchangeRate,
+            amount: item.quantity * item.unitPrice * exchangeRate,
+          })) || [],
       };
 
       const response = await this.accurateApiService.createInvoice(
@@ -400,7 +428,9 @@ export class AccurateMultiCurrencyService {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to create Accurate invoice: ${response.error?.message}`);
+        throw new Error(
+          `Failed to create Accurate invoice: ${response.error?.message}`,
+        );
       }
 
       // TODO: Update local invoice with foreign currency info when Invoice entity is created
@@ -420,9 +450,10 @@ export class AccurateMultiCurrencyService {
         exchangeRate,
         currency: invoiceCurrency,
       };
-
     } catch (error) {
-      this.logger.error(`Multi-currency invoice creation failed: ${error.message}`);
+      this.logger.error(
+        `Multi-currency invoice creation failed: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -437,7 +468,9 @@ export class AccurateMultiCurrencyService {
   ): Promise<CurrencyRevaluationResult> {
     try {
       const effectiveDate = revaluationDate || new Date();
-      this.logger.log(`Performing currency revaluation for ${effectiveDate.toISOString()}`);
+      this.logger.log(
+        `Performing currency revaluation for ${effectiveDate.toISOString()}`,
+      );
 
       const accountingAccount = await this.accountingAccountRepository.findOne({
         where: { id: accountingAccountId, tenantId },
@@ -448,8 +481,9 @@ export class AccurateMultiCurrencyService {
       }
 
       const credentials = this.getCredentials(accountingAccount);
-      const config = (accountingAccount.platformConfig as any)?.currencyConfig as CurrencyConfiguration;
-      
+      const config = (accountingAccount.platformConfig as any)
+        ?.currencyConfig as CurrencyConfiguration;
+
       if (!config) {
         throw new Error('Multi-currency not configured');
       }
@@ -492,7 +526,8 @@ export class AccurateMultiCurrencyService {
         if (accountBalance.currency !== baseCurrency) {
           const currentRate = exchangeRates.get(accountBalance.currency) || 1;
           const revaluedAmount = accountBalance.balance * currentRate;
-          const originalAmount = accountBalance.balanceInBaseCurrency || accountBalance.balance;
+          const originalAmount =
+            accountBalance.balanceInBaseCurrency || accountBalance.balance;
           const unrealizedGainLoss = revaluedAmount - originalAmount;
 
           result.accounts.push({
@@ -523,10 +558,11 @@ export class AccurateMultiCurrencyService {
         result.journalEntryId = journalEntryId;
       }
 
-      this.logger.log(`Currency revaluation completed: ${result.totalUnrealizedGainLoss} unrealized gain/loss`);
+      this.logger.log(
+        `Currency revaluation completed: ${result.totalUnrealizedGainLoss} unrealized gain/loss`,
+      );
 
       return result;
-
     } catch (error) {
       this.logger.error(`Currency revaluation failed: ${error.message}`);
       throw error;
@@ -543,7 +579,9 @@ export class AccurateMultiCurrencyService {
   ): Promise<CurrencyReport> {
     try {
       const effectiveDate = reportDate || new Date();
-      this.logger.log(`Generating currency report for ${effectiveDate.toISOString()}`);
+      this.logger.log(
+        `Generating currency report for ${effectiveDate.toISOString()}`,
+      );
 
       const accountingAccount = await this.accountingAccountRepository.findOne({
         where: { id: accountingAccountId, tenantId },
@@ -553,7 +591,8 @@ export class AccurateMultiCurrencyService {
         throw new Error('Accounting account not found');
       }
 
-      const config = (accountingAccount.platformConfig as any)?.currencyConfig as CurrencyConfiguration;
+      const config = (accountingAccount.platformConfig as any)
+        ?.currencyConfig as CurrencyConfiguration;
       if (!config) {
         throw new Error('Multi-currency not configured');
       }
@@ -598,16 +637,25 @@ export class AccurateMultiCurrencyService {
       // Calculate totals
       const summary = {
         totalAssets: byCurrency.reduce((sum, curr) => sum + curr.assets, 0),
-        totalLiabilities: byCurrency.reduce((sum, curr) => sum + curr.liabilities, 0),
+        totalLiabilities: byCurrency.reduce(
+          (sum, curr) => sum + curr.liabilities,
+          0,
+        ),
         totalEquity: 0, // Would be calculated from accounting data
-        unrealizedGainLoss: byCurrency.reduce((sum, curr) => sum + curr.unrealizedGainLoss, 0),
+        unrealizedGainLoss: byCurrency.reduce(
+          (sum, curr) => sum + curr.unrealizedGainLoss,
+          0,
+        ),
         realizedGainLoss: 0, // Would be calculated from historical transactions
       };
 
       summary.totalEquity = summary.totalAssets - summary.totalLiabilities;
 
       // Risk analysis
-      const riskAnalysis = this.calculateCurrencyRisk(byCurrency, exchangeRates);
+      const riskAnalysis = this.calculateCurrencyRisk(
+        byCurrency,
+        exchangeRates,
+      );
 
       const report: CurrencyReport = {
         reportDate: effectiveDate,
@@ -618,10 +666,11 @@ export class AccurateMultiCurrencyService {
         riskAnalysis,
       };
 
-      this.logger.log(`Currency report generated with ${byCurrency.length} currencies`);
+      this.logger.log(
+        `Currency report generated with ${byCurrency.length} currencies`,
+      );
 
       return report;
-
     } catch (error) {
       this.logger.error(`Currency report generation failed: ${error.message}`);
       throw error;
@@ -630,7 +679,9 @@ export class AccurateMultiCurrencyService {
 
   // Helper methods
 
-  private validateCurrencyConfiguration(config: CurrencyConfiguration): string[] {
+  private validateCurrencyConfiguration(
+    config: CurrencyConfiguration,
+  ): string[] {
     const errors: string[] = [];
 
     if (!config.baseCurrency) {
@@ -641,14 +692,19 @@ export class AccurateMultiCurrencyService {
       errors.push('At least one enabled currency is required');
     }
 
-    if (config.enabledCurrencies && !config.enabledCurrencies.includes(config.baseCurrency)) {
+    if (
+      config.enabledCurrencies &&
+      !config.enabledCurrencies.includes(config.baseCurrency)
+    ) {
       errors.push('Base currency must be included in enabled currencies');
     }
 
     return errors;
   }
 
-  private getCredentials(accountingAccount: AccountingAccount): AccurateCredentials {
+  private getCredentials(
+    accountingAccount: AccountingAccount,
+  ): AccurateCredentials {
     return {
       clientId: accountingAccount.clientId!,
       clientSecret: accountingAccount.clientSecret!,
@@ -698,7 +754,9 @@ export class AccurateMultiCurrencyService {
             tenantId,
           );
         } catch (error) {
-          this.logger.warn(`Failed to initialize rate for ${currency}: ${error.message}`);
+          this.logger.warn(
+            `Failed to initialize rate for ${currency}: ${error.message}`,
+          );
         }
       }
     }
@@ -727,7 +785,10 @@ export class AccurateMultiCurrencyService {
   ): number {
     // Default rounding rules
     const defaultDecimalPlaces = currency === 'IDR' ? 0 : 2;
-    return Math.round(amount * Math.pow(10, defaultDecimalPlaces)) / Math.pow(10, defaultDecimalPlaces);
+    return (
+      Math.round(amount * Math.pow(10, defaultDecimalPlaces)) /
+      Math.pow(10, defaultDecimalPlaces)
+    );
   }
 
   private async getAccurateCustomerId(
@@ -800,9 +861,10 @@ export class AccurateMultiCurrencyService {
 
     const volatilityIndicators: Record<string, number> = {};
     // This would typically calculate historical volatility
-    
-    const hedgingRecommendations = highRiskCurrencies.map(currency =>
-      `Consider hedging exposure to ${currency} due to high volatility`
+
+    const hedgingRecommendations = highRiskCurrencies.map(
+      currency =>
+        `Consider hedging exposure to ${currency} due to high volatility`,
     );
 
     return {

@@ -38,6 +38,11 @@ import { ApprovalChain } from './entities/approval-chain.entity';
 import { ApprovalStep } from './entities/approval-step.entity';
 import { ApprovalInstance } from './entities/approval-instance.entity';
 import { ApprovalAction } from './entities/approval-action.entity';
+import { Company } from './entities/company.entity';
+import { CompanyRelationship } from './entities/company-relationship.entity';
+import { CompanyBilling } from './entities/company-billing.entity';
+import { ConsolidatedReport } from './entities/consolidated-report.entity';
+import { InterCompanyTransfer } from './entities/inter-company-transfer.entity';
 
 // Guards and middleware
 import { EnterprisePermissionsGuard } from './guards/enterprise-permissions.guard';
@@ -49,8 +54,8 @@ import { UsersModule } from '../users/users.module';
   imports: [
     TypeOrmModule.forFeature([
       // Core entities
-      User, 
-      Permission, 
+      User,
+      Permission,
       RolePermission,
       // Enterprise entities
       Department,
@@ -62,6 +67,12 @@ import { UsersModule } from '../users/users.module';
       ApprovalStep,
       ApprovalInstance,
       ApprovalAction,
+      // Multi-entity support entities
+      Company,
+      CompanyRelationship,
+      CompanyBilling,
+      ConsolidatedReport,
+      InterCompanyTransfer,
     ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
@@ -93,8 +104,8 @@ import { UsersModule } from '../users/users.module';
   ],
   providers: [
     // Core providers
-    AuthService, 
-    JwtStrategy, 
+    AuthService,
+    JwtStrategy,
     LocalStrategy,
     // Enterprise services
     DepartmentService,
@@ -108,8 +119,8 @@ import { UsersModule } from '../users/users.module';
   ],
   exports: [
     // Core exports
-    AuthService, 
-    JwtModule, 
+    AuthService,
+    JwtModule,
     PassportModule,
     // Enterprise exports
     DepartmentService,

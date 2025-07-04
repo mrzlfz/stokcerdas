@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere, Between, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -12,7 +17,11 @@ import {
 } from '../entities/privacy-management.entity';
 import { User } from '../../users/entities/user.entity';
 import { SOC2AuditLogService } from './soc2-audit-log.service';
-import { AuditEventType, AuditEventOutcome, AuditEventSeverity } from '../entities/soc2-audit-log.entity';
+import {
+  AuditEventType,
+  AuditEventOutcome,
+  AuditEventSeverity,
+} from '../entities/soc2-audit-log.entity';
 
 export interface ConsentRequestDto {
   userId: string;
@@ -61,11 +70,14 @@ export interface ConsentAnalytics {
   withdrawnConsents: number;
   expiredConsents: number;
   pendingConsents: number;
-  consentsByPurpose: Record<ProcessingPurpose, {
-    total: number;
-    active: number;
-    withdrawalRate: number;
-  }>;
+  consentsByPurpose: Record<
+    ProcessingPurpose,
+    {
+      total: number;
+      active: number;
+      withdrawalRate: number;
+    }
+  >;
   consentTrends: {
     date: Date;
     given: number;
@@ -119,7 +131,11 @@ export class PrivacyConsentService {
 
       if (existingConsent) {
         // Update existing consent instead of creating new one
-        return this.updateExistingConsent(existingConsent, request, collectedBy);
+        return this.updateExistingConsent(
+          existingConsent,
+          request,
+          collectedBy,
+        );
       }
 
       // Calculate expiry date (default 2 years for UU PDP compliance)
@@ -141,28 +157,31 @@ export class PrivacyConsentService {
         isMinor: request.isMinor || false,
         legalGuardian: request.legalGuardian,
         consentDetails: {
-          granularConsents: request.granularConsents?.map(gc => ({
-            ...gc,
-            timestamp: new Date(),
-          })) || [],
+          granularConsents:
+            request.granularConsents?.map(gc => ({
+              ...gc,
+              timestamp: new Date(),
+            })) || [],
           consentMethod: 'explicit',
           evidenceType: 'digital_signature',
           renewalRequired: true,
           childConsent: request.isMinor || false,
           parentalConsent: request.parentalConsent,
         },
-        auditTrail: [{
-          action: 'given',
-          timestamp: new Date(),
-          userId: collectedBy,
-          ipAddress: request.ipAddress || '',
-          userAgent: request.userAgent || '',
-          details: {
-            version: request.version,
-            purpose: request.purpose,
-            expiryDate,
+        auditTrail: [
+          {
+            action: 'given',
+            timestamp: new Date(),
+            userId: collectedBy,
+            ipAddress: request.ipAddress || '',
+            userAgent: request.userAgent || '',
+            details: {
+              version: request.version,
+              purpose: request.purpose,
+              expiryDate,
+            },
           },
-        }],
+        ],
         createdBy: collectedBy,
       });
 
@@ -197,11 +216,15 @@ export class PrivacyConsentService {
         },
       });
 
-      this.logger.log(`Consent collected for user ${request.userId}, purpose: ${request.purpose}`);
+      this.logger.log(
+        `Consent collected for user ${request.userId}, purpose: ${request.purpose}`,
+      );
       return savedConsent;
-
     } catch (error) {
-      this.logger.error(`Error collecting consent: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error collecting consent: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to collect consent');
     }
   }
@@ -282,11 +305,15 @@ export class PrivacyConsentService {
         },
       });
 
-      this.logger.log(`Consent withdrawn for user ${userId}, purpose: ${purpose}`);
+      this.logger.log(
+        `Consent withdrawn for user ${userId}, purpose: ${purpose}`,
+      );
       return updatedConsent;
-
     } catch (error) {
-      this.logger.error(`Error withdrawing consent: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error withdrawing consent: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof NotFoundException) throw error;
       throw new BadRequestException('Failed to withdraw consent');
     }
@@ -315,9 +342,11 @@ export class PrivacyConsentService {
         where,
         order: { createdAt: 'DESC' },
       });
-
     } catch (error) {
-      this.logger.error(`Error getting user consents: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting user consents: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve user consents');
     }
   }
@@ -350,9 +379,11 @@ export class PrivacyConsentService {
       }
 
       return true;
-
     } catch (error) {
-      this.logger.error(`Error checking consent validity: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error checking consent validity: ${error.message}`,
+        error.stack,
+      );
       return false;
     }
   }
@@ -384,7 +415,11 @@ export class PrivacyConsentService {
       if (params.status) {
         where.status = params.status;
       } else if (!params.includeWithdrawn) {
-        where.status = In([ConsentStatus.GIVEN, ConsentStatus.PENDING, ConsentStatus.EXPIRED]);
+        where.status = In([
+          ConsentStatus.GIVEN,
+          ConsentStatus.PENDING,
+          ConsentStatus.EXPIRED,
+        ]);
       }
 
       if (params.isMinor !== undefined) {
@@ -402,7 +437,7 @@ export class PrivacyConsentService {
       if (params.isExpiring) {
         const thirtyDaysFromNow = new Date();
         thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-        
+
         where.expiryDate = Between(new Date(), thirtyDaysFromNow);
         where.status = ConsentStatus.GIVEN;
       }
@@ -415,9 +450,11 @@ export class PrivacyConsentService {
       });
 
       return { consents, total };
-
     } catch (error) {
-      this.logger.error(`Error querying consents: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error querying consents: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to query consents');
     }
   }
@@ -446,55 +483,79 @@ export class PrivacyConsentService {
       const allConsents = await this.consentRepository.find({ where });
 
       const totalConsents = allConsents.length;
-      const activeConsents = allConsents.filter(c => c.status === ConsentStatus.GIVEN).length;
-      const withdrawnConsents = allConsents.filter(c => c.status === ConsentStatus.WITHDRAWN).length;
-      const expiredConsents = allConsents.filter(c => c.status === ConsentStatus.EXPIRED).length;
-      const pendingConsents = allConsents.filter(c => c.status === ConsentStatus.PENDING).length;
+      const activeConsents = allConsents.filter(
+        c => c.status === ConsentStatus.GIVEN,
+      ).length;
+      const withdrawnConsents = allConsents.filter(
+        c => c.status === ConsentStatus.WITHDRAWN,
+      ).length;
+      const expiredConsents = allConsents.filter(
+        c => c.status === ConsentStatus.EXPIRED,
+      ).length;
+      const pendingConsents = allConsents.filter(
+        c => c.status === ConsentStatus.PENDING,
+      ).length;
 
       // Consent by purpose analysis
       const consentsByPurpose = {} as Record<ProcessingPurpose, any>;
       Object.values(ProcessingPurpose).forEach(purpose => {
         const purposeConsents = allConsents.filter(c => c.purpose === purpose);
-        const activePurposeConsents = purposeConsents.filter(c => c.status === ConsentStatus.GIVEN);
-        const withdrawnPurposeConsents = purposeConsents.filter(c => c.status === ConsentStatus.WITHDRAWN);
-        
+        const activePurposeConsents = purposeConsents.filter(
+          c => c.status === ConsentStatus.GIVEN,
+        );
+        const withdrawnPurposeConsents = purposeConsents.filter(
+          c => c.status === ConsentStatus.WITHDRAWN,
+        );
+
         consentsByPurpose[purpose] = {
           total: purposeConsents.length,
           active: activePurposeConsents.length,
-          withdrawalRate: purposeConsents.length > 0 ? 
-            (withdrawnPurposeConsents.length / purposeConsents.length) * 100 : 0,
+          withdrawalRate:
+            purposeConsents.length > 0
+              ? (withdrawnPurposeConsents.length / purposeConsents.length) * 100
+              : 0,
         };
       });
 
       // Consent trends (daily aggregation)
-      const consentTrends = this.calculateConsentTrends(allConsents, startDate, endDate);
+      const consentTrends = this.calculateConsentTrends(
+        allConsents,
+        startDate,
+        endDate,
+      );
 
       // Compliance metrics
       const minorConsentsCount = allConsents.filter(c => c.isMinor).length;
-      const averageResponseTime = this.calculateAverageResponseTime(allConsents);
+      const averageResponseTime =
+        this.calculateAverageResponseTime(allConsents);
       const timesToExpiry = allConsents
         .filter(c => c.status === ConsentStatus.GIVEN && c.expiryDate)
-        .map(c => Math.ceil((c.expiryDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-      
+        .map(c =>
+          Math.ceil(
+            (c.expiryDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+          ),
+        );
+
       const renewalRate = this.calculateRenewalRate(allConsents);
 
       // Risk indicators
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      
-      const expiringConsents = allConsents.filter(c => 
-        c.status === ConsentStatus.GIVEN && 
-        c.expiryDate && 
-        c.expiryDate <= thirtyDaysFromNow
+
+      const expiringConsents = allConsents.filter(
+        c =>
+          c.status === ConsentStatus.GIVEN &&
+          c.expiryDate &&
+          c.expiryDate <= thirtyDaysFromNow,
       ).length;
 
       const currentVersion = '1.0'; // This should come from configuration
-      const outdatedVersions = allConsents.filter(c => c.version !== currentVersion).length;
+      const outdatedVersions = allConsents.filter(
+        c => c.version !== currentVersion,
+      ).length;
 
-      const invalidConsents = allConsents.filter(c => 
-        !c.consentText || 
-        !c.version || 
-        (c.isMinor && !c.legalGuardian)
+      const invalidConsents = allConsents.filter(
+        c => !c.consentText || !c.version || (c.isMinor && !c.legalGuardian),
       ).length;
 
       const highWithdrawalPurposes = Object.entries(consentsByPurpose)
@@ -522,9 +583,11 @@ export class PrivacyConsentService {
           highWithdrawalPurposes,
         },
       };
-
     } catch (error) {
-      this.logger.error(`Error generating consent analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error generating consent analytics: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to generate consent analytics');
     }
   }
@@ -550,9 +613,11 @@ export class PrivacyConsentService {
       }
 
       this.logger.log(`Expired ${expiredConsents.length} outdated consents`);
-
     } catch (error) {
-      this.logger.error(`Error during automated consent expiry: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error during automated consent expiry: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -588,7 +653,7 @@ export class PrivacyConsentService {
 
       for (const consent of expiringConsents) {
         const daysToExpiry = Math.ceil(
-          (consent.expiryDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          (consent.expiryDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
         );
 
         if (daysToExpiry === 30 || daysToExpiry === 7) {
@@ -603,10 +668,14 @@ export class PrivacyConsentService {
         }
       }
 
-      this.logger.log(`Sent renewal reminders for ${expiringConsents.length} consents`);
-
+      this.logger.log(
+        `Sent renewal reminders for ${expiringConsents.length} consents`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending consent renewal reminders: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error sending consent renewal reminders: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -644,14 +713,17 @@ export class PrivacyConsentService {
       },
     };
 
-    existingConsent.auditTrail = [...(existingConsent.auditTrail || []), auditEntry];
+    existingConsent.auditTrail = [
+      ...(existingConsent.auditTrail || []),
+      auditEntry,
+    ];
 
     return await this.consentRepository.save(existingConsent);
   }
 
   private async expireConsent(consent: PrivacyConsent): Promise<void> {
     consent.status = ConsentStatus.EXPIRED;
-    
+
     const auditEntry = {
       action: 'expired' as const,
       timestamp: new Date(),
@@ -665,7 +737,7 @@ export class PrivacyConsentService {
     };
 
     consent.auditTrail = [...(consent.auditTrail || []), auditEntry];
-    
+
     await this.consentRepository.save(consent);
 
     // Emit consent expired event
@@ -684,11 +756,18 @@ export class PrivacyConsentService {
     startDate?: Date,
     endDate?: Date,
   ): any[] {
-    const trends = new Map<string, { given: number; withdrawn: number; expired: number }>();
+    const trends = new Map<
+      string,
+      { given: number; withdrawn: number; expired: number }
+    >();
 
     consents.forEach(consent => {
       const dateKey = consent.createdAt.toISOString().split('T')[0];
-      const trend = trends.get(dateKey) || { given: 0, withdrawn: 0, expired: 0 };
+      const trend = trends.get(dateKey) || {
+        given: 0,
+        withdrawn: 0,
+        expired: 0,
+      };
 
       if (consent.givenAt) trend.given++;
       if (consent.status === ConsentStatus.WITHDRAWN) trend.withdrawn++;
@@ -712,18 +791,20 @@ export class PrivacyConsentService {
 
     if (responseTimes.length === 0) return 0;
 
-    const averageMs = responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
+    const averageMs =
+      responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
     return averageMs / (1000 * 60 * 60); // Convert to hours
   }
 
   private calculateRenewalRate(consents: PrivacyConsent[]): number {
-    const renewedConsents = consents.filter(c => 
-      c.auditTrail?.some(entry => entry.action === 'renewed')
+    const renewedConsents = consents.filter(c =>
+      c.auditTrail?.some(entry => entry.action === 'renewed'),
     );
 
-    const eligibleForRenewal = consents.filter(c => 
-      c.status === ConsentStatus.EXPIRED || 
-      (c.expiryDate && c.expiryDate < new Date())
+    const eligibleForRenewal = consents.filter(
+      c =>
+        c.status === ConsentStatus.EXPIRED ||
+        (c.expiryDate && c.expiryDate < new Date()),
     );
 
     if (eligibleForRenewal.length === 0) return 0;

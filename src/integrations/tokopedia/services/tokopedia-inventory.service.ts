@@ -117,7 +117,10 @@ export class TokopediaInventoryService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -153,22 +156,19 @@ export class TokopediaInventoryService {
             total_pages: number;
             total_items: number;
           };
-        }>(
-          tenantId,
-          channelId,
-          config,
-          {
-            method: 'GET',
-            endpoint: '/v1/inventory/stock',
-            params,
-            requiresAuth: true,
-          },
-        );
+        }>(tenantId, channelId, config, {
+          method: 'GET',
+          endpoint: '/v1/inventory/stock',
+          params,
+          requiresAuth: true,
+        });
 
         if (!stockResult.success) {
-          const errorMessage = typeof stockResult.error === 'string' 
-            ? stockResult.error 
-            : this.extractErrorMessage(stockResult.error) || 'Failed to fetch stock data from Tokopedia';
+          const errorMessage =
+            typeof stockResult.error === 'string'
+              ? stockResult.error
+              : this.extractErrorMessage(stockResult.error) ||
+                'Failed to fetch stock data from Tokopedia';
           throw new Error(errorMessage);
         }
 
@@ -184,22 +184,19 @@ export class TokopediaInventoryService {
             total_pages: number;
             total_items: number;
           };
-        }>(
-          tenantId,
-          channelId,
-          config,
-          {
-            method: 'GET',
-            endpoint: '/v1/inventory/prices',
-            params,
-            requiresAuth: true,
-          },
-        );
+        }>(tenantId, channelId, config, {
+          method: 'GET',
+          endpoint: '/v1/inventory/prices',
+          params,
+          requiresAuth: true,
+        });
 
         if (!priceResult.success) {
-          const errorMessage = typeof priceResult.error === 'string' 
-            ? priceResult.error 
-            : this.extractErrorMessage(priceResult.error) || 'Failed to fetch price data from Tokopedia';
+          const errorMessage =
+            typeof priceResult.error === 'string'
+              ? priceResult.error
+              : this.extractErrorMessage(priceResult.error) ||
+                'Failed to fetch price data from Tokopedia';
           throw new Error(errorMessage);
         }
 
@@ -219,7 +216,10 @@ export class TokopediaInventoryService {
           await this.processInboundStock(tenantId, channelId, stockInfo);
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to process stock for ${stockInfo.sku}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to process stock for ${stockInfo.sku}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Stock ${stockInfo.sku}: ${error.message}`);
           errorCount++;
         }
@@ -231,7 +231,10 @@ export class TokopediaInventoryService {
           await this.processInboundPrice(tenantId, channelId, priceInfo);
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to process price for ${priceInfo.sku}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to process price for ${priceInfo.sku}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Price ${priceInfo.sku}: ${error.message}`);
           errorCount++;
         }
@@ -277,11 +280,13 @@ export class TokopediaInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Tokopedia inventory sync failed: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Tokopedia inventory sync failed: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.logSync(
         tenantId,
@@ -327,7 +332,10 @@ export class TokopediaInventoryService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -354,21 +362,16 @@ export class TokopediaInventoryService {
               sku: string;
               error: string;
             }>;
-          }>(
-            tenantId,
-            channelId,
-            config,
-            {
-              method: 'PUT',
-              endpoint: '/v1/inventory/stock',
-              data: { stock_updates: batch },
-              requiresAuth: true,
-            },
-          );
+          }>(tenantId, channelId, config, {
+            method: 'PUT',
+            endpoint: '/v1/inventory/stock',
+            data: { stock_updates: batch },
+            requiresAuth: true,
+          });
 
           if (result.success) {
             updatedCount += result.data?.updated_items || 0;
-            
+
             if (result.data?.failed_items) {
               for (const failedItem of result.data.failed_items) {
                 errors.push(`${failedItem.sku}: ${failedItem.error}`);
@@ -376,15 +379,18 @@ export class TokopediaInventoryService {
               }
             }
           } else {
-            const errorMessage = typeof result.error === 'string' 
-              ? result.error 
-              : this.extractErrorMessage(result.error) || 'Unknown error';
+            const errorMessage =
+              typeof result.error === 'string'
+                ? result.error
+                : this.extractErrorMessage(result.error) || 'Unknown error';
             errors.push(`Batch ${i / batchSize + 1}: ${errorMessage}`);
             errorCount += batch.length;
           }
-
         } catch (error) {
-          this.logger.error(`Failed to update inventory batch: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to update inventory batch: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Batch ${i / batchSize + 1}: ${error.message}`);
           errorCount += batch.length;
         }
@@ -420,11 +426,13 @@ export class TokopediaInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Tokopedia inventory update failed: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Tokopedia inventory update failed: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.logSync(
         tenantId,
@@ -469,7 +477,10 @@ export class TokopediaInventoryService {
         updateCount: updates.length,
       });
 
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -494,12 +505,14 @@ export class TokopediaInventoryService {
             sku: update.sku,
             price: update.price,
             ...(update.variant_id && { variant_id: update.variant_id }),
-            ...(update.special_price && { special_price: update.special_price }),
-            ...(update.special_price_start && { 
-              special_price_start: update.special_price_start.toISOString() 
+            ...(update.special_price && {
+              special_price: update.special_price,
             }),
-            ...(update.special_price_end && { 
-              special_price_end: update.special_price_end.toISOString() 
+            ...(update.special_price_start && {
+              special_price_start: update.special_price_start.toISOString(),
+            }),
+            ...(update.special_price_end && {
+              special_price_end: update.special_price_end.toISOString(),
             }),
           }));
 
@@ -510,21 +523,16 @@ export class TokopediaInventoryService {
               sku: string;
               error: string;
             }>;
-          }>(
-            tenantId,
-            channelId,
-            config,
-            {
-              method: 'PUT',
-              endpoint: '/v1/inventory/prices',
-              data: { price_updates: priceUpdates },
-              requiresAuth: true,
-            },
-          );
+          }>(tenantId, channelId, config, {
+            method: 'PUT',
+            endpoint: '/v1/inventory/prices',
+            data: { price_updates: priceUpdates },
+            requiresAuth: true,
+          });
 
           if (result.success) {
             updatedCount += result.data?.updated_items || 0;
-            
+
             if (result.data?.failed_items) {
               for (const failedItem of result.data.failed_items) {
                 errors.push(`${failedItem.sku}: ${failedItem.error}`);
@@ -532,15 +540,18 @@ export class TokopediaInventoryService {
               }
             }
           } else {
-            const errorMessage = typeof result.error === 'string' 
-              ? result.error 
-              : this.extractErrorMessage(result.error) || 'Unknown error';
+            const errorMessage =
+              typeof result.error === 'string'
+                ? result.error
+                : this.extractErrorMessage(result.error) || 'Unknown error';
             errors.push(`Batch ${i / batchSize + 1}: ${errorMessage}`);
             errorCount += batch.length;
           }
-
         } catch (error) {
-          this.logger.error(`Failed to update price batch: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to update price batch: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Batch ${i / batchSize + 1}: ${error.message}`);
           errorCount += batch.length;
         }
@@ -575,11 +586,13 @@ export class TokopediaInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Tokopedia price update failed: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Tokopedia price update failed: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.logSync(
         tenantId,
@@ -612,7 +625,10 @@ export class TokopediaInventoryService {
     error?: string;
   }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -628,17 +644,12 @@ export class TokopediaInventoryService {
 
       const result = await this.apiService.makeTokopediaRequest<{
         stock_info: TokopediaStockInfo[];
-      }>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'GET',
-          endpoint: '/v1/inventory/stock',
-          params: { skus: productSkus.join(',') },
-          requiresAuth: true,
-        },
-      );
+      }>(tenantId, channelId, config, {
+        method: 'GET',
+        endpoint: '/v1/inventory/stock',
+        params: { skus: productSkus.join(',') },
+        requiresAuth: true,
+      });
 
       if (result.success) {
         return {
@@ -648,15 +659,18 @@ export class TokopediaInventoryService {
       } else {
         return {
           success: false,
-          error: typeof result.error === 'string' 
-            ? result.error 
-            : this.extractErrorMessage(result.error) || 'Unknown error',
+          error:
+            typeof result.error === 'string'
+              ? result.error
+              : this.extractErrorMessage(result.error) || 'Unknown error',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Tokopedia stock: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to get Tokopedia stock: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: false,
         error: error.message,
@@ -677,7 +691,10 @@ export class TokopediaInventoryService {
     error?: string;
   }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -693,17 +710,12 @@ export class TokopediaInventoryService {
 
       const result = await this.apiService.makeTokopediaRequest<{
         price_info: TokopediaPriceInfo[];
-      }>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'GET',
-          endpoint: '/v1/inventory/prices',
-          params: { skus: productSkus.join(',') },
-          requiresAuth: true,
-        },
-      );
+      }>(tenantId, channelId, config, {
+        method: 'GET',
+        endpoint: '/v1/inventory/prices',
+        params: { skus: productSkus.join(',') },
+        requiresAuth: true,
+      });
 
       if (result.success) {
         return {
@@ -713,15 +725,18 @@ export class TokopediaInventoryService {
       } else {
         return {
           success: false,
-          error: typeof result.error === 'string' 
-            ? result.error 
-            : this.extractErrorMessage(result.error) || 'Unknown error',
+          error:
+            typeof result.error === 'string'
+              ? result.error
+              : this.extractErrorMessage(result.error) || 'Unknown error',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Tokopedia prices: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to get Tokopedia prices: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: false,
         error: error.message,
@@ -747,7 +762,9 @@ export class TokopediaInventoryService {
     });
 
     if (!mapping) {
-      throw new Error(`No product mapping found for Tokopedia product ${stockInfo.product_id}`);
+      throw new Error(
+        `No product mapping found for Tokopedia product ${stockInfo.product_id}`,
+      );
     }
 
     // Update or create inventory level
@@ -805,7 +822,9 @@ export class TokopediaInventoryService {
     });
 
     if (!mapping) {
-      throw new Error(`No product mapping found for Tokopedia product ${priceInfo.product_id}`);
+      throw new Error(
+        `No product mapping found for Tokopedia product ${priceInfo.product_id}`,
+      );
     }
 
     // Update product price
@@ -815,11 +834,11 @@ export class TokopediaInventoryService {
 
     if (product) {
       product.sellingPrice = priceInfo.price;
-      
+
       if (!product.metadata) {
         product.metadata = {};
       }
-      
+
       product.metadata.tokopedia = {
         ...product.metadata.tokopedia,
         price: priceInfo.price,

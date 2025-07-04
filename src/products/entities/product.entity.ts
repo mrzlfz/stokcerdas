@@ -1,7 +1,15 @@
-import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { ProductCategory } from './product-category.entity';
+import { ProductVariant } from './product-variant.entity';
 
 export enum ProductStatus {
   ACTIVE = 'active',
@@ -150,16 +158,18 @@ export class Product extends BaseEntity {
   metadata?: Record<string, any>;
 
   // Relations
-  @ManyToOne(() => ProductCategory, (category) => category.products, { nullable: true })
+  @ManyToOne(() => ProductCategory, category => category.products, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'categoryId' })
   category?: ProductCategory;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.products, { nullable: true })
+  @ManyToOne(() => Supplier, supplier => supplier.products, { nullable: true })
   @JoinColumn({ name: 'supplierId' })
   supplier?: Supplier;
 
-  @OneToMany('ProductVariant', 'product')
-  variants?: any[];
+  @OneToMany(() => ProductVariant, variant => variant.product)
+  variants?: ProductVariant[];
 
   @OneToMany('InventoryItem', 'product')
   inventoryItems?: any[];
@@ -173,7 +183,9 @@ export class Product extends BaseEntity {
   }
 
   get hasVariants(): boolean {
-    return this.type === ProductType.VARIANT && (this.variants?.length || 0) > 0;
+    return (
+      this.type === ProductType.VARIANT && (this.variants?.length || 0) > 0
+    );
   }
 
   get isLowStock(): boolean {
@@ -203,79 +215,6 @@ export class Product extends BaseEntity {
   }
 }
 
-// Supporting entities
-@Entity('product_categories')
-@Index(['tenantId', 'name'], { unique: true })
-export class ProductCategory extends BaseEntity {
-  @Column({ type: 'varchar', length: 100 })
-  name: string;
-
-  @Column({ type: 'text', nullable: true })
-  description?: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  image?: string;
-
-  @Column({ type: 'uuid', nullable: true })
-  parentId?: string;
-
-  @Column({ type: 'int', default: 0 })
-  sortOrder: number;
-
-  @Column({ type: 'boolean', default: true })
-  isActive: boolean;
-
-  @OneToMany('Product', 'category')
-  products?: any[];
-
-  @ManyToOne('ProductCategory', { nullable: true })
-  @JoinColumn({ name: 'parentId' })
-  parent?: any;
-
-  @OneToMany('ProductCategory', 'parent')
-  children?: any[];
-}
-
-@Entity('product_variants')
-@Index(['tenantId', 'productId'])
-@Index(['tenantId', 'sku'], { unique: true })
-export class ProductVariant extends BaseEntity {
-  @Column({ type: 'uuid' })
-  productId: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  sku: string;
-
-  @Column({ type: 'varchar', length: 255 })
-  name: string;
-
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  barcode?: string;
-
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  costPrice: number;
-
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  sellingPrice: number;
-
-  @Column({ type: 'decimal', precision: 8, scale: 3, nullable: true })
-  weight?: number;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  image?: string;
-
-  @Column({ type: 'jsonb' })
-  attributes: Record<string, any>; // color: red, size: L, etc.
-
-  @Column({ type: 'boolean', default: true })
-  isActive: boolean;
-
-  @ManyToOne('Product', 'variants')
-  @JoinColumn({ name: 'productId' })
-  product: any;
-}
-
-// Import types for relations (these would be defined in their respective files)
-declare class InventoryItem {
-  product: Product;
-}
+// Supporting entities are now imported from separate files
+// ProductCategory is imported from ./product-category.entity.ts
+// ProductVariant is imported from ./product-variant.entity.ts

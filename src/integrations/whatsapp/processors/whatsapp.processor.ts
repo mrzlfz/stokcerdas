@@ -1,4 +1,10 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -9,7 +15,10 @@ import { WhatsAppTemplateService } from '../services/whatsapp-template.service';
 import { WhatsAppAuthService } from '../services/whatsapp-auth.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface WhatsAppWebhookJobData {
   webhookId: string;
@@ -24,7 +33,13 @@ export interface WhatsAppWebhookJobData {
 export interface WhatsAppMessageJobData {
   tenantId: string;
   channelId: string;
-  messageType: 'text' | 'template' | 'interactive' | 'media' | 'location' | 'contact';
+  messageType:
+    | 'text'
+    | 'template'
+    | 'interactive'
+    | 'media'
+    | 'location'
+    | 'contact';
   messageData: any;
   priority?: 'high' | 'normal' | 'low';
   scheduleAt?: Date;
@@ -101,15 +116,18 @@ export class WhatsAppProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`WhatsApp job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `WhatsApp job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -117,8 +135,16 @@ export class WhatsAppProcessor {
    */
   @Process('process-webhook')
   async processWebhook(job: Job<WhatsAppWebhookJobData>) {
-    const { webhookId, tenantId, channelId, eventType, eventSource, payload, isRetry } = job.data;
-    
+    const {
+      webhookId,
+      tenantId,
+      channelId,
+      eventType,
+      eventSource,
+      payload,
+      isRetry,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing WhatsApp webhook: ${eventType}`, {
         webhookId,
@@ -129,8 +155,10 @@ export class WhatsAppProcessor {
       });
 
       // Mark webhook as processing
-      const webhook = await this.webhookHandler.markWebhookAsProcessing(webhookId);
-      
+      const webhook = await this.webhookHandler.markWebhookAsProcessing(
+        webhookId,
+      );
+
       // Process webhook payload
       const result = await this.webhookService.processWhatsAppWebhook(
         tenantId,
@@ -171,11 +199,15 @@ export class WhatsAppProcessor {
           true, // Schedule retry
         );
 
-        throw new Error(result.errors?.join(', ') || 'Webhook processing failed');
+        throw new Error(
+          result.errors?.join(', ') || 'Webhook processing failed',
+        );
       }
-
     } catch (error) {
-      this.logger.error(`Webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Mark webhook as failed
       await this.webhookHandler.markWebhookAsFailed(
@@ -203,8 +235,9 @@ export class WhatsAppProcessor {
    */
   @Process('send-message')
   async processSendMessage(job: Job<WhatsAppMessageJobData>) {
-    const { tenantId, channelId, messageType, messageData, priority } = job.data;
-    
+    const { tenantId, channelId, messageType, messageData, priority } =
+      job.data;
+
     try {
       this.logger.debug(`Processing WhatsApp message send: ${messageType}`, {
         tenantId,
@@ -217,27 +250,51 @@ export class WhatsAppProcessor {
 
       switch (messageType) {
         case 'text':
-          result = await this.messageService.sendTextMessage(tenantId, channelId, messageData);
+          result = await this.messageService.sendTextMessage(
+            tenantId,
+            channelId,
+            messageData,
+          );
           break;
 
         case 'template':
-          result = await this.messageService.sendTemplateMessage(tenantId, channelId, messageData);
+          result = await this.messageService.sendTemplateMessage(
+            tenantId,
+            channelId,
+            messageData,
+          );
           break;
 
         case 'interactive':
-          result = await this.messageService.sendInteractiveMessage(tenantId, channelId, messageData);
+          result = await this.messageService.sendInteractiveMessage(
+            tenantId,
+            channelId,
+            messageData,
+          );
           break;
 
         case 'media':
-          result = await this.messageService.sendMediaMessage(tenantId, channelId, messageData);
+          result = await this.messageService.sendMediaMessage(
+            tenantId,
+            channelId,
+            messageData,
+          );
           break;
 
         case 'location':
-          result = await this.messageService.sendLocationMessage(tenantId, channelId, messageData);
+          result = await this.messageService.sendLocationMessage(
+            tenantId,
+            channelId,
+            messageData,
+          );
           break;
 
         case 'contact':
-          result = await this.messageService.sendContactMessage(tenantId, channelId, messageData);
+          result = await this.messageService.sendContactMessage(
+            tenantId,
+            channelId,
+            messageData,
+          );
           break;
 
         default:
@@ -270,7 +327,6 @@ export class WhatsAppProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Message send failed: ${error.message}`, error.stack);
 
@@ -292,16 +348,27 @@ export class WhatsAppProcessor {
    */
   @Process('send-bulk-messages')
   async processBulkMessages(job: Job<WhatsAppBulkMessageJobData>) {
-    const { tenantId, channelId, recipients, messageData, messageType, batchSize = 10, sendDelay = 1000 } = job.data;
-    
+    const {
+      tenantId,
+      channelId,
+      recipients,
+      messageData,
+      messageType,
+      batchSize = 10,
+      sendDelay = 1000,
+    } = job.data;
+
     try {
-      this.logger.debug(`Processing WhatsApp bulk message send: ${messageType}`, {
-        tenantId,
-        channelId,
-        messageType,
-        recipientCount: recipients.length,
-        batchSize,
-      });
+      this.logger.debug(
+        `Processing WhatsApp bulk message send: ${messageType}`,
+        {
+          tenantId,
+          channelId,
+          messageType,
+          recipientCount: recipients.length,
+          batchSize,
+        },
+      );
 
       const results = [];
       let successCount = 0;
@@ -310,37 +377,56 @@ export class WhatsAppProcessor {
       // Process recipients in batches
       for (let i = 0; i < recipients.length; i += batchSize) {
         const batch = recipients.slice(i, i + batchSize);
-        
+
         // Process batch
         for (const recipient of batch) {
           try {
             const individualMessageData = { ...messageData, to: recipient };
-            
+
             let result;
             switch (messageType) {
               case 'text':
-                result = await this.messageService.sendTextMessage(tenantId, channelId, individualMessageData);
+                result = await this.messageService.sendTextMessage(
+                  tenantId,
+                  channelId,
+                  individualMessageData,
+                );
                 break;
               case 'template':
-                result = await this.messageService.sendTemplateMessage(tenantId, channelId, individualMessageData);
+                result = await this.messageService.sendTemplateMessage(
+                  tenantId,
+                  channelId,
+                  individualMessageData,
+                );
                 break;
               case 'interactive':
-                result = await this.messageService.sendInteractiveMessage(tenantId, channelId, individualMessageData);
+                result = await this.messageService.sendInteractiveMessage(
+                  tenantId,
+                  channelId,
+                  individualMessageData,
+                );
                 break;
               default:
-                throw new Error(`Unsupported bulk message type: ${messageType}`);
+                throw new Error(
+                  `Unsupported bulk message type: ${messageType}`,
+                );
             }
 
-            results.push({ recipient, success: true, messageId: result.messageId });
+            results.push({
+              recipient,
+              success: true,
+              messageId: result.messageId,
+            });
             successCount++;
 
             // Add delay between messages
             if (sendDelay > 0) {
               await new Promise(resolve => setTimeout(resolve, sendDelay));
             }
-
           } catch (error) {
-            this.logger.error(`Bulk message failed for recipient ${recipient}: ${error.message}`);
+            this.logger.error(
+              `Bulk message failed for recipient ${recipient}: ${error.message}`,
+            );
             results.push({ recipient, success: false, error: error.message });
             errorCount++;
           }
@@ -385,9 +471,11 @@ export class WhatsAppProcessor {
       });
 
       return bulkResult;
-
     } catch (error) {
-      this.logger.error(`Bulk message send failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Bulk message send failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
@@ -407,8 +495,15 @@ export class WhatsAppProcessor {
    */
   @Process('template-operation')
   async processTemplateOperation(job: Job<WhatsAppTemplateJobData>) {
-    const { tenantId, channelId, action, templateData, templateId, templateName } = job.data;
-    
+    const {
+      tenantId,
+      channelId,
+      action,
+      templateData,
+      templateId,
+      templateName,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing WhatsApp template operation: ${action}`, {
         tenantId,
@@ -422,11 +517,20 @@ export class WhatsAppProcessor {
 
       switch (action) {
         case 'create':
-          result = await this.templateService.createTemplate(tenantId, channelId, templateData);
+          result = await this.templateService.createTemplate(
+            tenantId,
+            channelId,
+            templateData,
+          );
           break;
 
         case 'delete':
-          result = await this.templateService.deleteTemplate(tenantId, channelId, templateId, templateName);
+          result = await this.templateService.deleteTemplate(
+            tenantId,
+            channelId,
+            templateId,
+            templateName,
+          );
           break;
 
         case 'sync':
@@ -463,9 +567,11 @@ export class WhatsAppProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Template operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Template operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
@@ -486,8 +592,16 @@ export class WhatsAppProcessor {
    */
   @Process('media-operation')
   async processMediaOperation(job: Job<WhatsAppMediaJobData>) {
-    const { tenantId, channelId, action, mediaId, mediaData, mimeType, filename } = job.data;
-    
+    const {
+      tenantId,
+      channelId,
+      action,
+      mediaId,
+      mediaData,
+      mimeType,
+      filename,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing WhatsApp media operation: ${action}`, {
         tenantId,
@@ -503,12 +617,18 @@ export class WhatsAppProcessor {
       switch (action) {
         case 'upload':
           // TODO: Implement media upload via API service
-          result = { success: true, message: 'Media upload not implemented yet' };
+          result = {
+            success: true,
+            message: 'Media upload not implemented yet',
+          };
           break;
 
         case 'download':
           // TODO: Implement media download via API service
-          result = { success: true, message: 'Media download not implemented yet' };
+          result = {
+            success: true,
+            message: 'Media download not implemented yet',
+          };
           break;
 
         default:
@@ -532,9 +652,11 @@ export class WhatsAppProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Media operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Media operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {
@@ -553,9 +675,11 @@ export class WhatsAppProcessor {
    * Process mark message as read
    */
   @Process('mark-as-read')
-  async processMarkAsRead(job: Job<{ tenantId: string; channelId: string; messageId: string }>) {
+  async processMarkAsRead(
+    job: Job<{ tenantId: string; channelId: string; messageId: string }>,
+  ) {
     const { tenantId, channelId, messageId } = job.data;
-    
+
     try {
       this.logger.debug(`Processing WhatsApp mark as read`, {
         tenantId,
@@ -563,7 +687,11 @@ export class WhatsAppProcessor {
         messageId,
       });
 
-      const result = await this.messageService.markMessageAsRead(tenantId, channelId, messageId);
+      const result = await this.messageService.markMessageAsRead(
+        tenantId,
+        channelId,
+        messageId,
+      );
 
       if (result.success) {
         // Log success
@@ -578,7 +706,6 @@ export class WhatsAppProcessor {
       }
 
       return result;
-
     } catch (error) {
       this.logger.error(`Mark as read failed: ${error.message}`, error.stack);
 
@@ -600,7 +727,7 @@ export class WhatsAppProcessor {
   @Process('health-check')
   async processHealthCheck(job: Job<WhatsAppHealthCheckJobData>) {
     const { tenantId, channelId, checkType } = job.data;
-    
+
     try {
       this.logger.debug(`Processing WhatsApp health check: ${checkType}`, {
         tenantId,
@@ -612,7 +739,10 @@ export class WhatsAppProcessor {
 
       switch (checkType) {
         case 'auth':
-          result = await this.authService.testAuthentication(tenantId, channelId);
+          result = await this.authService.testAuthentication(
+            tenantId,
+            channelId,
+          );
           break;
 
         case 'api':
@@ -621,7 +751,10 @@ export class WhatsAppProcessor {
 
         case 'webhook':
           // TODO: Implement webhook health check
-          result = { success: true, message: 'Webhook health check not implemented yet' };
+          result = {
+            success: true,
+            message: 'Webhook health check not implemented yet',
+          };
           break;
 
         default:
@@ -639,7 +772,6 @@ export class WhatsAppProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Health check failed: ${error.message}`, error.stack);
 
@@ -660,21 +792,27 @@ export class WhatsAppProcessor {
    */
   @Process('scheduled-message')
   async processScheduledMessage(job: Job<WhatsAppMessageJobData>) {
-    const { tenantId, channelId, messageType, messageData, scheduleAt } = job.data;
-    
+    const { tenantId, channelId, messageType, messageData, scheduleAt } =
+      job.data;
+
     try {
-      this.logger.debug(`Processing scheduled WhatsApp message: ${messageType}`, {
-        tenantId,
-        channelId,
-        messageType,
-        scheduleAt,
-      });
+      this.logger.debug(
+        `Processing scheduled WhatsApp message: ${messageType}`,
+        {
+          tenantId,
+          channelId,
+          messageType,
+          scheduleAt,
+        },
+      );
 
       // Check if it's time to send the message
       if (scheduleAt && new Date() < scheduleAt) {
         // Reschedule the job
         const delay = scheduleAt.getTime() - Date.now();
-        throw new Error(`Message scheduled for later, rescheduling with ${delay}ms delay`);
+        throw new Error(
+          `Message scheduled for later, rescheduling with ${delay}ms delay`,
+        );
       }
 
       // Process the message normally
@@ -685,10 +823,14 @@ export class WhatsAppProcessor {
         messageData,
       };
 
-      return await this.processSendMessage({ data: messageJob } as Job<WhatsAppMessageJobData>);
-
+      return await this.processSendMessage({
+        data: messageJob,
+      } as Job<WhatsAppMessageJobData>);
     } catch (error) {
-      this.logger.error(`Scheduled message processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Scheduled message processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
       await this.logService.logError(tenantId, channelId, error, {

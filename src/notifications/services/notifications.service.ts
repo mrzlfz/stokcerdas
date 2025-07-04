@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Notification, NotificationType, NotificationStatus, NotificationPriority } from '../entities/notification.entity';
+import {
+  Notification,
+  NotificationType,
+  NotificationStatus,
+  NotificationPriority,
+} from '../entities/notification.entity';
 import { NotificationTemplate } from '../entities/notification-template.entity';
 import { NotificationSubscription } from '../entities/notification-subscription.entity';
 
@@ -50,7 +55,11 @@ export class NotificationsService {
     });
   }
 
-  async findByUser(userId: string, tenantId: string, limit: number = 50): Promise<Notification[]> {
+  async findByUser(
+    userId: string,
+    tenantId: string,
+    limit: number = 50,
+  ): Promise<Notification[]> {
     return this.notificationRepository.find({
       where: { userId, tenantId },
       order: { createdAt: 'DESC' },
@@ -61,40 +70,40 @@ export class NotificationsService {
   async markAsRead(id: string, tenantId: string): Promise<void> {
     await this.notificationRepository.update(
       { id, tenantId },
-      { 
+      {
         status: NotificationStatus.READ,
         readAt: new Date(),
-      }
+      },
     );
   }
 
   async markAsSent(id: string): Promise<void> {
     await this.notificationRepository.update(
       { id },
-      { 
+      {
         status: NotificationStatus.SENT,
         sentAt: new Date(),
-      }
+      },
     );
   }
 
   async markAsDelivered(id: string): Promise<void> {
     await this.notificationRepository.update(
       { id },
-      { 
+      {
         status: NotificationStatus.DELIVERED,
         deliveredAt: new Date(),
-      }
+      },
     );
   }
 
   async markAsFailed(id: string, errorMessage: string): Promise<void> {
     await this.notificationRepository.update(
       { id },
-      { 
+      {
         status: NotificationStatus.FAILED,
         errorMessage,
-      }
+      },
     );
   }
 
@@ -109,12 +118,17 @@ export class NotificationsService {
   }
 
   // Template methods
-  async createTemplate(templateData: Partial<NotificationTemplate>): Promise<NotificationTemplate> {
+  async createTemplate(
+    templateData: Partial<NotificationTemplate>,
+  ): Promise<NotificationTemplate> {
     const template = this.templateRepository.create(templateData);
     return this.templateRepository.save(template);
   }
 
-  async getTemplate(code: string, tenantId: string): Promise<NotificationTemplate> {
+  async getTemplate(
+    code: string,
+    tenantId: string,
+  ): Promise<NotificationTemplate> {
     return this.templateRepository.findOne({
       where: { code, tenantId, isActive: true },
     });

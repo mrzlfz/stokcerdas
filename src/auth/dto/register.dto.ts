@@ -34,7 +34,8 @@ export class RegisterDto {
   @MinLength(8, { message: 'Password harus minimal 8 karakter' })
   @MaxLength(100, { message: 'Password maksimal 100 karakter' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
-    message: 'Password harus mengandung minimal 1 huruf kecil, 1 huruf besar, 1 angka, dan 1 karakter khusus',
+    message:
+      'Password harus mengandung minimal 1 huruf kecil, 1 huruf besar, 1 angka, dan 1 karakter khusus',
   })
   @IsNotEmpty({ message: 'Password tidak boleh kosong' })
   password: string;
@@ -67,7 +68,9 @@ export class RegisterDto {
     required: false,
   })
   @IsOptional()
-  @IsPhoneNumber('ID', { message: 'Nomor telepon harus berupa nomor telepon Indonesia yang valid' })
+  @IsPhoneNumber('ID', {
+    message: 'Nomor telepon harus berupa nomor telepon Indonesia yang valid',
+  })
   phoneNumber?: string;
 
   @ApiProperty({
@@ -77,6 +80,8 @@ export class RegisterDto {
     required: false,
   })
   @IsOptional()
-  @IsEnum(UserRole, { message: 'Role harus salah satu dari: admin, manager, staff' })
+  @IsEnum(UserRole, {
+    message: 'Role harus salah satu dari: admin, manager, staff',
+  })
   role?: UserRole;
 }

@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateMultiEntitySupport1735700000000 implements MigrationInterface {
+export class CreateMultiEntitySupport1735700000000
+  implements MigrationInterface
+{
   name = 'CreateMultiEntitySupport1735700000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -733,50 +735,128 @@ export class CreateMultiEntitySupport1735700000000 implements MigrationInterface
     `);
 
     // Create indexes for performance
-    await queryRunner.query(`CREATE INDEX "IDX_companies_tenant_deleted" ON "companies" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_companies_tenant_code" ON "companies" ("tenant_id", "code")`);
-    await queryRunner.query(`CREATE INDEX "IDX_companies_tenant_status" ON "companies" ("tenant_id", "status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_companies_tenant_type" ON "companies" ("tenant_id", "type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_companies_tenant_business_type" ON "companies" ("tenant_id", "business_type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_companies_status_active" ON "companies" ("status", "is_active")`);
-    await queryRunner.query(`CREATE INDEX "IDX_companies_parent" ON "companies" ("parent_company_id", "status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_companies_tenant_deleted" ON "companies" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_companies_tenant_code" ON "companies" ("tenant_id", "code")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_companies_tenant_status" ON "companies" ("tenant_id", "status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_companies_tenant_type" ON "companies" ("tenant_id", "type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_companies_tenant_business_type" ON "companies" ("tenant_id", "business_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_companies_status_active" ON "companies" ("status", "is_active")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_companies_parent" ON "companies" ("parent_company_id", "status")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_company_relationships_tenant_deleted" ON "company_relationships" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_relationships_tenant_from" ON "company_relationships" ("tenant_id", "from_company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_relationships_tenant_to" ON "company_relationships" ("tenant_id", "to_company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_relationships_tenant_type" ON "company_relationships" ("tenant_id", "relationship_type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_relationships_tenant_status" ON "company_relationships" ("tenant_id", "status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_relationships_status_active" ON "company_relationships" ("status", "is_active")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_relationships_from_to_status" ON "company_relationships" ("from_company_id", "to_company_id", "status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_relationships_tenant_deleted" ON "company_relationships" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_relationships_tenant_from" ON "company_relationships" ("tenant_id", "from_company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_relationships_tenant_to" ON "company_relationships" ("tenant_id", "to_company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_relationships_tenant_type" ON "company_relationships" ("tenant_id", "relationship_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_relationships_tenant_status" ON "company_relationships" ("tenant_id", "status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_relationships_status_active" ON "company_relationships" ("status", "is_active")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_relationships_from_to_status" ON "company_relationships" ("from_company_id", "to_company_id", "status")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_deleted" ON "inter_company_transfers" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_number" ON "inter_company_transfers" ("tenant_id", "transfer_number")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_from" ON "inter_company_transfers" ("tenant_id", "from_company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_to" ON "inter_company_transfers" ("tenant_id", "to_company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_type" ON "inter_company_transfers" ("tenant_id", "transfer_type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_status" ON "inter_company_transfers" ("tenant_id", "status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_priority" ON "inter_company_transfers" ("tenant_id", "priority")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_tenant_date" ON "inter_company_transfers" ("tenant_id", "transfer_date")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_status_date" ON "inter_company_transfers" ("status", "transfer_date")`);
-    await queryRunner.query(`CREATE INDEX "IDX_inter_company_transfers_from_to_status" ON "inter_company_transfers" ("from_company_id", "to_company_id", "status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_deleted" ON "inter_company_transfers" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_number" ON "inter_company_transfers" ("tenant_id", "transfer_number")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_from" ON "inter_company_transfers" ("tenant_id", "from_company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_to" ON "inter_company_transfers" ("tenant_id", "to_company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_type" ON "inter_company_transfers" ("tenant_id", "transfer_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_status" ON "inter_company_transfers" ("tenant_id", "status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_priority" ON "inter_company_transfers" ("tenant_id", "priority")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_tenant_date" ON "inter_company_transfers" ("tenant_id", "transfer_date")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_status_date" ON "inter_company_transfers" ("status", "transfer_date")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_inter_company_transfers_from_to_status" ON "inter_company_transfers" ("from_company_id", "to_company_id", "status")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_tenant_deleted" ON "consolidated_reports" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_tenant_number" ON "consolidated_reports" ("tenant_id", "report_number")`);
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_tenant_type" ON "consolidated_reports" ("tenant_id", "report_type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_tenant_status" ON "consolidated_reports" ("tenant_id", "status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_tenant_parent" ON "consolidated_reports" ("tenant_id", "parent_company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_tenant_period" ON "consolidated_reports" ("tenant_id", "report_period")`);
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_tenant_period_range" ON "consolidated_reports" ("tenant_id", "period_start", "period_end")`);
-    await queryRunner.query(`CREATE INDEX "IDX_consolidated_reports_status_generated" ON "consolidated_reports" ("status", "generated_date")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_tenant_deleted" ON "consolidated_reports" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_tenant_number" ON "consolidated_reports" ("tenant_id", "report_number")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_tenant_type" ON "consolidated_reports" ("tenant_id", "report_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_tenant_status" ON "consolidated_reports" ("tenant_id", "status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_tenant_parent" ON "consolidated_reports" ("tenant_id", "parent_company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_tenant_period" ON "consolidated_reports" ("tenant_id", "report_period")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_tenant_period_range" ON "consolidated_reports" ("tenant_id", "period_start", "period_end")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_consolidated_reports_status_generated" ON "consolidated_reports" ("status", "generated_date")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_company_billing_tenant_deleted" ON "company_billing" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_billing_tenant_company" ON "company_billing" ("tenant_id", "company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_billing_tenant_status" ON "company_billing" ("tenant_id", "billing_status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_billing_tenant_plan" ON "company_billing" ("tenant_id", "billing_plan")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_billing_tenant_next_billing" ON "company_billing" ("tenant_id", "next_billing_date")`);
-    await queryRunner.query(`CREATE INDEX "IDX_company_billing_status_next_billing" ON "company_billing" ("billing_status", "next_billing_date")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_billing_tenant_deleted" ON "company_billing" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_billing_tenant_company" ON "company_billing" ("tenant_id", "company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_billing_tenant_status" ON "company_billing" ("tenant_id", "billing_status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_billing_tenant_plan" ON "company_billing" ("tenant_id", "billing_plan")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_billing_tenant_next_billing" ON "company_billing" ("tenant_id", "next_billing_date")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_company_billing_status_next_billing" ON "company_billing" ("billing_status", "next_billing_date")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_departments_tenant_company" ON "departments" ("tenant_id", "company_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_departments_tenant_company" ON "departments" ("tenant_id", "company_id")`,
+    );
 
     // Create unique constraints
     await queryRunner.query(`
@@ -831,88 +911,230 @@ export class CreateMultiEntitySupport1735700000000 implements MigrationInterface
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop triggers
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_company_billing_updated_at ON "company_billing"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_consolidated_reports_updated_at ON "consolidated_reports"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_inter_company_transfers_updated_at ON "inter_company_transfers"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_company_relationships_updated_at ON "company_relationships"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_companies_updated_at ON "companies"`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_company_billing_updated_at ON "company_billing"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_consolidated_reports_updated_at ON "consolidated_reports"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_inter_company_transfers_updated_at ON "inter_company_transfers"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_company_relationships_updated_at ON "company_relationships"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_companies_updated_at ON "companies"`,
+    );
 
     // Drop indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_departments_tenant_company"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_billing_status_next_billing"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_billing_tenant_next_billing"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_billing_tenant_plan"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_billing_tenant_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_billing_tenant_company"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_billing_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_status_generated"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_period_range"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_period"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_number"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_from_to_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_status_date"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_date"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_priority"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_to"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_from"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_number"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_from_to_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_status_active"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_tenant_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_tenant_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_tenant_to"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_tenant_from"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_tenant_deleted"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_departments_tenant_company"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_billing_status_next_billing"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_billing_tenant_next_billing"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_billing_tenant_plan"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_billing_tenant_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_billing_tenant_company"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_billing_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_status_generated"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_period_range"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_period"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_parent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_type"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_number"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_consolidated_reports_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_from_to_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_status_date"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_date"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_priority"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_type"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_to"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_from"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_number"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inter_company_transfers_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_from_to_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_status_active"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_tenant_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_tenant_type"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_tenant_to"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_tenant_from"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_tenant_deleted"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_status_active"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_tenant_business_type"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_companies_status_active"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_companies_tenant_business_type"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_tenant_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_tenant_status"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_companies_tenant_status"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_tenant_code"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_tenant_deleted"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_companies_tenant_deleted"`,
+    );
 
     // Drop unique constraints
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_billing_company_unique"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_company_relationships_unique"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_companies_tenant_code_unique"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_billing_company_unique"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_company_relationships_unique"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_companies_tenant_code_unique"`,
+    );
 
     // Drop foreign key constraints
-    await queryRunner.query(`ALTER TABLE "departments" DROP CONSTRAINT IF EXISTS "FK_departments_company"`);
-    await queryRunner.query(`ALTER TABLE "company_billing" DROP CONSTRAINT IF EXISTS "FK_company_billing_customer_success_manager"`);
-    await queryRunner.query(`ALTER TABLE "company_billing" DROP CONSTRAINT IF EXISTS "FK_company_billing_account_manager"`);
-    await queryRunner.query(`ALTER TABLE "company_billing" DROP CONSTRAINT IF EXISTS "FK_company_billing_company"`);
-    await queryRunner.query(`ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_published_by"`);
-    await queryRunner.query(`ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_approved_by"`);
-    await queryRunner.query(`ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_generated_by"`);
-    await queryRunner.query(`ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_parent_company"`);
-    await queryRunner.query(`ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_approval_instance"`);
-    await queryRunner.query(`ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_received_by"`);
-    await queryRunner.query(`ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_shipped_by"`);
-    await queryRunner.query(`ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_approved_by"`);
-    await queryRunner.query(`ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_requested_by"`);
-    await queryRunner.query(`ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_to"`);
-    await queryRunner.query(`ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_from"`);
-    await queryRunner.query(`ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_manager"`);
-    await queryRunner.query(`ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_contact_to"`);
-    await queryRunner.query(`ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_contact_from"`);
-    await queryRunner.query(`ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_to"`);
-    await queryRunner.query(`ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_from"`);
-    await queryRunner.query(`ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_hr_manager"`);
-    await queryRunner.query(`ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_finance_manager"`);
-    await queryRunner.query(`ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_ceo"`);
-    await queryRunner.query(`ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_parent"`);
-    await queryRunner.query(`ALTER TABLE "companies_closure" DROP CONSTRAINT IF EXISTS "FK_companies_closure_descendant"`);
-    await queryRunner.query(`ALTER TABLE "companies_closure" DROP CONSTRAINT IF EXISTS "FK_companies_closure_ancestor"`);
+    await queryRunner.query(
+      `ALTER TABLE "departments" DROP CONSTRAINT IF EXISTS "FK_departments_company"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_billing" DROP CONSTRAINT IF EXISTS "FK_company_billing_customer_success_manager"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_billing" DROP CONSTRAINT IF EXISTS "FK_company_billing_account_manager"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_billing" DROP CONSTRAINT IF EXISTS "FK_company_billing_company"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_published_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_approved_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_generated_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "consolidated_reports" DROP CONSTRAINT IF EXISTS "FK_consolidated_reports_parent_company"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_approval_instance"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_received_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_shipped_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_approved_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_requested_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_to"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inter_company_transfers" DROP CONSTRAINT IF EXISTS "FK_inter_company_transfers_from"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_manager"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_contact_to"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_contact_from"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_to"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "company_relationships" DROP CONSTRAINT IF EXISTS "FK_company_relationships_from"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_hr_manager"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_finance_manager"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_ceo"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies" DROP CONSTRAINT IF EXISTS "FK_companies_parent"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies_closure" DROP CONSTRAINT IF EXISTS "FK_companies_closure_descendant"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "companies_closure" DROP CONSTRAINT IF EXISTS "FK_companies_closure_ancestor"`,
+    );
 
     // Remove company_id column from departments
-    await queryRunner.query(`ALTER TABLE "departments" DROP COLUMN IF EXISTS "company_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "departments" DROP COLUMN IF EXISTS "company_id"`,
+    );
 
     // Drop tables in reverse order
     await queryRunner.query(`DROP TABLE "company_billing"`);

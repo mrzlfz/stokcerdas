@@ -8,10 +8,17 @@ import { ConfigService } from '@nestjs/config';
 import * as moment from 'moment-timezone';
 
 import { MLModel, ModelStatus, ModelType } from '../entities/ml-model.entity';
-import { TrainingJob, JobStatus, TrainingJobType } from '../entities/training-job.entity';
+import {
+  TrainingJob,
+  JobStatus,
+  TrainingJobType,
+} from '../entities/training-job.entity';
 import { Prediction } from '../entities/prediction.entity';
 import { ModelTrainingService } from './model-training.service';
-import { AccuracyTrackingService, RetrainingTrigger } from './accuracy-tracking.service';
+import {
+  AccuracyTrackingService,
+  RetrainingTrigger,
+} from './accuracy-tracking.service';
 
 export interface RetrainingSchedule {
   modelId: string;
@@ -57,16 +64,16 @@ export class ModelRetrainingService {
   constructor(
     @InjectRepository(MLModel)
     private mlModelRepo: Repository<MLModel>,
-    
+
     @InjectRepository(TrainingJob)
     private trainingJobRepo: Repository<TrainingJob>,
-    
+
     @InjectRepository(Prediction)
     private predictionRepo: Repository<Prediction>,
-    
+
     @InjectQueue('ml-training')
     private trainingQueue: Queue,
-    
+
     private modelTrainingService: ModelTrainingService,
     private accuracyTrackingService: AccuracyTrackingService,
     private configService: ConfigService,
@@ -84,7 +91,9 @@ export class ModelRetrainingService {
     trigger: RetrainingTrigger;
     timestamp: Date;
   }): Promise<void> {
-    this.logger.log(`Handling retraining trigger for model ${event.trigger.modelId}`);
+    this.logger.log(
+      `Handling retraining trigger for model ${event.trigger.modelId}`,
+    );
 
     try {
       const model = await this.mlModelRepo.findOne({
@@ -97,19 +106,29 @@ export class ModelRetrainingService {
       }
 
       // Get retraining policy for this tenant/model type
-      const policy = await this.getRetrainingPolicy(event.tenantId, model.modelType);
+      const policy = await this.getRetrainingPolicy(
+        event.tenantId,
+        model.modelType,
+      );
 
       // Check if retraining should be scheduled
-      const shouldSchedule = await this.shouldScheduleRetraining(event.trigger, policy);
+      const shouldSchedule = await this.shouldScheduleRetraining(
+        event.trigger,
+        policy,
+      );
 
       if (shouldSchedule) {
         await this.scheduleRetraining(event.tenantId, event.trigger, policy);
       } else {
-        this.logger.log(`Retraining trigger ignored for model ${event.trigger.modelId} due to policy restrictions`);
+        this.logger.log(
+          `Retraining trigger ignored for model ${event.trigger.modelId} due to policy restrictions`,
+        );
       }
-
     } catch (error) {
-      this.logger.error(`Failed to handle retraining trigger: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to handle retraining trigger: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -119,7 +138,7 @@ export class ModelRetrainingService {
   async scheduleRetraining(
     tenantId: string,
     trigger: RetrainingTrigger,
-    policy: RetrainingPolicy
+    policy: RetrainingPolicy,
   ): Promise<RetrainingSchedule> {
     this.logger.log(`Scheduling retraining for model ${trigger.modelId}`);
 
@@ -135,10 +154,14 @@ export class ModelRetrainingService {
     const scheduledAt = this.calculateScheduledTime(policy, trigger.priority);
 
     // Estimate resource requirements
-    const resourceRequirements = this.estimateResourceRequirements(model.modelType, trigger.priority);
+    const resourceRequirements = this.estimateResourceRequirements(
+      model.modelType,
+      trigger.priority,
+    );
 
     // Check if approval is required
-    const requiresApproval = policy.approval.requiresApproval && 
+    const requiresApproval =
+      policy.approval.requiresApproval &&
       trigger.triggerValue < policy.approval.autoApproveThreshold;
 
     const schedule: RetrainingSchedule = {
@@ -173,7 +196,11 @@ export class ModelRetrainingService {
       await this.sendApprovalNotification(tenantId, schedule, trigger);
     }
 
-    this.logger.log(`Retraining scheduled for model ${trigger.modelId} at ${scheduledAt.toISOString()}`);
+    this.logger.log(
+      `Retraining scheduled for model ${
+        trigger.modelId
+      } at ${scheduledAt.toISOString()}`,
+    );
     return schedule;
   }
 
@@ -183,7 +210,7 @@ export class ModelRetrainingService {
   async executeRetraining(
     tenantId: string,
     modelId: string,
-    approvedBy?: string
+    approvedBy?: string,
   ): Promise<string> {
     this.logger.log(`Executing retraining for model ${modelId}`);
 
@@ -208,7 +235,9 @@ export class ModelRetrainingService {
     trainingJob.priority = schedule.priority;
     trainingJob.trainingConfig = {
       dataSource: {
-        from: model.trainingConfig?.trainingDataFrom || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        from:
+          model.trainingConfig?.trainingDataFrom ||
+          new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
         to: new Date().toISOString(),
       },
       validation: {
@@ -220,7 +249,7 @@ export class ModelRetrainingService {
       target: model.trainingConfig?.target || 'quantity',
     };
     trainingJob.estimatedDuration = schedule.estimatedDuration;
-    
+
     trainingJob.start();
     const savedJob = await this.trainingJobRepo.save(trainingJob);
 
@@ -236,20 +265,26 @@ export class ModelRetrainingService {
     await this.mlModelRepo.save(model);
 
     // Add to training queue
-    await this.trainingQueue.add('retrain-model', {
-      tenantId,
-      modelId,
-      jobId: savedJob.id,
-      trainingConfig: trainingJob.trainingConfig,
-    }, {
-      priority: this.getPriorityScore(schedule.priority),
-      delay: Math.max(0, schedule.scheduledAt.getTime() - Date.now()),
-    });
+    await this.trainingQueue.add(
+      'retrain-model',
+      {
+        tenantId,
+        modelId,
+        jobId: savedJob.id,
+        trainingConfig: trainingJob.trainingConfig,
+      },
+      {
+        priority: this.getPriorityScore(schedule.priority),
+        delay: Math.max(0, schedule.scheduledAt.getTime() - Date.now()),
+      },
+    );
 
     // Remove from schedule
     this.retrainingSchedule.delete(modelId);
 
-    this.logger.log(`Retraining started for model ${modelId} with job ${savedJob.id}`);
+    this.logger.log(
+      `Retraining started for model ${modelId} with job ${savedJob.id}`,
+    );
     return savedJob.id;
   }
 
@@ -260,7 +295,7 @@ export class ModelRetrainingService {
     tenantId: string,
     modelId: string,
     canceledBy: string,
-    reason: string
+    reason: string,
   ): Promise<void> {
     this.logger.log(`Canceling retraining for model ${modelId}`);
 
@@ -273,7 +308,9 @@ export class ModelRetrainingService {
     this.retrainingSchedule.delete(modelId);
 
     // Update model metadata
-    const model = await this.mlModelRepo.findOne({ where: { id: modelId, tenantId } });
+    const model = await this.mlModelRepo.findOne({
+      where: { id: modelId, tenantId },
+    });
     if (model) {
       model.metadata = {
         ...model.metadata,
@@ -286,13 +323,18 @@ export class ModelRetrainingService {
       await this.mlModelRepo.save(model);
     }
 
-    this.logger.log(`Retraining canceled for model ${modelId} by ${canceledBy}: ${reason}`);
+    this.logger.log(
+      `Retraining canceled for model ${modelId} by ${canceledBy}: ${reason}`,
+    );
   }
 
   /**
    * Get retraining status for a model
    */
-  async getRetrainingStatus(tenantId: string, modelId: string): Promise<{
+  async getRetrainingStatus(
+    tenantId: string,
+    modelId: string,
+  ): Promise<{
     isScheduled: boolean;
     schedule?: RetrainingSchedule;
     inProgress: boolean;
@@ -309,14 +351,14 @@ export class ModelRetrainingService {
     }
 
     const inProgress = model.status === ModelStatus.TRAINING;
-    const lastRetraining = model.metadata?.lastRetrainingAt 
-      ? new Date(model.metadata.lastRetrainingAt) 
+    const lastRetraining = model.metadata?.lastRetrainingAt
+      ? new Date(model.metadata.lastRetrainingAt)
       : undefined;
 
     // Check for time-based next retraining
     const policy = await this.getRetrainingPolicy(tenantId, model.modelType);
     let nextScheduled: Date | undefined;
-    
+
     if (policy.triggers.timeBasedInterval > 0 && lastRetraining) {
       nextScheduled = moment(lastRetraining)
         .add(policy.triggers.timeBasedInterval, 'days')
@@ -335,7 +377,9 @@ export class ModelRetrainingService {
   /**
    * List all scheduled retrainings for a tenant
    */
-  async listScheduledRetrainings(tenantId: string): Promise<RetrainingSchedule[]> {
+  async listScheduledRetrainings(
+    tenantId: string,
+  ): Promise<RetrainingSchedule[]> {
     return Array.from(this.retrainingSchedule.values())
       .filter(schedule => schedule.tenantId === tenantId)
       .sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime());
@@ -348,15 +392,20 @@ export class ModelRetrainingService {
     this.logger.debug('Processing scheduled retrainings');
 
     const now = new Date();
-    const dueSchedules = Array.from(this.retrainingSchedule.values())
-      .filter(schedule => schedule.scheduledAt <= now && schedule.autoExecute);
+    const dueSchedules = Array.from(this.retrainingSchedule.values()).filter(
+      schedule => schedule.scheduledAt <= now && schedule.autoExecute,
+    );
 
     for (const schedule of dueSchedules) {
       try {
         await this.executeRetraining(schedule.tenantId, schedule.modelId);
-        this.logger.log(`Executed scheduled retraining for model ${schedule.modelId}`);
+        this.logger.log(
+          `Executed scheduled retraining for model ${schedule.modelId}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to execute scheduled retraining for model ${schedule.modelId}: ${error.message}`);
+        this.logger.error(
+          `Failed to execute scheduled retraining for model ${schedule.modelId}: ${error.message}`,
+        );
       }
     }
   }
@@ -369,7 +418,10 @@ export class ModelRetrainingService {
     this.logger.log('Retraining schedules initialized');
   }
 
-  private async getRetrainingPolicy(tenantId: string, modelType: ModelType): Promise<RetrainingPolicy> {
+  private async getRetrainingPolicy(
+    tenantId: string,
+    modelType: ModelType,
+  ): Promise<RetrainingPolicy> {
     // Get policy from database or configuration
     // For now, return default policy
     return {
@@ -396,7 +448,7 @@ export class ModelRetrainingService {
 
   private async shouldScheduleRetraining(
     trigger: RetrainingTrigger,
-    policy: RetrainingPolicy
+    policy: RetrainingPolicy,
   ): Promise<boolean> {
     // Check if trigger value exceeds policy thresholds
     switch (trigger.triggerType) {
@@ -413,7 +465,10 @@ export class ModelRetrainingService {
     }
   }
 
-  private calculateScheduledTime(policy: RetrainingPolicy, priority: string): Date {
+  private calculateScheduledTime(
+    policy: RetrainingPolicy,
+    priority: string,
+  ): Date {
     const now = moment();
     let scheduledTime = now.clone();
 
@@ -421,9 +476,10 @@ export class ModelRetrainingService {
     if (priority === 'critical') {
       if (!policy.schedule.allowedHours.includes(now.hour())) {
         // Find next allowed hour
-        const nextAllowedHour = policy.schedule.allowedHours.find(hour => hour > now.hour()) ||
+        const nextAllowedHour =
+          policy.schedule.allowedHours.find(hour => hour > now.hour()) ||
           policy.schedule.allowedHours[0];
-        
+
         if (nextAllowedHour > now.hour()) {
           scheduledTime.hour(nextAllowedHour).minute(0).second(0);
         } else {
@@ -433,30 +489,39 @@ export class ModelRetrainingService {
     } else {
       // For other priorities, schedule for next allowed time window
       let foundSlot = false;
-      
-      for (let i = 0; i < 7 && !foundSlot; i++) { // Check next 7 days
+
+      for (let i = 0; i < 7 && !foundSlot; i++) {
+        // Check next 7 days
         const checkDate = now.clone().add(i, 'days');
-        
+
         if (policy.schedule.allowedDays.includes(checkDate.day())) {
           const allowedHour = policy.schedule.allowedHours[0]; // Use first allowed hour
           scheduledTime = checkDate.hour(allowedHour).minute(0).second(0);
-          
+
           if (scheduledTime.isAfter(now)) {
             foundSlot = true;
           }
         }
       }
-      
+
       if (!foundSlot) {
         // Fallback to tomorrow at first allowed hour
-        scheduledTime = now.clone().add(1, 'day').hour(policy.schedule.allowedHours[0]).minute(0).second(0);
+        scheduledTime = now
+          .clone()
+          .add(1, 'day')
+          .hour(policy.schedule.allowedHours[0])
+          .minute(0)
+          .second(0);
       }
     }
 
     return scheduledTime.toDate();
   }
 
-  private estimateResourceRequirements(modelType: ModelType, priority: string): {
+  private estimateResourceRequirements(
+    modelType: ModelType,
+    priority: string,
+  ): {
     cpu: string;
     memory: string;
     estimatedCost: number;
@@ -466,11 +531,17 @@ export class ModelRetrainingService {
       [ModelType.PROPHET]: { cpu: '4 cores', memory: '8GB', cost: 20 },
       [ModelType.XGBOOST]: { cpu: '8 cores', memory: '16GB', cost: 40 },
       [ModelType.LINEAR_REGRESSION]: { cpu: '1 core', memory: '2GB', cost: 5 },
-      [ModelType.EXPONENTIAL_SMOOTHING]: { cpu: '1 core', memory: '2GB', cost: 5 },
+      [ModelType.EXPONENTIAL_SMOOTHING]: {
+        cpu: '1 core',
+        memory: '2GB',
+        cost: 5,
+      },
       [ModelType.ENSEMBLE]: { cpu: '16 cores', memory: '32GB', cost: 80 },
     };
 
-    const base = baseRequirements[modelType] || baseRequirements[ModelType.LINEAR_REGRESSION];
+    const base =
+      baseRequirements[modelType] ||
+      baseRequirements[ModelType.LINEAR_REGRESSION];
     const priorityMultiplier = priority === 'critical' ? 1.5 : 1;
 
     return {
@@ -494,26 +565,32 @@ export class ModelRetrainingService {
     return durations[modelType] || 60;
   }
 
-  private async queueRetrainingJob(schedule: RetrainingSchedule): Promise<void> {
+  private async queueRetrainingJob(
+    schedule: RetrainingSchedule,
+  ): Promise<void> {
     const delay = Math.max(0, schedule.scheduledAt.getTime() - Date.now());
-    
-    await this.trainingQueue.add('retrain-model', {
-      tenantId: schedule.tenantId,
-      modelId: schedule.modelId,
-      triggerType: schedule.triggerType,
-      priority: schedule.priority,
-    }, {
-      priority: this.getPriorityScore(schedule.priority),
-      delay,
-    });
+
+    await this.trainingQueue.add(
+      'retrain-model',
+      {
+        tenantId: schedule.tenantId,
+        modelId: schedule.modelId,
+        triggerType: schedule.triggerType,
+        priority: schedule.priority,
+      },
+      {
+        priority: this.getPriorityScore(schedule.priority),
+        delay,
+      },
+    );
   }
 
   private getPriorityScore(priority: string): number {
     const scores = {
-      'critical': 1,
-      'high': 2,
-      'medium': 3,
-      'low': 4,
+      critical: 1,
+      high: 2,
+      medium: 3,
+      low: 4,
     };
     return scores[priority] || 3;
   }
@@ -521,10 +598,12 @@ export class ModelRetrainingService {
   private async sendApprovalNotification(
     tenantId: string,
     schedule: RetrainingSchedule,
-    trigger: RetrainingTrigger
+    trigger: RetrainingTrigger,
   ): Promise<void> {
     // This would send notifications to approvers
     // Implementation would depend on notification system
-    this.logger.log(`Approval notification sent for model ${schedule.modelId} retraining`);
+    this.logger.log(
+      `Approval notification sent for model ${schedule.modelId} retraining`,
+    );
   }
 }

@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuickBooksApiService, QuickBooksCredentials, QuickBooksInvoice, QuickBooksCustomer } from './quickbooks-api.service';
+import {
+  QuickBooksApiService,
+  QuickBooksCredentials,
+  QuickBooksInvoice,
+  QuickBooksCustomer,
+} from './quickbooks-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { AccountingAccount } from '../../entities/accounting-account.entity';
 import { Order } from '../../../orders/entities/order.entity';
@@ -100,7 +105,8 @@ export class QuickBooksInvoiceService {
         accessToken: accountingAccount.accessToken!,
         refreshToken: accountingAccount.refreshToken!,
         realmId: accountingAccount.platformConfig?.realmId!,
-        environment: accountingAccount.platformConfig?.environment || 'production',
+        environment:
+          accountingAccount.platformConfig?.environment || 'production',
         expiresAt: accountingAccount.tokenExpiresAt,
       };
 
@@ -114,8 +120,14 @@ export class QuickBooksInvoiceService {
         throw new Error('Order not found');
       }
 
-      if (order.status !== 'confirmed' && order.status !== 'processing' && order.status !== 'shipped') {
-        throw new Error('Order status must be confirmed, processing, or shipped to generate invoice');
+      if (
+        order.status !== 'confirmed' &&
+        order.status !== 'processing' &&
+        order.status !== 'shipped'
+      ) {
+        throw new Error(
+          'Order status must be confirmed, processing, or shipped to generate invoice',
+        );
       }
 
       // Ensure customer exists in QuickBooks
@@ -125,7 +137,7 @@ export class QuickBooksInvoiceService {
         email: order.customerEmail,
         phone: order.customerPhone,
         company: order.customerInfo?.username || '',
-        address: order.shippingAddress || order.billingAddress
+        address: order.shippingAddress || order.billingAddress,
       };
       const quickBooksCustomerId = await this.ensureCustomerExists(
         credentials,
@@ -150,7 +162,9 @@ export class QuickBooksInvoiceService {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to create QuickBooks invoice: ${response.error?.message}`);
+        throw new Error(
+          `Failed to create QuickBooks invoice: ${response.error?.message}`,
+        );
       }
 
       const createdInvoice = response.data?.Invoice!;
@@ -171,7 +185,9 @@ export class QuickBooksInvoiceService {
             pdfUrl = `https://storage.stokcerdas.com/invoices/${createdInvoice.Id}.pdf`;
           }
         } catch (error) {
-          this.logger.warn(`Failed to generate PDF for invoice ${createdInvoice.Id}: ${error.message}`);
+          this.logger.warn(
+            `Failed to generate PDF for invoice ${createdInvoice.Id}: ${error.message}`,
+          );
         }
       }
 
@@ -180,7 +196,7 @@ export class QuickBooksInvoiceService {
         ...order.externalData,
         quickbooksInvoiceId: createdInvoice.Id,
         quickbooksInvoiceNumber: createdInvoice.DocNumber,
-        lastSyncAt: new Date().toISOString()
+        lastSyncAt: new Date().toISOString(),
       };
       await this.orderRepository.update(orderId, {
         externalData: updatedExternalData,
@@ -199,12 +215,15 @@ export class QuickBooksInvoiceService {
         pdfUrl,
       };
 
-      this.logger.log(`Successfully generated QuickBooks invoice ${createdInvoice.Id} for order ${orderId}`);
+      this.logger.log(
+        `Successfully generated QuickBooks invoice ${createdInvoice.Id} for order ${orderId}`,
+      );
 
       return generatedInvoice;
-
     } catch (error) {
-      this.logger.error(`Failed to generate QuickBooks invoice for order ${orderId}: ${error.message}`);
+      this.logger.error(
+        `Failed to generate QuickBooks invoice for order ${orderId}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -218,7 +237,9 @@ export class QuickBooksInvoiceService {
     tenantId: string,
     options: InvoiceGenerationOptions = {},
   ): Promise<InvoiceBatch> {
-    const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const batchId = `batch_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     const startTime = new Date();
 
     const batch: InvoiceBatch = {
@@ -232,7 +253,9 @@ export class QuickBooksInvoiceService {
       startTime,
     };
 
-    this.logger.log(`Starting invoice batch generation for ${orderIds.length} orders`);
+    this.logger.log(
+      `Starting invoice batch generation for ${orderIds.length} orders`,
+    );
 
     for (const orderId of orderIds) {
       try {
@@ -245,11 +268,12 @@ export class QuickBooksInvoiceService {
 
         batch.invoices.push(invoice);
         batch.successfulInvoices++;
-
       } catch (error) {
         batch.failedInvoices++;
         batch.errors.push(`Order ${orderId}: ${error.message}`);
-        this.logger.error(`Failed to generate invoice for order ${orderId}: ${error.message}`);
+        this.logger.error(
+          `Failed to generate invoice for order ${orderId}: ${error.message}`,
+        );
       }
 
       batch.processedOrders++;
@@ -261,7 +285,9 @@ export class QuickBooksInvoiceService {
     batch.endTime = new Date();
     batch.duration = batch.endTime.getTime() - startTime.getTime();
 
-    this.logger.log(`Invoice batch generation completed: ${batch.successfulInvoices}/${batch.totalOrders} successful`);
+    this.logger.log(
+      `Invoice batch generation completed: ${batch.successfulInvoices}/${batch.totalOrders} successful`,
+    );
 
     return batch;
   }
@@ -294,7 +320,8 @@ export class QuickBooksInvoiceService {
       accessToken: accountingAccount.accessToken!,
       refreshToken: accountingAccount.refreshToken!,
       realmId: accountingAccount.platformConfig?.realmId!,
-      environment: accountingAccount.platformConfig?.environment || 'production',
+      environment:
+        accountingAccount.platformConfig?.environment || 'production',
       expiresAt: accountingAccount.tokenExpiresAt,
     };
 
@@ -310,7 +337,9 @@ export class QuickBooksInvoiceService {
     );
 
     if (!response.success) {
-      throw new Error(`Failed to fetch invoice status: ${response.error?.message}`);
+      throw new Error(
+        `Failed to fetch invoice status: ${response.error?.message}`,
+      );
     }
 
     const invoice = response.data?.Invoice;
@@ -359,16 +388,22 @@ export class QuickBooksInvoiceService {
     channelId: string,
   ): Promise<string> {
     // Check if customer already mapped to QuickBooks
-    const existingMapping = await this.getCustomerMapping(customer.id, tenantId);
-    
+    const existingMapping = await this.getCustomerMapping(
+      customer.id,
+      tenantId,
+    );
+
     if (existingMapping) {
       return existingMapping.quickBooksCustomerId;
     }
 
     // Search for customer by email or name in QuickBooks
-    const searchQuery = customer.email 
+    const searchQuery = customer.email
       ? `SELECT * FROM Customer WHERE PrimaryEmailAddr = '${customer.email}'`
-      : `SELECT * FROM Customer WHERE Name = '${customer.name.replace(/'/g, "\\'")}'`;
+      : `SELECT * FROM Customer WHERE Name = '${customer.name.replace(
+          /'/g,
+          "\\'",
+        )}'`;
 
     const searchResponse = await this.quickBooksApiService.queryCustomers(
       credentials,
@@ -377,12 +412,20 @@ export class QuickBooksInvoiceService {
       channelId,
     );
 
-    if (searchResponse.success && searchResponse.data?.QueryResponse?.Customer?.length > 0) {
+    if (
+      searchResponse.success &&
+      searchResponse.data?.QueryResponse?.Customer?.length > 0
+    ) {
       const existingCustomer = searchResponse.data.QueryResponse.Customer[0];
-      
+
       // Save mapping
-      await this.saveCustomerMapping(customer.id, existingCustomer.Id!, customer.name, tenantId);
-      
+      await this.saveCustomerMapping(
+        customer.id,
+        existingCustomer.Id!,
+        customer.name,
+        tenantId,
+      );
+
       return existingCustomer.Id!;
     }
 
@@ -390,15 +433,21 @@ export class QuickBooksInvoiceService {
     const quickBooksCustomer: QuickBooksCustomer = {
       Name: customer.name,
       CompanyName: customer.company,
-      PrimaryEmailAddr: customer.email ? { Address: customer.email } : undefined,
-      PrimaryPhone: customer.phone ? { FreeFormNumber: customer.phone } : undefined,
-      BillAddr: customer.address ? {
-        Line1: customer.address.address || '',
-        City: customer.address.city || '',
-        Country: customer.address.country || 'Indonesia',
-        CountrySubDivisionCode: customer.address.state || '',
-        PostalCode: customer.address.postalCode || '',
-      } : undefined,
+      PrimaryEmailAddr: customer.email
+        ? { Address: customer.email }
+        : undefined,
+      PrimaryPhone: customer.phone
+        ? { FreeFormNumber: customer.phone }
+        : undefined,
+      BillAddr: customer.address
+        ? {
+            Line1: customer.address.address || '',
+            City: customer.address.city || '',
+            Country: customer.address.country || 'Indonesia',
+            CountrySubDivisionCode: customer.address.state || '',
+            PostalCode: customer.address.postalCode || '',
+          }
+        : undefined,
       Taxable: true,
       CurrencyRef: { value: 'IDR', name: 'Indonesian Rupiah' },
     };
@@ -411,13 +460,20 @@ export class QuickBooksInvoiceService {
     );
 
     if (!createResponse.success) {
-      throw new Error(`Failed to create QuickBooks customer: ${createResponse.error?.message}`);
+      throw new Error(
+        `Failed to create QuickBooks customer: ${createResponse.error?.message}`,
+      );
     }
 
     const createdCustomer = createResponse.data?.Customer!;
-    
+
     // Save mapping
-    await this.saveCustomerMapping(customer.id, createdCustomer.Id!, customer.name, tenantId);
+    await this.saveCustomerMapping(
+      customer.id,
+      createdCustomer.Id!,
+      customer.name,
+      tenantId,
+    );
 
     return createdCustomer.Id!;
   }
@@ -436,8 +492,11 @@ export class QuickBooksInvoiceService {
         name: order.customerName,
       },
       TxnDate: order.orderDate.toISOString().split('T')[0],
-      DueDate: options.dueDate?.toISOString().split('T')[0] || 
-                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+      DueDate:
+        options.dueDate?.toISOString().split('T')[0] ||
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split('T')[0], // 30 days from now
       DocNumber: options.invoiceNumber || order.orderNumber,
       PrivateNote: `Generated from StokCerdas order ${order.orderNumber}`,
       Line: [],
@@ -483,14 +542,19 @@ export class QuickBooksInvoiceService {
         SalesItemLineDetail: {
           Qty: item.quantity,
           UnitPrice: item.unitPrice,
-          TaxCodeRef: options.defaultTaxCode ? {
-            value: options.defaultTaxCode,
-          } : undefined,
+          TaxCodeRef: options.defaultTaxCode
+            ? {
+                value: options.defaultTaxCode,
+              }
+            : undefined,
         } as any,
       };
 
       // Try to map to QuickBooks item
-      const quickBooksItemId = await this.getQuickBooksItemId(item.productId, order.tenantId);
+      const quickBooksItemId = await this.getQuickBooksItemId(
+        item.productId,
+        order.tenantId,
+      );
       if (quickBooksItemId) {
         lineItem.SalesItemLineDetail = {
           ...lineItem.SalesItemLineDetail,
@@ -506,7 +570,11 @@ export class QuickBooksInvoiceService {
     }
 
     // Add shipping if enabled
-    if (options.includeShipping && order.shippingAmount && order.shippingAmount > 0) {
+    if (
+      options.includeShipping &&
+      order.shippingAmount &&
+      order.shippingAmount > 0
+    ) {
       invoice.Line!.push({
         Id: lineNum.toString(),
         LineNum: lineNum,
@@ -522,7 +590,11 @@ export class QuickBooksInvoiceService {
     }
 
     // Add discount if enabled
-    if (options.includeDiscounts && order.discountAmount && order.discountAmount > 0) {
+    if (
+      options.includeDiscounts &&
+      order.discountAmount &&
+      order.discountAmount > 0
+    ) {
       invoice.Line!.push({
         Id: lineNum.toString(),
         LineNum: lineNum,
@@ -553,14 +625,17 @@ export class QuickBooksInvoiceService {
    */
   private calculateTaxAmount(invoice: QuickBooksInvoice): number {
     if (!invoice.Line) return 0;
-    
-    return invoice.Line
-      .filter(line => line.DetailType === 'TaxLineDetail')
-      .reduce((sum, line) => sum + (line.Amount || 0), 0);
+
+    return invoice.Line.filter(
+      line => line.DetailType === 'TaxLineDetail',
+    ).reduce((sum, line) => sum + (line.Amount || 0), 0);
   }
 
   // Helper methods for customer mapping
-  private async getCustomerMapping(customerId: string, tenantId: string): Promise<CustomerMapping | null> {
+  private async getCustomerMapping(
+    customerId: string,
+    tenantId: string,
+  ): Promise<CustomerMapping | null> {
     // This would typically be stored in a separate mapping table
     // For now, we'll use a simple implementation
     return null;
@@ -576,7 +651,10 @@ export class QuickBooksInvoiceService {
     // Implementation would depend on your mapping table structure
   }
 
-  private async getQuickBooksItemId(productId: string, tenantId: string): Promise<string | null> {
+  private async getQuickBooksItemId(
+    productId: string,
+    tenantId: string,
+  ): Promise<string | null> {
     // Get QuickBooks item ID from sync status or mapping table
     // This would typically query the sync_status table
     return null;

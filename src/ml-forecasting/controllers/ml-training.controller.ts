@@ -21,7 +21,17 @@ import {
   ApiParam,
   ApiProperty,
 } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsArray, IsObject, IsNumber, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  IsArray,
+  IsObject,
+  IsNumber,
+  Min,
+  Max,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -31,7 +41,10 @@ import { GetTenant } from '../../common/decorators/tenant.decorator';
 import { GetUser } from '../../common/decorators/user.decorator';
 import { UserRole } from '../../users/entities/user.entity';
 
-import { ModelTrainingService, TrainingRequest } from '../services/model-training.service';
+import {
+  ModelTrainingService,
+  TrainingRequest,
+} from '../services/model-training.service';
 import { ModelType } from '../entities/ml-model.entity';
 
 // DTOs
@@ -44,17 +57,23 @@ class StartTrainingDto {
   @IsEnum(ModelType)
   modelType: ModelType;
 
-  @ApiProperty({ description: 'Product ID for product-specific models (optional)' })
+  @ApiProperty({
+    description: 'Product ID for product-specific models (optional)',
+  })
   @IsOptional()
   @IsString()
   productId?: string;
 
-  @ApiProperty({ description: 'Category ID for category-level models (optional)' })
+  @ApiProperty({
+    description: 'Category ID for category-level models (optional)',
+  })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiProperty({ description: 'Location ID for location-specific models (optional)' })
+  @ApiProperty({
+    description: 'Location ID for location-specific models (optional)',
+  })
   @IsOptional()
   @IsString()
   locationId?: string;
@@ -73,13 +92,17 @@ class StartTrainingDto {
   @IsString({ each: true })
   productIds?: string[];
 
-  @ApiProperty({ description: 'Category IDs to include in training (optional)' })
+  @ApiProperty({
+    description: 'Category IDs to include in training (optional)',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   categoryIds?: string[];
 
-  @ApiProperty({ description: 'Location IDs to include in training (optional)' })
+  @ApiProperty({
+    description: 'Location IDs to include in training (optional)',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -164,16 +187,15 @@ class TrainingJobQueryDto {
 @Controller('api/v1/ml/training')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MLTrainingController {
-  constructor(
-    private readonly modelTrainingService: ModelTrainingService,
-  ) {}
+  constructor(private readonly modelTrainingService: ModelTrainingService) {}
 
   @Post('start')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Start Model Training',
-    description: 'Start training a new machine learning model for demand forecasting',
+    description:
+      'Start training a new machine learning model for demand forecasting',
   })
   @ApiResponse({
     status: 202,
@@ -213,13 +235,17 @@ export class MLTrainingController {
     // Validate training configuration
     const trainingFrom = new Date(trainingDto.trainingDataFrom);
     const trainingTo = new Date(trainingDto.trainingDataTo);
-    
+
     if (trainingFrom >= trainingTo) {
-      throw new BadRequestException('Training start date must be before end date');
+      throw new BadRequestException(
+        'Training start date must be before end date',
+      );
     }
 
     // Check if enough training data timespan
-    const daysDiff = Math.ceil((trainingTo.getTime() - trainingFrom.getTime()) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.ceil(
+      (trainingTo.getTime() - trainingFrom.getTime()) / (1000 * 60 * 60 * 24),
+    );
     if (daysDiff < 30) {
       throw new BadRequestException('Training data must span at least 30 days');
     }
@@ -249,7 +275,10 @@ export class MLTrainingController {
       userId,
     };
 
-    const result = await this.modelTrainingService.startTraining(tenantId, trainingRequest);
+    const result = await this.modelTrainingService.startTraining(
+      tenantId,
+      trainingRequest,
+    );
 
     if (!result.success) {
       throw new BadRequestException(result.error);
@@ -259,7 +288,8 @@ export class MLTrainingController {
       success: true,
       modelId: result.modelId,
       jobId: result.jobId,
-      message: 'Model training started successfully. Check job status for progress.',
+      message:
+        'Model training started successfully. Check job status for progress.',
     };
   }
 
@@ -297,7 +327,9 @@ export class MLTrainingController {
   }> {
     // This would implement retraining logic
     // For now, return a placeholder response
-    throw new BadRequestException('Retraining functionality will be implemented in Phase 2');
+    throw new BadRequestException(
+      'Retraining functionality will be implemented in Phase 2',
+    );
   }
 
   @Get('jobs')
@@ -452,7 +484,9 @@ export class MLTrainingController {
   }> {
     // This would implement job cancellation logic
     // For now, return a placeholder response
-    throw new BadRequestException('Job cancellation functionality will be implemented in Phase 2');
+    throw new BadRequestException(
+      'Job cancellation functionality will be implemented in Phase 2',
+    );
   }
 
   @Get('models')
@@ -586,7 +620,9 @@ export class MLTrainingController {
   }> {
     // This would implement model deployment logic
     // For now, return a placeholder response
-    throw new BadRequestException('Model deployment functionality will be implemented in Phase 2');
+    throw new BadRequestException(
+      'Model deployment functionality will be implemented in Phase 2',
+    );
   }
 
   @Post('models/:modelId/deprecate')
@@ -618,6 +654,8 @@ export class MLTrainingController {
   }> {
     // This would implement model deprecation logic
     // For now, return a placeholder response
-    throw new BadRequestException('Model deprecation functionality will be implemented in Phase 2');
+    throw new BadRequestException(
+      'Model deprecation functionality will be implemented in Phase 2',
+    );
   }
 }

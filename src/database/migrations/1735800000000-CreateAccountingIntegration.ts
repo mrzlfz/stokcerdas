@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateAccountingIntegration1735800000000 implements MigrationInterface {
+export class CreateAccountingIntegration1735800000000
+  implements MigrationInterface
+{
   name = 'CreateAccountingIntegration1735800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -90,11 +92,21 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
     `);
 
     // Create indexes for accounting_accounts
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_accounts_tenant_platform" ON "accounting_accounts" ("tenant_id", "platform")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_accounts_tenant_status" ON "accounting_accounts" ("tenant_id", "status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_accounts_company_id" ON "accounting_accounts" ("company_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_accounts_sync_schedule" ON "accounting_accounts" ("next_sync_at") WHERE "auto_sync_enabled" = true`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_accounts_health_score" ON "accounting_accounts" ("connection_health_score")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_accounts_tenant_platform" ON "accounting_accounts" ("tenant_id", "platform")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_accounts_tenant_status" ON "accounting_accounts" ("tenant_id", "status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_accounts_company_id" ON "accounting_accounts" ("company_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_accounts_sync_schedule" ON "accounting_accounts" ("next_sync_at") WHERE "auto_sync_enabled" = true`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_accounts_health_score" ON "accounting_accounts" ("connection_health_score")`,
+    );
 
     // Add foreign key constraint to channels table if it exists
     await queryRunner.query(`
@@ -126,11 +138,21 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_entity_mappings_tenant" ON "accounting_entity_mappings" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_entity_mappings_account" ON "accounting_entity_mappings" ("accounting_account_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_entity_mappings_internal" ON "accounting_entity_mappings" ("internal_entity_type", "internal_entity_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_entity_mappings_external" ON "accounting_entity_mappings" ("external_entity_type", "external_entity_id")`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_accounting_entity_mappings_unique" ON "accounting_entity_mappings" ("tenant_id", "accounting_account_id", "internal_entity_type", "internal_entity_id", "external_entity_type")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_entity_mappings_tenant" ON "accounting_entity_mappings" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_entity_mappings_account" ON "accounting_entity_mappings" ("accounting_account_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_entity_mappings_internal" ON "accounting_entity_mappings" ("internal_entity_type", "internal_entity_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_entity_mappings_external" ON "accounting_entity_mappings" ("external_entity_type", "external_entity_id")`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_accounting_entity_mappings_unique" ON "accounting_entity_mappings" ("tenant_id", "accounting_account_id", "internal_entity_type", "internal_entity_id", "external_entity_type")`,
+    );
 
     // Create table for storing accounting sync jobs
     await queryRunner.query(`
@@ -159,12 +181,24 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_sync_jobs_tenant" ON "accounting_sync_jobs" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_sync_jobs_account" ON "accounting_sync_jobs" ("accounting_account_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_sync_jobs_status" ON "accounting_sync_jobs" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_sync_jobs_scheduled" ON "accounting_sync_jobs" ("scheduled_at") WHERE "status" = 'pending'`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_sync_jobs_type" ON "accounting_sync_jobs" ("job_type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_accounting_sync_jobs_parent" ON "accounting_sync_jobs" ("parent_job_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_sync_jobs_tenant" ON "accounting_sync_jobs" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_sync_jobs_account" ON "accounting_sync_jobs" ("accounting_account_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_sync_jobs_status" ON "accounting_sync_jobs" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_sync_jobs_scheduled" ON "accounting_sync_jobs" ("scheduled_at") WHERE "status" = 'pending'`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_sync_jobs_type" ON "accounting_sync_jobs" ("job_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_accounting_sync_jobs_parent" ON "accounting_sync_jobs" ("parent_job_id")`,
+    );
 
     // Create table for storing exchange rates (for multi-currency support)
     await queryRunner.query(`
@@ -187,11 +221,21 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_exchange_rates_tenant" ON "exchange_rates" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_exchange_rates_account" ON "exchange_rates" ("accounting_account_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_exchange_rates_currencies_date" ON "exchange_rates" ("from_currency", "to_currency", "rate_date")`);
-    await queryRunner.query(`CREATE INDEX "IDX_exchange_rates_date" ON "exchange_rates" ("rate_date")`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_exchange_rates_unique" ON "exchange_rates" ("tenant_id", "from_currency", "to_currency", "rate_date", "source") WHERE "is_active" = true`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_exchange_rates_tenant" ON "exchange_rates" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_exchange_rates_account" ON "exchange_rates" ("accounting_account_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_exchange_rates_currencies_date" ON "exchange_rates" ("from_currency", "to_currency", "rate_date")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_exchange_rates_date" ON "exchange_rates" ("rate_date")`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_exchange_rates_unique" ON "exchange_rates" ("tenant_id", "from_currency", "to_currency", "rate_date", "source") WHERE "is_active" = true`,
+    );
 
     // Create table for storing tax compliance data
     await queryRunner.query(`
@@ -216,11 +260,21 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_tax_compliance_records_tenant" ON "tax_compliance_records" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_tax_compliance_records_account" ON "tax_compliance_records" ("accounting_account_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_tax_compliance_records_reference" ON "tax_compliance_records" ("reference_type", "reference_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_tax_compliance_records_period" ON "tax_compliance_records" ("tax_period_start", "tax_period_end")`);
-    await queryRunner.query(`CREATE INDEX "IDX_tax_compliance_records_status" ON "tax_compliance_records" ("compliance_status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_tax_compliance_records_tenant" ON "tax_compliance_records" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_tax_compliance_records_account" ON "tax_compliance_records" ("accounting_account_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_tax_compliance_records_reference" ON "tax_compliance_records" ("reference_type", "reference_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_tax_compliance_records_period" ON "tax_compliance_records" ("tax_period_start", "tax_period_end")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_tax_compliance_records_status" ON "tax_compliance_records" ("compliance_status")`,
+    );
 
     // Add foreign key constraints
     await queryRunner.query(`
@@ -279,9 +333,15 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
       ADD COLUMN "asset_account_id" varchar NULL
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_products_external_item" ON "products" ("external_item_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_products_tax_category" ON "products" ("tax_category")`);
-    await queryRunner.query(`CREATE INDEX "IDX_products_tax_exempt" ON "products" ("tax_exempt")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_products_external_item" ON "products" ("external_item_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_products_tax_category" ON "products" ("tax_category")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_products_tax_exempt" ON "products" ("tax_exempt")`,
+    );
 
     // Note: customers table enhancement will be done when customers table is created
     // These ALTER TABLE statements are commented out until customers table exists
@@ -397,62 +457,138 @@ export class CreateAccountingIntegration1735800000000 implements MigrationInterf
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop triggers and functions
-    await queryRunner.query(`DROP TRIGGER IF EXISTS trigger_accounting_sync_jobs_health_score ON accounting_sync_jobs`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS trigger_update_health_score()`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS update_accounting_account_health_score(uuid)`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS trigger_accounting_sync_jobs_health_score ON accounting_sync_jobs`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS trigger_update_health_score()`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS update_accounting_account_health_score(uuid)`,
+    );
 
     // Drop view
-    await queryRunner.query(`DROP VIEW IF EXISTS "accounting_integration_overview"`);
+    await queryRunner.query(
+      `DROP VIEW IF EXISTS "accounting_integration_overview"`,
+    );
 
     // Remove added columns from existing tables
-    await queryRunner.query(`ALTER TABLE "customers" DROP COLUMN IF EXISTS "external_customer_id"`);
-    await queryRunner.query(`ALTER TABLE "customers" DROP COLUMN IF EXISTS "accounting_customer_mappings"`);
-    await queryRunner.query(`ALTER TABLE "customers" DROP COLUMN IF EXISTS "npwp"`);
-    await queryRunner.query(`ALTER TABLE "customers" DROP COLUMN IF EXISTS "tax_exempt"`);
-    await queryRunner.query(`ALTER TABLE "customers" DROP COLUMN IF EXISTS "payment_terms"`);
-    await queryRunner.query(`ALTER TABLE "customers" DROP COLUMN IF EXISTS "credit_limit"`);
+    await queryRunner.query(
+      `ALTER TABLE "customers" DROP COLUMN IF EXISTS "external_customer_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "customers" DROP COLUMN IF EXISTS "accounting_customer_mappings"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "customers" DROP COLUMN IF EXISTS "npwp"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "customers" DROP COLUMN IF EXISTS "tax_exempt"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "customers" DROP COLUMN IF EXISTS "payment_terms"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "customers" DROP COLUMN IF EXISTS "credit_limit"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN IF EXISTS "external_item_id"`);
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN IF EXISTS "accounting_item_mappings"`);
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN IF EXISTS "tax_category"`);
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN IF EXISTS "tax_exempt"`);
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN IF EXISTS "cogs_account_id"`);
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN IF EXISTS "income_account_id"`);
-    await queryRunner.query(`ALTER TABLE "products" DROP COLUMN IF EXISTS "asset_account_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN IF EXISTS "external_item_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN IF EXISTS "accounting_item_mappings"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN IF EXISTS "tax_category"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN IF EXISTS "tax_exempt"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN IF EXISTS "cogs_account_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN IF EXISTS "income_account_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP COLUMN IF EXISTS "asset_account_id"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_invoice_id"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_invoice_number"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_payment_id"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_customer_id"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "tax_calculation_data"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "currency"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "exchange_rate"`);
-    await queryRunner.query(`ALTER TABLE "orders" DROP COLUMN IF EXISTS "base_currency_total"`);
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_invoice_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_invoice_number"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_payment_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "external_customer_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "tax_calculation_data"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "currency"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "exchange_rate"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "orders" DROP COLUMN IF EXISTS "base_currency_total"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "accounting_account_id"`);
-    await queryRunner.query(`ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "operation_type"`);
-    await queryRunner.query(`ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "entity_type"`);
-    await queryRunner.query(`ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "entity_id"`);
-    await queryRunner.query(`ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "external_entity_id"`);
-    await queryRunner.query(`ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "transformation_details"`);
+    await queryRunner.query(
+      `ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "accounting_account_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "operation_type"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "entity_type"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "entity_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "external_entity_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "integration_logs" DROP COLUMN IF EXISTS "transformation_details"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "accounting_account_id"`);
-    await queryRunner.query(`ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "external_reference_id"`);
-    await queryRunner.query(`ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "sync_direction"`);
-    await queryRunner.query(`ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "data_transformation"`);
-    await queryRunner.query(`ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "conflict_resolution"`);
+    await queryRunner.query(
+      `ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "accounting_account_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "external_reference_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "sync_direction"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "data_transformation"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sync_status" DROP COLUMN IF EXISTS "conflict_resolution"`,
+    );
 
     // Drop accounting tables
     await queryRunner.query(`DROP TABLE IF EXISTS "tax_compliance_records"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "exchange_rates"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "accounting_sync_jobs"`);
-    await queryRunner.query(`DROP TABLE IF EXISTS "accounting_entity_mappings"`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS "accounting_entity_mappings"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "accounting_accounts"`);
 
     // Drop ENUM types
     await queryRunner.query(`DROP TYPE IF EXISTS "sync_frequency_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "accounting_data_type_enum"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "accounting_connection_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "accounting_connection_status_enum"`,
+    );
     await queryRunner.query(`DROP TYPE IF EXISTS "accounting_platform_enum"`);
   }
 }

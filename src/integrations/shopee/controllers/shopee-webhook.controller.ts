@@ -36,7 +36,10 @@ export class ShopeeWebhookController {
   @ApiOperation({ summary: 'Handle Shopee webhook events' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiParam({ name: 'webhookType', description: 'Webhook type (e.g., order_status_update)' })
+  @ApiParam({
+    name: 'webhookType',
+    description: 'Webhook type (e.g., order_status_update)',
+  })
   @ApiHeader({ name: 'authorization', description: 'Shopee webhook signature' })
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid webhook data' })
@@ -52,7 +55,7 @@ export class ShopeeWebhookController {
   ) {
     const startTime = Date.now();
     const requestId = this.generateRequestId();
-    
+
     try {
       // Get raw payload
       const rawPayload = JSON.stringify(body);
@@ -98,14 +101,17 @@ export class ShopeeWebhookController {
       const processingTime = Date.now() - startTime;
 
       if (result.success) {
-        this.logger.log(`Shopee webhook processed successfully: ${webhookType}`, {
-          tenantId,
-          channelId,
-          webhookType,
-          webhookId: result.webhookId,
-          processingTime,
-          requestId,
-        });
+        this.logger.log(
+          `Shopee webhook processed successfully: ${webhookType}`,
+          {
+            tenantId,
+            channelId,
+            webhookType,
+            webhookId: result.webhookId,
+            processingTime,
+            requestId,
+          },
+        );
 
         // Return success response
         res.status(HttpStatus.OK).json({
@@ -132,10 +138,9 @@ export class ShopeeWebhookController {
           processingTime,
         });
       }
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.error(`Shopee webhook error: ${error.message}`, {
         tenantId,
         channelId,
@@ -311,7 +316,7 @@ export class ShopeeWebhookController {
     @Res() res: Response,
   ) {
     const requestId = this.generateRequestId();
-    
+
     try {
       this.logger.log(`Shopee webhook health check`, {
         tenantId,
@@ -340,7 +345,6 @@ export class ShopeeWebhookController {
         timestamp: new Date().toISOString(),
         requestId,
       });
-
     } catch (error) {
       this.logger.error(`Shopee webhook health check error: ${error.message}`, {
         tenantId,
@@ -360,7 +364,9 @@ export class ShopeeWebhookController {
   // Private helper methods
 
   private generateRequestId(): string {
-    return `shopee_webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `shopee_webhook_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
   }
 
   private getClientIpAddress(req: Request): string {
@@ -374,9 +380,11 @@ export class ShopeeWebhookController {
     );
   }
 
-  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+  private sanitizeHeaders(
+    headers: Record<string, string>,
+  ): Record<string, string> {
     const sanitized = { ...headers };
-    
+
     // Remove sensitive headers for logging
     const sensitiveHeaders = [
       'authorization',
@@ -385,7 +393,7 @@ export class ShopeeWebhookController {
       'set-cookie',
       'x-shopee-signature',
     ];
-    
+
     sensitiveHeaders.forEach(header => {
       if (sanitized[header]) {
         sanitized[header] = '[REDACTED]';
@@ -394,7 +402,7 @@ export class ShopeeWebhookController {
         sanitized[header.toLowerCase()] = '[REDACTED]';
       }
     });
-    
+
     return sanitized;
   }
 }

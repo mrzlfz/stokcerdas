@@ -86,10 +86,7 @@ export class IntegrationController {
   @ApiQuery({ name: 'orderBy', required: false, enum: ['createdAt', 'level'] })
   @ApiQuery({ name: 'orderDirection', required: false, enum: ['ASC', 'DESC'] })
   @ApiResponse({ status: 200, description: 'Logs retrieved successfully' })
-  async getLogs(
-    @CurrentUser() user: any,
-    @Query() query: LogQueryDto,
-  ) {
+  async getLogs(@CurrentUser() user: any, @Query() query: LogQueryDto) {
     try {
       const logQuery: any = {
         tenantId: user.tenantId,
@@ -134,7 +131,10 @@ export class IntegrationController {
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
-  @ApiResponse({ status: 200, description: 'Log statistics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Log statistics retrieved successfully',
+  })
   async getLogStats(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,
@@ -157,7 +157,10 @@ export class IntegrationController {
         data: stats,
       };
     } catch (error) {
-      this.logger.error(`Failed to get log stats: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get log stats: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -172,7 +175,10 @@ export class IntegrationController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get logs for specific request' })
   @ApiParam({ name: 'requestId', description: 'Request ID' })
-  @ApiResponse({ status: 200, description: 'Request logs retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Request logs retrieved successfully',
+  })
   async getRequestLogs(
     @CurrentUser() user: any,
     @Param('requestId') requestId: string,
@@ -192,7 +198,10 @@ export class IntegrationController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get request logs: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get request logs: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -208,7 +217,10 @@ export class IntegrationController {
   @ApiOperation({ summary: 'Get recent error logs' })
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Error logs retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Error logs retrieved successfully',
+  })
   async getRecentErrors(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,
@@ -229,7 +241,10 @@ export class IntegrationController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get recent errors: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get recent errors: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -243,11 +258,11 @@ export class IntegrationController {
   @Delete('logs/cleanup')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Clean up old integration logs' })
-  @ApiResponse({ status: 200, description: 'Log cleanup completed successfully' })
-  async cleanupLogs(
-    @CurrentUser() user: any,
-    @Body() dto: LogCleanupDto,
-  ) {
+  @ApiResponse({
+    status: 200,
+    description: 'Log cleanup completed successfully',
+  })
+  async cleanupLogs(@CurrentUser() user: any, @Body() dto: LogCleanupDto) {
     try {
       const deletedCount = await this.logService.cleanupOldLogs(
         user.tenantId,
@@ -263,7 +278,10 @@ export class IntegrationController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to cleanup logs: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cleanup logs: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -281,7 +299,10 @@ export class IntegrationController {
   @ApiOperation({ summary: 'Get rate limit status' })
   @ApiQuery({ name: 'key', required: true })
   @ApiQuery({ name: 'platform', required: true })
-  @ApiResponse({ status: 200, description: 'Rate limit status retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rate limit status retrieved successfully',
+  })
   async getRateLimitStatus(
     @CurrentUser() user: any,
     @Query('key') key: string,
@@ -293,7 +314,10 @@ export class IntegrationController {
 
       for (const config of configs) {
         const rateLimitKey = `${user.tenantId}:${key}`;
-        const status = await this.rateLimiter.getRateLimitStatus(rateLimitKey, config);
+        const status = await this.rateLimiter.getRateLimitStatus(
+          rateLimitKey,
+          config,
+        );
         results[config.keyPrefix || 'default'] = status;
       }
 
@@ -306,7 +330,10 @@ export class IntegrationController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get rate limit status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get rate limit status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -320,11 +347,11 @@ export class IntegrationController {
   @Post('rate-limit/test')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test rate limiting' })
-  @ApiResponse({ status: 201, description: 'Rate limit test completed successfully' })
-  async testRateLimit(
-    @CurrentUser() user: any,
-    @Body() dto: RateLimitTestDto,
-  ) {
+  @ApiResponse({
+    status: 201,
+    description: 'Rate limit test completed successfully',
+  })
+  async testRateLimit(@CurrentUser() user: any, @Body() dto: RateLimitTestDto) {
     try {
       const config = {
         windowSizeMs: dto.windowSizeMs || 60000, // 1 minute
@@ -333,7 +360,10 @@ export class IntegrationController {
       };
 
       const rateLimitKey = `${user.tenantId}:${dto.key}`;
-      const result = await this.rateLimiter.checkRateLimit(rateLimitKey, config);
+      const result = await this.rateLimiter.checkRateLimit(
+        rateLimitKey,
+        config,
+      );
 
       return {
         success: true,
@@ -346,7 +376,10 @@ export class IntegrationController {
         },
       };
     } catch (error) {
-      this.logger.error(`Rate limit test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Rate limit test failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -385,7 +418,10 @@ export class IntegrationController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to reset rate limit: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to reset rate limit: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -401,10 +437,11 @@ export class IntegrationController {
   @Get('health')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get integration health status' })
-  @ApiResponse({ status: 200, description: 'Integration health status retrieved successfully' })
-  async getIntegrationHealth(
-    @CurrentUser() user: any,
-  ) {
+  @ApiResponse({
+    status: 200,
+    description: 'Integration health status retrieved successfully',
+  })
+  async getIntegrationHealth(@CurrentUser() user: any) {
     try {
       // Get basic health metrics
       const endTime = new Date();
@@ -458,8 +495,11 @@ export class IntegrationController {
         data: health,
       };
     } catch (error) {
-      this.logger.error(`Failed to get integration health: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to get integration health: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: true,
         data: {
@@ -474,7 +514,10 @@ export class IntegrationController {
   @Get('platforms')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get supported integration platforms' })
-  @ApiResponse({ status: 200, description: 'Supported platforms retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Supported platforms retrieved successfully',
+  })
   async getSupportedPlatforms() {
     try {
       const platforms = [
@@ -521,7 +564,10 @@ export class IntegrationController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get platforms: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get platforms: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -537,7 +583,10 @@ export class IntegrationController {
   @ApiOperation({ summary: 'Get integration sync status' })
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'entityType', required: false })
-  @ApiResponse({ status: 200, description: 'Sync status retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync status retrieved successfully',
+  })
   async getSyncStatus(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,
@@ -561,7 +610,10 @@ export class IntegrationController {
         message: 'Sync status query endpoint - implementation pending',
       };
     } catch (error) {
-      this.logger.error(`Failed to get sync status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get sync status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

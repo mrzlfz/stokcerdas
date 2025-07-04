@@ -36,7 +36,8 @@ export class CreateSupplierDto {
   @MinLength(3, { message: 'Kode supplier minimal 3 karakter' })
   @MaxLength(50, { message: 'Kode supplier maksimal 50 karakter' })
   @Matches(/^[A-Z0-9\-_]+$/, {
-    message: 'Kode supplier hanya boleh mengandung huruf besar, angka, dash, dan underscore',
+    message:
+      'Kode supplier hanya boleh mengandung huruf besar, angka, dash, dan underscore',
   })
   code: string;
 

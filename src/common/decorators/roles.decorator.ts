@@ -5,9 +5,9 @@ export const ROLES_KEY = 'roles';
 
 /**
  * Decorator to specify required roles for accessing an endpoint
- * 
+ *
  * @param roles - Array of roles that can access this endpoint
- * 
+ *
  * @example
  * ```typescript
  * @Roles(UserRole.ADMIN, UserRole.MANAGER)

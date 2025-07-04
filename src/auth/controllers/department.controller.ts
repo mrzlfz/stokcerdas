@@ -32,7 +32,10 @@ import { PermissionsGuard } from '../guards/permissions.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { CurrentTenant } from '../decorators/current-tenant.decorator';
 import { Permissions } from '../decorators/permissions.decorator';
-import { PermissionResource, PermissionAction } from '../entities/permission.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../entities/permission.entity';
 import { DepartmentStatus } from '../entities/department.entity';
 import {
   CreateDepartmentDto,
@@ -63,9 +66,16 @@ export class DepartmentController {
     description: 'Departemen berhasil dibuat',
     type: DepartmentResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Data tidak valid atau kode departemen sudah ada' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk membuat departemen' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.CREATE })
+  @ApiBadRequestResponse({
+    description: 'Data tidak valid atau kode departemen sudah ada',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk membuat departemen',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.CREATE,
+  })
   async create(
     @Body() createDepartmentDto: CreateDepartmentDto,
     @CurrentTenant() tenantId: string,
@@ -93,15 +103,46 @@ export class DepartmentController {
     description: 'Daftar departemen berhasil diambil',
     type: [DepartmentResponseDto],
   })
-  @ApiQuery({ name: 'type', required: false, description: 'Filter berdasarkan jenis departemen' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter berdasarkan status' })
-  @ApiQuery({ name: 'parentId', required: false, description: 'Filter berdasarkan departemen induk' })
-  @ApiQuery({ name: 'managerId', required: false, description: 'Filter berdasarkan manajer' })
-  @ApiQuery({ name: 'location', required: false, description: 'Filter berdasarkan lokasi' })
-  @ApiQuery({ name: 'search', required: false, description: 'Kata kunci pencarian' })
-  @ApiQuery({ name: 'includeInactive', required: false, description: 'Sertakan departemen tidak aktif' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filter berdasarkan jenis departemen',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter berdasarkan status',
+  })
+  @ApiQuery({
+    name: 'parentId',
+    required: false,
+    description: 'Filter berdasarkan departemen induk',
+  })
+  @ApiQuery({
+    name: 'managerId',
+    required: false,
+    description: 'Filter berdasarkan manajer',
+  })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    description: 'Filter berdasarkan lokasi',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Kata kunci pencarian',
+  })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    description: 'Sertakan departemen tidak aktif',
+  })
   @ApiQuery({ name: 'limit', required: false, description: 'Batas hasil' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async findAll(
     @Query() query: DepartmentQueryDto,
     @CurrentTenant() tenantId: string,
@@ -116,19 +157,29 @@ export class DepartmentController {
         query.limit || 20,
       );
     } else if (query.type) {
-      departments = await this.departmentService.findByType(query.type, tenantId);
+      departments = await this.departmentService.findByType(
+        query.type,
+        tenantId,
+      );
     } else if (query.managerId) {
-      departments = await this.departmentService.findByManager(query.managerId, tenantId);
+      departments = await this.departmentService.findByManager(
+        query.managerId,
+        tenantId,
+      );
     } else {
-      departments = await this.departmentService.findAll(tenantId, query.includeInactive);
+      departments = await this.departmentService.findAll(
+        tenantId,
+        query.includeInactive,
+      );
     }
 
     // Filter by department access
-    const accessibleDepartments = await this.departmentService.filterByDepartmentAccess(
-      departments.map(d => ({ ...d, departmentId: d.id })),
-      userId,
-      tenantId,
-    );
+    const accessibleDepartments =
+      await this.departmentService.filterByDepartmentAccess(
+        departments.map(d => ({ ...d, departmentId: d.id })),
+        userId,
+        tenantId,
+      );
 
     return {
       success: true,
@@ -150,7 +201,10 @@ export class DepartmentController {
     description: 'Struktur hierarki departemen berhasil diambil',
     type: [DepartmentTreeResponseDto],
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getDepartmentTree(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<DepartmentTreeResponseDto[]>> {
@@ -166,13 +220,17 @@ export class DepartmentController {
   @Get('stats')
   @ApiOperation({
     summary: 'Dapatkan statistik departemen',
-    description: 'Mengambil statistik departemen termasuk jumlah per jenis dan level',
+    description:
+      'Mengambil statistik departemen termasuk jumlah per jenis dan level',
   })
   @ApiOkResponse({
     description: 'Statistik departemen berhasil diambil',
     type: DepartmentStatsDto,
   })
-  @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.ANALYTICS,
+    action: PermissionAction.READ,
+  })
   async getStats(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<DepartmentStatsDto>> {
@@ -188,21 +246,26 @@ export class DepartmentController {
   @Get('accessible')
   @ApiOperation({
     summary: 'Dapatkan departemen yang dapat diakses user',
-    description: 'Mengambil daftar departemen yang dapat diakses oleh user saat ini',
+    description:
+      'Mengambil daftar departemen yang dapat diakses oleh user saat ini',
   })
   @ApiOkResponse({
     description: 'Departemen yang dapat diakses berhasil diambil',
     type: [DepartmentResponseDto],
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getAccessibleDepartments(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<DepartmentResponseDto[]>> {
-    const departments = await this.departmentService.getUserAccessibleDepartments(
-      userId,
-      tenantId,
-    );
+    const departments =
+      await this.departmentService.getUserAccessibleDepartments(
+        userId,
+        tenantId,
+      );
 
     return {
       success: true,
@@ -222,8 +285,13 @@ export class DepartmentController {
     type: DepartmentResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Departemen tidak ditemukan' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki akses ke departemen ini' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki akses ke departemen ini',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
@@ -249,14 +317,20 @@ export class DepartmentController {
     description: 'Hierarki atas departemen berhasil diambil',
     type: DepartmentTreeResponseDto,
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getAncestors(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<DepartmentTreeResponseDto>> {
     await this.departmentService.enforceDepartmentAccess(id, userId, tenantId);
-    const department = await this.departmentService.getDepartmentWithAncestors(id, tenantId);
+    const department = await this.departmentService.getDepartmentWithAncestors(
+      id,
+      tenantId,
+    );
 
     return {
       success: true,
@@ -275,14 +349,18 @@ export class DepartmentController {
     description: 'Hierarki bawah departemen berhasil diambil',
     type: DepartmentTreeResponseDto,
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getDescendants(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<DepartmentTreeResponseDto>> {
     await this.departmentService.enforceDepartmentAccess(id, userId, tenantId);
-    const department = await this.departmentService.getDepartmentWithDescendants(id, tenantId);
+    const department =
+      await this.departmentService.getDepartmentWithDescendants(id, tenantId);
 
     return {
       success: true,
@@ -303,8 +381,13 @@ export class DepartmentController {
   })
   @ApiNotFoundResponse({ description: 'Departemen tidak ditemukan' })
   @ApiBadRequestResponse({ description: 'Data tidak valid' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk memperbarui departemen' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk memperbarui departemen',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDepartmentDto: UpdateDepartmentDto,
@@ -336,7 +419,10 @@ export class DepartmentController {
     description: 'Status departemen berhasil diubah',
     type: DepartmentResponseDto,
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: DepartmentStatus,
@@ -344,7 +430,12 @@ export class DepartmentController {
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<DepartmentResponseDto>> {
     await this.departmentService.enforceDepartmentAccess(id, userId, tenantId);
-    const department = await this.departmentService.changeStatus(id, status, tenantId, userId);
+    const department = await this.departmentService.changeStatus(
+      id,
+      status,
+      tenantId,
+      userId,
+    );
 
     return {
       success: true,
@@ -363,8 +454,13 @@ export class DepartmentController {
     description: 'Departemen berhasil dipindahkan',
     type: DepartmentResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Tidak dapat memindahkan ke departemen anak' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiBadRequestResponse({
+    description: 'Tidak dapat memindahkan ke departemen anak',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async moveDepartment(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() moveDepartmentDto: MoveDepartmentDto,
@@ -392,7 +488,10 @@ export class DepartmentController {
     description: 'Mengubah status beberapa departemen sekaligus',
   })
   @ApiOkResponse({ description: 'Status departemen berhasil diubah' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async bulkUpdateStatus(
     @Body() bulkUpdateDto: BulkUpdateStatusDto,
     @CurrentTenant() tenantId: string,
@@ -400,7 +499,11 @@ export class DepartmentController {
   ): Promise<StandardResponse<void>> {
     // Check access to all departments
     for (const departmentId of bulkUpdateDto.departmentIds) {
-      await this.departmentService.enforceDepartmentAccess(departmentId, userId, tenantId);
+      await this.departmentService.enforceDepartmentAccess(
+        departmentId,
+        userId,
+        tenantId,
+      );
     }
 
     await this.departmentService.bulkUpdateStatus(
@@ -426,14 +529,23 @@ export class DepartmentController {
     description: 'Departemen berhasil dipulihkan',
     type: DepartmentResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'Departemen yang dihapus tidak ditemukan' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiNotFoundResponse({
+    description: 'Departemen yang dihapus tidak ditemukan',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async restore(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<DepartmentResponseDto>> {
-    const department = await this.departmentService.restore(id, tenantId, userId);
+    const department = await this.departmentService.restore(
+      id,
+      tenantId,
+      userId,
+    );
 
     return {
       success: true,
@@ -464,7 +576,10 @@ export class DepartmentController {
       },
     },
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async checkAccess(
     @Body() accessDto: DepartmentAccessDto,
     @CurrentTenant() tenantId: string,
@@ -489,14 +604,22 @@ export class DepartmentController {
   @Delete(':id')
   @ApiOperation({
     summary: 'Hapus departemen',
-    description: 'Menghapus departemen (soft delete). Departemen dengan sub-departemen atau user aktif tidak dapat dihapus.',
+    description:
+      'Menghapus departemen (soft delete). Departemen dengan sub-departemen atau user aktif tidak dapat dihapus.',
   })
   @ApiParam({ name: 'id', description: 'ID departemen' })
   @ApiNoContentResponse({ description: 'Departemen berhasil dihapus' })
   @ApiNotFoundResponse({ description: 'Departemen tidak ditemukan' })
-  @ApiBadRequestResponse({ description: 'Departemen memiliki sub-departemen atau user aktif' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk menghapus departemen' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.DELETE })
+  @ApiBadRequestResponse({
+    description: 'Departemen memiliki sub-departemen atau user aktif',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk menghapus departemen',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.DELETE,
+  })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,

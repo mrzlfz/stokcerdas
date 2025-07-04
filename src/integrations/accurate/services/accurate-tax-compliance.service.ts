@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AccurateApiService, AccurateCredentials, AccurateTaxRate } from './accurate-api.service';
+import {
+  AccurateApiService,
+  AccurateCredentials,
+  AccurateTaxRate,
+} from './accurate-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { AccountingAccount } from '../../entities/accounting-account.entity';
 import { Order } from '../../../orders/entities/order.entity';
@@ -70,7 +74,12 @@ export interface EFakturData {
   ppnbm?: number; // Pajak Penjualan atas Barang Mewah
   referensiId: string; // Reference to original invoice/order
   kodeTransaksi: string;
-  statusApproval: 'DRAFT' | 'APPROVAL_PENDING' | 'APPROVED' | 'REJECTED' | 'REPLACED';
+  statusApproval:
+    | 'DRAFT'
+    | 'APPROVAL_PENDING'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'REPLACED';
   statusUpload: 'NOT_UPLOADED' | 'UPLOADED' | 'UPLOAD_FAILED';
 }
 
@@ -137,7 +146,9 @@ export class AccurateTaxComplianceService {
     config: IndonesianTaxConfiguration,
   ): Promise<{ success: boolean; errors: string[] }> {
     try {
-      this.logger.log(`Configuring Indonesian tax settings for tenant ${tenantId}`);
+      this.logger.log(
+        `Configuring Indonesian tax settings for tenant ${tenantId}`,
+      );
 
       // Validate NPWP
       if (!this.validateNPWP(config.npwp)) {
@@ -170,13 +181,20 @@ export class AccurateTaxComplianceService {
       });
 
       // Sync tax rates with Accurate
-      const credentials: AccurateCredentials = this.getCredentials(accountingAccount);
-      await this.syncTaxRatesWithAccurate(credentials, config, tenantId, accountingAccount.channelId!);
+      const credentials: AccurateCredentials =
+        this.getCredentials(accountingAccount);
+      await this.syncTaxRatesWithAccurate(
+        credentials,
+        config,
+        tenantId,
+        accountingAccount.channelId!,
+      );
 
-      this.logger.log(`Successfully configured Indonesian tax settings for tenant ${tenantId}`);
+      this.logger.log(
+        `Successfully configured Indonesian tax settings for tenant ${tenantId}`,
+      );
 
       return { success: true, errors: [] };
-
     } catch (error) {
       this.logger.error(`Failed to configure tax settings: ${error.message}`);
       return { success: false, errors: [error.message] };
@@ -208,19 +226,24 @@ export class AccurateTaxComplianceService {
       if (!indonesianSettings) {
         throw new Error('Indonesian tax configuration not found');
       }
-      
+
       const taxConfig: IndonesianTaxConfiguration = {
         npwp: indonesianSettings.npwp || '',
         nppkp: indonesianSettings.nppkp,
         pkpStatus: indonesianSettings.pkpStatus || false,
         vatRate: indonesianSettings.vatRate || 11,
         enableEFaktur: indonesianSettings.enableEFaktur || false,
-        eFakturConfig: indonesianSettings.eFakturConfig ? {
-          certificatePath: indonesianSettings.eFakturConfig.certificatePath || '',
-          certificatePassword: indonesianSettings.eFakturConfig.certificatePassword || '',
-          counterNumber: indonesianSettings.eFakturConfig.counterNumber || '',
-          kodeTransaksi: '01',
-        } : undefined,
+        eFakturConfig: indonesianSettings.eFakturConfig
+          ? {
+              certificatePath:
+                indonesianSettings.eFakturConfig.certificatePath || '',
+              certificatePassword:
+                indonesianSettings.eFakturConfig.certificatePassword || '',
+              counterNumber:
+                indonesianSettings.eFakturConfig.counterNumber || '',
+              kodeTransaksi: '01',
+            }
+          : undefined,
         taxCategories: {},
         defaultTaxSettings: {
           salesTaxId: 1,
@@ -262,7 +285,7 @@ export class AccurateTaxComplianceService {
         // items = invoice.items || [];
         // customer = invoice.customer;
         // subtotal = invoice.subtotal || 0;
-        
+
         // Temporary fallback
         items = [];
         customer = { name: 'Unknown', email: 'unknown@example.com' };
@@ -279,10 +302,13 @@ export class AccurateTaxComplianceService {
 
         // Get tax category for product
         const taxCategory = this.getTaxCategoryForProduct(product, taxConfig);
-        
-        if (taxCategory.taxType !== 'BEBAS' && taxCategory.taxType !== 'TIDAK_KENA') {
+
+        if (
+          taxCategory.taxType !== 'BEBAS' &&
+          taxCategory.taxType !== 'TIDAK_KENA'
+        ) {
           const taxAmount = itemSubtotal * (taxCategory.taxRate / 100);
-          
+
           taxDetails.push({
             description: `${taxCategory.taxType} untuk ${product.name}`,
             taxableAmount: itemSubtotal,
@@ -319,10 +345,11 @@ export class AccurateTaxComplianceService {
         );
       }
 
-      this.logger.log(`Tax calculation completed for ${type} ${orderOrInvoiceId}: ${totalTaxAmount}`);
+      this.logger.log(
+        `Tax calculation completed for ${type} ${orderOrInvoiceId}: ${totalTaxAmount}`,
+      );
 
       return result;
-
     } catch (error) {
       this.logger.error(`Tax calculation failed: ${error.message}`);
       throw error;
@@ -362,14 +389,17 @@ export class AccurateTaxComplianceService {
       // if (!invoice) {
       //   throw new Error('Invoice not found');
       // }
-      
+
       // Temporary invoice placeholder
       const invoice = {
         invoiceNumber: 'TEMP-001',
         invoiceDate: new Date(),
         customerName: 'Temporary Customer',
         customer: { name: 'Temporary Customer', npwp: '00.000.000.0-000.000' },
-        billingAddress: { address: 'Temporary Address', street: 'Temporary Street' },
+        billingAddress: {
+          address: 'Temporary Address',
+          street: 'Temporary Street',
+        },
         subtotal: 0,
         totalAmount: 0,
       };
@@ -389,12 +419,15 @@ export class AccurateTaxComplianceService {
         pkpStatus: taxConfig.pkpStatus || false,
         vatRate: taxConfig.vatRate || 11,
         enableEFaktur: taxConfig.enableEFaktur || false,
-        eFakturConfig: taxConfig.eFakturConfig ? {
-          certificatePath: taxConfig.eFakturConfig.certificatePath || '',
-          certificatePassword: taxConfig.eFakturConfig.certificatePassword || '',
-          counterNumber: taxConfig.eFakturConfig.counterNumber || '',
-          kodeTransaksi: '01',
-        } : undefined,
+        eFakturConfig: taxConfig.eFakturConfig
+          ? {
+              certificatePath: taxConfig.eFakturConfig.certificatePath || '',
+              certificatePassword:
+                taxConfig.eFakturConfig.certificatePassword || '',
+              counterNumber: taxConfig.eFakturConfig.counterNumber || '',
+              kodeTransaksi: '01',
+            }
+          : undefined,
         taxCategories: {},
         defaultTaxSettings: {
           salesTaxId: 1,
@@ -405,7 +438,10 @@ export class AccurateTaxComplianceService {
       };
 
       // Generate e-Faktur number
-      const eFakturNumber = await this.generateEFakturNumber(fullTaxConfig, tenantId);
+      const eFakturNumber = await this.generateEFakturNumber(
+        fullTaxConfig,
+        tenantId,
+      );
 
       const eFakturData: EFakturData = {
         nomorFaktur: eFakturNumber,
@@ -426,7 +462,12 @@ export class AccurateTaxComplianceService {
 
       // Save e-Faktur data to Accurate
       const credentials = this.getCredentials(accountingAccount);
-      await this.saveEFakturToAccurate(credentials, eFakturData, tenantId, accountingAccount.channelId!);
+      await this.saveEFakturToAccurate(
+        credentials,
+        eFakturData,
+        tenantId,
+        accountingAccount.channelId!,
+      );
 
       // Update invoice with e-Faktur reference
       // await this.invoiceRepository.update(invoiceId, {
@@ -434,10 +475,11 @@ export class AccurateTaxComplianceService {
       //   updatedBy: 'tax_compliance_service',
       // });
 
-      this.logger.log(`Successfully generated e-Faktur ${eFakturNumber} for invoice ${invoiceId}`);
+      this.logger.log(
+        `Successfully generated e-Faktur ${eFakturNumber} for invoice ${invoiceId}`,
+      );
 
       return eFakturData;
-
     } catch (error) {
       this.logger.error(`e-Faktur generation failed: ${error.message}`);
       throw error;
@@ -468,19 +510,24 @@ export class AccurateTaxComplianceService {
       if (!indonesianSettings) {
         throw new Error('Indonesian tax configuration not found');
       }
-      
+
       const taxConfig: IndonesianTaxConfiguration = {
         npwp: indonesianSettings.npwp || '',
         nppkp: indonesianSettings.nppkp,
         pkpStatus: indonesianSettings.pkpStatus || false,
         vatRate: indonesianSettings.vatRate || 11,
         enableEFaktur: indonesianSettings.enableEFaktur || false,
-        eFakturConfig: indonesianSettings.eFakturConfig ? {
-          certificatePath: indonesianSettings.eFakturConfig.certificatePath || '',
-          certificatePassword: indonesianSettings.eFakturConfig.certificatePassword || '',
-          counterNumber: indonesianSettings.eFakturConfig.counterNumber || '',
-          kodeTransaksi: '01',
-        } : undefined,
+        eFakturConfig: indonesianSettings.eFakturConfig
+          ? {
+              certificatePath:
+                indonesianSettings.eFakturConfig.certificatePath || '',
+              certificatePassword:
+                indonesianSettings.eFakturConfig.certificatePassword || '',
+              counterNumber:
+                indonesianSettings.eFakturConfig.counterNumber || '',
+              kodeTransaksi: '01',
+            }
+          : undefined,
         taxCategories: {},
         defaultTaxSettings: {
           salesTaxId: 1,
@@ -507,7 +554,9 @@ export class AccurateTaxComplianceService {
       );
 
       if (!salesResponse.success) {
-        throw new Error(`Failed to fetch sales data: ${salesResponse.error?.message}`);
+        throw new Error(
+          `Failed to fetch sales data: ${salesResponse.error?.message}`,
+        );
       }
 
       const salesInvoices = salesResponse.data?.sp || [];
@@ -518,7 +567,8 @@ export class AccurateTaxComplianceService {
       const transactions: TaxReportData['transactions'] = [];
 
       for (const invoice of salesInvoices) {
-        const vatAmount = (invoice.totalAmount || 0) * (taxConfig.vatRate / 100);
+        const vatAmount =
+          (invoice.totalAmount || 0) * (taxConfig.vatRate / 100);
         totalSales += invoice.totalAmount || 0;
         outputVAT += vatAmount;
 
@@ -554,10 +604,11 @@ export class AccurateTaxComplianceService {
         transactions,
       };
 
-      this.logger.log(`Tax report generated for ${month}/${year}: VAT payable ${report.vatPayable}`);
+      this.logger.log(
+        `Tax report generated for ${month}/${year}: VAT payable ${report.vatPayable}`,
+      );
 
       return report;
-
     } catch (error) {
       this.logger.error(`Tax report generation failed: ${error.message}`);
       throw error;
@@ -584,13 +635,16 @@ export class AccurateTaxComplianceService {
       const issues: ComplianceCheckResult['issues'] = [];
 
       // Check NPWP validity
-      const npwpValid = taxConfig?.npwp ? this.validateNPWP(taxConfig.npwp) : false;
+      const npwpValid = taxConfig?.npwp
+        ? this.validateNPWP(taxConfig.npwp)
+        : false;
       if (!npwpValid) {
         issues.push({
           type: 'ERROR',
           code: 'INVALID_NPWP',
           message: 'NPWP tidak valid atau belum diatur',
-          recommendation: 'Pastikan NPWP terdaftar dengan format yang benar (15 digit)',
+          recommendation:
+            'Pastikan NPWP terdaftar dengan format yang benar (15 digit)',
         });
       }
 
@@ -601,7 +655,8 @@ export class AccurateTaxComplianceService {
           type: 'WARNING',
           code: 'PKP_STATUS_NOT_SET',
           message: 'Status PKP belum diatur',
-          recommendation: 'Tentukan apakah perusahaan berstatus PKP atau non-PKP',
+          recommendation:
+            'Tentukan apakah perusahaan berstatus PKP atau non-PKP',
         });
       }
 
@@ -612,23 +667,29 @@ export class AccurateTaxComplianceService {
           type: 'WARNING',
           code: 'INCORRECT_VAT_RATE',
           message: 'Tarif PPN tidak sesuai dengan ketentuan terbaru (11%)',
-          recommendation: 'Update tarif PPN menjadi 11% sesuai ketentuan terbaru',
+          recommendation:
+            'Update tarif PPN menjadi 11% sesuai ketentuan terbaru',
         });
       }
 
       // Check e-Faktur configuration
-      const eFakturConfigValid = !taxConfig?.enableEFaktur || 
-        Boolean(taxConfig.eFakturConfig && taxConfig.eFakturConfig.certificatePath);
+      const eFakturConfigValid =
+        !taxConfig?.enableEFaktur ||
+        Boolean(
+          taxConfig.eFakturConfig && taxConfig.eFakturConfig.certificatePath,
+        );
       if (!eFakturConfigValid) {
         issues.push({
           type: 'ERROR',
           code: 'EFAKTUR_NOT_CONFIGURED',
           message: 'Konfigurasi e-Faktur belum lengkap',
-          recommendation: 'Lengkapi sertifikat digital dan konfigurasi e-Faktur',
+          recommendation:
+            'Lengkapi sertifikat digital dan konfigurasi e-Faktur',
         });
       }
 
-      const isCompliant = issues.filter(issue => issue.type === 'ERROR').length === 0;
+      const isCompliant =
+        issues.filter(issue => issue.type === 'ERROR').length === 0;
 
       return {
         isCompliant,
@@ -638,7 +699,6 @@ export class AccurateTaxComplianceService {
         taxRatesValid,
         eFakturConfigValid,
       };
-
     } catch (error) {
       this.logger.error(`Compliance check failed: ${error.message}`);
       throw error;
@@ -651,7 +711,9 @@ export class AccurateTaxComplianceService {
     return this.accurateApiService.validateNPWP(npwp);
   }
 
-  private getCredentials(accountingAccount: AccountingAccount): AccurateCredentials {
+  private getCredentials(
+    accountingAccount: AccountingAccount,
+  ): AccurateCredentials {
     return {
       clientId: accountingAccount.clientId!,
       clientSecret: accountingAccount.clientSecret!,
@@ -669,12 +731,14 @@ export class AccurateTaxComplianceService {
     taxConfig: IndonesianTaxConfiguration,
   ): { taxRate: number; taxType: string; accurateTaxId?: number } {
     const categoryName = product.category?.name || 'default';
-    
-    return taxConfig.taxCategories[categoryName] || {
-      taxRate: taxConfig.vatRate,
-      taxType: 'PPN',
-      accurateTaxId: taxConfig.defaultTaxSettings.salesTaxId,
-    };
+
+    return (
+      taxConfig.taxCategories[categoryName] || {
+        taxRate: taxConfig.vatRate,
+        taxType: 'PPN',
+        accurateTaxId: taxConfig.defaultTaxSettings.salesTaxId,
+      }
+    );
   }
 
   private isEFakturRequired(
@@ -687,11 +751,12 @@ export class AccurateTaxComplianceService {
     // 1. PKP customers (have NPWP)
     // 2. Transactions above certain threshold
     // 3. When PKP status is enabled
-    
-    return taxConfig.enableEFaktur && (
-      customer?.npwp ||  // Customer has NPWP
-      subtotal >= 5000000 || // Above 5 million IDR threshold
-      taxConfig.pkpStatus // Company is PKP
+
+    return (
+      taxConfig.enableEFaktur &&
+      (customer?.npwp || // Customer has NPWP
+        subtotal >= 5000000 || // Above 5 million IDR threshold
+        taxConfig.pkpStatus) // Company is PKP
     );
   }
 
@@ -704,14 +769,14 @@ export class AccurateTaxComplianceService {
     // 000 = serial number prefix
     // XX = year
     // XXXXXXXX = sequential number
-    
+
     const year = new Date().getFullYear().toString().slice(-2);
     const kodeTransaksi = taxConfig.eFakturConfig?.kodeTransaksi || '010';
-    
+
     // Get next sequential number (this would typically be stored in database)
     const nextNumber = await this.getNextEFakturSequence(tenantId);
     const sequentialNumber = nextNumber.toString().padStart(8, '0');
-    
+
     return `${kodeTransaksi}.000-${year}.${sequentialNumber}`;
   }
 
@@ -735,7 +800,9 @@ export class AccurateTaxComplianceService {
     );
 
     if (!response.success) {
-      throw new Error(`Failed to fetch tax rates from Accurate: ${response.error?.message}`);
+      throw new Error(
+        `Failed to fetch tax rates from Accurate: ${response.error?.message}`,
+      );
     }
 
     // Update local configuration with Accurate tax IDs

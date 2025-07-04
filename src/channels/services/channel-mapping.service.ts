@@ -1,15 +1,27 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { ChannelMapping, MappingType, MappingDirection } from '../entities/channel-mapping.entity';
+import {
+  ChannelMapping,
+  MappingType,
+  MappingDirection,
+} from '../entities/channel-mapping.entity';
 import { Channel } from '../entities/channel.entity';
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../integrations/entities/integration-log.entity';
 
 export interface CreateChannelMappingDto {
   channelId: string;
@@ -96,7 +108,9 @@ export interface ChannelMappingQuery {
 
 export interface BulkMappingOperation {
   operation: 'create' | 'update' | 'delete' | 'validate';
-  mappings: Array<CreateChannelMappingDto | { id: string; updates: UpdateChannelMappingDto }>;
+  mappings: Array<
+    CreateChannelMappingDto | { id: string; updates: UpdateChannelMappingDto }
+  >;
 }
 
 export interface BulkMappingResult {
@@ -122,7 +136,7 @@ export class ChannelMappingService {
     private readonly mappingRepository: Repository<ChannelMapping>,
     @InjectRepository(Channel)
     private readonly channelRepository: Repository<Channel>,
-    
+
     // Common services
     private readonly logService: IntegrationLogService,
     private readonly eventEmitter: EventEmitter2,
@@ -136,7 +150,9 @@ export class ChannelMappingService {
     createDto: CreateChannelMappingDto,
   ): Promise<ChannelMapping> {
     try {
-      this.logger.debug(`Creating channel mapping for tenant ${tenantId}`, { createDto });
+      this.logger.debug(`Creating channel mapping for tenant ${tenantId}`, {
+        createDto,
+      });
 
       // Validate channel exists
       const channel = await this.channelRepository.findOne({
@@ -156,7 +172,9 @@ export class ChannelMappingService {
         },
       });
       if (existingMapping) {
-        throw new BadRequestException('Mapping already exists for this internal ID');
+        throw new BadRequestException(
+          'Mapping already exists for this internal ID',
+        );
       }
 
       // Create mapping
@@ -170,12 +188,14 @@ export class ChannelMappingService {
         syncStatus: 'pending',
         syncCount: 0,
         errorCount: 0,
-        changeLog: [{
-          timestamp: new Date().toISOString(),
-          type: 'created',
-          source: 'internal',
-          changes: { created: true },
-        }],
+        changeLog: [
+          {
+            timestamp: new Date().toISOString(),
+            type: 'created',
+            source: 'internal',
+            changes: { created: true },
+          },
+        ],
       });
 
       const savedMapping = await this.mappingRepository.save(mapping);
@@ -210,9 +230,11 @@ export class ChannelMappingService {
       });
 
       return savedMapping;
-
     } catch (error) {
-      this.logger.error(`Failed to create channel mapping: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create channel mapping: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, createDto.channelId, error, {
         metadata: { action: 'create_channel_mapping', createDto },
       });
@@ -249,7 +271,8 @@ export class ChannelMappingService {
         where.isActive = query.isActive;
       }
 
-      const queryBuilder = this.mappingRepository.createQueryBuilder('mapping')
+      const queryBuilder = this.mappingRepository
+        .createQueryBuilder('mapping')
         .where(where);
 
       // Special filters
@@ -276,13 +299,16 @@ export class ChannelMappingService {
 
       // Search filter
       if (query.search) {
-        queryBuilder.andWhere(`
+        queryBuilder.andWhere(
+          `
           (mapping.internalId ILIKE :search OR 
            mapping.internalValue ILIKE :search OR
            mapping.externalId ILIKE :search OR
            mapping.externalValue ILIKE :search OR
            mapping.notes ILIKE :search)
-        `, { search: `%${query.search}%` });
+        `,
+          { search: `%${query.search}%` },
+        );
       }
 
       // Tags filter
@@ -302,15 +328,18 @@ export class ChannelMappingService {
       }
 
       // Ordering
-      queryBuilder.orderBy('mapping.priority', 'DESC')
+      queryBuilder
+        .orderBy('mapping.priority', 'DESC')
         .addOrderBy('mapping.createdAt', 'DESC');
 
       const [mappings, total] = await queryBuilder.getManyAndCount();
 
       return { mappings, total };
-
     } catch (error) {
-      this.logger.error(`Failed to get channel mappings: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get channel mappings: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -318,7 +347,10 @@ export class ChannelMappingService {
   /**
    * Get a specific channel mapping by ID
    */
-  async getChannelMappingById(tenantId: string, mappingId: string): Promise<ChannelMapping> {
+  async getChannelMappingById(
+    tenantId: string,
+    mappingId: string,
+  ): Promise<ChannelMapping> {
     try {
       const mapping = await this.mappingRepository.findOne({
         where: { tenantId, id: mappingId },
@@ -330,9 +362,11 @@ export class ChannelMappingService {
       }
 
       return mapping;
-
     } catch (error) {
-      this.logger.error(`Failed to get channel mapping: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get channel mapping: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -385,9 +419,11 @@ export class ChannelMappingService {
       });
 
       return updatedMapping;
-
     } catch (error) {
-      this.logger.error(`Failed to update channel mapping: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update channel mapping: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, null, error, {
         metadata: { action: 'update_channel_mapping', mappingId, updateDto },
       });
@@ -398,7 +434,10 @@ export class ChannelMappingService {
   /**
    * Delete a channel mapping
    */
-  async deleteChannelMapping(tenantId: string, mappingId: string): Promise<void> {
+  async deleteChannelMapping(
+    tenantId: string,
+    mappingId: string,
+  ): Promise<void> {
     try {
       const mapping = await this.getChannelMappingById(tenantId, mappingId);
 
@@ -420,9 +459,11 @@ export class ChannelMappingService {
         channelId: mapping.channelId,
         mapping,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to delete channel mapping: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete channel mapping: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -435,9 +476,14 @@ export class ChannelMappingService {
     request: MappingTransformRequest,
   ): Promise<MappingTransformResult> {
     try {
-      const mapping = await this.getChannelMappingById(tenantId, request.mappingId);
+      const mapping = await this.getChannelMappingById(
+        tenantId,
+        request.mappingId,
+      );
 
-      this.logger.debug(`Transforming data for mapping ${request.mappingId}`, { request });
+      this.logger.debug(`Transforming data for mapping ${request.mappingId}`, {
+        request,
+      });
 
       const result: MappingTransformResult = {
         success: true,
@@ -487,8 +533,12 @@ export class ChannelMappingService {
         tenantId,
         channelId: mapping.channelId,
         type: IntegrationLogType.SYSTEM,
-        level: result.success ? IntegrationLogLevel.DEBUG : IntegrationLogLevel.WARN,
-        message: `Data transformation ${result.success ? 'completed' : 'failed'}: ${mapping.mappingType}`,
+        level: result.success
+          ? IntegrationLogLevel.DEBUG
+          : IntegrationLogLevel.WARN,
+        message: `Data transformation ${
+          result.success ? 'completed' : 'failed'
+        }: ${mapping.mappingType}`,
         metadata: {
           mappingId: request.mappingId,
           direction: request.direction,
@@ -498,9 +548,11 @@ export class ChannelMappingService {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Failed to transform data: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to transform data: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         mappingId: request.mappingId,
@@ -520,20 +572,25 @@ export class ChannelMappingService {
     resolution: MappingConflictResolution,
   ): Promise<ChannelMapping> {
     try {
-      const mapping = await this.getChannelMappingById(tenantId, resolution.mappingId);
+      const mapping = await this.getChannelMappingById(
+        tenantId,
+        resolution.mappingId,
+      );
 
       if (!mapping.hasConflict) {
-        throw new BadRequestException('Mapping does not have any conflicts to resolve');
+        throw new BadRequestException(
+          'Mapping does not have any conflicts to resolve',
+        );
       }
 
       // Apply conflict resolution
       const resolutionMap = {
-        'internal_wins': 'internal' as const,
-        'external_wins': 'external' as const,
-        'merge': 'merge' as const,
-        'manual': 'merge' as const, // Default manual to merge
+        internal_wins: 'internal' as const,
+        external_wins: 'external' as const,
+        merge: 'merge' as const,
+        manual: 'merge' as const, // Default manual to merge
       };
-      
+
       const mappedResolution = resolutionMap[resolution.resolution] || 'merge';
       mapping.resolveConflict(mappedResolution, resolution.mergeStrategy);
       const resolvedMapping = await this.mappingRepository.save(mapping);
@@ -562,9 +619,11 @@ export class ChannelMappingService {
       });
 
       return resolvedMapping;
-
     } catch (error) {
-      this.logger.error(`Failed to resolve mapping conflict: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to resolve mapping conflict: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -572,7 +631,10 @@ export class ChannelMappingService {
   /**
    * Validate a mapping
    */
-  async validateMapping(tenantId: string, mappingId: string): Promise<MappingValidationResult> {
+  async validateMapping(
+    tenantId: string,
+    mappingId: string,
+  ): Promise<MappingValidationResult> {
     try {
       const mapping = await this.getChannelMappingById(tenantId, mappingId);
 
@@ -611,18 +673,24 @@ export class ChannelMappingService {
       });
 
       // Calculate overall score
-      const passedChecks = result.validationChecks.filter(check => check.passed).length;
+      const passedChecks = result.validationChecks.filter(
+        check => check.passed,
+      ).length;
       const totalChecks = result.validationChecks.length;
-      result.overallScore = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
+      result.overallScore =
+        totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
 
       // Determine overall validity
-      result.isValid = !result.validationChecks.some(check => 
-        check.severity === 'error' && !check.passed
+      result.isValid = !result.validationChecks.some(
+        check => check.severity === 'error' && !check.passed,
       );
 
       // Generate recommendations
       if (result.overallScore < 100) {
-        result.recommendations = this.generateMappingRecommendations(mapping, result.validationChecks);
+        result.recommendations = this.generateMappingRecommendations(
+          mapping,
+          result.validationChecks,
+        );
       }
 
       // Update mapping verification status
@@ -633,18 +701,22 @@ export class ChannelMappingService {
       }
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Failed to validate mapping: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to validate mapping: ${error.message}`,
+        error.stack,
+      );
       return {
         isValid: false,
         mappingId,
-        validationChecks: [{
-          checkType: 'system_error',
-          passed: false,
-          message: error.message,
-          severity: 'error',
-        }],
+        validationChecks: [
+          {
+            checkType: 'system_error',
+            passed: false,
+            message: error.message,
+            severity: 'error',
+          },
+        ],
         overallScore: 0,
       };
     }
@@ -658,9 +730,12 @@ export class ChannelMappingService {
     operation: BulkMappingOperation,
   ): Promise<BulkMappingResult> {
     try {
-      this.logger.debug(`Performing bulk mapping operation: ${operation.operation}`, {
-        itemsCount: operation.mappings.length,
-      });
+      this.logger.debug(
+        `Performing bulk mapping operation: ${operation.operation}`,
+        {
+          itemsCount: operation.mappings.length,
+        },
+      );
 
       const result: BulkMappingResult = {
         success: true,
@@ -677,12 +752,22 @@ export class ChannelMappingService {
 
           switch (operation.operation) {
             case 'create':
-              operationResult = await this.createChannelMapping(tenantId, item as CreateChannelMappingDto);
+              operationResult = await this.createChannelMapping(
+                tenantId,
+                item as CreateChannelMappingDto,
+              );
               break;
 
             case 'update':
-              const updateItem = item as { id: string; updates: UpdateChannelMappingDto };
-              operationResult = await this.updateChannelMapping(tenantId, updateItem.id, updateItem.updates);
+              const updateItem = item as {
+                id: string;
+                updates: UpdateChannelMappingDto;
+              };
+              operationResult = await this.updateChannelMapping(
+                tenantId,
+                updateItem.id,
+                updateItem.updates,
+              );
               break;
 
             case 'delete':
@@ -693,7 +778,10 @@ export class ChannelMappingService {
 
             case 'validate':
               const validateItem = item as { id: string };
-              operationResult = await this.validateMapping(tenantId, validateItem.id);
+              operationResult = await this.validateMapping(
+                tenantId,
+                validateItem.id,
+              );
               break;
 
             default:
@@ -706,7 +794,6 @@ export class ChannelMappingService {
             result: operationResult,
           });
           result.successCount++;
-
         } catch (error) {
           result.results.push({
             success: false,
@@ -723,7 +810,9 @@ export class ChannelMappingService {
       await this.logService.log({
         tenantId,
         type: IntegrationLogType.SYSTEM,
-        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
+        level: result.success
+          ? IntegrationLogLevel.INFO
+          : IntegrationLogLevel.WARN,
         message: `Bulk mapping operation completed: ${result.successCount}/${result.totalItems} successful`,
         metadata: {
           operation: operation.operation,
@@ -732,9 +821,11 @@ export class ChannelMappingService {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Failed bulk mapping operation: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed bulk mapping operation: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -750,14 +841,18 @@ export class ChannelMappingService {
 
     if (direction === 'internal_to_external') {
       // Map internal fields to external fields
-      for (const [internalField, externalField] of Object.entries(fieldMappings)) {
+      for (const [internalField, externalField] of Object.entries(
+        fieldMappings,
+      )) {
         if (sourceData[internalField] !== undefined) {
           result[externalField] = sourceData[internalField];
         }
       }
     } else {
       // Map external fields to internal fields
-      for (const [internalField, externalField] of Object.entries(fieldMappings)) {
+      for (const [internalField, externalField] of Object.entries(
+        fieldMappings,
+      )) {
         if (sourceData[externalField] !== undefined) {
           result[internalField] = sourceData[externalField];
         }
@@ -819,7 +914,11 @@ export class ChannelMappingService {
           break;
 
         case 'format':
-          if (value && rules.pattern && !new RegExp(rules.pattern).test(value)) {
+          if (
+            value &&
+            rules.pattern &&
+            !new RegExp(rules.pattern).test(value)
+          ) {
             errors.push(`Field ${field} format is invalid`);
           }
           break;
@@ -856,11 +955,20 @@ export class ChannelMappingService {
     return value;
   }
 
-  private calculateValue(data: Record<string, any>, field: string, rules: any): any {
+  private calculateValue(
+    data: Record<string, any>,
+    field: string,
+    rules: any,
+  ): any {
     if (rules.formula) {
       // Simple formula evaluation - in production, use a safe formula evaluator
       try {
-        return eval(rules.formula.replace(/\$(\w+)/g, (match, fieldName) => data[fieldName] || 0));
+        return eval(
+          rules.formula.replace(
+            /\$(\w+)/g,
+            (match, fieldName) => data[fieldName] || 0,
+          ),
+        );
       } catch (error) {
         this.logger.error(`Formula evaluation failed: ${error.message}`);
         return data[field];
@@ -876,7 +984,11 @@ export class ChannelMappingService {
     return rules.defaultValue || value;
   }
 
-  private conditionalValue(data: Record<string, any>, field: string, rules: any): any {
+  private conditionalValue(
+    data: Record<string, any>,
+    field: string,
+    rules: any,
+  ): any {
     if (rules.conditions) {
       for (const condition of rules.conditions) {
         if (this.evaluateCondition(data, condition.if)) {
@@ -887,7 +999,10 @@ export class ChannelMappingService {
     return rules.else || data[field];
   }
 
-  private evaluateCondition(data: Record<string, any>, condition: any): boolean {
+  private evaluateCondition(
+    data: Record<string, any>,
+    condition: any,
+  ): boolean {
     // Simple condition evaluation - in production, use a more sophisticated evaluator
     const { field, operator, value } = condition;
     const fieldValue = data[field];
@@ -915,8 +1030,11 @@ export class ChannelMappingService {
       case MappingType.PRODUCT:
         checks.push({
           checkType: 'product_validation',
-          passed: Boolean(mapping.internalData?.sku && mapping.externalData?.sku),
-          message: 'Product SKUs are present in both internal and external data',
+          passed: Boolean(
+            mapping.internalData?.sku && mapping.externalData?.sku,
+          ),
+          message:
+            'Product SKUs are present in both internal and external data',
           severity: 'warning' as const,
         });
         break;
@@ -924,8 +1042,11 @@ export class ChannelMappingService {
       case MappingType.CATEGORY:
         checks.push({
           checkType: 'category_validation',
-          passed: Boolean(mapping.internalData?.name && mapping.externalData?.name),
-          message: 'Category names are present in both internal and external data',
+          passed: Boolean(
+            mapping.internalData?.name && mapping.externalData?.name,
+          ),
+          message:
+            'Category names are present in both internal and external data',
           severity: 'warning' as const,
         });
         break;
@@ -943,7 +1064,10 @@ export class ChannelMappingService {
     let totalFields = 0;
 
     for (const field of commonFields) {
-      if (mapping.internalData[field] !== undefined && mapping.externalData[field] !== undefined) {
+      if (
+        mapping.internalData[field] !== undefined &&
+        mapping.externalData[field] !== undefined
+      ) {
         totalFields++;
         if (mapping.internalData[field] === mapping.externalData[field]) {
           consistentFields++;
@@ -951,17 +1075,26 @@ export class ChannelMappingService {
       }
     }
 
-    const consistencyRatio = totalFields > 0 ? consistentFields / totalFields : 1;
+    const consistencyRatio =
+      totalFields > 0 ? consistentFields / totalFields : 1;
 
     return {
       checkType: 'data_consistency',
       passed: consistencyRatio >= 0.8, // 80% consistency threshold
       message: `Data consistency: ${Math.round(consistencyRatio * 100)}%`,
-      severity: consistencyRatio < 0.5 ? 'error' : consistencyRatio < 0.8 ? 'warning' : 'info',
+      severity:
+        consistencyRatio < 0.5
+          ? 'error'
+          : consistencyRatio < 0.8
+          ? 'warning'
+          : 'info',
     };
   }
 
-  private generateMappingRecommendations(mapping: ChannelMapping, checks: any[]): string[] {
+  private generateMappingRecommendations(
+    mapping: ChannelMapping,
+    checks: any[],
+  ): string[] {
     const recommendations = [];
 
     if (!mapping.isVerified) {
@@ -973,12 +1106,18 @@ export class ChannelMappingService {
     }
 
     if (mapping.errorCount > 5) {
-      recommendations.push('Consider reviewing mapping rules due to high error count');
+      recommendations.push(
+        'Consider reviewing mapping rules due to high error count',
+      );
     }
 
-    const failedChecks = checks.filter(check => !check.passed && check.severity === 'error');
+    const failedChecks = checks.filter(
+      check => !check.passed && check.severity === 'error',
+    );
     if (failedChecks.length > 0) {
-      recommendations.push('Resolve critical validation errors before using this mapping');
+      recommendations.push(
+        'Resolve critical validation errors before using this mapping',
+      );
     }
 
     return recommendations;

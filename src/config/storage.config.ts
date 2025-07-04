@@ -6,14 +6,14 @@ export const storageConfig = registerAs('storage', () => ({
   accessKey: process.env.MINIO_ACCESS_KEY || 'minioadmin',
   secretKey: process.env.MINIO_SECRET_KEY || 'minioadmin123',
   region: process.env.MINIO_REGION || 'us-east-1',
-  
+
   // Buckets
   buckets: {
     uploads: process.env.MINIO_BUCKET_UPLOADS || 'stokcerdas-uploads',
     exports: process.env.MINIO_BUCKET_EXPORTS || 'stokcerdas-exports',
     backups: process.env.MINIO_BUCKET_BACKUPS || 'stokcerdas-backups',
   },
-  
+
   // File limits
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 10485760, // 10MB
   allowedMimeTypes: process.env.ALLOWED_MIME_TYPES?.split(',') || [
@@ -26,7 +26,7 @@ export const storageConfig = registerAs('storage', () => ({
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ],
-  
+
   // CDN
   cdnUrl: process.env.CDN_URL || process.env.MINIO_ENDPOINT,
   useSSL: process.env.MINIO_USE_SSL === 'true' || false,

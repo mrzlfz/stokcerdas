@@ -6,10 +6,16 @@ import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
 
-import { Channel, ChannelStatus } from '../../../channels/entities/channel.entity';
+import {
+  Channel,
+  ChannelStatus,
+} from '../../../channels/entities/channel.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { TokopediaApiService, TokopediaConfig } from './tokopedia-api.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface TokopediaAuthConfig {
   clientId: string;
@@ -91,7 +97,9 @@ export class TokopediaAuthService {
   ): Promise<{ authUrl: string; state: string }> {
     try {
       const authState = state || this.generateState();
-      const baseUrl = config.sandbox ? this.authUrls.sandbox : this.authUrls.production;
+      const baseUrl = config.sandbox
+        ? this.authUrls.sandbox
+        : this.authUrls.production;
 
       // Standard Tokopedia OAuth scopes
       const scopes = [
@@ -142,16 +150,13 @@ export class TokopediaAuthService {
         authUrl,
         state: authState,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate authorization URL: ${error.message}`, error.stack);
-      
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { },
+      this.logger.error(
+        `Failed to generate authorization URL: ${error.message}`,
+        error.stack,
       );
+
+      await this.logService.logError(tenantId, channelId, error, {});
 
       throw error;
     }
@@ -172,7 +177,9 @@ export class TokopediaAuthService {
         channelId,
       });
 
-      const baseUrl = config.sandbox ? this.apiUrls.sandbox : this.apiUrls.production;
+      const baseUrl = config.sandbox
+        ? this.apiUrls.sandbox
+        : this.apiUrls.production;
       const tokenUrl = `${baseUrl}/oauth/token`;
 
       const tokenData = {
@@ -197,7 +204,9 @@ export class TokopediaAuthService {
       );
 
       if (response.status !== 200) {
-        throw new Error(`Token exchange failed: ${response.data?.error || 'Unknown error'}`);
+        throw new Error(
+          `Token exchange failed: ${response.data?.error || 'Unknown error'}`,
+        );
       }
 
       const tokenInfo = response.data;
@@ -238,16 +247,10 @@ export class TokopediaAuthService {
       });
 
       return tokenInfo;
-
     } catch (error) {
       this.logger.error(`Token exchange failed: ${error.message}`, error.stack);
-      
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { },
-      );
+
+      await this.logService.logError(tenantId, channelId, error, {});
 
       throw error;
     }
@@ -277,7 +280,9 @@ export class TokopediaAuthService {
         channelId,
       });
 
-      const baseUrl = config.sandbox ? this.apiUrls.sandbox : this.apiUrls.production;
+      const baseUrl = config.sandbox
+        ? this.apiUrls.sandbox
+        : this.apiUrls.production;
       const tokenUrl = `${baseUrl}/oauth/token`;
 
       const tokenData = {
@@ -301,7 +306,9 @@ export class TokopediaAuthService {
       );
 
       if (response.status !== 200) {
-        throw new Error(`Token refresh failed: ${response.data?.error || 'Unknown error'}`);
+        throw new Error(
+          `Token refresh failed: ${response.data?.error || 'Unknown error'}`,
+        );
       }
 
       const tokenInfo = response.data;
@@ -336,16 +343,10 @@ export class TokopediaAuthService {
       });
 
       return tokenInfo;
-
     } catch (error) {
       this.logger.error(`Token refresh failed: ${error.message}`, error.stack);
-      
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { },
-      );
+
+      await this.logService.logError(tenantId, channelId, error, {});
 
       throw error;
     }
@@ -382,19 +383,21 @@ export class TokopediaAuthService {
         });
 
         await this.refreshAccessToken(tenantId, channelId);
-        
+
         // Fetch updated credentials
         const updatedChannel = await this.channelRepository.findOne({
           where: { id: channelId, tenantId },
         });
-        
+
         return updatedChannel.config.credentials as TokopediaCredentials;
       }
 
       return credentials;
-
     } catch (error) {
-      this.logger.error(`Failed to get valid credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get valid credentials: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -405,7 +408,11 @@ export class TokopediaAuthService {
   async testAuthentication(
     tenantId: string,
     channelId: string,
-  ): Promise<{ isValid: boolean; userInfo?: TokopediaUserInfo; error?: string }> {
+  ): Promise<{
+    isValid: boolean;
+    userInfo?: TokopediaUserInfo;
+    error?: string;
+  }> {
     try {
       const credentials = await this.getValidCredentials(tenantId, channelId);
       const channel = await this.channelRepository.findOne({
@@ -422,7 +429,11 @@ export class TokopediaAuthService {
       };
 
       // Test with shop info endpoint
-      const result = await this.apiService.testConnection(tenantId, channelId, config);
+      const result = await this.apiService.testConnection(
+        tenantId,
+        channelId,
+        config,
+      );
 
       if (result.success) {
         return {
@@ -431,13 +442,15 @@ export class TokopediaAuthService {
             user_id: credentials.shopId || 'unknown',
             name: channel.name || 'Unknown Shop',
             email: 'unknown@example.com',
-            shops: [{
-              shop_id: credentials.shopId || 'unknown',
-              shop_name: channel.name || 'Unknown Shop',
-              shop_domain: 'unknown',
-              is_official: false,
-              status: 'active',
-            }],
+            shops: [
+              {
+                shop_id: credentials.shopId || 'unknown',
+                shop_name: channel.name || 'Unknown Shop',
+                shop_domain: 'unknown',
+                is_official: false,
+                status: 'active',
+              },
+            ],
           },
         };
       } else {
@@ -446,10 +459,12 @@ export class TokopediaAuthService {
           error: result.error,
         };
       }
-
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
+
       return {
         isValid: false,
         error: error.message,
@@ -495,16 +510,13 @@ export class TokopediaAuthService {
         success: true,
         message: 'Authentication revoked successfully',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
-      
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { },
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
       );
+
+      await this.logService.logError(tenantId, channelId, error, {});
 
       return {
         success: false,
@@ -545,7 +557,11 @@ export class TokopediaAuthService {
     config: TokopediaAuthConfig,
   ): Promise<{ success: boolean; message: string }> {
     try {
-      if (!config.tiktokShopEnabled || !config.tiktokAppKey || !config.tiktokAppSecret) {
+      if (
+        !config.tiktokShopEnabled ||
+        !config.tiktokAppKey ||
+        !config.tiktokAppSecret
+      ) {
         throw new Error('TikTok Shop configuration not available');
       }
 
@@ -556,7 +572,7 @@ export class TokopediaAuthService {
 
       // Here you would implement TikTok Shop OAuth flow
       // This is a placeholder for the actual TikTok Shop integration
-      
+
       await this.logService.log({
         tenantId,
         channelId,
@@ -570,16 +586,13 @@ export class TokopediaAuthService {
         success: true,
         message: 'TikTok Shop migration completed successfully',
       };
-
     } catch (error) {
-      this.logger.error(`TikTok Shop migration failed: ${error.message}`, error.stack);
-      
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { },
+      this.logger.error(
+        `TikTok Shop migration failed: ${error.message}`,
+        error.stack,
       );
+
+      await this.logService.logError(tenantId, channelId, error, {});
 
       return {
         success: false,

@@ -172,7 +172,9 @@ export class MLModel extends BaseEntity {
 
   get modelAge(): number {
     if (!this.trainedAt) return 0;
-    return Math.floor((new Date().getTime() - this.trainedAt.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.floor(
+      (new Date().getTime() - this.trainedAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
   }
 
   // Methods
@@ -195,7 +197,9 @@ export class MLModel extends BaseEntity {
     if (this.status === ModelStatus.TRAINED && this.isAccurate) {
       this.status = ModelStatus.DEPLOYED;
       this.deployedAt = new Date();
-      this.nextRetrainingAt = new Date(Date.now() + this.retrainingIntervalDays * 24 * 60 * 60 * 1000);
+      this.nextRetrainingAt = new Date(
+        Date.now() + this.retrainingIntervalDays * 24 * 60 * 60 * 1000,
+      );
     }
   }
 

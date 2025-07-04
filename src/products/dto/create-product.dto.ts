@@ -168,7 +168,10 @@ export class CreateProductDto {
   @ApiPropertyOptional({
     description: 'Array URL gambar produk',
     type: [String],
-    example: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'],
+    example: [
+      'https://example.com/image1.jpg',
+      'https://example.com/image2.jpg',
+    ],
   })
   @IsOptional()
   @IsArray()

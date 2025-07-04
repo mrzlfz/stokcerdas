@@ -3,10 +3,10 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 
-import { 
-  WorkflowStepType, 
-  ConditionOperator, 
-  DataTransformOperation 
+import {
+  WorkflowStepType,
+  ConditionOperator,
+  DataTransformOperation,
 } from '../entities/workflow-step.entity';
 import { WorkflowCategory } from '../entities/workflow.entity';
 
@@ -60,12 +60,15 @@ export interface WorkflowTemplate {
     configuration: any;
     executionOrder: number;
   }>;
-  variables?: Record<string, {
-    type: string;
-    description: string;
-    defaultValue?: any;
-    required?: boolean;
-  }>;
+  variables?: Record<
+    string,
+    {
+      type: string;
+      description: string;
+      defaultValue?: any;
+      required?: boolean;
+    }
+  >;
   documentation?: {
     overview: string;
     useCases: string[];
@@ -95,13 +98,18 @@ export class ActionTemplateService {
   // ACTION TEMPLATE MANAGEMENT
   // =============================================
 
-  async getActionTemplates(category?: string, difficulty?: string): Promise<ActionTemplate[]> {
-    const cacheKey = `${this.cachePrefix}:actions:${category || 'all'}:${difficulty || 'all'}`;
-    
+  async getActionTemplates(
+    category?: string,
+    difficulty?: string,
+  ): Promise<ActionTemplate[]> {
+    const cacheKey = `${this.cachePrefix}:actions:${category || 'all'}:${
+      difficulty || 'all'
+    }`;
+
     let templates = await this.cacheManager.get<ActionTemplate[]>(cacheKey);
     if (!templates) {
       templates = this.loadActionTemplates();
-      
+
       // Filter by category and difficulty if specified
       if (category) {
         templates = templates.filter(t => t.category === category);
@@ -109,10 +117,10 @@ export class ActionTemplateService {
       if (difficulty) {
         templates = templates.filter(t => t.difficulty === difficulty);
       }
-      
+
       await this.cacheManager.set(cacheKey, templates, 3600); // 1 hour
     }
-    
+
     return templates;
   }
 
@@ -121,29 +129,36 @@ export class ActionTemplateService {
     return templates.find(t => t.id === templateId) || null;
   }
 
-  async getWorkflowTemplates(category?: WorkflowCategory): Promise<WorkflowTemplate[]> {
+  async getWorkflowTemplates(
+    category?: WorkflowCategory,
+  ): Promise<WorkflowTemplate[]> {
     const cacheKey = `${this.cachePrefix}:workflows:${category || 'all'}`;
-    
+
     let templates = await this.cacheManager.get<WorkflowTemplate[]>(cacheKey);
     if (!templates) {
       templates = this.loadWorkflowTemplates();
-      
+
       if (category) {
         templates = templates.filter(t => t.category === category);
       }
-      
+
       await this.cacheManager.set(cacheKey, templates, 3600);
     }
-    
+
     return templates;
   }
 
-  async getWorkflowTemplate(templateId: string): Promise<WorkflowTemplate | null> {
+  async getWorkflowTemplate(
+    templateId: string,
+  ): Promise<WorkflowTemplate | null> {
     const templates = await this.getWorkflowTemplates();
     return templates.find(t => t.id === templateId) || null;
   }
 
-  async searchTemplates(query: string, type: 'action' | 'workflow' | 'both' = 'both'): Promise<{
+  async searchTemplates(
+    query: string,
+    type: 'action' | 'workflow' | 'both' = 'both',
+  ): Promise<{
     actionTemplates: ActionTemplate[];
     workflowTemplates: WorkflowTemplate[];
   }> {
@@ -154,19 +169,21 @@ export class ActionTemplateService {
 
     if (type === 'action' || type === 'both') {
       const actionTemplates = await this.getActionTemplates();
-      result.actionTemplates = actionTemplates.filter(t => 
-        t.name.toLowerCase().includes(query.toLowerCase()) ||
-        t.description.toLowerCase().includes(query.toLowerCase()) ||
-        t.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))
+      result.actionTemplates = actionTemplates.filter(
+        t =>
+          t.name.toLowerCase().includes(query.toLowerCase()) ||
+          t.description.toLowerCase().includes(query.toLowerCase()) ||
+          t.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase())),
       );
     }
 
     if (type === 'workflow' || type === 'both') {
       const workflowTemplates = await this.getWorkflowTemplates();
-      result.workflowTemplates = workflowTemplates.filter(t => 
-        t.name.toLowerCase().includes(query.toLowerCase()) ||
-        t.description.toLowerCase().includes(query.toLowerCase()) ||
-        t.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))
+      result.workflowTemplates = workflowTemplates.filter(
+        t =>
+          t.name.toLowerCase().includes(query.toLowerCase()) ||
+          t.description.toLowerCase().includes(query.toLowerCase()) ||
+          t.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase())),
       );
     }
 
@@ -190,7 +207,10 @@ export class ActionTemplateService {
     };
   }
 
-  validateTemplateConfiguration(templateId: string, configuration: any): {
+  validateTemplateConfiguration(
+    templateId: string,
+    configuration: any,
+  ): {
     isValid: boolean;
     errors: string[];
     warnings: string[];
@@ -209,7 +229,12 @@ export class ActionTemplateService {
     const warnings: string[] = [];
 
     // Validate required fields based on step type
-    this.validateStepTypeConfiguration(template.stepType, configuration, errors, warnings);
+    this.validateStepTypeConfiguration(
+      template.stepType,
+      configuration,
+      errors,
+      warnings,
+    );
 
     return {
       isValid: errors.length === 0,
@@ -228,7 +253,8 @@ export class ActionTemplateService {
       {
         id: 'inventory_check_stock_level',
         name: 'Check Stock Level',
-        description: 'Memeriksa level stok produk dan mengambil tindakan berdasarkan kondisi tertentu',
+        description:
+          'Memeriksa level stok produk dan mengambil tindakan berdasarkan kondisi tertentu',
         category: 'inventory',
         stepType: WorkflowStepType.CHECK_STOCK_LEVEL,
         icon: '📦',
@@ -251,7 +277,8 @@ export class ActionTemplateService {
           isLowStock: { type: 'boolean' },
         },
         documentation: {
-          usage: 'Gunakan action ini untuk memeriksa level stok produk secara real-time',
+          usage:
+            'Gunakan action ini untuk memeriksa level stok produk secara real-time',
           examples: [
             {
               title: 'Check stock untuk produk tertentu',
@@ -295,11 +322,16 @@ export class ActionTemplateService {
           productId: { type: 'string', required: true },
           locationId: { type: 'string', required: true },
           adjustmentQuantity: { type: 'number', required: true },
-          adjustmentType: { type: 'string', enum: ['increase', 'decrease'], required: true },
+          adjustmentType: {
+            type: 'string',
+            enum: ['increase', 'decrease'],
+            required: true,
+          },
           reason: { type: 'string', required: true },
         },
         documentation: {
-          usage: 'Gunakan untuk melakukan penyesuaian stok manual atau otomatis',
+          usage:
+            'Gunakan untuk melakukan penyesuaian stok manual atau otomatis',
           examples: [
             {
               title: 'Koreksi stok karena stock opname',
@@ -357,7 +389,8 @@ export class ActionTemplateService {
           totalAmount: { type: 'number' },
         },
         documentation: {
-          usage: 'Membuat PO otomatis berdasarkan reorder rules atau manual trigger',
+          usage:
+            'Membuat PO otomatis berdasarkan reorder rules atau manual trigger',
           examples: [
             {
               title: 'PO otomatis untuk reorder',
@@ -384,7 +417,8 @@ export class ActionTemplateService {
       {
         id: 'notification_send_email',
         name: 'Send Email Notification',
-        description: 'Mengirim notifikasi email dengan template yang dapat dikustomisasi',
+        description:
+          'Mengirim notifikasi email dengan template yang dapat dikustomisasi',
         category: 'notification',
         stepType: WorkflowStepType.SEND_EMAIL,
         icon: '📧',
@@ -401,11 +435,19 @@ export class ActionTemplateService {
           },
         },
         inputSchema: {
-          emailRecipients: { type: 'array', items: { type: 'string', format: 'email' }, required: true },
+          emailRecipients: {
+            type: 'array',
+            items: { type: 'string', format: 'email' },
+            required: true,
+          },
           emailSubject: { type: 'string', required: true },
           emailMessage: { type: 'string', required: true },
           template: { type: 'string', required: false },
-          priority: { type: 'string', enum: ['low', 'normal', 'high', 'critical'], required: false },
+          priority: {
+            type: 'string',
+            enum: ['low', 'normal', 'high', 'critical'],
+            required: false,
+          },
         },
         documentation: {
           usage: 'Kirim email notification untuk berbagai event dalam workflow',
@@ -417,7 +459,8 @@ export class ActionTemplateService {
                 notification: {
                   recipients: ['manager@company.com'],
                   subject: 'Low Stock Alert: ${productName}',
-                  message: 'Stok produk ${productName} sudah mencapai level minimum. Silakan lakukan reorder.',
+                  message:
+                    'Stok produk ${productName} sudah mencapai level minimum. Silakan lakukan reorder.',
                   priority: 'high',
                 },
               },
@@ -456,7 +499,8 @@ export class ActionTemplateService {
           transformFunction: { type: 'string', required: true },
         },
         documentation: {
-          usage: 'Transform data struktur untuk memformat output sesuai kebutuhan',
+          usage:
+            'Transform data struktur untuk memformat output sesuai kebutuhan',
           examples: [
             {
               title: 'Format currency values',
@@ -466,7 +510,8 @@ export class ActionTemplateService {
                   operation: 'map',
                   sourceField: 'price',
                   targetField: 'formattedPrice',
-                  transformFunction: 'value => "Rp " + value.toLocaleString("id-ID")',
+                  transformFunction:
+                    'value => "Rp " + value.toLocaleString("id-ID")',
                 },
               },
             },
@@ -505,7 +550,8 @@ export class ActionTemplateService {
           sufficientStockStepId: { type: 'string', required: false },
         },
         documentation: {
-          usage: 'Gunakan untuk membuat cabang dalam workflow berdasarkan kondisi stok',
+          usage:
+            'Gunakan untuk membuat cabang dalam workflow berdasarkan kondisi stok',
           examples: [
             {
               title: 'Low stock decision',
@@ -546,7 +592,7 @@ export class ActionTemplateService {
             method: '${httpMethod}',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': '${authHeader}',
+              Authorization: '${authHeader}',
             },
             body: '${requestBody}',
             timeout: 30000,
@@ -555,7 +601,11 @@ export class ActionTemplateService {
         },
         inputSchema: {
           apiUrl: { type: 'string', format: 'uri', required: true },
-          httpMethod: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], required: true },
+          httpMethod: {
+            type: 'string',
+            enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+            required: true,
+          },
           authHeader: { type: 'string', required: false },
           requestBody: { type: 'object', required: false },
         },
@@ -565,7 +615,8 @@ export class ActionTemplateService {
           responseTime: { type: 'number' },
         },
         documentation: {
-          usage: 'Integrasikan dengan API eksternal untuk sinkronisasi data atau trigger action',
+          usage:
+            'Integrasikan dengan API eksternal untuk sinkronisasi data atau trigger action',
           examples: [
             {
               title: 'Sync product to e-commerce',
@@ -575,7 +626,7 @@ export class ActionTemplateService {
                   url: 'https://api.tokopedia.com/v1/products',
                   method: 'POST',
                   headers: {
-                    'Authorization': 'Bearer ${accessToken}',
+                    Authorization: 'Bearer ${accessToken}',
                     'Content-Type': 'application/json',
                   },
                   body: {
@@ -614,10 +665,15 @@ export class ActionTemplateService {
         },
         inputSchema: {
           delayDuration: { type: 'number', required: true },
-          delayUnit: { type: 'string', enum: ['ms', 'seconds', 'minutes', 'hours', 'days'], required: true },
+          delayUnit: {
+            type: 'string',
+            enum: ['ms', 'seconds', 'minutes', 'hours', 'days'],
+            required: true,
+          },
         },
         documentation: {
-          usage: 'Tambahkan jeda waktu dalam workflow untuk rate limiting atau timing control',
+          usage:
+            'Tambahkan jeda waktu dalam workflow untuk rate limiting atau timing control',
           examples: [
             {
               title: 'Wait before retry',
@@ -645,7 +701,8 @@ export class ActionTemplateService {
       {
         id: 'auto_reorder_workflow',
         name: 'Automatic Reorder Workflow',
-        description: 'Workflow otomatis untuk melakukan reorder ketika stok mencapai level minimum',
+        description:
+          'Workflow otomatis untuk melakukan reorder ketika stok mencapai level minimum',
         category: WorkflowCategory.INVENTORY_MANAGEMENT,
         icon: '🔄',
         tags: ['reorder', 'automation', 'inventory'],
@@ -706,7 +763,8 @@ export class ActionTemplateService {
           },
         },
         documentation: {
-          overview: 'Workflow ini secara otomatis memonitor level stok dan membuat purchase order ketika stok mencapai level minimum yang ditentukan.',
+          overview:
+            'Workflow ini secara otomatis memonitor level stok dan membuat purchase order ketika stok mencapai level minimum yang ditentukan.',
           useCases: [
             'Automatic reordering untuk fast-moving products',
             'Mencegah stockout pada produk kritis',
@@ -785,7 +843,8 @@ export class ActionTemplateService {
           },
         },
         documentation: {
-          overview: 'Simple workflow untuk monitoring stok dan mengirim alert ketika stok mencapai level rendah.',
+          overview:
+            'Simple workflow untuk monitoring stok dan mengirim alert ketika stok mencapai level rendah.',
           useCases: [
             'Daily stock monitoring',
             'Preventive stock management',
@@ -809,7 +868,8 @@ export class ActionTemplateService {
       {
         id: 'supplier_performance_review',
         name: 'Supplier Performance Review',
-        description: 'Workflow untuk review dan evaluasi performa supplier secara berkala',
+        description:
+          'Workflow untuk review dan evaluasi performa supplier secara berkala',
         category: WorkflowCategory.SUPPLIER_MANAGEMENT,
         icon: '📊',
         tags: ['supplier', 'performance', 'review'],
@@ -859,7 +919,8 @@ export class ActionTemplateService {
           },
         },
         documentation: {
-          overview: 'Comprehensive workflow untuk melakukan review performa supplier secara sistematis.',
+          overview:
+            'Comprehensive workflow untuk melakukan review performa supplier secara sistematis.',
           useCases: [
             'Monthly supplier review',
             'Supplier contract renewal evaluation',
@@ -918,7 +979,10 @@ export class ActionTemplateService {
         break;
 
       case WorkflowStepType.DELAY:
-        if (!configuration.delay?.duration || configuration.delay.duration <= 0) {
+        if (
+          !configuration.delay?.duration ||
+          configuration.delay.duration <= 0
+        ) {
           errors.push('Duration harus > 0 untuk delay step');
         }
         if (!configuration.delay?.unit) {
@@ -933,7 +997,10 @@ export class ActionTemplateService {
         if (!configuration.purchaseOrderOperation?.productId) {
           errors.push('Product ID diperlukan untuk create PO step');
         }
-        if (!configuration.purchaseOrderOperation?.quantity || configuration.purchaseOrderOperation.quantity <= 0) {
+        if (
+          !configuration.purchaseOrderOperation?.quantity ||
+          configuration.purchaseOrderOperation.quantity <= 0
+        ) {
           errors.push('Quantity harus > 0 untuk create PO step');
         }
         break;

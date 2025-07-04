@@ -6,17 +6,17 @@ export const CACHE_EVICT_KEY = 'cache_evict';
 
 /**
  * Cacheable Decorator
- * 
+ *
  * Automatically caches method results using the PerformanceCacheService.
  * Supports intelligent cache key generation and multi-level caching.
- * 
+ *
  * Usage Examples:
- * 
+ *
  * @Cacheable('products:list', { level: 'warm', ttl: 900 })
  * async findAllProducts(tenantId: string, filters: any) {
  *   // This method's result will be cached for 15 minutes
  * }
- * 
+ *
  * @Cacheable('inventory:item', { level: 'hot', ttl: 60, tags: ['inventory'] })
  * async getInventoryItem(tenantId: string, productId: string) {
  *   // Hot cache with 1 minute TTL and inventory tag
@@ -25,19 +25,19 @@ export const CACHE_EVICT_KEY = 'cache_evict';
 export interface CacheableOptions extends CacheOptions {
   // Cache key generation strategy
   keyStrategy?: 'auto' | 'custom';
-  
+
   // Custom key generator function
   keyGenerator?: (...args: any[]) => Record<string, any>;
-  
+
   // Conditional caching - cache only if this returns true
   condition?: (...args: any[]) => boolean;
-  
+
   // Whether to cache null/undefined results
   cacheNullValues?: boolean;
-  
+
   // Async cache warming - continue execution while updating cache in background
   asyncRefresh?: boolean;
-  
+
   // Cache version for schema changes
   version?: string;
 }
@@ -63,17 +63,17 @@ export function Cacheable(pattern: string, options: CacheableOptions = {}) {
 
 /**
  * Cache Evict Decorator
- * 
+ *
  * Automatically invalidates cache when method is called.
  * Supports pattern-based and tag-based invalidation.
- * 
+ *
  * Usage Examples:
- * 
+ *
  * @CacheEvict(['products:list', 'products:search'])
  * async updateProduct(tenantId: string, productId: string, data: any) {
  *   // Will invalidate product list and search caches
  * }
- * 
+ *
  * @CacheEvict({ tags: ['inventory'], patterns: ['inventory:*'] })
  * async updateInventory(data: any) {
  *   // Will invalidate all inventory-related caches
@@ -82,16 +82,16 @@ export function Cacheable(pattern: string, options: CacheableOptions = {}) {
 export interface CacheEvictOptions {
   // Cache patterns to invalidate
   patterns?: string[];
-  
+
   // Cache tags to invalidate
   tags?: string[];
-  
+
   // Whether to invalidate before or after method execution
   timing?: 'before' | 'after';
-  
+
   // Conditional eviction - evict only if this returns true
   condition?: (...args: any[]) => boolean;
-  
+
   // Whether to evict all tenant data
   allEntries?: boolean;
 }
@@ -99,21 +99,17 @@ export interface CacheEvictOptions {
 /**
  * Marks a method to evict cache entries
  */
-export function CacheEvict(
-  patternsOrOptions: string[] | CacheEvictOptions,
-) {
+export function CacheEvict(patternsOrOptions: string[] | CacheEvictOptions) {
   const options: CacheEvictOptions = Array.isArray(patternsOrOptions)
     ? { patterns: patternsOrOptions, timing: 'after' }
     : { timing: 'after', ...patternsOrOptions };
 
-  return applyDecorators(
-    SetMetadata(CACHE_EVICT_KEY, options),
-  );
+  return applyDecorators(SetMetadata(CACHE_EVICT_KEY, options));
 }
 
 /**
  * Cache Put Decorator
- * 
+ *
  * Always executes the method and updates the cache with the result.
  * Useful for methods that should always refresh cache data.
  */
@@ -133,7 +129,7 @@ export function CachePut(pattern: string, options: CacheableOptions = {}) {
 
 /**
  * Conditional Cache Decorator
- * 
+ *
  * Caches result only if condition is met.
  * Useful for caching expensive operations selectively.
  */
@@ -150,7 +146,7 @@ export function CacheableIf(
 
 /**
  * Time-based Cache Decorator
- * 
+ *
  * Caches with different TTLs based on time of day or business hours.
  * Useful for Indonesian business context.
  */
@@ -163,7 +159,7 @@ export function TimeBasedCache(
   } = {},
 ) {
   const timezone = options.timezone || 'Asia/Jakarta';
-  
+
   // Determine TTL based on current time in Indonesian timezone
   const getCurrentTTL = () => {
     const now = new Date();
@@ -172,15 +168,15 @@ export function TimeBasedCache(
       hour: 'numeric',
       hour12: false,
     }).format(now);
-    
+
     const hour = parseInt(jakartaTime);
     const isBusinessHours = hour >= 9 && hour < 18;
-    
-    return isBusinessHours 
-      ? (options.businessHoursTTL || 300) // 5 minutes during business hours
-      : (options.offHoursTTL || 1800); // 30 minutes during off hours
+
+    return isBusinessHours
+      ? options.businessHoursTTL || 300 // 5 minutes during business hours
+      : options.offHoursTTL || 1800; // 30 minutes during off hours
   };
-  
+
   return Cacheable(pattern, {
     ...options,
     ttl: getCurrentTTL(),
@@ -189,7 +185,7 @@ export function TimeBasedCache(
 
 /**
  * Indonesian Business Cache Decorator
- * 
+ *
  * Optimized for Indonesian SMB usage patterns:
  * - Higher cache during Ramadan (reduced business activity)
  * - Different TTLs for different provinces (timezone consideration)
@@ -206,26 +202,26 @@ export function IndonesianBusinessCache(
 ) {
   const getBusinessContextTTL = () => {
     const now = new Date();
-    
+
     // Get hour in appropriate Indonesian timezone
     let timezone = 'Asia/Jakarta'; // WIB
     if (options.province === 'WITA') timezone = 'Asia/Makassar';
     if (options.province === 'WIT') timezone = 'Asia/Jayapura';
-    
+
     const localHour = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       hour: 'numeric',
       hour12: false,
     }).format(now);
-    
+
     const hour = parseInt(localHour);
     const isPeakHours = hour >= 10 && hour <= 14; // 10 AM - 2 PM
-    
+
     return isPeakHours
-      ? (options.peakHoursTTL || 180) // 3 minutes during peak
-      : (options.normalTTL || 600); // 10 minutes normal
+      ? options.peakHoursTTL || 180 // 3 minutes during peak
+      : options.normalTTL || 600; // 10 minutes normal
   };
-  
+
   return Cacheable(pattern, {
     level: 'warm',
     ...options,
@@ -236,7 +232,7 @@ export function IndonesianBusinessCache(
 
 /**
  * Auto-Refresh Cache Decorator
- * 
+ *
  * Automatically refreshes cache in background before expiry.
  * Ensures users never experience cache misses for critical data.
  */
@@ -256,14 +252,11 @@ export function AutoRefreshCache(
 
 /**
  * Multi-Tenant Cache Decorator
- * 
+ *
  * Automatically includes tenant context in cache keys and tags.
  * Ensures proper tenant isolation in cached data.
  */
-export function TenantCache(
-  pattern: string,
-  options: CacheableOptions = {},
-) {
+export function TenantCache(pattern: string, options: CacheableOptions = {}) {
   return Cacheable(`tenant:${pattern}`, {
     ...options,
     keyGenerator: (...args: any[]) => {
@@ -280,7 +273,7 @@ export function TenantCache(
 
 /**
  * Inventory Specific Cache Decorator
- * 
+ *
  * Optimized for inventory operations with business-specific caching strategy.
  */
 export function InventoryCache(
@@ -297,7 +290,7 @@ export function InventoryCache(
 
 /**
  * Analytics Cache Decorator
- * 
+ *
  * Long-term caching for analytics and reporting data.
  */
 export function AnalyticsCache(

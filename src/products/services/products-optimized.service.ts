@@ -1,29 +1,53 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  Inject,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, IsNull, Not, In, QueryRunner, SelectQueryBuilder } from 'typeorm';
+import {
+  Repository,
+  Like,
+  Between,
+  IsNull,
+  Not,
+  In,
+  QueryRunner,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 
-import { Product, ProductStatus, ProductType } from '../entities/product.entity';
+import {
+  Product,
+  ProductStatus,
+  ProductType,
+} from '../entities/product.entity';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { ProductQueryDto } from '../dto/product-query.dto';
-import { BulkCreateProductDto, BulkUpdateProductDto, BulkDeleteProductDto, BulkProductResponseDto } from '../dto/bulk-product.dto';
+import {
+  BulkCreateProductDto,
+  BulkUpdateProductDto,
+  BulkDeleteProductDto,
+  BulkProductResponseDto,
+} from '../dto/bulk-product.dto';
 
 // Import cache decorators
-import { 
-  TenantCache, 
-  CacheEvict, 
+import {
+  TenantCache,
+  CacheEvict,
   InventoryCache,
   IndonesianBusinessCache,
-  AutoRefreshCache 
+  AutoRefreshCache,
 } from '../../common/decorators/cacheable.decorator';
 
 /**
  * Optimized Products Service
- * 
+ *
  * Performance improvements:
  * 1. Selective relation loading based on needs
  * 2. Query result caching with intelligent invalidation
@@ -31,7 +55,7 @@ import {
  * 4. Bulk operations optimization
  * 5. Indonesian business context awareness
  * 6. Multi-level caching strategy
- * 
+ *
  * Target Performance:
  * - Product list queries: 70-80% faster
  * - Search operations: 90%+ faster (with full-text search)
@@ -40,7 +64,12 @@ import {
  */
 
 export interface ProductSearchOptions {
-  includeRelations?: ('category' | 'supplier' | 'variants' | 'inventoryItems')[];
+  includeRelations?: (
+    | 'category'
+    | 'supplier'
+    | 'variants'
+    | 'inventoryItems'
+  )[];
   useFullTextSearch?: boolean;
   cacheLevel?: 'hot' | 'warm' | 'cold';
   skipCache?: boolean;
@@ -73,7 +102,11 @@ export class ProductsOptimizedService {
    * Create product with optimized validation and caching
    */
   @CacheEvict(['products:list', 'products:search', 'products:count'])
-  async create(tenantId: string, createProductDto: CreateProductDto, userId?: string): Promise<Product> {
+  async create(
+    tenantId: string,
+    createProductDto: CreateProductDto,
+    userId?: string,
+  ): Promise<Product> {
     // Batch validation untuk performance
     await this.batchValidation(tenantId, createProductDto);
 
@@ -107,22 +140,26 @@ export class ProductsOptimizedService {
   /**
    * Optimized product listing with intelligent caching and selective loading
    */
-  @TenantCache('products:list', { 
-    level: 'warm', 
-    ttl: 900, // 15 minutes 
-    tags: ['products', 'inventory'] 
+  @TenantCache('products:list', {
+    level: 'warm',
+    ttl: 900, // 15 minutes
+    tags: ['products', 'inventory'],
   })
   async findAll(
-    tenantId: string, 
+    tenantId: string,
     query: ProductQueryDto,
-    options: ProductSearchOptions = {}
+    options: ProductSearchOptions = {},
   ): Promise<ProductListResponse> {
     const startTime = Date.now();
     const { includeRelations = [], useFullTextSearch = true } = options;
 
     try {
       // Build optimized query with selective relation loading
-      const queryBuilder = this.buildOptimizedQuery(tenantId, query, includeRelations);
+      const queryBuilder = this.buildOptimizedQuery(
+        tenantId,
+        query,
+        includeRelations,
+      );
 
       // Use full-text search for better performance if enabled and search exists
       if (query.search && useFullTextSearch) {
@@ -157,24 +194,30 @@ export class ProductsOptimizedService {
           cacheHit: false, // Will be set by cache interceptor
         },
       };
-
     } catch (error) {
-      throw new BadRequestException(`Error in product search: ${error.message}`);
+      throw new BadRequestException(
+        `Error in product search: ${error.message}`,
+      );
     }
   }
 
   /**
    * Optimized single product retrieval with smart relation loading
    */
-  @TenantCache('products:detail', { 
-    level: 'hot', 
+  @TenantCache('products:detail', {
+    level: 'hot',
     ttl: 300, // 5 minutes for hot data
-    tags: ['products'] 
+    tags: ['products'],
   })
   async findOne(
-    tenantId: string, 
-    id: string, 
-    includeRelations: ('category' | 'supplier' | 'variants' | 'inventoryItems')[] = ['category', 'supplier']
+    tenantId: string,
+    id: string,
+    includeRelations: (
+      | 'category'
+      | 'supplier'
+      | 'variants'
+      | 'inventoryItems'
+    )[] = ['category', 'supplier'],
   ): Promise<Product> {
     try {
       // Build query with only required relations
@@ -197,7 +240,10 @@ export class ProductsOptimizedService {
             queryBuilder.leftJoinAndSelect('product.variants', 'variants');
             break;
           case 'inventoryItems':
-            queryBuilder.leftJoinAndSelect('product.inventoryItems', 'inventoryItems');
+            queryBuilder.leftJoinAndSelect(
+              'product.inventoryItems',
+              'inventoryItems',
+            );
             break;
         }
       });
@@ -214,22 +260,23 @@ export class ProductsOptimizedService {
       });
 
       return product;
-
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException(`Error retrieving product: ${error.message}`);
+      throw new BadRequestException(
+        `Error retrieving product: ${error.message}`,
+      );
     }
   }
 
   /**
    * Optimized SKU lookup with caching
    */
-  @TenantCache('products:sku', { 
-    level: 'hot', 
+  @TenantCache('products:sku', {
+    level: 'hot',
     ttl: 600, // 10 minutes
-    tags: ['products'] 
+    tags: ['products'],
   })
   async findBySku(tenantId: string, sku: string): Promise<Product> {
     const product = await this.productRepository
@@ -251,10 +298,10 @@ export class ProductsOptimizedService {
   /**
    * Optimized barcode lookup with caching
    */
-  @TenantCache('products:barcode', { 
-    level: 'hot', 
+  @TenantCache('products:barcode', {
+    level: 'hot',
     ttl: 600, // 10 minutes
-    tags: ['products'] 
+    tags: ['products'],
   })
   async findByBarcode(tenantId: string, barcode: string): Promise<Product> {
     const product = await this.productRepository
@@ -267,7 +314,9 @@ export class ProductsOptimizedService {
       .getOne();
 
     if (!product) {
-      throw new NotFoundException(`Produk dengan barcode "${barcode}" tidak ditemukan`);
+      throw new NotFoundException(
+        `Produk dengan barcode "${barcode}" tidak ditemukan`,
+      );
     }
 
     return product;
@@ -276,8 +325,19 @@ export class ProductsOptimizedService {
   /**
    * Update product with intelligent cache invalidation
    */
-  @CacheEvict(['products:list', 'products:search', 'products:detail', 'products:sku', 'products:barcode'])
-  async update(tenantId: string, id: string, updateProductDto: UpdateProductDto, userId?: string): Promise<Product> {
+  @CacheEvict([
+    'products:list',
+    'products:search',
+    'products:detail',
+    'products:sku',
+    'products:barcode',
+  ])
+  async update(
+    tenantId: string,
+    id: string,
+    updateProductDto: UpdateProductDto,
+    userId?: string,
+  ): Promise<Product> {
     const product = await this.findOne(tenantId, id, []); // No relations needed for validation
 
     // Batch validation untuk performance
@@ -302,8 +362,19 @@ export class ProductsOptimizedService {
   /**
    * Remove product with cache invalidation
    */
-  @CacheEvict(['products:list', 'products:search', 'products:detail', 'products:sku', 'products:barcode'])
-  async remove(tenantId: string, id: string, hardDelete: boolean = false, userId?: string): Promise<void> {
+  @CacheEvict([
+    'products:list',
+    'products:search',
+    'products:detail',
+    'products:sku',
+    'products:barcode',
+  ])
+  async remove(
+    tenantId: string,
+    id: string,
+    hardDelete: boolean = false,
+    userId?: string,
+  ): Promise<void> {
     const product = await this.findOne(tenantId, id, []);
 
     if (hardDelete) {
@@ -328,13 +399,17 @@ export class ProductsOptimizedService {
   /**
    * High-performance product search with full-text search
    */
-  @IndonesianBusinessCache('products:search', { 
+  @IndonesianBusinessCache('products:search', {
     province: 'WIB',
     peakHoursTTL: 180, // 3 minutes during peak hours
     normalTTL: 600, // 10 minutes normally
-    tags: ['products', 'search'] 
+    tags: ['products', 'search'],
   })
-  async searchProducts(tenantId: string, searchQuery: string, limit: number = 20): Promise<Product[]> {
+  async searchProducts(
+    tenantId: string,
+    searchQuery: string,
+    limit: number = 20,
+  ): Promise<Product[]> {
     try {
       // Use PostgreSQL full-text search for optimal performance
       const products = await this.productRepository
@@ -342,15 +417,19 @@ export class ProductsOptimizedService {
         .leftJoinAndSelect('product.category', 'category')
         .where('product.tenantId = :tenantId', { tenantId })
         .andWhere('product.isDeleted = :isDeleted', { isDeleted: false })
-        .andWhere(`
+        .andWhere(
+          `
           to_tsvector('indonesian', 
             COALESCE(product.name, '') || ' ' || 
             COALESCE(product.description, '') || ' ' || 
             COALESCE(product.sku, '') || ' ' ||
             COALESCE(product.barcode, '')
           ) @@ plainto_tsquery('indonesian', :searchQuery)
-        `, { searchQuery })
-        .orderBy(`
+        `,
+          { searchQuery },
+        )
+        .orderBy(
+          `
           ts_rank(
             to_tsvector('indonesian', 
               COALESCE(product.name, '') || ' ' || 
@@ -360,12 +439,13 @@ export class ProductsOptimizedService {
             ), 
             plainto_tsquery('indonesian', :searchQuery)
           )
-        `, 'DESC')
+        `,
+          'DESC',
+        )
         .limit(limit)
         .getMany();
 
       return products;
-
     } catch (error) {
       // Fallback to traditional ILIKE search if full-text search fails
       return this.fallbackSearch(tenantId, searchQuery, limit);
@@ -375,8 +455,14 @@ export class ProductsOptimizedService {
   /**
    * Get low stock products with caching
    */
-  @InventoryCache('products:lowstock', { ttl: 300, tags: ['products', 'inventory', 'alerts'] })
-  async getLowStockProducts(tenantId: string, threshold?: number): Promise<Product[]> {
+  @InventoryCache('products:lowstock', {
+    ttl: 300,
+    tags: ['products', 'inventory', 'alerts'],
+  })
+  async getLowStockProducts(
+    tenantId: string,
+    threshold?: number,
+  ): Promise<Product[]> {
     const query = this.productRepository
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.inventoryItems', 'inventoryItems')
@@ -386,11 +472,13 @@ export class ProductsOptimizedService {
       .andWhere('product.trackStock = :trackStock', { trackStock: true });
 
     if (threshold) {
-      query.andWhere('product.minStock > 0')
-           .andWhere('inventoryItems.quantityOnHand <= :threshold', { threshold });
+      query
+        .andWhere('product.minStock > 0')
+        .andWhere('inventoryItems.quantityOnHand <= :threshold', { threshold });
     } else {
-      query.andWhere('product.minStock > 0')
-           .andWhere('inventoryItems.quantityOnHand <= product.minStock');
+      query
+        .andWhere('product.minStock > 0')
+        .andWhere('inventoryItems.quantityOnHand <= product.minStock');
     }
 
     return query.getMany();
@@ -399,10 +487,10 @@ export class ProductsOptimizedService {
   /**
    * Get product analytics with caching
    */
-  @TenantCache('products:analytics', { 
-    level: 'cold', 
+  @TenantCache('products:analytics', {
+    level: 'cold',
     ttl: 3600, // 1 hour
-    tags: ['products', 'analytics'] 
+    tags: ['products', 'analytics'],
   })
   async getProductAnalytics(tenantId: string): Promise<{
     totalProducts: number;
@@ -418,21 +506,21 @@ export class ProductsOptimizedService {
       lowStockCount,
       categoryCount,
       avgPriceResult,
-      topSelling
+      topSelling,
     ] = await Promise.all([
       // Total products
-      this.productRepository.count({ 
-        where: { tenantId, isDeleted: false } 
+      this.productRepository.count({
+        where: { tenantId, isDeleted: false },
       }),
-      
+
       // Active products
-      this.productRepository.count({ 
-        where: { tenantId, isDeleted: false, status: ProductStatus.ACTIVE } 
+      this.productRepository.count({
+        where: { tenantId, isDeleted: false, status: ProductStatus.ACTIVE },
       }),
-      
+
       // Low stock products count
       this.getLowStockProducts(tenantId).then(products => products.length),
-      
+
       // Total categories (placeholder - would need category service)
       this.productRepository
         .createQueryBuilder('product')
@@ -440,7 +528,7 @@ export class ProductsOptimizedService {
         .where('product.tenantId = :tenantId', { tenantId })
         .andWhere('product.isDeleted = :isDeleted', { isDeleted: false })
         .getRawOne(),
-      
+
       // Average price
       this.productRepository
         .createQueryBuilder('product')
@@ -449,7 +537,7 @@ export class ProductsOptimizedService {
         .andWhere('product.isDeleted = :isDeleted', { isDeleted: false })
         .andWhere('product.sellingPrice > 0')
         .getRawOne(),
-      
+
       // Top selling products
       this.productRepository
         .createQueryBuilder('product')
@@ -458,7 +546,7 @@ export class ProductsOptimizedService {
         .andWhere('product.isDeleted = :isDeleted', { isDeleted: false })
         .orderBy('product.salesCount', 'DESC')
         .limit(10)
-        .getMany()
+        .getMany(),
     ]);
 
     return {
@@ -474,9 +562,9 @@ export class ProductsOptimizedService {
   // ===== PRIVATE OPTIMIZATION METHODS =====
 
   private buildOptimizedQuery(
-    tenantId: string, 
-    query: ProductQueryDto, 
-    includeRelations: string[]
+    tenantId: string,
+    query: ProductQueryDto,
+    includeRelations: string[],
   ): SelectQueryBuilder<Product> {
     const queryBuilder = this.productRepository
       .createQueryBuilder('product')
@@ -493,29 +581,41 @@ export class ProductsOptimizedService {
       queryBuilder.leftJoinAndSelect('product.variants', 'variants');
     }
     if (includeRelations.includes('inventoryItems')) {
-      queryBuilder.leftJoinAndSelect('product.inventoryItems', 'inventoryItems');
+      queryBuilder.leftJoinAndSelect(
+        'product.inventoryItems',
+        'inventoryItems',
+      );
     }
 
     // Filter soft delete
     if (!query.includeDeleted) {
-      queryBuilder.andWhere('product.isDeleted = :isDeleted', { isDeleted: false });
+      queryBuilder.andWhere('product.isDeleted = :isDeleted', {
+        isDeleted: false,
+      });
     }
 
     return queryBuilder;
   }
 
-  private applyFullTextSearch(queryBuilder: SelectQueryBuilder<Product>, search: string): void {
-    queryBuilder.andWhere(`
+  private applyFullTextSearch(
+    queryBuilder: SelectQueryBuilder<Product>,
+    search: string,
+  ): void {
+    queryBuilder.andWhere(
+      `
       to_tsvector('indonesian', 
         COALESCE(product.name, '') || ' ' || 
         COALESCE(product.description, '') || ' ' || 
         COALESCE(product.sku, '') || ' ' ||
         COALESCE(product.barcode, '')
       ) @@ plainto_tsquery('indonesian', :search)
-    `, { search });
+    `,
+      { search },
+    );
 
     // Add ranking for better results
-    queryBuilder.addSelect(`
+    queryBuilder.addSelect(
+      `
       ts_rank(
         to_tsvector('indonesian', 
           COALESCE(product.name, '') || ' ' || 
@@ -525,20 +625,36 @@ export class ProductsOptimizedService {
         ), 
         plainto_tsquery('indonesian', :search)
       )
-    `, 'search_rank');
-  }
-
-  private applyTraditionalSearch(queryBuilder: SelectQueryBuilder<Product>, search: string): void {
-    queryBuilder.andWhere(
-      '(product.name ILIKE :search OR product.sku ILIKE :search OR product.barcode ILIKE :search OR product.description ILIKE :search)',
-      { search: `%${search}%` }
+    `,
+      'search_rank',
     );
   }
 
-  private applyFilters(queryBuilder: SelectQueryBuilder<Product>, query: ProductQueryDto): void {
+  private applyTraditionalSearch(
+    queryBuilder: SelectQueryBuilder<Product>,
+    search: string,
+  ): void {
+    queryBuilder.andWhere(
+      '(product.name ILIKE :search OR product.sku ILIKE :search OR product.barcode ILIKE :search OR product.description ILIKE :search)',
+      { search: `%${search}%` },
+    );
+  }
+
+  private applyFilters(
+    queryBuilder: SelectQueryBuilder<Product>,
+    query: ProductQueryDto,
+  ): void {
     const {
-      status, type, categoryId, brand, supplier,
-      minPrice, maxPrice, lowStock, outOfStock, expiringSoon
+      status,
+      type,
+      categoryId,
+      brand,
+      supplier,
+      minPrice,
+      maxPrice,
+      lowStock,
+      outOfStock,
+      expiringSoon,
     } = query;
 
     if (status) {
@@ -554,13 +670,18 @@ export class ProductsOptimizedService {
     }
 
     if (brand) {
-      queryBuilder.andWhere('product.brand ILIKE :brand', { brand: `%${brand}%` });
+      queryBuilder.andWhere('product.brand ILIKE :brand', {
+        brand: `%${brand}%`,
+      });
     }
 
     if (supplier) {
-      queryBuilder.andWhere('supplier.name ILIKE :supplier OR supplier.code ILIKE :supplier', { 
-        supplier: `%${supplier}%` 
-      });
+      queryBuilder.andWhere(
+        'supplier.name ILIKE :supplier OR supplier.code ILIKE :supplier',
+        {
+          supplier: `%${supplier}%`,
+        },
+      );
     }
 
     if (minPrice !== undefined) {
@@ -576,33 +697,61 @@ export class ProductsOptimizedService {
     }
 
     if (outOfStock) {
-      queryBuilder.andWhere('product.trackStock = :trackStock', { trackStock: true });
+      queryBuilder.andWhere('product.trackStock = :trackStock', {
+        trackStock: true,
+      });
     }
 
     if (expiringSoon) {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      
-      queryBuilder.andWhere('product.expiryDate IS NOT NULL')
-                  .andWhere('product.expiryDate <= :thirtyDaysFromNow', { thirtyDaysFromNow })
-                  .andWhere('product.expiryDate > :now', { now: new Date() });
+
+      queryBuilder
+        .andWhere('product.expiryDate IS NOT NULL')
+        .andWhere('product.expiryDate <= :thirtyDaysFromNow', {
+          thirtyDaysFromNow,
+        })
+        .andWhere('product.expiryDate > :now', { now: new Date() });
     }
   }
 
-  private applySorting(queryBuilder: SelectQueryBuilder<Product>, sortBy?: string, sortOrder?: 'ASC' | 'DESC'): void {
-    const validSortFields = ['name', 'sku', 'sellingPrice', 'costPrice', 'createdAt', 'salesCount'];
-    const sortField = validSortFields.includes(sortBy || '') ? sortBy : 'createdAt';
+  private applySorting(
+    queryBuilder: SelectQueryBuilder<Product>,
+    sortBy?: string,
+    sortOrder?: 'ASC' | 'DESC',
+  ): void {
+    const validSortFields = [
+      'name',
+      'sku',
+      'sellingPrice',
+      'costPrice',
+      'createdAt',
+      'salesCount',
+    ];
+    const sortField = validSortFields.includes(sortBy || '')
+      ? sortBy
+      : 'createdAt';
     const order = sortOrder || 'DESC';
 
     // Add search ranking if available
-    if (queryBuilder.expressionMap.selects.some(select => select.aliasName === 'search_rank')) {
-      queryBuilder.orderBy('search_rank', 'DESC').addOrderBy(`product.${sortField}`, order);
+    if (
+      queryBuilder.expressionMap.selects.some(
+        select => select.aliasName === 'search_rank',
+      )
+    ) {
+      queryBuilder
+        .orderBy('search_rank', 'DESC')
+        .addOrderBy(`product.${sortField}`, order);
     } else {
       queryBuilder.orderBy(`product.${sortField}`, order);
     }
   }
 
-  private async fallbackSearch(tenantId: string, searchQuery: string, limit: number): Promise<Product[]> {
+  private async fallbackSearch(
+    tenantId: string,
+    searchQuery: string,
+    limit: number,
+  ): Promise<Product[]> {
     return this.productRepository
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -610,53 +759,87 @@ export class ProductsOptimizedService {
       .andWhere('product.isDeleted = :isDeleted', { isDeleted: false })
       .andWhere(
         '(product.name ILIKE :search OR product.sku ILIKE :search OR product.barcode ILIKE :search)',
-        { search: `%${searchQuery}%` }
+        { search: `%${searchQuery}%` },
       )
       .orderBy('product.name', 'ASC')
       .limit(limit)
       .getMany();
   }
 
-  private async batchValidation(tenantId: string, createProductDto: CreateProductDto): Promise<void> {
+  private async batchValidation(
+    tenantId: string,
+    createProductDto: CreateProductDto,
+  ): Promise<void> {
     const validationPromises: Promise<void>[] = [
       this.validateSkuUnique(tenantId, createProductDto.sku),
     ];
 
     if (createProductDto.barcode) {
-      validationPromises.push(this.validateBarcodeUnique(tenantId, createProductDto.barcode));
+      validationPromises.push(
+        this.validateBarcodeUnique(tenantId, createProductDto.barcode),
+      );
     }
 
     await Promise.all(validationPromises);
-    this.validatePricing(createProductDto.costPrice, createProductDto.sellingPrice, createProductDto.wholesalePrice);
+    this.validatePricing(
+      createProductDto.costPrice,
+      createProductDto.sellingPrice,
+      createProductDto.wholesalePrice,
+    );
   }
 
   private async batchValidationForUpdate(
-    tenantId: string, 
-    updateProductDto: UpdateProductDto, 
-    existingProduct: Product
+    tenantId: string,
+    updateProductDto: UpdateProductDto,
+    existingProduct: Product,
   ): Promise<void> {
     const validationPromises: Promise<void>[] = [];
 
     if (updateProductDto.sku && updateProductDto.sku !== existingProduct.sku) {
-      validationPromises.push(this.validateSkuUnique(tenantId, updateProductDto.sku, existingProduct.id));
+      validationPromises.push(
+        this.validateSkuUnique(
+          tenantId,
+          updateProductDto.sku,
+          existingProduct.id,
+        ),
+      );
     }
 
-    if (updateProductDto.barcode && updateProductDto.barcode !== existingProduct.barcode) {
-      validationPromises.push(this.validateBarcodeUnique(tenantId, updateProductDto.barcode, existingProduct.id));
+    if (
+      updateProductDto.barcode &&
+      updateProductDto.barcode !== existingProduct.barcode
+    ) {
+      validationPromises.push(
+        this.validateBarcodeUnique(
+          tenantId,
+          updateProductDto.barcode,
+          existingProduct.id,
+        ),
+      );
     }
 
     await Promise.all(validationPromises);
 
-    if (updateProductDto.costPrice !== undefined || updateProductDto.sellingPrice !== undefined || updateProductDto.wholesalePrice !== undefined) {
+    if (
+      updateProductDto.costPrice !== undefined ||
+      updateProductDto.sellingPrice !== undefined ||
+      updateProductDto.wholesalePrice !== undefined
+    ) {
       const costPrice = updateProductDto.costPrice ?? existingProduct.costPrice;
-      const sellingPrice = updateProductDto.sellingPrice ?? existingProduct.sellingPrice;
-      const wholesalePrice = updateProductDto.wholesalePrice ?? existingProduct.wholesalePrice;
-      
+      const sellingPrice =
+        updateProductDto.sellingPrice ?? existingProduct.sellingPrice;
+      const wholesalePrice =
+        updateProductDto.wholesalePrice ?? existingProduct.wholesalePrice;
+
       this.validatePricing(costPrice, sellingPrice, wholesalePrice);
     }
   }
 
-  private async validateSkuUnique(tenantId: string, sku: string, excludeId?: string): Promise<void> {
+  private async validateSkuUnique(
+    tenantId: string,
+    sku: string,
+    excludeId?: string,
+  ): Promise<void> {
     const query = this.productRepository
       .createQueryBuilder('product')
       .where('product.tenantId = :tenantId', { tenantId })
@@ -673,7 +856,11 @@ export class ProductsOptimizedService {
     }
   }
 
-  private async validateBarcodeUnique(tenantId: string, barcode: string, excludeId?: string): Promise<void> {
+  private async validateBarcodeUnique(
+    tenantId: string,
+    barcode: string,
+    excludeId?: string,
+  ): Promise<void> {
     const query = this.productRepository
       .createQueryBuilder('product')
       .where('product.tenantId = :tenantId', { tenantId })
@@ -690,17 +877,28 @@ export class ProductsOptimizedService {
     }
   }
 
-  private validatePricing(costPrice: number, sellingPrice: number, wholesalePrice?: number): void {
+  private validatePricing(
+    costPrice: number,
+    sellingPrice: number,
+    wholesalePrice?: number,
+  ): void {
     if (costPrice < 0 || sellingPrice < 0) {
       throw new BadRequestException('Harga tidak boleh negatif');
     }
 
     if (sellingPrice < costPrice) {
-      throw new BadRequestException('Harga jual tidak boleh lebih kecil dari harga pokok');
+      throw new BadRequestException(
+        'Harga jual tidak boleh lebih kecil dari harga pokok',
+      );
     }
 
-    if (wholesalePrice && (wholesalePrice < costPrice || wholesalePrice > sellingPrice)) {
-      throw new BadRequestException('Harga grosir harus berada di antara harga pokok dan harga jual');
+    if (
+      wholesalePrice &&
+      (wholesalePrice < costPrice || wholesalePrice > sellingPrice)
+    ) {
+      throw new BadRequestException(
+        'Harga grosir harus berada di antara harga pokok dan harga jual',
+      );
     }
   }
 }

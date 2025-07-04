@@ -31,8 +31,15 @@ import { PermissionsGuard } from '../guards/permissions.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { CurrentTenant } from '../decorators/current-tenant.decorator';
 import { Permissions } from '../decorators/permissions.decorator';
-import { PermissionResource, PermissionAction } from '../entities/permission.entity';
-import { RoleStatus, RoleType, RoleLevel } from '../entities/hierarchical-role.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../entities/permission.entity';
+import {
+  RoleStatus,
+  RoleType,
+  RoleLevel,
+} from '../entities/hierarchical-role.entity';
 import { InheritanceType } from '../entities/role-hierarchy.entity';
 import {
   CreateHierarchicalRoleDto,
@@ -58,15 +65,23 @@ export class HierarchicalRoleController {
   @Post()
   @ApiOperation({
     summary: 'Buat role hierarki baru',
-    description: 'Membuat role baru dalam sistem hierarki dengan inheritance capability',
+    description:
+      'Membuat role baru dalam sistem hierarki dengan inheritance capability',
   })
   @ApiCreatedResponse({
     description: 'Role berhasil dibuat',
     type: HierarchicalRoleResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Data tidak valid atau kode role sudah ada' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk membuat role' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.CREATE })
+  @ApiBadRequestResponse({
+    description: 'Data tidak valid atau kode role sudah ada',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk membuat role',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.CREATE,
+  })
   async create(
     @Body() createRoleDto: CreateHierarchicalRoleDto,
     @CurrentTenant() tenantId: string,
@@ -90,12 +105,35 @@ export class HierarchicalRoleController {
     description: 'Daftar role hierarki berhasil diambil',
     type: [HierarchicalRoleResponseDto],
   })
-  @ApiQuery({ name: 'type', required: false, description: 'Filter berdasarkan jenis role' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter berdasarkan status' })
-  @ApiQuery({ name: 'level', required: false, description: 'Filter berdasarkan level' })
-  @ApiQuery({ name: 'department', required: false, description: 'Filter berdasarkan departemen' })
-  @ApiQuery({ name: 'search', required: false, description: 'Kata kunci pencarian' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filter berdasarkan jenis role',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter berdasarkan status',
+  })
+  @ApiQuery({
+    name: 'level',
+    required: false,
+    description: 'Filter berdasarkan level',
+  })
+  @ApiQuery({
+    name: 'department',
+    required: false,
+    description: 'Filter berdasarkan departemen',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Kata kunci pencarian',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async findAll(
     @Query() query: HierarchicalRoleQueryDto,
     @CurrentTenant() tenantId: string,
@@ -103,7 +141,11 @@ export class HierarchicalRoleController {
     let roles;
 
     if (query.search) {
-      roles = await this.roleService.search(query.search, tenantId, query.limit || 20);
+      roles = await this.roleService.search(
+        query.search,
+        tenantId,
+        query.limit || 20,
+      );
     } else if (query.type) {
       roles = await this.roleService.findByType(query.type, tenantId);
     } else if (query.level) {
@@ -132,7 +174,10 @@ export class HierarchicalRoleController {
     description: 'Struktur tree role hierarki berhasil diambil',
     type: [HierarchicalRoleResponseDto],
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getRoleTree(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<HierarchicalRoleResponseDto[]>> {
@@ -148,13 +193,17 @@ export class HierarchicalRoleController {
   @Get('stats')
   @ApiOperation({
     summary: 'Dapatkan statistik role hierarki',
-    description: 'Mengambil statistik role termasuk jumlah per jenis, level, dan user',
+    description:
+      'Mengambil statistik role termasuk jumlah per jenis, level, dan user',
   })
   @ApiOkResponse({
     description: 'Statistik role hierarki berhasil diambil',
     type: RoleStatsDto,
   })
-  @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.ANALYTICS,
+    action: PermissionAction.READ,
+  })
   async getStats(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<RoleStatsDto>> {
@@ -176,7 +225,10 @@ export class HierarchicalRoleController {
     description: 'Relationship hierarki role berhasil diambil',
     type: [RoleHierarchyResponseDto],
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getHierarchies(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<RoleHierarchyResponseDto[]>> {
@@ -200,7 +252,10 @@ export class HierarchicalRoleController {
     type: HierarchicalRoleResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Role tidak ditemukan' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
@@ -224,7 +279,10 @@ export class HierarchicalRoleController {
     description: 'Hierarki atas role berhasil diambil',
     type: HierarchicalRoleResponseDto,
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getAncestors(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
@@ -248,7 +306,10 @@ export class HierarchicalRoleController {
     description: 'Hierarki bawah role berhasil diambil',
     type: HierarchicalRoleResponseDto,
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getDescendants(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
@@ -272,7 +333,10 @@ export class HierarchicalRoleController {
     description: 'Parent roles berhasil diambil',
     type: [HierarchicalRoleResponseDto],
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getParentRoles(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
@@ -296,7 +360,10 @@ export class HierarchicalRoleController {
     description: 'Child roles berhasil diambil',
     type: [HierarchicalRoleResponseDto],
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getChildRoles(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
@@ -313,10 +380,15 @@ export class HierarchicalRoleController {
   @Get(':id/effective-permissions')
   @ApiOperation({
     summary: 'Dapatkan effective permissions',
-    description: 'Mengambil semua permission efektif untuk role (termasuk inherited)',
+    description:
+      'Mengambil semua permission efektif untuk role (termasuk inherited)',
   })
   @ApiParam({ name: 'id', description: 'ID role' })
-  @ApiQuery({ name: 'departmentId', required: false, description: 'Context departemen' })
+  @ApiQuery({
+    name: 'departmentId',
+    required: false,
+    description: 'Context departemen',
+  })
   @ApiOkResponse({
     description: 'Effective permissions berhasil diambil',
     schema: {
@@ -335,23 +407,32 @@ export class HierarchicalRoleController {
       },
     },
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async getEffectivePermissions(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('departmentId') departmentId: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-  ): Promise<StandardResponse<{
-    roleId: string;
-    permissions: string[];
-    inheritedFrom: string[];
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      roleId: string;
+      permissions: string[];
+      inheritedFrom: string[];
+    }>
+  > {
     const context = {
       departmentId,
       userId,
     };
 
-    const permissions = await this.roleService.getEffectivePermissions(id, tenantId, context);
+    const permissions = await this.roleService.getEffectivePermissions(
+      id,
+      tenantId,
+      context,
+    );
     const parentRoles = await this.roleService.getParentRoles(id, tenantId);
 
     return {
@@ -377,15 +458,25 @@ export class HierarchicalRoleController {
   })
   @ApiNotFoundResponse({ description: 'Role tidak ditemukan' })
   @ApiBadRequestResponse({ description: 'Data tidak valid' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin atau role adalah system role' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin atau role adalah system role',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateRoleDto: UpdateHierarchicalRoleDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<HierarchicalRoleResponseDto>> {
-    const role = await this.roleService.update(id, updateRoleDto, tenantId, userId);
+    const role = await this.roleService.update(
+      id,
+      updateRoleDto,
+      tenantId,
+      userId,
+    );
 
     return {
       success: true,
@@ -404,14 +495,22 @@ export class HierarchicalRoleController {
     description: 'Status role berhasil diubah',
     type: HierarchicalRoleResponseDto,
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: RoleStatus,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<HierarchicalRoleResponseDto>> {
-    const role = await this.roleService.changeStatus(id, status, tenantId, userId);
+    const role = await this.roleService.changeStatus(
+      id,
+      status,
+      tenantId,
+      userId,
+    );
 
     return {
       success: true,
@@ -423,14 +522,20 @@ export class HierarchicalRoleController {
   @Post('hierarchies')
   @ApiOperation({
     summary: 'Buat relationship hierarki role',
-    description: 'Membuat relationship inheritance antara parent dan child role',
+    description:
+      'Membuat relationship inheritance antara parent dan child role',
   })
   @ApiCreatedResponse({
     description: 'Relationship hierarki berhasil dibuat',
     type: RoleHierarchyResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Data tidak valid atau akan menyebabkan circular reference' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.CREATE })
+  @ApiBadRequestResponse({
+    description: 'Data tidak valid atau akan menyebabkan circular reference',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.CREATE,
+  })
   async createHierarchy(
     @Body() createHierarchyDto: CreateRoleHierarchyDto,
     @CurrentTenant() tenantId: string,
@@ -467,7 +572,10 @@ export class HierarchicalRoleController {
     type: HierarchicalRoleResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Kode role baru sudah ada' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.CREATE,
+  })
   async cloneRole(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() cloneRoleDto: CloneRoleDto,
@@ -495,7 +603,10 @@ export class HierarchicalRoleController {
     description: 'Mengubah status beberapa role sekaligus',
   })
   @ApiOkResponse({ description: 'Status role berhasil diubah' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.UPDATE,
+  })
   async bulkUpdateStatus(
     @Body() bulkUpdateDto: BulkUpdateRoleStatusDto,
     @CurrentTenant() tenantId: string,
@@ -517,7 +628,8 @@ export class HierarchicalRoleController {
   @Post('check-permission-grant')
   @ApiOperation({
     summary: 'Periksa kemampuan grant permission',
-    description: 'Memeriksa apakah role dapat memberikan permission ke role lain',
+    description:
+      'Memeriksa apakah role dapat memberikan permission ke role lain',
   })
   @ApiOkResponse({
     description: 'Hasil pemeriksaan grant permission',
@@ -538,16 +650,21 @@ export class HierarchicalRoleController {
       },
     },
   })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.READ,
+  })
   async checkPermissionGrant(
     @Body() permissionGrantDto: PermissionGrantDto,
     @CurrentTenant() tenantId: string,
-  ): Promise<StandardResponse<{
-    canGrant: boolean;
-    grantingRoleId: string;
-    receivingRoleId: string;
-    permissionKey: string;
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      canGrant: boolean;
+      grantingRoleId: string;
+      receivingRoleId: string;
+      permissionKey: string;
+    }>
+  > {
     const canGrant = await this.roleService.canGrantPermission(
       permissionGrantDto.grantingRoleId,
       permissionGrantDto.receivingRoleId,
@@ -570,14 +687,22 @@ export class HierarchicalRoleController {
   @Delete(':id')
   @ApiOperation({
     summary: 'Hapus role hierarki',
-    description: 'Menghapus role hierarki (soft delete). Role sistem dan role dengan user aktif tidak dapat dihapus.',
+    description:
+      'Menghapus role hierarki (soft delete). Role sistem dan role dengan user aktif tidak dapat dihapus.',
   })
   @ApiParam({ name: 'id', description: 'ID role' })
   @ApiNoContentResponse({ description: 'Role berhasil dihapus' })
   @ApiNotFoundResponse({ description: 'Role tidak ditemukan' })
-  @ApiBadRequestResponse({ description: 'Role memiliki sub-role atau user aktif' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin atau role adalah system role' })
-  @Permissions({ resource: PermissionResource.USERS, action: PermissionAction.DELETE })
+  @ApiBadRequestResponse({
+    description: 'Role memiliki sub-role atau user aktif',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin atau role adalah system role',
+  })
+  @Permissions({
+    resource: PermissionResource.USERS,
+    action: PermissionAction.DELETE,
+  })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,

@@ -8,7 +8,10 @@ import { LazadaOrderService } from './lazada-order.service';
 import { LazadaInventoryService } from './lazada-inventory.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 import { WebhookEventType } from '../../entities/webhook-event.entity';
 
 export interface LazadaWebhookPayload {
@@ -94,9 +97,15 @@ export class LazadaWebhookService {
       }
 
       // Verify webhook signature if present
-      const signature = headers['x-lazada-signature'] || headers['authorization'];
+      const signature =
+        headers['x-lazada-signature'] || headers['authorization'];
       if (signature) {
-        const isValid = await this.verifyWebhookSignature(tenantId, channelId, payload, signature);
+        const isValid = await this.verifyWebhookSignature(
+          tenantId,
+          channelId,
+          payload,
+          signature,
+        );
         if (!isValid) {
           throw new Error('Invalid webhook signature');
         }
@@ -122,7 +131,9 @@ export class LazadaWebhookService {
       });
 
       if (!webhookRecord.success) {
-        throw new Error(webhookRecord.error || 'Failed to create webhook record');
+        throw new Error(
+          webhookRecord.error || 'Failed to create webhook record',
+        );
       }
 
       // Process the webhook event
@@ -139,9 +150,11 @@ export class LazadaWebhookService {
         webhookId: webhookRecord.webhookId,
         error: result.error,
       };
-
     } catch (error) {
-      this.logger.error(`Lazada webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Lazada webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log webhook error
       await this.logService.logWebhook(
@@ -187,27 +200,52 @@ export class LazadaWebhookService {
       switch (eventType) {
         case WebhookEventType.ORDER_CREATED:
         case WebhookEventType.ORDER_UPDATED:
-          result = await this.handleOrderEvent(tenantId, channelId, payload.data as OrderWebhookData);
+          result = await this.handleOrderEvent(
+            tenantId,
+            channelId,
+            payload.data as OrderWebhookData,
+          );
           break;
 
         case WebhookEventType.ORDER_CANCELLED:
-          result = await this.handleOrderCancelledEvent(tenantId, channelId, payload.data as OrderWebhookData);
+          result = await this.handleOrderCancelledEvent(
+            tenantId,
+            channelId,
+            payload.data as OrderWebhookData,
+          );
           break;
 
         case WebhookEventType.ORDER_COMPLETED:
-          result = await this.handleOrderShippingEvent(tenantId, channelId, payload.data as OrderWebhookData);
+          result = await this.handleOrderShippingEvent(
+            tenantId,
+            channelId,
+            payload.data as OrderWebhookData,
+          );
           break;
 
         case WebhookEventType.PRODUCT_UPDATED:
-          result = await this.handleProductEvent(tenantId, channelId, payload.data as ProductWebhookData);
+          result = await this.handleProductEvent(
+            tenantId,
+            channelId,
+            payload.data as ProductWebhookData,
+          );
           break;
 
         case WebhookEventType.INVENTORY_UPDATED:
-          result = await this.handleInventoryEvent(tenantId, channelId, payload.data as InventoryWebhookData);
+          result = await this.handleInventoryEvent(
+            tenantId,
+            channelId,
+            payload.data as InventoryWebhookData,
+          );
           break;
 
         case WebhookEventType.SYSTEM_NOTIFICATION:
-          result = await this.handleSystemEvent(tenantId, channelId, eventType, payload.data);
+          result = await this.handleSystemEvent(
+            tenantId,
+            channelId,
+            eventType,
+            payload.data,
+          );
           break;
 
         default:
@@ -232,9 +270,11 @@ export class LazadaWebhookService {
       }
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Webhook event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Webhook event handling failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log event processing error
       await this.logService.logWebhook(
@@ -264,12 +304,17 @@ export class LazadaWebhookService {
   ): Promise<boolean> {
     try {
       // Get channel credentials to get app secret
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
-      return this.verifySignature(payload, signature, credentials.appSecret);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
+      return this.verifySignature(payload, signature, credentials.appSecret);
     } catch (error) {
-      this.logger.error(`Failed to verify webhook signature: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to verify webhook signature: ${error.message}`,
+        error.stack,
+      );
       return false;
     }
   }
@@ -277,7 +322,11 @@ export class LazadaWebhookService {
   /**
    * Verify signature with app secret
    */
-  verifySignature(payload: string, signature: string, appSecret: string): boolean {
+  verifySignature(
+    payload: string,
+    signature: string,
+    appSecret: string,
+  ): boolean {
     try {
       // Remove any prefix from signature
       const cleanSignature = signature.replace(/^(sha256=|sha1=)/, '');
@@ -293,9 +342,11 @@ export class LazadaWebhookService {
         Buffer.from(cleanSignature, 'hex'),
         Buffer.from(expectedSignature, 'hex'),
       );
-
     } catch (error) {
-      this.logger.error(`Signature verification error: ${error.message}`, error.stack);
+      this.logger.error(
+        `Signature verification error: ${error.message}`,
+        error.stack,
+      );
       return false;
     }
   }
@@ -328,9 +379,11 @@ export class LazadaWebhookService {
 
       // The order details fetching will handle the sync automatically
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Order event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Order event handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -352,11 +405,13 @@ export class LazadaWebhookService {
 
       // Update local order status to cancelled
       // This would need implementation based on your order management system
-      
-      return { success: true };
 
+      return { success: true };
     } catch (error) {
-      this.logger.error(`Order cancelled event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Order cancelled event handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -379,11 +434,13 @@ export class LazadaWebhookService {
 
       // Update local order status and get tracking info
       // This would need implementation based on your order management system
-      
-      return { success: true };
 
+      return { success: true };
     } catch (error) {
-      this.logger.error(`Order shipping event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Order shipping event handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -417,9 +474,11 @@ export class LazadaWebhookService {
 
       // The product details fetching will handle the sync automatically
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Product event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Product event handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -452,9 +511,11 @@ export class LazadaWebhookService {
       }
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Inventory event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Inventory event handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -487,9 +548,11 @@ export class LazadaWebhookService {
       }
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Price event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Price event handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -521,9 +584,11 @@ export class LazadaWebhookService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`System event handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `System event handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -536,19 +601,19 @@ export class LazadaWebhookService {
   private mapWebhookEventType(lazadaEvent: string): WebhookEventType {
     // Map Lazada event names to our internal event types
     const eventMapping: Record<string, WebhookEventType> = {
-      'order_created': WebhookEventType.ORDER_CREATED,
-      'order_updated': WebhookEventType.ORDER_UPDATED,
-      'order_status_changed': WebhookEventType.ORDER_UPDATED,
-      'order_cancelled': WebhookEventType.ORDER_CANCELLED,
-      'order_shipped': WebhookEventType.ORDER_UPDATED,
-      'order_delivered': WebhookEventType.ORDER_COMPLETED,
-      'product_updated': WebhookEventType.PRODUCT_UPDATED,
-      'product_status_changed': WebhookEventType.PRODUCT_UPDATED,
-      'inventory_updated': WebhookEventType.INVENTORY_UPDATED,
-      'price_updated': WebhookEventType.PRODUCT_UPDATED,
-      'seller_performance': WebhookEventType.SYSTEM_NOTIFICATION,
-      'promotion_updated': WebhookEventType.SYSTEM_NOTIFICATION,
-      'finance_updated': WebhookEventType.SYSTEM_NOTIFICATION,
+      order_created: WebhookEventType.ORDER_CREATED,
+      order_updated: WebhookEventType.ORDER_UPDATED,
+      order_status_changed: WebhookEventType.ORDER_UPDATED,
+      order_cancelled: WebhookEventType.ORDER_CANCELLED,
+      order_shipped: WebhookEventType.ORDER_UPDATED,
+      order_delivered: WebhookEventType.ORDER_COMPLETED,
+      product_updated: WebhookEventType.PRODUCT_UPDATED,
+      product_status_changed: WebhookEventType.PRODUCT_UPDATED,
+      inventory_updated: WebhookEventType.INVENTORY_UPDATED,
+      price_updated: WebhookEventType.PRODUCT_UPDATED,
+      seller_performance: WebhookEventType.SYSTEM_NOTIFICATION,
+      promotion_updated: WebhookEventType.SYSTEM_NOTIFICATION,
+      finance_updated: WebhookEventType.SYSTEM_NOTIFICATION,
     };
 
     return eventMapping[lazadaEvent] || WebhookEventType.SYSTEM_NOTIFICATION;
@@ -558,7 +623,7 @@ export class LazadaWebhookService {
     const timestamp = webhookData.timestamp || Date.now();
     const event = webhookData.event || 'unknown';
     const sellerId = webhookData.seller_id || 'unknown';
-    
+
     return `lazada_${event}_${sellerId}_${timestamp}`;
   }
 

@@ -15,13 +15,13 @@ export interface MLTrainingJobData {
 export class MLTrainingProcessor {
   private readonly logger = new Logger(MLTrainingProcessor.name);
 
-  constructor(
-    private readonly modelTrainingService: ModelTrainingService,
-  ) {}
+  constructor(private readonly modelTrainingService: ModelTrainingService) {}
 
   @Process('train-model')
   async handleTrainModel(job: Job<MLTrainingJobData>): Promise<void> {
-    this.logger.log(`Processing training job: ${job.id} for model: ${job.data.modelId}`);
+    this.logger.log(
+      `Processing training job: ${job.id} for model: ${job.data.modelId}`,
+    );
 
     try {
       await this.modelTrainingService.executeTraining(

@@ -1,7 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CompanyRelationship, RelationshipType, RelationshipStatus } from '../entities/company-relationship.entity';
+import {
+  CompanyRelationship,
+  RelationshipType,
+  RelationshipStatus,
+} from '../entities/company-relationship.entity';
 import { Company } from '../entities/company.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -24,7 +33,11 @@ export class CompanyRelationshipService {
   ): Promise<CompanyRelationship> {
     // Validate from and to companies
     const fromCompany = await this.companyRepository.findOne({
-      where: { id: createRelationshipData.fromCompanyId, tenantId, isDeleted: false },
+      where: {
+        id: createRelationshipData.fromCompanyId,
+        tenantId,
+        isDeleted: false,
+      },
     });
 
     if (!fromCompany) {
@@ -32,7 +45,11 @@ export class CompanyRelationshipService {
     }
 
     const toCompany = await this.companyRepository.findOne({
-      where: { id: createRelationshipData.toCompanyId, tenantId, isDeleted: false },
+      where: {
+        id: createRelationshipData.toCompanyId,
+        tenantId,
+        isDeleted: false,
+      },
     });
 
     if (!toCompany) {
@@ -40,8 +57,13 @@ export class CompanyRelationshipService {
     }
 
     // Prevent self-relationship
-    if (createRelationshipData.fromCompanyId === createRelationshipData.toCompanyId) {
-      throw new BadRequestException('Company tidak dapat memiliki relasi dengan dirinya sendiri');
+    if (
+      createRelationshipData.fromCompanyId ===
+      createRelationshipData.toCompanyId
+    ) {
+      throw new BadRequestException(
+        'Company tidak dapat memiliki relasi dengan dirinya sendiri',
+      );
     }
 
     // Check for existing relationship
@@ -57,7 +79,7 @@ export class CompanyRelationshipService {
 
     if (existingRelationship) {
       throw new ConflictException(
-        `Relasi ${createRelationshipData.relationshipType} antara company ini sudah ada`
+        `Relasi ${createRelationshipData.relationshipType} antara company ini sudah ada`,
       );
     }
 
@@ -79,20 +101,25 @@ export class CompanyRelationshipService {
       throw new BadRequestException('Business terms tidak valid');
     }
 
-    const savedRelationship = await this.relationshipRepository.save(relationship);
+    const savedRelationship = await this.relationshipRepository.save(
+      relationship,
+    );
     return this.findByIdAndTenant(savedRelationship.id, tenantId);
   }
 
   // Find relationship by ID and tenant
-  async findByIdAndTenant(id: string, tenantId: string): Promise<CompanyRelationship> {
+  async findByIdAndTenant(
+    id: string,
+    tenantId: string,
+  ): Promise<CompanyRelationship> {
     const relationship = await this.relationshipRepository.findOne({
       where: { id, tenantId, isDeleted: false },
       relations: [
         'fromCompany',
-        'toCompany', 
+        'toCompany',
         'primaryContactFrom',
         'primaryContactTo',
-        'relationshipManager'
+        'relationshipManager',
       ],
     });
 
@@ -118,36 +145,49 @@ export class CompanyRelationshipService {
       .createQueryBuilder('relationship')
       .leftJoinAndSelect('relationship.fromCompany', 'fromCompany')
       .leftJoinAndSelect('relationship.toCompany', 'toCompany')
-      .leftJoinAndSelect('relationship.primaryContactFrom', 'primaryContactFrom')
+      .leftJoinAndSelect(
+        'relationship.primaryContactFrom',
+        'primaryContactFrom',
+      )
       .leftJoinAndSelect('relationship.primaryContactTo', 'primaryContactTo')
-      .leftJoinAndSelect('relationship.relationshipManager', 'relationshipManager')
+      .leftJoinAndSelect(
+        'relationship.relationshipManager',
+        'relationshipManager',
+      )
       .where('relationship.tenantId = :tenantId', { tenantId })
       .andWhere('relationship.isDeleted = :isDeleted', { isDeleted: false });
 
     if (options?.relationshipType) {
-      queryBuilder.andWhere('relationship.relationshipType = :relationshipType', { 
-        relationshipType: options.relationshipType 
-      });
+      queryBuilder.andWhere(
+        'relationship.relationshipType = :relationshipType',
+        {
+          relationshipType: options.relationshipType,
+        },
+      );
     }
 
     if (options?.status) {
-      queryBuilder.andWhere('relationship.status = :status', { status: options.status });
+      queryBuilder.andWhere('relationship.status = :status', {
+        status: options.status,
+      });
     }
 
     if (options?.fromCompanyId) {
-      queryBuilder.andWhere('relationship.fromCompanyId = :fromCompanyId', { 
-        fromCompanyId: options.fromCompanyId 
+      queryBuilder.andWhere('relationship.fromCompanyId = :fromCompanyId', {
+        fromCompanyId: options.fromCompanyId,
       });
     }
 
     if (options?.toCompanyId) {
-      queryBuilder.andWhere('relationship.toCompanyId = :toCompanyId', { 
-        toCompanyId: options.toCompanyId 
+      queryBuilder.andWhere('relationship.toCompanyId = :toCompanyId', {
+        toCompanyId: options.toCompanyId,
       });
     }
 
     if (!options?.includeInactive) {
-      queryBuilder.andWhere('relationship.isActive = :isActive', { isActive: true });
+      queryBuilder.andWhere('relationship.isActive = :isActive', {
+        isActive: true,
+      });
     }
 
     queryBuilder.orderBy('relationship.effectiveFrom', 'DESC');
@@ -156,7 +196,10 @@ export class CompanyRelationshipService {
   }
 
   // Get relationships for a specific company
-  async findRelationshipsForCompany(companyId: string, tenantId: string): Promise<CompanyRelationship[]> {
+  async findRelationshipsForCompany(
+    companyId: string,
+    tenantId: string,
+  ): Promise<CompanyRelationship[]> {
     return this.relationshipRepository.find({
       where: [
         { fromCompanyId: companyId, tenantId, isDeleted: false },
@@ -168,7 +211,9 @@ export class CompanyRelationshipService {
   }
 
   // Get parent-subsidiary relationships
-  async getParentSubsidiaryRelationships(tenantId: string): Promise<CompanyRelationship[]> {
+  async getParentSubsidiaryRelationships(
+    tenantId: string,
+  ): Promise<CompanyRelationship[]> {
     return this.findAllByTenant(tenantId, {
       relationshipType: RelationshipType.PARENT_SUBSIDIARY,
       status: RelationshipStatus.ACTIVE,
@@ -176,7 +221,9 @@ export class CompanyRelationshipService {
   }
 
   // Get business partnerships
-  async getBusinessPartnerships(tenantId: string): Promise<CompanyRelationship[]> {
+  async getBusinessPartnerships(
+    tenantId: string,
+  ): Promise<CompanyRelationship[]> {
     return this.relationshipRepository.find({
       where: {
         tenantId,
@@ -190,7 +237,9 @@ export class CompanyRelationshipService {
   }
 
   // Get trading relationships (suppliers, customers, distributors)
-  async getTradingRelationships(tenantId: string): Promise<CompanyRelationship[]> {
+  async getTradingRelationships(
+    tenantId: string,
+  ): Promise<CompanyRelationship[]> {
     return this.relationshipRepository
       .createQueryBuilder('relationship')
       .leftJoinAndSelect('relationship.fromCompany', 'fromCompany')
@@ -198,9 +247,15 @@ export class CompanyRelationshipService {
       .where('relationship.tenantId = :tenantId', { tenantId })
       .andWhere('relationship.isDeleted = :isDeleted', { isDeleted: false })
       .andWhere('relationship.relationshipType IN (:...types)', {
-        types: [RelationshipType.SUPPLIER, RelationshipType.CUSTOMER, RelationshipType.DISTRIBUTOR]
+        types: [
+          RelationshipType.SUPPLIER,
+          RelationshipType.CUSTOMER,
+          RelationshipType.DISTRIBUTOR,
+        ],
       })
-      .andWhere('relationship.status = :status', { status: RelationshipStatus.ACTIVE })
+      .andWhere('relationship.status = :status', {
+        status: RelationshipStatus.ACTIVE,
+      })
       .orderBy('relationship.effectiveFrom', 'DESC')
       .getMany();
   }
@@ -230,7 +285,11 @@ export class CompanyRelationshipService {
   }
 
   // Activate relationship
-  async activate(id: string, tenantId: string, updatedById: string): Promise<CompanyRelationship> {
+  async activate(
+    id: string,
+    tenantId: string,
+    updatedById: string,
+  ): Promise<CompanyRelationship> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
     relationship.activate();
     relationship.updatedBy = updatedById;
@@ -239,7 +298,11 @@ export class CompanyRelationshipService {
   }
 
   // Deactivate relationship
-  async deactivate(id: string, tenantId: string, updatedById: string): Promise<CompanyRelationship> {
+  async deactivate(
+    id: string,
+    tenantId: string,
+    updatedById: string,
+  ): Promise<CompanyRelationship> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
     relationship.deactivate();
     relationship.updatedBy = updatedById;
@@ -248,7 +311,12 @@ export class CompanyRelationshipService {
   }
 
   // Suspend relationship
-  async suspend(id: string, tenantId: string, reason: string, updatedById: string): Promise<CompanyRelationship> {
+  async suspend(
+    id: string,
+    tenantId: string,
+    reason: string,
+    updatedById: string,
+  ): Promise<CompanyRelationship> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
     relationship.suspend(reason);
     relationship.updatedBy = updatedById;
@@ -257,7 +325,12 @@ export class CompanyRelationshipService {
   }
 
   // Terminate relationship
-  async terminate(id: string, tenantId: string, reason: string, updatedById: string): Promise<CompanyRelationship> {
+  async terminate(
+    id: string,
+    tenantId: string,
+    reason: string,
+    updatedById: string,
+  ): Promise<CompanyRelationship> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
     relationship.terminate(reason);
     relationship.updatedBy = updatedById;
@@ -266,11 +339,20 @@ export class CompanyRelationshipService {
   }
 
   // Check if transfer is allowed between companies
-  async canTransfer(fromCompanyId: string, toCompanyId: string, tenantId: string): Promise<boolean> {
+  async canTransfer(
+    fromCompanyId: string,
+    toCompanyId: string,
+    tenantId: string,
+  ): Promise<boolean> {
     const relationship = await this.relationshipRepository.findOne({
       where: [
         { fromCompanyId, toCompanyId, tenantId, isDeleted: false },
-        { fromCompanyId: toCompanyId, toCompanyId: fromCompanyId, tenantId, isDeleted: false },
+        {
+          fromCompanyId: toCompanyId,
+          toCompanyId: fromCompanyId,
+          tenantId,
+          isDeleted: false,
+        },
       ],
     });
 
@@ -279,15 +361,20 @@ export class CompanyRelationshipService {
 
   // Check if transfer requires approval
   async requiresTransferApproval(
-    fromCompanyId: string, 
-    toCompanyId: string, 
-    amount: number, 
-    tenantId: string
+    fromCompanyId: string,
+    toCompanyId: string,
+    amount: number,
+    tenantId: string,
   ): Promise<boolean> {
     const relationship = await this.relationshipRepository.findOne({
       where: [
         { fromCompanyId, toCompanyId, tenantId, isDeleted: false },
-        { fromCompanyId: toCompanyId, toCompanyId: fromCompanyId, tenantId, isDeleted: false },
+        {
+          fromCompanyId: toCompanyId,
+          toCompanyId: fromCompanyId,
+          tenantId,
+          isDeleted: false,
+        },
       ],
     });
 
@@ -307,19 +394,25 @@ export class CompanyRelationshipService {
   }
 
   // Calculate relationship health
-  async calculateRelationshipHealth(id: string, tenantId: string): Promise<number> {
+  async calculateRelationshipHealth(
+    id: string,
+    tenantId: string,
+  ): Promise<number> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
     const healthScore = relationship.calculateRelationshipHealth();
-    
+
     // Update the score in database
     relationship.relationshipScore = healthScore / 20; // Convert to 0-5 scale
     await this.relationshipRepository.save(relationship);
-    
+
     return healthScore;
   }
 
   // Get expiring relationships
-  async getExpiringRelationships(tenantId: string, daysAhead: number = 30): Promise<CompanyRelationship[]> {
+  async getExpiringRelationships(
+    tenantId: string,
+    daysAhead: number = 30,
+  ): Promise<CompanyRelationship[]> {
     const warningDate = new Date();
     warningDate.setDate(warningDate.getDate() + daysAhead);
 
@@ -329,7 +422,9 @@ export class CompanyRelationshipService {
       .leftJoinAndSelect('relationship.toCompany', 'toCompany')
       .where('relationship.tenantId = :tenantId', { tenantId })
       .andWhere('relationship.isDeleted = :isDeleted', { isDeleted: false })
-      .andWhere('relationship.status = :status', { status: RelationshipStatus.ACTIVE })
+      .andWhere('relationship.status = :status', {
+        status: RelationshipStatus.ACTIVE,
+      })
       .andWhere('relationship.effectiveUntil IS NOT NULL')
       .andWhere('relationship.effectiveUntil <= :warningDate', { warningDate })
       .orderBy('relationship.effectiveUntil', 'ASC')
@@ -337,7 +432,12 @@ export class CompanyRelationshipService {
   }
 
   // Renew relationship
-  async renew(id: string, tenantId: string, months: number, updatedById: string): Promise<CompanyRelationship> {
+  async renew(
+    id: string,
+    tenantId: string,
+    months: number,
+    updatedById: string,
+  ): Promise<CompanyRelationship> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
     relationship.renew(months);
     relationship.updatedBy = updatedById;
@@ -353,19 +453,21 @@ export class CompanyRelationshipService {
     updatedById: string,
   ): Promise<CompanyRelationship> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
-    
+
     const manager = await this.userRepository.findOne({
       where: { id: managerId, tenantId, isDeleted: false },
     });
 
     if (!manager) {
-      throw new NotFoundException('User untuk relationship manager tidak ditemukan');
+      throw new NotFoundException(
+        'User untuk relationship manager tidak ditemukan',
+      );
     }
 
     relationship.relationshipManagerId = managerId;
     relationship.relationshipManager = manager;
     relationship.updatedBy = updatedById;
-    
+
     await this.relationshipRepository.save(relationship);
     return relationship;
   }
@@ -379,7 +481,7 @@ export class CompanyRelationshipService {
     updatedById: string,
   ): Promise<CompanyRelationship> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
-    
+
     const fromContact = await this.userRepository.findOne({
       where: { id: fromContactId, tenantId, isDeleted: false },
     });
@@ -401,7 +503,7 @@ export class CompanyRelationshipService {
     relationship.primaryContactToId = toContactId;
     relationship.primaryContactTo = toContact;
     relationship.updatedBy = updatedById;
-    
+
     await this.relationshipRepository.save(relationship);
     return relationship;
   }
@@ -445,16 +547,20 @@ export class CompanyRelationshipService {
   }
 
   // Get relationships due for review
-  async getRelationshipsDueForReview(tenantId: string): Promise<CompanyRelationship[]> {
+  async getRelationshipsDueForReview(
+    tenantId: string,
+  ): Promise<CompanyRelationship[]> {
     const today = new Date();
-    
+
     return this.relationshipRepository
       .createQueryBuilder('relationship')
       .leftJoinAndSelect('relationship.fromCompany', 'fromCompany')
       .leftJoinAndSelect('relationship.toCompany', 'toCompany')
       .where('relationship.tenantId = :tenantId', { tenantId })
       .andWhere('relationship.isDeleted = :isDeleted', { isDeleted: false })
-      .andWhere('relationship.status = :status', { status: RelationshipStatus.ACTIVE })
+      .andWhere('relationship.status = :status', {
+        status: RelationshipStatus.ACTIVE,
+      })
       .andWhere('relationship.nextReviewDate IS NOT NULL')
       .andWhere('relationship.nextReviewDate <= :today', { today })
       .orderBy('relationship.nextReviewDate', 'ASC')
@@ -462,7 +568,11 @@ export class CompanyRelationshipService {
   }
 
   // Soft delete relationship
-  async softDelete(id: string, tenantId: string, deletedById: string): Promise<void> {
+  async softDelete(
+    id: string,
+    tenantId: string,
+    deletedById: string,
+  ): Promise<void> {
     const relationship = await this.findByIdAndTenant(id, tenantId);
     relationship.softDelete(deletedById);
     await this.relationshipRepository.save(relationship);
@@ -477,7 +587,9 @@ export class CompanyRelationshipService {
     expiringRelationships: number;
     averageRelationshipHealth: number;
   }> {
-    const relationships = await this.findAllByTenant(tenantId, { includeInactive: true });
+    const relationships = await this.findAllByTenant(tenantId, {
+      includeInactive: true,
+    });
     const expiringRelationships = await this.getExpiringRelationships(tenantId);
 
     const relationshipsByType = relationships.reduce((acc, rel) => {
@@ -491,12 +603,17 @@ export class CompanyRelationshipService {
     }, {} as Record<string, number>);
 
     const healthScores = relationships
-      .filter(rel => rel.relationshipScore !== null && rel.relationshipScore !== undefined)
+      .filter(
+        rel =>
+          rel.relationshipScore !== null && rel.relationshipScore !== undefined,
+      )
       .map(rel => rel.relationshipScore);
-    
-    const averageRelationshipHealth = healthScores.length > 0 
-      ? healthScores.reduce((sum, score) => sum + score, 0) / healthScores.length
-      : 0;
+
+    const averageRelationshipHealth =
+      healthScores.length > 0
+        ? healthScores.reduce((sum, score) => sum + score, 0) /
+          healthScores.length
+        : 0;
 
     return {
       totalRelationships: relationships.length,
@@ -504,7 +621,8 @@ export class CompanyRelationshipService {
       relationshipsByType,
       relationshipsByStatus,
       expiringRelationships: expiringRelationships.length,
-      averageRelationshipHealth: Math.round(averageRelationshipHealth * 100) / 100,
+      averageRelationshipHealth:
+        Math.round(averageRelationshipHealth * 100) / 100,
     };
   }
 
@@ -526,19 +644,24 @@ export class CompanyRelationshipService {
       .andWhere('relationship.isDeleted = :isDeleted', { isDeleted: false })
       .andWhere(
         '(LOWER(relationship.relationshipName) LIKE LOWER(:searchTerm) OR ' +
-        'LOWER(fromCompany.name) LIKE LOWER(:searchTerm) OR ' +
-        'LOWER(toCompany.name) LIKE LOWER(:searchTerm))',
-        { searchTerm: `%${searchTerm}%` }
+          'LOWER(fromCompany.name) LIKE LOWER(:searchTerm) OR ' +
+          'LOWER(toCompany.name) LIKE LOWER(:searchTerm))',
+        { searchTerm: `%${searchTerm}%` },
       );
 
     if (options?.relationshipType) {
-      queryBuilder.andWhere('relationship.relationshipType = :relationshipType', { 
-        relationshipType: options.relationshipType 
-      });
+      queryBuilder.andWhere(
+        'relationship.relationshipType = :relationshipType',
+        {
+          relationshipType: options.relationshipType,
+        },
+      );
     }
 
     if (options?.status) {
-      queryBuilder.andWhere('relationship.status = :status', { status: options.status });
+      queryBuilder.andWhere('relationship.status = :status', {
+        status: options.status,
+      });
     }
 
     if (options?.limit) {
@@ -558,12 +681,17 @@ export class CompanyRelationshipService {
     updatedById: string,
   ): Promise<CompanyRelationship[]> {
     const relationships = await Promise.all(
-      relationshipIds.map(id => this.findByIdAndTenant(id, tenantId))
+      relationshipIds.map(id => this.findByIdAndTenant(id, tenantId)),
     );
 
     const updatedRelationships = [];
     for (const relationship of relationships) {
-      const updated = await this.update(relationship.id, updateData, tenantId, updatedById);
+      const updated = await this.update(
+        relationship.id,
+        updateData,
+        tenantId,
+        updatedById,
+      );
       updatedRelationships.push(updated);
     }
 

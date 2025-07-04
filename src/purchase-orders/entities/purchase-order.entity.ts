@@ -77,7 +77,9 @@ export class PurchaseOrder extends AuditableEntity {
   @Column({ type: 'uuid' })
   supplierId: string;
 
-  @ManyToOne(() => Supplier, supplier => supplier.purchaseOrders, { eager: true })
+  @ManyToOne(() => Supplier, supplier => supplier.purchaseOrders, {
+    eager: true,
+  })
   @JoinColumn({ name: 'supplierId' })
   supplier: Supplier;
 
@@ -277,7 +279,10 @@ export class PurchaseOrder extends AuditableEntity {
   emailSentCount: number;
 
   // Relations
-  @OneToMany(() => PurchaseOrderItem, item => item.purchaseOrder, { cascade: true, eager: true })
+  @OneToMany(() => PurchaseOrderItem, item => item.purchaseOrder, {
+    cascade: true,
+    eager: true,
+  })
   items?: PurchaseOrderItem[];
 
   @OneToMany(() => PurchaseOrderApproval, approval => approval.purchaseOrder)
@@ -288,17 +293,23 @@ export class PurchaseOrder extends AuditableEntity {
 
   // Virtual fields
   get isEditable(): boolean {
-    return [PurchaseOrderStatus.DRAFT, PurchaseOrderStatus.REJECTED].includes(this.status);
+    return [PurchaseOrderStatus.DRAFT, PurchaseOrderStatus.REJECTED].includes(
+      this.status,
+    );
   }
 
   get canBeApproved(): boolean {
-    return this.status === PurchaseOrderStatus.PENDING_APPROVAL && 
-           this.approvalStatus === ApprovalStatus.PENDING;
+    return (
+      this.status === PurchaseOrderStatus.PENDING_APPROVAL &&
+      this.approvalStatus === ApprovalStatus.PENDING
+    );
   }
 
   get canBeRejected(): boolean {
-    return this.status === PurchaseOrderStatus.PENDING_APPROVAL && 
-           this.approvalStatus === ApprovalStatus.PENDING;
+    return (
+      this.status === PurchaseOrderStatus.PENDING_APPROVAL &&
+      this.approvalStatus === ApprovalStatus.PENDING
+    );
   }
 
   get canBeSentToSupplier(): boolean {
@@ -309,12 +320,14 @@ export class PurchaseOrder extends AuditableEntity {
     return ![
       PurchaseOrderStatus.RECEIVED,
       PurchaseOrderStatus.CLOSED,
-      PurchaseOrderStatus.CANCELLED
+      PurchaseOrderStatus.CANCELLED,
     ].includes(this.status);
   }
 
   get isPartiallyReceived(): boolean {
-    return this.receivedItemCount > 0 && this.receivedItemCount < this.itemCount;
+    return (
+      this.receivedItemCount > 0 && this.receivedItemCount < this.itemCount
+    );
   }
 
   get isFullyReceived(): boolean {
@@ -322,17 +335,29 @@ export class PurchaseOrder extends AuditableEntity {
   }
 
   get needsApproval(): boolean {
-    return this.requiresApproval && this.approvalStatus === ApprovalStatus.PENDING;
+    return (
+      this.requiresApproval && this.approvalStatus === ApprovalStatus.PENDING
+    );
   }
 
   get isOverdue(): boolean {
     if (!this.expectedDeliveryDate) return false;
-    return new Date() > this.expectedDeliveryDate && 
-           ![PurchaseOrderStatus.RECEIVED, PurchaseOrderStatus.CLOSED, PurchaseOrderStatus.CANCELLED].includes(this.status);
+    return (
+      new Date() > this.expectedDeliveryDate &&
+      ![
+        PurchaseOrderStatus.RECEIVED,
+        PurchaseOrderStatus.CLOSED,
+        PurchaseOrderStatus.CANCELLED,
+      ].includes(this.status)
+    );
   }
 
   // Methods
-  updateStatus(newStatus: PurchaseOrderStatus, userId?: string, reason?: string): void {
+  updateStatus(
+    newStatus: PurchaseOrderStatus,
+    userId?: string,
+    reason?: string,
+  ): void {
     const previousStatus = this.status;
     this.status = newStatus;
     this.updatedBy = userId;
@@ -370,7 +395,11 @@ export class PurchaseOrder extends AuditableEntity {
     this.updateCompletionPercentage();
   }
 
-  updateApprovalStatus(newStatus: ApprovalStatus, userId?: string, reason?: string): void {
+  updateApprovalStatus(
+    newStatus: ApprovalStatus,
+    userId?: string,
+    reason?: string,
+  ): void {
     this.approvalStatus = newStatus;
     this.updatedBy = userId;
 
@@ -393,14 +422,20 @@ export class PurchaseOrder extends AuditableEntity {
   calculateTotals(): void {
     if (this.items && this.items.length > 0) {
       this.subtotalAmount = this.items.reduce(
-        (sum, item) => sum + (item.unitPrice * item.orderedQuantity),
-        0
+        (sum, item) => sum + item.unitPrice * item.orderedQuantity,
+        0,
       );
-      
+
       this.taxAmount = this.subtotalAmount * (this.taxRate / 100);
-      this.totalAmount = this.subtotalAmount + this.taxAmount + this.shippingAmount - this.discountAmount;
+      this.totalAmount =
+        this.subtotalAmount +
+        this.taxAmount +
+        this.shippingAmount -
+        this.discountAmount;
       this.itemCount = this.items.length;
-      this.receivedItemCount = this.items.filter(item => item.receivedQuantity >= item.orderedQuantity).length;
+      this.receivedItemCount = this.items.filter(
+        item => item.receivedQuantity >= item.orderedQuantity,
+      ).length;
     }
   }
 
@@ -410,10 +445,13 @@ export class PurchaseOrder extends AuditableEntity {
       return;
     }
 
-    const totalOrdered = this.items?.reduce((sum, item) => sum + item.orderedQuantity, 0) || 0;
-    const totalReceived = this.items?.reduce((sum, item) => sum + item.receivedQuantity, 0) || 0;
+    const totalOrdered =
+      this.items?.reduce((sum, item) => sum + item.orderedQuantity, 0) || 0;
+    const totalReceived =
+      this.items?.reduce((sum, item) => sum + item.receivedQuantity, 0) || 0;
 
-    this.completionPercentage = totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0;
+    this.completionPercentage =
+      totalOrdered > 0 ? (totalReceived / totalOrdered) * 100 : 0;
   }
 
   addItem(item: Partial<PurchaseOrderItem>): void {
@@ -554,7 +592,9 @@ export class PurchaseOrderItem extends AuditableEntity {
   }
 
   get isPartiallyReceived(): boolean {
-    return this.receivedQuantity > 0 && this.receivedQuantity < this.orderedQuantity;
+    return (
+      this.receivedQuantity > 0 && this.receivedQuantity < this.orderedQuantity
+    );
   }
 
   get remainingQuantity(): number {
@@ -562,18 +602,20 @@ export class PurchaseOrderItem extends AuditableEntity {
   }
 
   get receivedPercentage(): number {
-    return this.orderedQuantity > 0 ? (this.receivedQuantity / this.orderedQuantity) * 100 : 0;
+    return this.orderedQuantity > 0
+      ? (this.receivedQuantity / this.orderedQuantity) * 100
+      : 0;
   }
 
   // Methods
   calculateTotals(): void {
     this.totalPrice = this.unitPrice * this.orderedQuantity;
-    
+
     // Apply discount
     if (this.discountPercentage > 0) {
       this.discountAmount = this.totalPrice * (this.discountPercentage / 100);
     }
-    
+
     // Calculate tax
     const taxableAmount = this.totalPrice - this.discountAmount;
     this.taxAmount = taxableAmount * ((this.taxRate || 0) / 100);
@@ -582,7 +624,7 @@ export class PurchaseOrderItem extends AuditableEntity {
   receiveQuantity(quantity: number, rejectedQuantity: number = 0): void {
     const maxReceivable = this.orderedQuantity - this.receivedQuantity;
     const actualReceived = Math.min(quantity, maxReceivable);
-    
+
     this.receivedQuantity += actualReceived;
     this.rejectedQuantity += rejectedQuantity;
     this.lastReceivedAt = new Date();
@@ -694,7 +736,9 @@ export class PurchaseOrderStatusHistory extends AuditableEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   source?: string; // 'manual', 'system', 'approval', etc.
 
-  @ManyToOne(() => PurchaseOrder, po => po.statusHistory, { onDelete: 'CASCADE' })
+  @ManyToOne(() => PurchaseOrder, po => po.statusHistory, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'purchaseOrderId' })
   purchaseOrder: PurchaseOrder;
 

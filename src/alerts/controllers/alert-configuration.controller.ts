@@ -45,15 +45,13 @@ import { AlertType } from '../entities/alert-configuration.entity';
   required: true,
 })
 export class AlertConfigurationController {
-  constructor(
-    private readonly alertConfigService: AlertConfigurationService,
-  ) {}
+  constructor(private readonly alertConfigService: AlertConfigurationService) {}
 
   @Post()
   @RequirePermissions('settings:update')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create alert configuration',
-    description: 'Buat konfigurasi alert baru untuk tenant' 
+    description: 'Buat konfigurasi alert baru untuk tenant',
   })
   @ApiResponse({
     status: 201,
@@ -87,9 +85,10 @@ export class AlertConfigurationController {
 
   @Get()
   @RequirePermissions('settings:read')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get alert configurations',
-    description: 'Dapatkan daftar konfigurasi alert dengan filter dan pagination' 
+    description:
+      'Dapatkan daftar konfigurasi alert dengan filter dan pagination',
   })
   @ApiQuery({ name: 'alertType', required: false, enum: AlertType })
   @ApiQuery({ name: 'productId', required: false })
@@ -133,18 +132,15 @@ export class AlertConfigurationController {
 
   @Get('statistics')
   @RequirePermissions('settings:read')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get alert configuration statistics',
-    description: 'Dapatkan statistik konfigurasi alert untuk tenant' 
+    description: 'Dapatkan statistik konfigurasi alert untuk tenant',
   })
   @ApiResponse({
     status: 200,
     description: 'Statistik konfigurasi alert berhasil diambil',
   })
-  async getStatistics(
-    @GetTenant() tenantId: string,
-    @Req() req: Request,
-  ) {
+  async getStatistics(@GetTenant() tenantId: string, @Req() req: Request) {
     const statistics = await this.alertConfigService.getStatistics(tenantId);
 
     return {
@@ -159,9 +155,9 @@ export class AlertConfigurationController {
 
   @Get(':id')
   @RequirePermissions('settings:read')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get alert configuration by ID',
-    description: 'Dapatkan detail konfigurasi alert berdasarkan ID' 
+    description: 'Dapatkan detail konfigurasi alert berdasarkan ID',
   })
   @ApiResponse({
     status: 200,
@@ -190,9 +186,9 @@ export class AlertConfigurationController {
 
   @Patch(':id')
   @RequirePermissions('settings:update')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update alert configuration',
-    description: 'Update konfigurasi alert berdasarkan ID' 
+    description: 'Update konfigurasi alert berdasarkan ID',
   })
   @ApiResponse({
     status: 200,
@@ -229,9 +225,9 @@ export class AlertConfigurationController {
   @Patch(':id/toggle')
   @RequirePermissions('settings:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Toggle alert configuration enabled status',
-    description: 'Toggle status enabled/disabled untuk konfigurasi alert' 
+    description: 'Toggle status enabled/disabled untuk konfigurasi alert',
   })
   @ApiResponse({
     status: 200,
@@ -262,9 +258,9 @@ export class AlertConfigurationController {
   @Delete(':id')
   @RequirePermissions('settings:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Delete alert configuration',
-    description: 'Hapus konfigurasi alert berdasarkan ID' 
+    description: 'Hapus konfigurasi alert berdasarkan ID',
   })
   @ApiResponse({
     status: 204,
@@ -284,9 +280,9 @@ export class AlertConfigurationController {
   @Post('initialize-defaults')
   @RequirePermissions('settings:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Initialize default alert configurations',
-    description: 'Inisialisasi konfigurasi alert default untuk tenant' 
+    description: 'Inisialisasi konfigurasi alert default untuk tenant',
   })
   @ApiResponse({
     status: 200,
@@ -297,7 +293,10 @@ export class AlertConfigurationController {
     @GetUser() user: User,
     @Req() req: Request,
   ) {
-    await this.alertConfigService.initializeDefaultConfigurations(tenantId, user.id);
+    await this.alertConfigService.initializeDefaultConfigurations(
+      tenantId,
+      user.id,
+    );
 
     return {
       success: true,
@@ -313,9 +312,10 @@ export class AlertConfigurationController {
 
   @Get('for-alert/:alertType')
   @RequirePermissions('inventory:read')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get configuration for specific alert',
-    description: 'Dapatkan konfigurasi untuk alert type, product, dan location tertentu' 
+    description:
+      'Dapatkan konfigurasi untuk alert type, product, dan location tertentu',
   })
   @ApiQuery({ name: 'productId', required: false })
   @ApiQuery({ name: 'locationId', required: false })
@@ -330,12 +330,13 @@ export class AlertConfigurationController {
     @Query('locationId') locationId?: string,
     @Req() req?: Request,
   ) {
-    const configuration = await this.alertConfigService.getConfigurationForAlert(
-      tenantId,
-      alertType,
-      productId,
-      locationId,
-    );
+    const configuration =
+      await this.alertConfigService.getConfigurationForAlert(
+        tenantId,
+        alertType,
+        productId,
+        locationId,
+      );
 
     return {
       success: true,

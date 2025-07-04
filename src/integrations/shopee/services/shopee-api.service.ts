@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 import * as crypto from 'crypto';
 
@@ -23,7 +28,7 @@ export interface ShopeeApiRequest extends ApiRequest {
 @Injectable()
 export class ShopeeApiService extends BaseApiService {
   protected readonly logger = new Logger(ShopeeApiService.name);
-  
+
   constructor(
     protected readonly httpService: HttpService,
     protected readonly configService: ConfigService,
@@ -35,7 +40,7 @@ export class ShopeeApiService extends BaseApiService {
    * Get Shopee API configuration
    */
   private getApiConfig(credentials: ShopeeCredentials): ApiConfig {
-    const baseUrl = credentials.isSandbox 
+    const baseUrl = credentials.isSandbox
       ? 'https://partner.test-stable.shopeemobile.com'
       : 'https://partner.shopeemobile.com';
 
@@ -64,7 +69,7 @@ export class ShopeeApiService extends BaseApiService {
     channelId: string,
   ): Promise<ApiResponse<T>> {
     const config = this.getApiConfig(credentials);
-    
+
     // Add Shopee-specific headers and signature
     const timestamp = request.timestamp || Math.floor(Date.now() / 1000);
     const signature = this.generateShopeeSignature(
@@ -115,13 +120,17 @@ export class ShopeeApiService extends BaseApiService {
   ): string {
     // Shopee signature format: HMAC-SHA256 of concatenated string
     // Format: {partner_id}{api_path}{timestamp}{access_token}{shop_id}
-    
+
     const apiPath = `/api/v2${request.endpoint}`;
-    const accessToken = request.requiresAuth !== false ? credentials.accessToken : '';
-    const shopId = request.requiresAuth !== false ? (request.shopId || credentials.shopId) : '';
-    
+    const accessToken =
+      request.requiresAuth !== false ? credentials.accessToken : '';
+    const shopId =
+      request.requiresAuth !== false
+        ? request.shopId || credentials.shopId
+        : '';
+
     const baseString = `${credentials.partnerId}${apiPath}${timestamp}${accessToken}${shopId}`;
-    
+
     return crypto
       .createHmac('sha256', credentials.partnerKey)
       .update(baseString)
@@ -175,7 +184,7 @@ export class ShopeeApiService extends BaseApiService {
     state?: string,
     isSandbox: boolean = false,
   ): string {
-    const baseUrl = isSandbox 
+    const baseUrl = isSandbox
       ? 'https://partner.test-stable.shopeemobile.com'
       : 'https://partner.shopeemobile.com';
 
@@ -200,13 +209,15 @@ export class ShopeeApiService extends BaseApiService {
     shopId: string,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-    merchant_id: string;
-    shop_id: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      merchant_id: string;
+      shop_id: string;
+    }>
+  > {
     const tempCredentials: ShopeeCredentials = {
       ...credentials,
       accessToken: '', // Not needed for this endpoint
@@ -239,13 +250,15 @@ export class ShopeeApiService extends BaseApiService {
     credentials: ShopeeCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-    merchant_id: string;
-    shop_id: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      merchant_id: string;
+      shop_id: string;
+    }>
+  > {
     const request: ShopeeApiRequest = {
       method: 'POST',
       endpoint: '/auth/access_token/get',
@@ -257,12 +270,7 @@ export class ShopeeApiService extends BaseApiService {
       requiresAuth: false,
     };
 
-    return this.makeShopeeRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeShopeeRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -272,27 +280,24 @@ export class ShopeeApiService extends BaseApiService {
     credentials: ShopeeCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    shop_id: number;
-    shop_name: string;
-    region: string;
-    status: string;
-    sip_affi_shops: any[];
-    is_cb: boolean;
-    is_cnsc: boolean;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      shop_id: number;
+      shop_name: string;
+      region: string;
+      status: string;
+      sip_affi_shops: any[];
+      is_cb: boolean;
+      is_cnsc: boolean;
+    }>
+  > {
     const request: ShopeeApiRequest = {
       method: 'GET',
       endpoint: '/shop/get_shop_info',
       requiresAuth: true,
     };
 
-    return this.makeShopeeRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeShopeeRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -302,25 +307,22 @@ export class ShopeeApiService extends BaseApiService {
     credentials: ShopeeCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    shop_name: string;
-    shop_logo: string;
-    description: string;
-    country: string;
-    status: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      shop_name: string;
+      shop_logo: string;
+      description: string;
+      country: string;
+      status: string;
+    }>
+  > {
     const request: ShopeeApiRequest = {
       method: 'GET',
       endpoint: '/shop/get_profile',
       requiresAuth: true,
     };
 
-    return this.makeShopeeRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeShopeeRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -335,7 +337,7 @@ export class ShopeeApiService extends BaseApiService {
       // Shopee webhook signature format: {webhook_url}|{request_body}
       const url = this.configService.get<string>('SHOPEE_WEBHOOK_URL');
       const stringToSign = `${url}|${payload}`;
-      
+
       const expectedSignature = crypto
         .createHmac('sha256', partnerKey)
         .update(stringToSign)
@@ -343,7 +345,7 @@ export class ShopeeApiService extends BaseApiService {
 
       // Extract signature from Authorization header
       const receivedSignature = authorizationHeader.replace(/^sha256=/, '');
-      
+
       return crypto.timingSafeEqual(
         Buffer.from(expectedSignature, 'hex'),
         Buffer.from(receivedSignature, 'hex'),
@@ -357,26 +359,31 @@ export class ShopeeApiService extends BaseApiService {
   /**
    * Handle API errors specific to Shopee
    */
-  handleShopeeError(error: any): { code: string; message: string; retryable: boolean } {
+  handleShopeeError(error: any): {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } {
     const errorCode = error.error_code || error.code;
-    const errorMessage = error.error_description || error.message || 'Unknown Shopee API error';
+    const errorMessage =
+      error.error_description || error.message || 'Unknown Shopee API error';
 
     // Map common Shopee error codes
     const errorMap: Record<string, { message: string; retryable: boolean }> = {
-      'E1001': { message: 'Invalid partner ID', retryable: false },
-      'E1002': { message: 'Invalid signature', retryable: false },
-      'E1003': { message: 'Invalid timestamp', retryable: true },
-      'E1004': { message: 'Invalid access token', retryable: false },
-      'E1005': { message: 'Invalid shop ID', retryable: false },
-      'E1006': { message: 'Permission denied', retryable: false },
-      'E1007': { message: 'Rate limit exceeded', retryable: true },
-      'E1008': { message: 'Invalid request format', retryable: false },
-      'E1009': { message: 'Service temporarily unavailable', retryable: true },
-      'E1010': { message: 'Shop not authorized', retryable: false },
+      E1001: { message: 'Invalid partner ID', retryable: false },
+      E1002: { message: 'Invalid signature', retryable: false },
+      E1003: { message: 'Invalid timestamp', retryable: true },
+      E1004: { message: 'Invalid access token', retryable: false },
+      E1005: { message: 'Invalid shop ID', retryable: false },
+      E1006: { message: 'Permission denied', retryable: false },
+      E1007: { message: 'Rate limit exceeded', retryable: true },
+      E1008: { message: 'Invalid request format', retryable: false },
+      E1009: { message: 'Service temporarily unavailable', retryable: true },
+      E1010: { message: 'Shop not authorized', retryable: false },
     };
 
     const mappedError = errorMap[errorCode];
-    
+
     return {
       code: errorCode || 'SHOPEE_API_ERROR',
       message: mappedError?.message || errorMessage,

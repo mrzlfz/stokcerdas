@@ -1,7 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, TreeRepository } from 'typeorm';
-import { Company, CompanyType, CompanyStatus } from '../entities/company.entity';
+import {
+  Company,
+  CompanyType,
+  CompanyStatus,
+} from '../entities/company.entity';
 import { User } from '../../users/entities/user.entity';
 
 @Injectable()
@@ -29,13 +38,18 @@ export class CompanyService {
     });
 
     if (existingCompany) {
-      throw new ConflictException(`Company dengan kode '${createCompanyData.code}' sudah ada`);
+      throw new ConflictException(
+        `Company dengan kode '${createCompanyData.code}' sudah ada`,
+      );
     }
 
     // Validate parent company if specified
     let parentCompany: Company | null = null;
     if (createCompanyData.parentCompanyId) {
-      parentCompany = await this.findByIdAndTenant(createCompanyData.parentCompanyId, tenantId);
+      parentCompany = await this.findByIdAndTenant(
+        createCompanyData.parentCompanyId,
+        tenantId,
+      );
       if (!parentCompany) {
         throw new NotFoundException(`Parent company tidak ditemukan`);
       }
@@ -78,7 +92,13 @@ export class CompanyService {
   async findByIdAndTenant(id: string, tenantId: string): Promise<Company> {
     const company = await this.companyRepository.findOne({
       where: { id, tenantId, isDeleted: false },
-      relations: ['parentCompany', 'children', 'ceo', 'financeManager', 'hrManager'],
+      relations: [
+        'parentCompany',
+        'children',
+        'ceo',
+        'financeManager',
+        'hrManager',
+      ],
     });
 
     if (!company) {
@@ -92,11 +112,19 @@ export class CompanyService {
   async findByCodeAndTenant(code: string, tenantId: string): Promise<Company> {
     const company = await this.companyRepository.findOne({
       where: { code, tenantId, isDeleted: false },
-      relations: ['parentCompany', 'children', 'ceo', 'financeManager', 'hrManager'],
+      relations: [
+        'parentCompany',
+        'children',
+        'ceo',
+        'financeManager',
+        'hrManager',
+      ],
     });
 
     if (!company) {
-      throw new NotFoundException(`Company dengan kode '${code}' tidak ditemukan`);
+      throw new NotFoundException(
+        `Company dengan kode '${code}' tidak ditemukan`,
+      );
     }
 
     return company;
@@ -127,12 +155,14 @@ export class CompanyService {
     }
 
     if (options?.status) {
-      queryBuilder.andWhere('company.status = :status', { status: options.status });
+      queryBuilder.andWhere('company.status = :status', {
+        status: options.status,
+      });
     }
 
     if (options?.parentCompanyId) {
-      queryBuilder.andWhere('company.parentCompanyId = :parentCompanyId', { 
-        parentCompanyId: options.parentCompanyId 
+      queryBuilder.andWhere('company.parentCompanyId = :parentCompanyId', {
+        parentCompanyId: options.parentCompanyId,
       });
     }
 
@@ -140,17 +170,23 @@ export class CompanyService {
       queryBuilder.andWhere('company.isActive = :isActive', { isActive: true });
     }
 
-    queryBuilder.orderBy('company.level', 'ASC')
-             .addOrderBy('company.name', 'ASC');
+    queryBuilder
+      .orderBy('company.level', 'ASC')
+      .addOrderBy('company.name', 'ASC');
 
     return queryBuilder.getMany();
   }
 
   // Get company hierarchy tree
-  async getCompanyTree(tenantId: string, rootCompanyId?: string): Promise<Company[]> {
+  async getCompanyTree(
+    tenantId: string,
+    rootCompanyId?: string,
+  ): Promise<Company[]> {
     if (rootCompanyId) {
       const rootCompany = await this.findByIdAndTenant(rootCompanyId, tenantId);
-      const tree = await this.companyRepository.findDescendantsTree(rootCompany);
+      const tree = await this.companyRepository.findDescendantsTree(
+        rootCompany,
+      );
       return [tree];
     }
 
@@ -166,7 +202,9 @@ export class CompanyService {
 
     const trees = [];
     for (const rootCompany of rootCompanies) {
-      const tree = await this.companyRepository.findDescendantsTree(rootCompany);
+      const tree = await this.companyRepository.findDescendantsTree(
+        rootCompany,
+      );
       trees.push(tree);
     }
 
@@ -174,13 +212,19 @@ export class CompanyService {
   }
 
   // Get company ancestors
-  async getCompanyAncestors(companyId: string, tenantId: string): Promise<Company[]> {
+  async getCompanyAncestors(
+    companyId: string,
+    tenantId: string,
+  ): Promise<Company[]> {
     const company = await this.findByIdAndTenant(companyId, tenantId);
     return this.companyRepository.findAncestors(company);
   }
 
   // Get company descendants
-  async getCompanyDescendants(companyId: string, tenantId: string): Promise<Company[]> {
+  async getCompanyDescendants(
+    companyId: string,
+    tenantId: string,
+  ): Promise<Company[]> {
     const company = await this.findByIdAndTenant(companyId, tenantId);
     return this.companyRepository.findDescendants(company);
   }
@@ -205,7 +249,9 @@ export class CompanyService {
       });
 
       if (existingCompany && existingCompany.id !== id) {
-        throw new ConflictException(`Company dengan kode '${updateData.code}' sudah ada`);
+        throw new ConflictException(
+          `Company dengan kode '${updateData.code}' sudah ada`,
+        );
       }
     }
 
@@ -213,13 +259,18 @@ export class CompanyService {
     if (updateData.parentCompanyId !== undefined) {
       if (updateData.parentCompanyId) {
         // Validate new parent
-        const newParent = await this.findByIdAndTenant(updateData.parentCompanyId, tenantId);
-        
+        const newParent = await this.findByIdAndTenant(
+          updateData.parentCompanyId,
+          tenantId,
+        );
+
         // Check for circular reference
         const descendants = await this.getCompanyDescendants(id, tenantId);
         const descendantIds = descendants.map(d => d.id);
         if (descendantIds.includes(updateData.parentCompanyId)) {
-          throw new BadRequestException('Tidak dapat menjadikan anak perusahaan sebagai parent');
+          throw new BadRequestException(
+            'Tidak dapat menjadikan anak perusahaan sebagai parent',
+          );
         }
 
         company.parentCompany = newParent;
@@ -261,12 +312,15 @@ export class CompanyService {
   }
 
   // Update paths for all descendants
-  private async updateDescendantPaths(company: Company, tenantId: string): Promise<void> {
+  private async updateDescendantPaths(
+    company: Company,
+    tenantId: string,
+  ): Promise<void> {
     const descendants = await this.getCompanyDescendants(company.id, tenantId);
-    
+
     for (const descendant of descendants) {
       if (descendant.id === company.id) continue; // Skip self
-      
+
       // Find the correct parent path
       const ancestors = await this.getCompanyAncestors(descendant.id, tenantId);
       const pathSegments = ancestors
@@ -274,14 +328,18 @@ export class CompanyService {
         .reverse()
         .map(a => a.code);
       pathSegments.push(descendant.code);
-      
+
       descendant.path = pathSegments.join('/');
       await this.companyRepository.save(descendant);
     }
   }
 
   // Soft delete company
-  async softDelete(id: string, tenantId: string, deletedById: string): Promise<void> {
+  async softDelete(
+    id: string,
+    tenantId: string,
+    deletedById: string,
+  ): Promise<void> {
     const company = await this.findByIdAndTenant(id, tenantId);
 
     // Check if company has children
@@ -294,7 +352,9 @@ export class CompanyService {
     });
 
     if (children.length > 0) {
-      throw new BadRequestException('Tidak dapat menghapus company yang masih memiliki anak perusahaan');
+      throw new BadRequestException(
+        'Tidak dapat menghapus company yang masih memiliki anak perusahaan',
+      );
     }
 
     company.softDelete(deletedById);
@@ -320,7 +380,11 @@ export class CompanyService {
   }
 
   // Activate company
-  async activate(id: string, tenantId: string, updatedById: string): Promise<Company> {
+  async activate(
+    id: string,
+    tenantId: string,
+    updatedById: string,
+  ): Promise<Company> {
     const company = await this.findByIdAndTenant(id, tenantId);
     company.activate();
     company.updatedBy = updatedById;
@@ -329,7 +393,11 @@ export class CompanyService {
   }
 
   // Deactivate company
-  async deactivate(id: string, tenantId: string, updatedById: string): Promise<Company> {
+  async deactivate(
+    id: string,
+    tenantId: string,
+    updatedById: string,
+  ): Promise<Company> {
     const company = await this.findByIdAndTenant(id, tenantId);
     company.deactivate();
     company.updatedBy = updatedById;
@@ -338,7 +406,12 @@ export class CompanyService {
   }
 
   // Suspend company
-  async suspend(id: string, tenantId: string, reason: string, updatedById: string): Promise<Company> {
+  async suspend(
+    id: string,
+    tenantId: string,
+    reason: string,
+    updatedById: string,
+  ): Promise<Company> {
     const company = await this.findByIdAndTenant(id, tenantId);
     company.suspend(reason);
     company.updatedBy = updatedById;
@@ -347,9 +420,14 @@ export class CompanyService {
   }
 
   // Dissolve company
-  async dissolve(id: string, tenantId: string, reason: string, updatedById: string): Promise<Company> {
+  async dissolve(
+    id: string,
+    tenantId: string,
+    reason: string,
+    updatedById: string,
+  ): Promise<Company> {
     const company = await this.findByIdAndTenant(id, tenantId);
-    
+
     // Check if company has active children
     const activeChildren = await this.companyRepository.find({
       where: {
@@ -361,7 +439,9 @@ export class CompanyService {
     });
 
     if (activeChildren.length > 0) {
-      throw new BadRequestException('Tidak dapat membubarkan company yang masih memiliki anak perusahaan aktif');
+      throw new BadRequestException(
+        'Tidak dapat membubarkan company yang masih memiliki anak perusahaan aktif',
+      );
     }
 
     company.dissolve(reason);
@@ -371,9 +451,14 @@ export class CompanyService {
   }
 
   // Assign CEO
-  async assignCeo(companyId: string, ceoId: string, tenantId: string, updatedById: string): Promise<Company> {
+  async assignCeo(
+    companyId: string,
+    ceoId: string,
+    tenantId: string,
+    updatedById: string,
+  ): Promise<Company> {
     const company = await this.findByIdAndTenant(companyId, tenantId);
-    
+
     const ceo = await this.userRepository.findOne({
       where: { id: ceoId, tenantId, isDeleted: false },
     });
@@ -385,15 +470,20 @@ export class CompanyService {
     company.ceoId = ceoId;
     company.ceo = ceo;
     company.updatedBy = updatedById;
-    
+
     await this.companyRepository.save(company);
     return company;
   }
 
   // Assign Finance Manager
-  async assignFinanceManager(companyId: string, managerId: string, tenantId: string, updatedById: string): Promise<Company> {
+  async assignFinanceManager(
+    companyId: string,
+    managerId: string,
+    tenantId: string,
+    updatedById: string,
+  ): Promise<Company> {
     const company = await this.findByIdAndTenant(companyId, tenantId);
-    
+
     const manager = await this.userRepository.findOne({
       where: { id: managerId, tenantId, isDeleted: false },
     });
@@ -405,15 +495,20 @@ export class CompanyService {
     company.financeManagerId = managerId;
     company.financeManager = manager;
     company.updatedBy = updatedById;
-    
+
     await this.companyRepository.save(company);
     return company;
   }
 
   // Assign HR Manager
-  async assignHrManager(companyId: string, managerId: string, tenantId: string, updatedById: string): Promise<Company> {
+  async assignHrManager(
+    companyId: string,
+    managerId: string,
+    tenantId: string,
+    updatedById: string,
+  ): Promise<Company> {
     const company = await this.findByIdAndTenant(companyId, tenantId);
-    
+
     const manager = await this.userRepository.findOne({
       where: { id: managerId, tenantId, isDeleted: false },
     });
@@ -425,7 +520,7 @@ export class CompanyService {
     company.hrManagerId = managerId;
     company.hrManager = manager;
     company.updatedBy = updatedById;
-    
+
     await this.companyRepository.save(company);
     return company;
   }
@@ -456,9 +551,15 @@ export class CompanyService {
   }
 
   // Get subsidiaries of a holding company
-  async getSubsidiaries(holdingCompanyId: string, tenantId: string): Promise<Company[]> {
-    const holdingCompany = await this.findByIdAndTenant(holdingCompanyId, tenantId);
-    
+  async getSubsidiaries(
+    holdingCompanyId: string,
+    tenantId: string,
+  ): Promise<Company[]> {
+    const holdingCompany = await this.findByIdAndTenant(
+      holdingCompanyId,
+      tenantId,
+    );
+
     if (!holdingCompany.isHolding()) {
       throw new BadRequestException('Company bukan holding company');
     }
@@ -467,7 +568,11 @@ export class CompanyService {
   }
 
   // Check if companies can transfer to each other
-  async canTransfer(fromCompanyId: string, toCompanyId: string, tenantId: string): Promise<boolean> {
+  async canTransfer(
+    fromCompanyId: string,
+    toCompanyId: string,
+    tenantId: string,
+  ): Promise<boolean> {
     const fromCompany = await this.findByIdAndTenant(fromCompanyId, tenantId);
     const toCompany = await this.findByIdAndTenant(toCompanyId, tenantId);
 
@@ -530,9 +635,9 @@ export class CompanyService {
       .andWhere('company.isDeleted = :isDeleted', { isDeleted: false })
       .andWhere(
         '(LOWER(company.name) LIKE LOWER(:searchTerm) OR ' +
-        'LOWER(company.code) LIKE LOWER(:searchTerm) OR ' +
-        'LOWER(company.legalName) LIKE LOWER(:searchTerm))',
-        { searchTerm: `%${searchTerm}%` }
+          'LOWER(company.code) LIKE LOWER(:searchTerm) OR ' +
+          'LOWER(company.legalName) LIKE LOWER(:searchTerm))',
+        { searchTerm: `%${searchTerm}%` },
       );
 
     if (options?.type) {
@@ -540,7 +645,9 @@ export class CompanyService {
     }
 
     if (options?.status) {
-      queryBuilder.andWhere('company.status = :status', { status: options.status });
+      queryBuilder.andWhere('company.status = :status', {
+        status: options.status,
+      });
     }
 
     if (options?.limit) {
@@ -560,12 +667,17 @@ export class CompanyService {
     updatedById: string,
   ): Promise<Company[]> {
     const companies = await Promise.all(
-      companyIds.map(id => this.findByIdAndTenant(id, tenantId))
+      companyIds.map(id => this.findByIdAndTenant(id, tenantId)),
     );
 
     const updatedCompanies = [];
     for (const company of companies) {
-      const updated = await this.update(company.id, updateData, tenantId, updatedById);
+      const updated = await this.update(
+        company.id,
+        updateData,
+        tenantId,
+        updatedById,
+      );
       updatedCompanies.push(updated);
     }
 
@@ -610,25 +722,39 @@ export class CompanyService {
   }
 
   // Check company setup completeness
-  async checkSetupCompleteness(companyId: string, tenantId: string): Promise<{
+  async checkSetupCompleteness(
+    companyId: string,
+    tenantId: string,
+  ): Promise<{
     isComplete: boolean;
     completionPercentage: number;
     missingItems: string[];
   }> {
     const company = await this.findByIdAndTenant(companyId, tenantId);
-    
+
     const checks = [
-      { key: 'basicInfo', check: () => !!(company.name && company.code && company.description) },
+      {
+        key: 'basicInfo',
+        check: () => !!(company.name && company.code && company.description),
+      },
       { key: 'contactInfo', check: () => company.isContactInfoComplete() },
       { key: 'financialInfo', check: () => company.isFinancialDataComplete() },
-      { key: 'management', check: () => !!(company.ceoId) },
-      { key: 'address', check: () => !!(company.addressLine1 && company.city && company.province) },
-      { key: 'businessSettings', check: () => !!(company.businessSettings) },
+      { key: 'management', check: () => !!company.ceoId },
+      {
+        key: 'address',
+        check: () =>
+          !!(company.addressLine1 && company.city && company.province),
+      },
+      { key: 'businessSettings', check: () => !!company.businessSettings },
     ];
 
     const completed = checks.filter(check => check.check());
-    const completionPercentage = Math.round((completed.length / checks.length) * 100);
-    const missingItems = checks.filter(check => !check.check()).map(check => check.key);
+    const completionPercentage = Math.round(
+      (completed.length / checks.length) * 100,
+    );
+    const missingItems = checks
+      .filter(check => !check.check())
+      .map(check => check.key);
 
     return {
       isComplete: company.isSetupComplete(),

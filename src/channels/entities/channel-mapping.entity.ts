@@ -68,21 +68,21 @@ export class ChannelMapping extends BaseEntity {
   mappingRules?: {
     // Field transformations
     fieldMappings?: Record<string, string>;
-    
+
     // Value transformations
     valueTransformations?: Array<{
       field: string;
       type: 'format' | 'calculate' | 'lookup' | 'conditional';
       rules: Record<string, any>;
     }>;
-    
+
     // Validation rules
     validations?: Array<{
       field: string;
       type: 'required' | 'format' | 'range' | 'custom';
       rules: Record<string, any>;
     }>;
-    
+
     // Sync preferences
     syncPreferences?: {
       priority: 'internal' | 'external' | 'latest';
@@ -154,7 +154,9 @@ export class ChannelMapping extends BaseEntity {
   };
 
   // Relations
-  @ManyToOne(() => Channel, channel => channel.mappings, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Channel, channel => channel.mappings, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'channelId' })
   channel: Channel;
 
@@ -165,23 +167,24 @@ export class ChannelMapping extends BaseEntity {
 
   get needsSync(): boolean {
     if (!this.isActive) return false;
-    
+
     const lastSync = this.lastSyncAt;
     const internalModified = this.internalLastModified;
     const externalModified = this.externalLastModified;
-    
+
     if (!lastSync) return true;
-    
+
     if (internalModified && internalModified > lastSync) return true;
     if (externalModified && externalModified > lastSync) return true;
-    
+
     return false;
   }
 
   get isStale(): boolean {
     if (!this.lastSyncAt) return true;
-    
-    const hoursSinceSync = (Date.now() - this.lastSyncAt.getTime()) / (1000 * 60 * 60);
+
+    const hoursSinceSync =
+      (Date.now() - this.lastSyncAt.getTime()) / (1000 * 60 * 60);
     return hoursSinceSync > 24; // Consider stale after 24 hours
   }
 
@@ -194,7 +197,7 @@ export class ChannelMapping extends BaseEntity {
   updateInternalData(data: Record<string, any>, userId?: string): void {
     this.internalData = { ...this.internalData, ...data };
     this.internalLastModified = new Date();
-    
+
     this.addToChangeLog({
       type: 'updated',
       source: 'internal',
@@ -206,7 +209,7 @@ export class ChannelMapping extends BaseEntity {
   updateExternalData(data: Record<string, any>): void {
     this.externalData = { ...this.externalData, ...data };
     this.externalLastModified = new Date();
-    
+
     this.addToChangeLog({
       type: 'updated',
       source: 'external',
@@ -217,7 +220,7 @@ export class ChannelMapping extends BaseEntity {
   recordSync(success: boolean, error?: string, duration?: number): void {
     this.lastSyncAt = new Date();
     this.syncCount += 1;
-    
+
     if (success) {
       this.syncStatus = 'synced';
       this.syncError = null;
@@ -226,10 +229,10 @@ export class ChannelMapping extends BaseEntity {
       this.syncError = error;
       this.errorCount += 1;
     }
-    
+
     // Update metrics
     this.updateMetrics({ lastSyncDuration: duration });
-    
+
     this.addToChangeLog({
       type: 'synced',
       source: 'system',
@@ -246,7 +249,10 @@ export class ChannelMapping extends BaseEntity {
     });
   }
 
-  resolveConflict(resolution: 'internal' | 'external' | 'merge', mergeData?: Record<string, any>): void {
+  resolveConflict(
+    resolution: 'internal' | 'external' | 'merge',
+    mergeData?: Record<string, any>,
+  ): void {
     switch (resolution) {
       case 'internal':
         // Keep internal data, update external
@@ -262,7 +268,7 @@ export class ChannelMapping extends BaseEntity {
         }
         break;
     }
-    
+
     this.syncStatus = 'synced';
     this.addToChangeLog({
       type: 'updated',
@@ -274,12 +280,12 @@ export class ChannelMapping extends BaseEntity {
   verify(): boolean {
     // Implement verification logic based on mapping type
     const isValid = this.validateMapping();
-    
+
     if (isValid) {
       this.isVerified = true;
       this.lastVerifiedAt = new Date();
     }
-    
+
     return isValid;
   }
 
@@ -287,7 +293,7 @@ export class ChannelMapping extends BaseEntity {
     // Basic validation - can be extended based on mapping type
     if (!this.internalId || !this.externalId) return false;
     if (!this.isActive) return false;
-    
+
     // Type-specific validation
     switch (this.mappingType) {
       case MappingType.PRODUCT:
@@ -309,14 +315,16 @@ export class ChannelMapping extends BaseEntity {
     return Boolean(this.internalData?.name && this.externalData?.name);
   }
 
-  private addToChangeLog(entry: Omit<ChannelMapping['changeLog'][0], 'timestamp'>): void {
+  private addToChangeLog(
+    entry: Omit<ChannelMapping['changeLog'][0], 'timestamp'>,
+  ): void {
     if (!this.changeLog) this.changeLog = [];
-    
+
     this.changeLog.push({
       timestamp: new Date().toISOString(),
       ...entry,
     });
-    
+
     // Keep only last 50 entries
     if (this.changeLog.length > 50) {
       this.changeLog = this.changeLog.slice(-50);
@@ -328,7 +336,7 @@ export class ChannelMapping extends BaseEntity {
       ...this.metrics,
       ...newMetrics,
     };
-    
+
     // Calculate success rate
     if (this.syncCount > 0) {
       this.metrics.syncSuccessRate = this.syncSuccessRate;
@@ -340,7 +348,7 @@ export class ChannelMapping extends BaseEntity {
     channelId: string,
     internalProductId: string,
     externalProductId: string,
-    productData?: Record<string, any>
+    productData?: Record<string, any>,
   ): Partial<ChannelMapping> {
     return {
       channelId,
@@ -358,7 +366,7 @@ export class ChannelMapping extends BaseEntity {
     channelId: string,
     internalCategoryId: string,
     externalCategoryId: string,
-    categoryData?: Record<string, any>
+    categoryData?: Record<string, any>,
   ): Partial<ChannelMapping> {
     return {
       channelId,

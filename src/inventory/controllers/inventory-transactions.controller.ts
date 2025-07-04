@@ -22,7 +22,10 @@ import {
 
 import { InventoryTransactionsService } from '../services/inventory-transactions.service';
 import { InventoryItemsService } from '../services/inventory-items.service';
-import { InventoryTransactionQueryDto, SortOrder } from '../dto/inventory-query.dto';
+import {
+  InventoryTransactionQueryDto,
+  SortOrder,
+} from '../dto/inventory-query.dto';
 import {
   CreateInventoryTransferDto,
   UpdateTransferStatusDto,
@@ -34,7 +37,10 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { Tenant } from '../../common/decorators/tenant.decorator';
-import { PermissionAction, PermissionResource } from '../../auth/entities/permission.entity';
+import {
+  PermissionAction,
+  PermissionResource,
+} from '../../auth/entities/permission.entity';
 
 @ApiTags('Inventory Transactions')
 @ApiBearerAuth('access-token')
@@ -47,15 +53,23 @@ export class InventoryTransactionsController {
   ) {}
 
   @Get()
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
-  @ApiOperation({ summary: 'Dapatkan daftar transaksi inventory dengan filter dan pagination' })
-  @ApiResponse({ status: 200, description: 'Daftar transaksi berhasil didapat' })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
+  @ApiOperation({
+    summary: 'Dapatkan daftar transaksi inventory dengan filter dan pagination',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Daftar transaksi berhasil didapat',
+  })
   async findAll(
     @Tenant() tenantId: string,
     @Query() query: InventoryTransactionQueryDto,
   ) {
     const result = await this.transactionsService.findAll(tenantId, query);
-    
+
     return {
       success: true,
       message: 'Daftar transaksi inventory berhasil didapat',
@@ -65,12 +79,30 @@ export class InventoryTransactionsController {
   }
 
   @Get('stats')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan statistik transaksi inventory' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Tanggal mulai periode' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Tanggal akhir periode' })
-  @ApiQuery({ name: 'locationId', required: false, description: 'Filter untuk lokasi spesifik' })
-  @ApiResponse({ status: 200, description: 'Statistik transaksi berhasil didapat' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Tanggal mulai periode',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Tanggal akhir periode',
+  })
+  @ApiQuery({
+    name: 'locationId',
+    required: false,
+    description: 'Filter untuk lokasi spesifik',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Statistik transaksi berhasil didapat',
+  })
   async getStats(
     @Tenant() tenantId: string,
     @Query('startDate') startDate?: string,
@@ -83,7 +115,7 @@ export class InventoryTransactionsController {
       endDate ? new Date(endDate) : undefined,
       locationId,
     );
-    
+
     return {
       success: true,
       message: 'Statistik transaksi inventory berhasil didapat',
@@ -92,17 +124,23 @@ export class InventoryTransactionsController {
   }
 
   @Get(':id')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan detail transaksi inventory' })
   @ApiParam({ name: 'id', description: 'ID transaksi' })
-  @ApiResponse({ status: 200, description: 'Detail transaksi berhasil didapat' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detail transaksi berhasil didapat',
+  })
   @ApiResponse({ status: 404, description: 'Transaksi tidak ditemukan' })
   async findOne(
     @Tenant() tenantId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const transaction = await this.transactionsService.findOne(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Detail transaksi inventory berhasil didapat',
@@ -111,10 +149,16 @@ export class InventoryTransactionsController {
   }
 
   @Patch(':id/status')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Update status transaksi' })
   @ApiParam({ name: 'id', description: 'ID transaksi' })
-  @ApiResponse({ status: 200, description: 'Status transaksi berhasil diupdate' })
+  @ApiResponse({
+    status: 200,
+    description: 'Status transaksi berhasil diupdate',
+  })
   @ApiResponse({ status: 404, description: 'Transaksi tidak ditemukan' })
   async updateStatus(
     @Tenant() tenantId: string,
@@ -128,7 +172,7 @@ export class InventoryTransactionsController {
       updateStatusDto,
       userId,
     );
-    
+
     return {
       success: true,
       message: 'Status transaksi berhasil diupdate',
@@ -137,7 +181,10 @@ export class InventoryTransactionsController {
   }
 
   @Post(':id/cancel')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Cancel transaksi' })
   @ApiParam({ name: 'id', description: 'ID transaksi' })
   @ApiResponse({ status: 200, description: 'Transaksi berhasil dibatalkan' })
@@ -155,7 +202,7 @@ export class InventoryTransactionsController {
       cancelData.reason,
       userId,
     );
-    
+
     return {
       success: true,
       message: 'Transaksi berhasil dibatalkan',
@@ -165,11 +212,17 @@ export class InventoryTransactionsController {
 
   // Transfer Operations
   @Post('transfers')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.CREATE,
+  })
   @ApiOperation({ summary: 'Buat transfer inventory antar lokasi' })
   @ApiResponse({ status: 201, description: 'Transfer berhasil dibuat' })
   @ApiResponse({ status: 400, description: 'Data tidak valid' })
-  @ApiResponse({ status: 404, description: 'Produk atau lokasi tidak ditemukan' })
+  @ApiResponse({
+    status: 404,
+    description: 'Produk atau lokasi tidak ditemukan',
+  })
   async createTransfer(
     @Tenant() tenantId: string,
     @GetUser('id') userId: string,
@@ -180,7 +233,7 @@ export class InventoryTransactionsController {
       createTransferDto,
       userId,
     );
-    
+
     return {
       success: true,
       message: 'Transfer inventory berhasil dibuat',
@@ -193,9 +246,15 @@ export class InventoryTransactionsController {
   }
 
   @Post('transfers/receipt')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Process penerimaan transfer inventory' })
-  @ApiResponse({ status: 200, description: 'Penerimaan transfer berhasil diproses' })
+  @ApiResponse({
+    status: 200,
+    description: 'Penerimaan transfer berhasil diproses',
+  })
   @ApiResponse({ status: 404, description: 'Transfer tidak ditemukan' })
   async processTransferReceipt(
     @Tenant() tenantId: string,
@@ -207,7 +266,7 @@ export class InventoryTransactionsController {
       receiptDto,
       userId,
     );
-    
+
     return {
       success: true,
       message: 'Penerimaan transfer berhasil diproses',
@@ -221,13 +280,19 @@ export class InventoryTransactionsController {
 
   // Advanced Transfer Operations
   @Post('transfers/inter-location')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.CREATE })
-  @ApiOperation({ summary: 'Transfer produk individual antar lokasi (quick transfer)' })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.CREATE,
+  })
+  @ApiOperation({
+    summary: 'Transfer produk individual antar lokasi (quick transfer)',
+  })
   @ApiResponse({ status: 200, description: 'Transfer berhasil dilakukan' })
   async quickTransfer(
     @Tenant() tenantId: string,
     @GetUser('id') userId: string,
-    @Body() transferData: {
+    @Body()
+    transferData: {
       productId: string;
       sourceLocationId: string;
       destinationLocationId: string;
@@ -240,10 +305,12 @@ export class InventoryTransactionsController {
     const transferDto: CreateInventoryTransferDto = {
       sourceLocationId: transferData.sourceLocationId,
       destinationLocationId: transferData.destinationLocationId,
-      items: [{
-        productId: transferData.productId,
-        quantity: transferData.quantity,
-      }],
+      items: [
+        {
+          productId: transferData.productId,
+          quantity: transferData.quantity,
+        },
+      ],
       reason: transferData.reason as any,
       notes: transferData.notes,
     };
@@ -255,11 +322,12 @@ export class InventoryTransactionsController {
     );
 
     // Get source inventory item to deduct
-    const sourceItem = await this.inventoryItemsService.findByProductAndLocation(
-      tenantId,
-      transferData.productId,
-      transferData.sourceLocationId,
-    );
+    const sourceItem =
+      await this.inventoryItemsService.findByProductAndLocation(
+        tenantId,
+        transferData.productId,
+        transferData.sourceLocationId,
+      );
 
     if (!sourceItem) {
       throw new Error('Source inventory item tidak ditemukan');
@@ -286,11 +354,12 @@ export class InventoryTransactionsController {
     );
 
     // Add to destination (or create new inventory item)
-    let destinationItem = await this.inventoryItemsService.findByProductAndLocation(
-      tenantId,
-      transferData.productId,
-      transferData.destinationLocationId,
-    );
+    let destinationItem =
+      await this.inventoryItemsService.findByProductAndLocation(
+        tenantId,
+        transferData.productId,
+        transferData.destinationLocationId,
+      );
 
     if (!destinationItem) {
       // Create new inventory item at destination
@@ -335,10 +404,20 @@ export class InventoryTransactionsController {
   }
 
   @Get('transfers/pending')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan daftar transfer yang pending' })
-  @ApiQuery({ name: 'locationId', required: false, description: 'Filter untuk lokasi tertentu' })
-  @ApiResponse({ status: 200, description: 'Daftar transfer pending berhasil didapat' })
+  @ApiQuery({
+    name: 'locationId',
+    required: false,
+    description: 'Filter untuk lokasi tertentu',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Daftar transfer pending berhasil didapat',
+  })
   async getPendingTransfers(
     @Tenant() tenantId: string,
     @Query('locationId') locationId?: string,
@@ -353,7 +432,7 @@ export class InventoryTransactionsController {
     };
 
     const result = await this.transactionsService.findAll(tenantId, query);
-    
+
     return {
       success: true,
       message: 'Daftar transfer pending berhasil didapat',
@@ -363,14 +442,39 @@ export class InventoryTransactionsController {
   }
 
   @Get('movements/product/:productId')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
-  @ApiOperation({ summary: 'Dapatkan riwayat pergerakan stok untuk produk tertentu' })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
+  @ApiOperation({
+    summary: 'Dapatkan riwayat pergerakan stok untuk produk tertentu',
+  })
   @ApiParam({ name: 'productId', description: 'ID produk' })
-  @ApiQuery({ name: 'locationId', required: false, description: 'Filter untuk lokasi tertentu' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Tanggal mulai filter' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Tanggal akhir filter' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Limit hasil', type: Number })
-  @ApiResponse({ status: 200, description: 'Riwayat pergerakan stok berhasil didapat' })
+  @ApiQuery({
+    name: 'locationId',
+    required: false,
+    description: 'Filter untuk lokasi tertentu',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Tanggal mulai filter',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Tanggal akhir filter',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Limit hasil',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Riwayat pergerakan stok berhasil didapat',
+  })
   async getProductMovements(
     @Tenant() tenantId: string,
     @Param('productId', ParseUUIDPipe) productId: string,
@@ -390,7 +494,7 @@ export class InventoryTransactionsController {
     };
 
     const result = await this.transactionsService.findAll(tenantId, query);
-    
+
     return {
       success: true,
       message: 'Riwayat pergerakan stok berhasil didapat',
@@ -400,12 +504,28 @@ export class InventoryTransactionsController {
   }
 
   @Get('audit-trail/location/:locationId')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan audit trail untuk lokasi tertentu' })
   @ApiParam({ name: 'locationId', description: 'ID lokasi' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Tanggal mulai filter' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Tanggal akhir filter' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Limit hasil', type: Number })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Tanggal mulai filter',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Tanggal akhir filter',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Limit hasil',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Audit trail berhasil didapat' })
   async getLocationAuditTrail(
     @Tenant() tenantId: string,
@@ -424,7 +544,7 @@ export class InventoryTransactionsController {
     };
 
     const result = await this.transactionsService.findAll(tenantId, query);
-    
+
     return {
       success: true,
       message: 'Audit trail lokasi berhasil didapat',

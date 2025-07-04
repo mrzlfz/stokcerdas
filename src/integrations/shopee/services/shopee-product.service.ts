@@ -3,9 +3,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { ShopeeApiService, ShopeeCredentials, ShopeeApiRequest } from './shopee-api.service';
+import {
+  ShopeeApiService,
+  ShopeeCredentials,
+  ShopeeApiRequest,
+} from './shopee-api.service';
 import { ShopeeAuthService } from './shopee-auth.service';
-import { Product, ProductStatus } from '../../../products/entities/product.entity';
+import {
+  Product,
+  ProductStatus,
+} from '../../../products/entities/product.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
@@ -129,8 +136,11 @@ export class ShopeeProductService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -148,16 +158,20 @@ export class ShopeeProductService {
       );
 
       if (!productList.success || !productList.data) {
-        throw new Error(`Failed to get product list: ${productList.error?.message}`);
+        throw new Error(
+          `Failed to get product list: ${productList.error?.message}`,
+        );
       }
 
-      const productIds = productList.data.item_list.map((item: any) => item.item_id);
+      const productIds = productList.data.item_list.map(
+        (item: any) => item.item_id,
+      );
       const batchSize = options.batchSize || 20;
 
       // Process products in batches
       for (let i = 0; i < productIds.length; i += batchSize) {
         const batch = productIds.slice(i, i + batchSize);
-        
+
         try {
           const batchResult = await this.syncProductBatch(
             credentials,
@@ -170,16 +184,18 @@ export class ShopeeProductService {
           syncedCount += batchResult.syncedCount;
           errorCount += batchResult.errorCount;
           errors.push(...batchResult.errors);
-
         } catch (error) {
-          this.logger.error(`Product batch sync failed: ${error.message}`, error.stack);
+          this.logger.error(
+            `Product batch sync failed: ${error.message}`,
+            error.stack,
+          );
           errorCount += batch.length;
           errors.push(`Batch sync failed: ${error.message}`);
         }
       }
 
       const duration = Date.now() - startTime;
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -195,10 +211,9 @@ export class ShopeeProductService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Product sync failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -226,7 +241,10 @@ export class ShopeeProductService {
     productId: string,
   ): Promise<{ success: boolean; externalId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const product = await this.getProductWithVariants(tenantId, productId);
 
       if (!product) {
@@ -289,10 +307,12 @@ export class ShopeeProductService {
       } else {
         throw new Error(result.error?.message || 'Unknown error');
       }
-
     } catch (error) {
-      this.logger.error(`Product sync to Shopee failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Product sync to Shopee failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -318,7 +338,10 @@ export class ShopeeProductService {
     itemId: number,
   ): Promise<{ success: boolean; data?: ShopeeProduct; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const request: ShopeeApiRequest = {
         method: 'GET',
@@ -348,9 +371,11 @@ export class ShopeeProductService {
           error: response.error?.message || 'Product not found',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Shopee product details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Shopee product details: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -367,7 +392,10 @@ export class ShopeeProductService {
     itemId: number,
   ): Promise<{ success: boolean; data?: ShopeeVariant[]; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const request: ShopeeApiRequest = {
         method: 'GET',
@@ -395,9 +423,11 @@ export class ShopeeProductService {
           error: response.error?.message || 'Variants not found',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Shopee product variants: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Shopee product variants: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -414,7 +444,10 @@ export class ShopeeProductService {
     itemId: number,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const request: ShopeeApiRequest = {
         method: 'POST',
@@ -456,9 +489,11 @@ export class ShopeeProductService {
           error: response.error?.message || 'Delete failed',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to delete Shopee product: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete Shopee product: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -527,7 +562,9 @@ export class ShopeeProductService {
     );
 
     if (!response.success || !response.data?.item_list) {
-      throw new Error(`Failed to get product batch: ${response.error?.message}`);
+      throw new Error(
+        `Failed to get product batch: ${response.error?.message}`,
+      );
     }
 
     // Process each product
@@ -541,7 +578,9 @@ export class ShopeeProductService {
         );
         syncedCount++;
       } catch (error) {
-        this.logger.error(`Failed to sync product ${shopeeProduct.item_id}: ${error.message}`);
+        this.logger.error(
+          `Failed to sync product ${shopeeProduct.item_id}: ${error.message}`,
+        );
         errors.push(`Product ${shopeeProduct.item_id}: ${error.message}`);
         errorCount++;
       }
@@ -645,9 +684,11 @@ export class ShopeeProductService {
     product.name = shopeeProduct.item_name;
     product.description = shopeeProduct.description;
     product.sku = shopeeProduct.item_sku;
-    product.status = this.mapShopeeStatus(shopeeProduct.status) as ProductStatus;
+    product.status = this.mapShopeeStatus(
+      shopeeProduct.status,
+    ) as ProductStatus;
     product.weight = shopeeProduct.weight;
-    
+
     product.metadata = {
       ...product.metadata,
       shopee: {
@@ -683,10 +724,10 @@ export class ShopeeProductService {
 
   private mapShopeeStatus(shopeeStatus: string): ProductStatus {
     const statusMap: Record<string, ProductStatus> = {
-      'NORMAL': ProductStatus.ACTIVE,
-      'BANNED': ProductStatus.INACTIVE,
-      'DELETED': ProductStatus.DISCONTINUED,
-      'UNLIST': ProductStatus.INACTIVE,
+      NORMAL: ProductStatus.ACTIVE,
+      BANNED: ProductStatus.INACTIVE,
+      DELETED: ProductStatus.DISCONTINUED,
+      UNLIST: ProductStatus.INACTIVE,
     };
 
     return statusMap[shopeeStatus] || ProductStatus.INACTIVE;

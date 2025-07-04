@@ -126,7 +126,10 @@ export class PurchaseOrderQueryDto {
     example: '2025-07-01',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Delivery start date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Delivery start date harus berupa tanggal yang valid' },
+  )
   deliveryStartDate?: string;
 
   @ApiPropertyOptional({
@@ -134,28 +137,37 @@ export class PurchaseOrderQueryDto {
     example: '2025-07-31',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Delivery end date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Delivery end date harus berupa tanggal yang valid' },
+  )
   deliveryEndDate?: string;
 
   @ApiPropertyOptional({
     description: 'Filter berdasarkan total amount minimal',
-    example: 1000000.00,
+    example: 1000000.0,
     minimum: 0,
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Min amount harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Min amount harus berupa angka dengan maksimal 2 desimal' },
+  )
   @Min(0, { message: 'Min amount tidak boleh negatif' })
   minAmount?: number;
 
   @ApiPropertyOptional({
     description: 'Filter berdasarkan total amount maksimal',
-    example: 50000000.00,
+    example: 50000000.0,
     minimum: 0,
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Max amount harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Max amount harus berupa angka dengan maksimal 2 desimal' },
+  )
   @Min(0, { message: 'Max amount tidak boleh negatif' })
   maxAmount?: number;
 

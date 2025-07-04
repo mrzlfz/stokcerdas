@@ -1,7 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { PermissionSet, PermissionSetType, PermissionSetStatus, PermissionSetScope } from '../entities/permission-set.entity';
+import {
+  PermissionSet,
+  PermissionSetType,
+  PermissionSetStatus,
+  PermissionSetScope,
+} from '../entities/permission-set.entity';
 import { Permission } from '../entities/permission.entity';
 
 @Injectable()
@@ -19,7 +29,8 @@ export class PermissionSetService {
     tenantId: string,
     userId: string,
   ): Promise<PermissionSet> {
-    const { permissionIds, inheritsFromId, ...permissionSetData } = createPermissionSetDto;
+    const { permissionIds, inheritsFromId, ...permissionSetData } =
+      createPermissionSetDto;
 
     // Check if code is unique within tenant
     const existingPermissionSet = await this.permissionSetRepository.findOne({
@@ -64,7 +75,9 @@ export class PermissionSetService {
       updatedBy: userId,
     });
 
-    const savedPermissionSet = await this.permissionSetRepository.save(permissionSet) as unknown as PermissionSet;
+    const savedPermissionSet = (await this.permissionSetRepository.save(
+      permissionSet,
+    )) as unknown as PermissionSet;
 
     // Record usage for template
     if (inheritsFromId) {
@@ -105,8 +118,8 @@ export class PermissionSetService {
       .andWhere('permissionSet.isDeleted = false');
 
     if (!includeInactive) {
-      queryBuilder.andWhere('permissionSet.status = :status', { 
-        status: PermissionSetStatus.ACTIVE 
+      queryBuilder.andWhere('permissionSet.status = :status', {
+        status: PermissionSetStatus.ACTIVE,
       });
     }
 
@@ -114,7 +127,8 @@ export class PermissionSetService {
       queryBuilder.andWhere('permissionSet.scope = :scope', { scope });
     }
 
-    queryBuilder.orderBy('permissionSet.priority', 'DESC')
+    queryBuilder
+      .orderBy('permissionSet.priority', 'DESC')
       .addOrderBy('permissionSet.name', 'ASC');
 
     return queryBuilder.getMany();
@@ -170,13 +184,18 @@ export class PermissionSetService {
       .where('permissionSet.tenantId = :tenantId', { tenantId })
       .andWhere('permissionSet.category = :category', { category })
       .andWhere('permissionSet.isDeleted = false')
-      .andWhere('permissionSet.status = :status', { status: PermissionSetStatus.ACTIVE });
+      .andWhere('permissionSet.status = :status', {
+        status: PermissionSetStatus.ACTIVE,
+      });
 
     if (subcategory) {
-      queryBuilder.andWhere('permissionSet.subcategory = :subcategory', { subcategory });
+      queryBuilder.andWhere('permissionSet.subcategory = :subcategory', {
+        subcategory,
+      });
     }
 
-    queryBuilder.orderBy('permissionSet.priority', 'DESC')
+    queryBuilder
+      .orderBy('permissionSet.priority', 'DESC')
       .addOrderBy('permissionSet.name', 'ASC');
 
     return queryBuilder.getMany();
@@ -193,10 +212,15 @@ export class PermissionSetService {
       .leftJoinAndSelect('permissionSet.permissions', 'permissions')
       .where('permissionSet.tenantId = :tenantId', { tenantId })
       .andWhere('permissionSet.isDeleted = false')
-      .andWhere('permissionSet.status = :status', { status: PermissionSetStatus.ACTIVE })
-      .andWhere('(permissionSet.name ILIKE :query OR permissionSet.code ILIKE :query OR permissionSet.description ILIKE :query)', {
-        query: `%${query}%`,
+      .andWhere('permissionSet.status = :status', {
+        status: PermissionSetStatus.ACTIVE,
       })
+      .andWhere(
+        '(permissionSet.name ILIKE :query OR permissionSet.code ILIKE :query OR permissionSet.description ILIKE :query)',
+        {
+          query: `%${query}%`,
+        },
+      )
       .orderBy('permissionSet.priority', 'DESC')
       .addOrderBy('permissionSet.name', 'ASC')
       .limit(limit)
@@ -214,7 +238,9 @@ export class PermissionSetService {
 
     // Check if system-defined permission set is being modified
     if (!permissionSet.canBeModified) {
-      throw new ForbiddenException('Permission set sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Permission set sistem tidak dapat dimodifikasi',
+      );
     }
 
     const { permissionIds, ...updateData } = updatePermissionSetDto;
@@ -263,7 +289,9 @@ export class PermissionSetService {
       const minorVersion = parseInt(versionParts[1]);
       const patchVersion = parseInt(versionParts[2] || '0');
 
-      permissionSet.version = `${majorVersion}.${minorVersion}.${patchVersion + 1}`;
+      permissionSet.version = `${majorVersion}.${minorVersion}.${
+        patchVersion + 1
+      }`;
     }
 
     return this.permissionSetRepository.save(permissionSet);
@@ -277,9 +305,11 @@ export class PermissionSetService {
     userId: string,
   ): Promise<PermissionSet> {
     const permissionSet = await this.findById(id, tenantId);
-    
+
     if (!permissionSet.canBeModified) {
-      throw new ForbiddenException('Permission set sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Permission set sistem tidak dapat dimodifikasi',
+      );
     }
 
     const permission = await this.permissionRepository.findOne({
@@ -304,9 +334,11 @@ export class PermissionSetService {
     userId: string,
   ): Promise<PermissionSet> {
     const permissionSet = await this.findById(id, tenantId);
-    
+
     if (!permissionSet.canBeModified) {
-      throw new ForbiddenException('Permission set sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Permission set sistem tidak dapat dimodifikasi',
+      );
     }
 
     permissionSet.removePermission(permissionId);
@@ -346,7 +378,9 @@ export class PermissionSetService {
       updatedBy: userId,
     });
 
-    const savedPermissionSet = await this.permissionSetRepository.save(clonedPermissionSet);
+    const savedPermissionSet = await this.permissionSetRepository.save(
+      clonedPermissionSet,
+    );
 
     // Record usage for source
     await this.recordUsage(sourceId);
@@ -364,7 +398,13 @@ export class PermissionSetService {
   ): Promise<PermissionSet> {
     const sourcePermissionSet = await this.findById(sourceId, tenantId);
 
-    const template = await this.clone(sourceId, templateCode, templateName, tenantId, userId);
+    const template = await this.clone(
+      sourceId,
+      templateCode,
+      templateName,
+      tenantId,
+      userId,
+    );
     template.type = PermissionSetType.TEMPLATE;
     template.isTemplate = true;
     template.isReusable = true;
@@ -393,7 +433,13 @@ export class PermissionSetService {
     }
 
     // Clone the template
-    const newPermissionSet = await this.clone(templateId, newCode, newName, tenantId, userId);
+    const newPermissionSet = await this.clone(
+      templateId,
+      newCode,
+      newName,
+      tenantId,
+      userId,
+    );
     newPermissionSet.type = PermissionSetType.CUSTOM;
     newPermissionSet.isTemplate = false;
 
@@ -405,7 +451,7 @@ export class PermissionSetService {
             id: In(customizations.addPermissions),
           },
         });
-        
+
         additionalPermissions.forEach(permission => {
           newPermissionSet.addPermission(permission);
         });
@@ -433,14 +479,16 @@ export class PermissionSetService {
     userId: string,
   ): Promise<PermissionSet> {
     const permissionSet = await this.findById(id, tenantId);
-    
+
     if (!permissionSet.canBeModified) {
-      throw new ForbiddenException('Permission set sistem tidak dapat dimodifikasi');
+      throw new ForbiddenException(
+        'Permission set sistem tidak dapat dimodifikasi',
+      );
     }
 
     permissionSet.status = status;
     permissionSet.updatedBy = userId;
-    
+
     return this.permissionSetRepository.save(permissionSet);
   }
 
@@ -457,7 +505,11 @@ export class PermissionSetService {
   }
 
   // Restore soft deleted permission set
-  async restore(id: string, tenantId: string, userId: string): Promise<PermissionSet> {
+  async restore(
+    id: string,
+    tenantId: string,
+    userId: string,
+  ): Promise<PermissionSet> {
     const permissionSet = await this.permissionSetRepository.findOne({
       where: {
         id,
@@ -468,12 +520,14 @@ export class PermissionSetService {
     });
 
     if (!permissionSet) {
-      throw new NotFoundException('Permission set yang dihapus tidak ditemukan');
+      throw new NotFoundException(
+        'Permission set yang dihapus tidak ditemukan',
+      );
     }
 
     permissionSet.restore();
     permissionSet.updatedBy = userId;
-    
+
     return this.permissionSetRepository.save(permissionSet);
   }
 
@@ -516,13 +570,15 @@ export class PermissionSetService {
 
     // Apply overrides
     if (permissionSet.overriddenPermissions) {
-      Object.entries(permissionSet.overriddenPermissions).forEach(([key, action]) => {
-        if (action === 'grant') {
-          permissions.add(key);
-        } else if (action === 'deny') {
-          permissions.delete(key);
-        }
-      });
+      Object.entries(permissionSet.overriddenPermissions).forEach(
+        ([key, action]) => {
+          if (action === 'grant') {
+            permissions.add(key);
+          } else if (action === 'deny') {
+            permissions.delete(key);
+          }
+        },
+      );
     }
 
     return Array.from(permissions);
@@ -535,45 +591,82 @@ export class PermissionSetService {
     tenantId: string,
     context?: any,
   ): Promise<boolean> {
-    const effectivePermissions = await this.getEffectivePermissions(id, tenantId, context);
+    const effectivePermissions = await this.getEffectivePermissions(
+      id,
+      tenantId,
+      context,
+    );
     return effectivePermissions.includes(permissionKey);
   }
 
   // Get permission set statistics
   async getPermissionSetStats(tenantId: string): Promise<any> {
     const permissionSets = await this.findAll(tenantId, true);
-    
+
     const stats = {
       total: permissionSets.length,
-      active: permissionSets.filter(ps => ps.status === PermissionSetStatus.ACTIVE).length,
-      inactive: permissionSets.filter(ps => ps.status === PermissionSetStatus.INACTIVE).length,
-      draft: permissionSets.filter(ps => ps.status === PermissionSetStatus.DRAFT).length,
-      archived: permissionSets.filter(ps => ps.status === PermissionSetStatus.ARCHIVED).length,
+      active: permissionSets.filter(
+        ps => ps.status === PermissionSetStatus.ACTIVE,
+      ).length,
+      inactive: permissionSets.filter(
+        ps => ps.status === PermissionSetStatus.INACTIVE,
+      ).length,
+      draft: permissionSets.filter(
+        ps => ps.status === PermissionSetStatus.DRAFT,
+      ).length,
+      archived: permissionSets.filter(
+        ps => ps.status === PermissionSetStatus.ARCHIVED,
+      ).length,
       byType: {
-        system: permissionSets.filter(ps => ps.type === PermissionSetType.SYSTEM).length,
-        template: permissionSets.filter(ps => ps.type === PermissionSetType.TEMPLATE).length,
-        custom: permissionSets.filter(ps => ps.type === PermissionSetType.CUSTOM).length,
-        department: permissionSets.filter(ps => ps.type === PermissionSetType.DEPARTMENT).length,
-        function: permissionSets.filter(ps => ps.type === PermissionSetType.FUNCTION).length,
-        project: permissionSets.filter(ps => ps.type === PermissionSetType.PROJECT).length,
+        system: permissionSets.filter(
+          ps => ps.type === PermissionSetType.SYSTEM,
+        ).length,
+        template: permissionSets.filter(
+          ps => ps.type === PermissionSetType.TEMPLATE,
+        ).length,
+        custom: permissionSets.filter(
+          ps => ps.type === PermissionSetType.CUSTOM,
+        ).length,
+        department: permissionSets.filter(
+          ps => ps.type === PermissionSetType.DEPARTMENT,
+        ).length,
+        function: permissionSets.filter(
+          ps => ps.type === PermissionSetType.FUNCTION,
+        ).length,
+        project: permissionSets.filter(
+          ps => ps.type === PermissionSetType.PROJECT,
+        ).length,
       },
       byScope: {
-        global: permissionSets.filter(ps => ps.scope === PermissionSetScope.GLOBAL).length,
-        tenant: permissionSets.filter(ps => ps.scope === PermissionSetScope.TENANT).length,
-        department: permissionSets.filter(ps => ps.scope === PermissionSetScope.DEPARTMENT).length,
-        team: permissionSets.filter(ps => ps.scope === PermissionSetScope.TEAM).length,
-        user: permissionSets.filter(ps => ps.scope === PermissionSetScope.USER).length,
+        global: permissionSets.filter(
+          ps => ps.scope === PermissionSetScope.GLOBAL,
+        ).length,
+        tenant: permissionSets.filter(
+          ps => ps.scope === PermissionSetScope.TENANT,
+        ).length,
+        department: permissionSets.filter(
+          ps => ps.scope === PermissionSetScope.DEPARTMENT,
+        ).length,
+        team: permissionSets.filter(ps => ps.scope === PermissionSetScope.TEAM)
+          .length,
+        user: permissionSets.filter(ps => ps.scope === PermissionSetScope.USER)
+          .length,
       },
       templates: permissionSets.filter(ps => ps.isTemplate).length,
       totalUsage: permissionSets.reduce((sum, ps) => sum + ps.usageCount, 0),
-      averagePermissions: permissionSets.reduce((sum, ps) => sum + ps.permissionCount, 0) / permissionSets.length,
+      averagePermissions:
+        permissionSets.reduce((sum, ps) => sum + ps.permissionCount, 0) /
+        permissionSets.length,
     };
 
     return stats;
   }
 
   // Get popular permission sets
-  async getPopularPermissionSets(tenantId: string, limit = 10): Promise<PermissionSet[]> {
+  async getPopularPermissionSets(
+    tenantId: string,
+    limit = 10,
+  ): Promise<PermissionSet[]> {
     return this.permissionSetRepository.find({
       where: {
         tenantId,
@@ -590,7 +683,10 @@ export class PermissionSetService {
   }
 
   // Get recently used permission sets
-  async getRecentlyUsedPermissionSets(tenantId: string, limit = 10): Promise<PermissionSet[]> {
+  async getRecentlyUsedPermissionSets(
+    tenantId: string,
+    limit = 10,
+  ): Promise<PermissionSet[]> {
     return this.permissionSetRepository.find({
       where: {
         tenantId,
@@ -623,9 +719,15 @@ export class PermissionSetService {
     const firstPermissions = new Set(firstSet.getPermissionKeys());
     const secondPermissions = new Set(secondSet.getPermissionKeys());
 
-    const common = Array.from(firstPermissions).filter(p => secondPermissions.has(p));
-    const onlyInFirst = Array.from(firstPermissions).filter(p => !secondPermissions.has(p));
-    const onlyInSecond = Array.from(secondPermissions).filter(p => !firstPermissions.has(p));
+    const common = Array.from(firstPermissions).filter(p =>
+      secondPermissions.has(p),
+    );
+    const onlyInFirst = Array.from(firstPermissions).filter(
+      p => !secondPermissions.has(p),
+    );
+    const onlyInSecond = Array.from(secondPermissions).filter(
+      p => !firstPermissions.has(p),
+    );
 
     return {
       common,
@@ -646,7 +748,7 @@ export class PermissionSetService {
     await this.permissionSetRepository
       .createQueryBuilder()
       .update(PermissionSet)
-      .set({ 
+      .set({
         status,
         updatedBy: userId,
         updatedAt: new Date(),
@@ -698,7 +800,9 @@ export class PermissionSetService {
   ): Promise<PermissionSet> {
     // Validate import data
     if (!importData.code || !importData.name) {
-      throw new BadRequestException('Data import tidak valid: code dan name diperlukan');
+      throw new BadRequestException(
+        'Data import tidak valid: code dan name diperlukan',
+      );
     }
 
     // Check if code exists
@@ -716,10 +820,11 @@ export class PermissionSetService {
 
     // Get permissions
     const permissions = await this.permissionRepository.find({
-      where: importData.permissions?.map((key: string) => {
-        const [resource, action] = key.split(':');
-        return { resource, action };
-      }) || [],
+      where:
+        importData.permissions?.map((key: string) => {
+          const [resource, action] = key.split(':');
+          return { resource, action };
+        }) || [],
     });
 
     const permissionSet = this.permissionSetRepository.create({
@@ -734,6 +839,8 @@ export class PermissionSetService {
       updatedBy: userId,
     });
 
-    return this.permissionSetRepository.save(permissionSet) as unknown as PermissionSet;
+    return this.permissionSetRepository.save(
+      permissionSet,
+    ) as unknown as PermissionSet;
   }
 }

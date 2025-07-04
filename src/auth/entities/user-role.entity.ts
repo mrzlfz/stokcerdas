@@ -1,10 +1,4 @@
-import {
-  Entity,
-  Column,
-  Index,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { AuditableEntity } from '../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
@@ -21,11 +15,11 @@ export enum UserRoleStatus {
 }
 
 export enum AssignmentType {
-  PERMANENT = 'permanent',    // Permanent role assignment
-  TEMPORARY = 'temporary',    // Temporary assignment with expiry
-  DELEGATION = 'delegation',  // Delegated from another user
-  ACTING = 'acting',         // Acting in role (e.g., manager on leave)
-  PROJECT = 'project',       // Project-specific assignment
+  PERMANENT = 'permanent', // Permanent role assignment
+  TEMPORARY = 'temporary', // Temporary assignment with expiry
+  DELEGATION = 'delegation', // Delegated from another user
+  ACTING = 'acting', // Acting in role (e.g., manager on leave)
+  PROJECT = 'project', // Project-specific assignment
 }
 
 @Entity('user_roles')
@@ -33,7 +27,10 @@ export enum AssignmentType {
 @Index(['tenantId', 'userId'])
 @Index(['tenantId', 'roleId'])
 @Index(['tenantId', 'departmentId'])
-@Index(['userId', 'roleId', 'departmentId'], { unique: true, where: 'is_deleted = false' })
+@Index(['userId', 'roleId', 'departmentId'], {
+  unique: true,
+  where: 'is_deleted = false',
+})
 export class UserRole extends AuditableEntity {
   // User reference
   @Column({ type: 'uuid', name: 'user_id' })
@@ -143,7 +140,7 @@ export class UserRole extends AuditableEntity {
   restrictions?: {
     ipWhitelist?: string[];
     timeRestriction?: {
-      allowedHours?: Record<string, { start: string; end: string; }>;
+      allowedHours?: Record<string, { start: string; end: string }>;
       timezone?: string;
     };
     locationRestriction?: {
@@ -190,7 +187,11 @@ export class UserRole extends AuditableEntity {
 
   // Computed properties
   get isActive(): boolean {
-    return this.status === UserRoleStatus.ACTIVE && !this.isDeleted && this.isValidNow;
+    return (
+      this.status === UserRoleStatus.ACTIVE &&
+      !this.isDeleted &&
+      this.isValidNow
+    );
   }
 
   get isValidNow(): boolean {
@@ -209,13 +210,17 @@ export class UserRole extends AuditableEntity {
   }
 
   get isTemporary(): boolean {
-    return this.assignmentType === AssignmentType.TEMPORARY || 
-           this.assignmentType === AssignmentType.DELEGATION ||
-           this.assignmentType === AssignmentType.ACTING;
+    return (
+      this.assignmentType === AssignmentType.TEMPORARY ||
+      this.assignmentType === AssignmentType.DELEGATION ||
+      this.assignmentType === AssignmentType.ACTING
+    );
   }
 
   get isDelegated(): boolean {
-    return this.assignmentType === AssignmentType.DELEGATION && !!this.delegatedBy;
+    return (
+      this.assignmentType === AssignmentType.DELEGATION && !!this.delegatedBy
+    );
   }
 
   get hasRestrictions(): boolean {
@@ -224,17 +229,17 @@ export class UserRole extends AuditableEntity {
 
   get effectivePermissions(): string[] {
     const permissions: string[] = [];
-    
+
     // Add role permissions
     if (this.role?.inheritsPermissions) {
       // TODO: Implement role inheritance logic
     }
-    
+
     // Add permission set permissions
     if (this.permissionSet?.permissions) {
       permissions.push(...this.permissionSet.getPermissionKeys());
     }
-    
+
     return [...new Set(permissions)]; // Remove duplicates
   }
 
@@ -265,7 +270,7 @@ export class UserRole extends AuditableEntity {
   extend(newExpiryDate: Date, extendedBy: string): void {
     this.validUntil = newExpiryDate;
     this.updatedBy = extendedBy;
-    
+
     if (!this.metadata) this.metadata = {};
     this.metadata.lastExtension = {
       date: new Date().toISOString(),
@@ -278,7 +283,7 @@ export class UserRole extends AuditableEntity {
     this.delegatedTo = delegatedTo;
     this.delegationReason = reason;
     this.assignmentType = AssignmentType.DELEGATION;
-    
+
     if (expiryDate) {
       this.validUntil = expiryDate;
     }
@@ -288,13 +293,15 @@ export class UserRole extends AuditableEntity {
   isWithinAllowedHours(): boolean {
     const timeRestriction = this.restrictions?.timeRestriction;
     if (!timeRestriction?.allowedHours) return true;
-    
+
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase();
+    const dayOfWeek = now
+      .toLocaleDateString('en', { weekday: 'long' })
+      .toLowerCase();
     const schedule = timeRestriction.allowedHours[dayOfWeek];
-    
+
     if (!schedule) return false;
-    
+
     const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
     return currentTime >= schedule.start && currentTime <= schedule.end;
   }
@@ -303,7 +310,7 @@ export class UserRole extends AuditableEntity {
   isIpAllowed(ip: string): boolean {
     const ipWhitelist = this.restrictions?.ipWhitelist;
     if (!ipWhitelist || ipWhitelist.length === 0) return true;
-    
+
     return ipWhitelist.includes(ip);
   }
 
@@ -311,7 +318,7 @@ export class UserRole extends AuditableEntity {
   isLocationAllowed(location: string): boolean {
     const locationRestriction = this.restrictions?.locationRestriction;
     if (!locationRestriction?.allowedLocations) return true;
-    
+
     return locationRestriction.allowedLocations.includes(location);
   }
 
@@ -324,16 +331,16 @@ export class UserRole extends AuditableEntity {
   // Calculate priority score for role conflicts
   getPriorityScore(): number {
     let score = this.priority;
-    
+
     // Primary roles get higher priority
     if (this.isPrimary) score += 1000;
-    
+
     // Permanent assignments get higher priority than temporary
     if (this.assignmentType === AssignmentType.PERMANENT) score += 100;
-    
+
     // Active roles get higher priority
     if (this.isActive) score += 10;
-    
+
     return score;
   }
 }

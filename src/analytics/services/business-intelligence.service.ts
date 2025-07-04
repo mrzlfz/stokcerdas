@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In, SelectQueryBuilder } from 'typeorm';
 
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
-import { InventoryTransaction, TransactionType } from '../../inventory/entities/inventory-transaction.entity';
+import {
+  InventoryTransaction,
+  TransactionType,
+} from '../../inventory/entities/inventory-transaction.entity';
 import { InventoryLocation } from '../../inventory/entities/inventory-location.entity';
 import { Product } from '../../products/entities/product.entity';
 
@@ -57,13 +60,15 @@ export class BusinessIntelligenceService {
     query: RevenueAnalyticsQueryDto,
   ): Promise<RevenueAnalyticsResponseDto> {
     const startTime = Date.now();
-    
+
     try {
       this.logger.debug(`Generating revenue analytics for tenant ${tenantId}`);
 
       // Set default date range if not provided
       const endDate = query.endDate ? new Date(query.endDate) : new Date();
-      const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 days back
+      const startDate = query.startDate
+        ? new Date(query.startDate)
+        : new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 days back
 
       // Build base query for sales transactions
       const queryBuilder = this.transactionRepository
@@ -72,24 +77,29 @@ export class BusinessIntelligenceService {
         .leftJoinAndSelect('transaction.location', 'location')
         .leftJoinAndSelect('product.category', 'category')
         .where('transaction.tenantId = :tenantId', { tenantId })
-        .andWhere('transaction.type = :saleType', { saleType: TransactionType.SALE })
-        .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-        });
+        .andWhere('transaction.type = :saleType', {
+          saleType: TransactionType.SALE,
+        })
+        .andWhere(
+          'transaction.transactionDate BETWEEN :startDate AND :endDate',
+          {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          },
+        );
 
       // Apply common filters
       this.applyCommonFilters(queryBuilder, query, 'transaction');
 
       // Group data by time granularity
       const groupByClause = this.getTimeGroupByClause(query.granularity);
-      
+
       const revenueData = await queryBuilder
         .select([
           `${groupByClause} as period`,
           'SUM(transaction.quantity * transaction.unitCost) as totalRevenue',
-          'SUM(CASE WHEN transaction.metadata->>\'discount\' IS NOT NULL THEN (transaction.metadata->>\'discount\')::numeric ELSE 0 END) as totalDiscounts',
-          'SUM(CASE WHEN transaction.metadata->>\'tax\' IS NOT NULL THEN (transaction.metadata->>\'tax\')::numeric ELSE 0 END) as totalTax',
+          "SUM(CASE WHEN transaction.metadata->>'discount' IS NOT NULL THEN (transaction.metadata->>'discount')::numeric ELSE 0 END) as totalDiscounts",
+          "SUM(CASE WHEN transaction.metadata->>'tax' IS NOT NULL THEN (transaction.metadata->>'tax')::numeric ELSE 0 END) as totalTax",
           'COUNT(DISTINCT transaction.id) as transactionCount',
           'COUNT(DISTINCT transaction.referenceNumber) as orderCount',
           'AVG(transaction.quantity * transaction.unitCost) as averageOrderValue',
@@ -101,7 +111,12 @@ export class BusinessIntelligenceService {
       // Calculate COGS if requested
       let cogsData: any[] = [];
       if (query.includeCOGS) {
-        cogsData = await this.calculateCOGS(tenantId, startDate, endDate, query.granularity);
+        cogsData = await this.calculateCOGS(
+          tenantId,
+          startDate,
+          endDate,
+          query.granularity,
+        );
       }
 
       // Transform data to response format
@@ -111,7 +126,8 @@ export class BusinessIntelligenceService {
         const totalDiscounts = Number(item.totalDiscounts) || 0;
         const netRevenue = totalRevenue - totalDiscounts;
         const grossProfit = netRevenue - cogs;
-        const grossProfitMargin = netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0;
+        const grossProfitMargin =
+          netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0;
 
         return {
           period: item.period,
@@ -137,7 +153,12 @@ export class BusinessIntelligenceService {
       // Generate comparison data if requested
       let comparison: ComparisonDataDto | undefined;
       if (query.includeComparison) {
-        comparison = await this.generateRevenueComparison(tenantId, query, startDate, endDate);
+        comparison = await this.generateRevenueComparison(
+          tenantId,
+          query,
+          startDate,
+          endDate,
+        );
       }
 
       // Generate alerts
@@ -162,10 +183,14 @@ export class BusinessIntelligenceService {
         comparison,
         alerts,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate revenue analytics: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to generate revenue analytics: ${error.message}`);
+      this.logger.error(
+        `Failed to generate revenue analytics: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to generate revenue analytics: ${error.message}`,
+      );
     }
   }
 
@@ -177,13 +202,17 @@ export class BusinessIntelligenceService {
     query: InventoryTurnoverQueryDto,
   ): Promise<InventoryTurnoverResponseDto> {
     const startTime = Date.now();
-    
+
     try {
-      this.logger.debug(`Generating inventory turnover analysis for tenant ${tenantId}`);
+      this.logger.debug(
+        `Generating inventory turnover analysis for tenant ${tenantId}`,
+      );
 
       // Set default date range
       const endDate = query.endDate ? new Date(query.endDate) : new Date();
-      const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 365 * 24 * 60 * 60 * 1000); // 1 year back
+      const startDate = query.startDate
+        ? new Date(query.startDate)
+        : new Date(endDate.getTime() - 365 * 24 * 60 * 60 * 1000); // 1 year back
 
       // Build complex query for inventory turnover calculation
       const queryBuilder = this.inventoryItemRepository
@@ -191,9 +220,15 @@ export class BusinessIntelligenceService {
         .leftJoinAndSelect('item.product', 'product')
         .leftJoinAndSelect('item.location', 'location')
         .leftJoinAndSelect('product.category', 'category')
-        .leftJoin('item.transactions', 'transaction', 
+        .leftJoin(
+          'item.transactions',
+          'transaction',
           'transaction.type = :saleType AND transaction.transactionDate BETWEEN :startDate AND :endDate',
-          { saleType: TransactionType.SALE, startDate: startDate.toISOString(), endDate: endDate.toISOString() }
+          {
+            saleType: TransactionType.SALE,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          },
         )
         .where('item.tenantId = :tenantId', { tenantId })
         .andWhere('item.isActive = true');
@@ -210,14 +245,18 @@ export class BusinessIntelligenceService {
           'category.name as category',
           'item.quantityOnHand as currentStockLevel',
           'AVG(item.totalValue / NULLIF(item.quantityOnHand, 0)) as averageCost',
-          'SUM(CASE WHEN transaction.type = \'sale\' THEN transaction.quantity ELSE 0 END) as totalUnitsSold',
-          'SUM(CASE WHEN transaction.type = \'sale\' THEN transaction.quantity * transaction.unitCost ELSE 0 END) as totalCOGS',
+          "SUM(CASE WHEN transaction.type = 'sale' THEN transaction.quantity ELSE 0 END) as totalUnitsSold",
+          "SUM(CASE WHEN transaction.type = 'sale' THEN transaction.quantity * transaction.unitCost ELSE 0 END) as totalCOGS",
           'AVG(item.totalValue) as averageInventoryValue',
           'MAX(transaction.transactionDate) as lastSaleDate',
           'EXTRACT(days FROM AGE(NOW(), MIN(item.createdAt))) as inventoryAge',
         ])
-        .groupBy('product.id, product.sku, product.name, category.name, item.quantityOnHand')
-        .having('SUM(CASE WHEN transaction.type = \'sale\' THEN transaction.quantity ELSE 0 END) > 0') // Only products with sales
+        .groupBy(
+          'product.id, product.sku, product.name, category.name, item.quantityOnHand',
+        )
+        .having(
+          "SUM(CASE WHEN transaction.type = 'sale' THEN transaction.quantity ELSE 0 END) > 0",
+        ) // Only products with sales
         .getRawMany();
 
       // Transform data and calculate additional metrics
@@ -225,26 +264,33 @@ export class BusinessIntelligenceService {
         const totalUnitsSold = Number(item.totalUnitsSold) || 0;
         const averageInventoryValue = Number(item.averageInventoryValue) || 0;
         const totalCOGS = Number(item.totalCOGS) || 0;
-        
+
         // Calculate turnover ratio: COGS / Average Inventory Value
-        const turnoverRatio = averageInventoryValue > 0 ? totalCOGS / averageInventoryValue : 0;
-        
+        const turnoverRatio =
+          averageInventoryValue > 0 ? totalCOGS / averageInventoryValue : 0;
+
         // Calculate days in inventory: 365 / Turnover Ratio
         const daysInInventory = turnoverRatio > 0 ? 365 / turnoverRatio : 365;
-        
+
         // Calculate sales velocity: Units sold / Days in period
-        const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        const periodDays = Math.ceil(
+          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+        );
         const salesVelocity = totalUnitsSold / periodDays;
 
         // Classify stock status
         const stockStatus = this.classifyStockStatus(
-          turnoverRatio, 
-          query.fastMovingThreshold || 4, 
-          query.slowMovingThreshold || 1
+          turnoverRatio,
+          query.fastMovingThreshold || 4,
+          query.slowMovingThreshold || 1,
         );
 
         // Generate recommendation
-        const recommendation = this.generateStockRecommendation(turnoverRatio, Number(item.currentStockLevel), salesVelocity);
+        const recommendation = this.generateStockRecommendation(
+          turnoverRatio,
+          Number(item.currentStockLevel),
+          salesVelocity,
+        );
 
         return {
           productId: item.productId,
@@ -273,12 +319,22 @@ export class BusinessIntelligenceService {
       const summary = this.calculateTurnoverSummary(data);
 
       // Generate trend data
-      const trends = this.generateTurnoverTrends(tenantId, startDate, endDate, query.granularity);
+      const trends = this.generateTurnoverTrends(
+        tenantId,
+        startDate,
+        endDate,
+        query.granularity,
+      );
 
       // Generate comparison data if requested
       let comparison: ComparisonDataDto | undefined;
       if (query.includeComparison) {
-        comparison = await this.generateTurnoverComparison(tenantId, query, startDate, endDate);
+        comparison = await this.generateTurnoverComparison(
+          tenantId,
+          query,
+          startDate,
+          endDate,
+        );
       }
 
       // Generate alerts
@@ -303,10 +359,14 @@ export class BusinessIntelligenceService {
         comparison,
         alerts,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate inventory turnover analysis: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to generate inventory turnover analysis: ${error.message}`);
+      this.logger.error(
+        `Failed to generate inventory turnover analysis: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to generate inventory turnover analysis: ${error.message}`,
+      );
     }
   }
 
@@ -318,22 +378,32 @@ export class BusinessIntelligenceService {
     query: ProductPerformanceQueryDto,
   ): Promise<ProductPerformanceResponseDto> {
     const startTime = Date.now();
-    
+
     try {
-      this.logger.debug(`Generating product performance analytics for tenant ${tenantId}`);
+      this.logger.debug(
+        `Generating product performance analytics for tenant ${tenantId}`,
+      );
 
       // Set default date range
       const endDate = query.endDate ? new Date(query.endDate) : new Date();
-      const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 days back
+      const startDate = query.startDate
+        ? new Date(query.startDate)
+        : new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 days back
 
       // Build comprehensive product performance query
       const queryBuilder = this.productRepository
         .createQueryBuilder('product')
         .leftJoinAndSelect('product.category', 'category')
         .leftJoin('product.inventoryItems', 'item')
-        .leftJoin('item.transactions', 'transaction', 
+        .leftJoin(
+          'item.transactions',
+          'transaction',
           'transaction.type = :saleType AND transaction.transactionDate BETWEEN :startDate AND :endDate',
-          { saleType: TransactionType.SALE, startDate: startDate.toISOString(), endDate: endDate.toISOString() }
+          {
+            saleType: TransactionType.SALE,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          },
         )
         .where('product.tenantId = :tenantId', { tenantId })
         .andWhere('product.status = :activeStatus', { activeStatus: 'active' });
@@ -358,31 +428,40 @@ export class BusinessIntelligenceService {
           'MIN(transaction.transactionDate) as firstSaleDate',
           'MAX(transaction.transactionDate) as lastSaleDate',
         ])
-        .groupBy('product.id, product.sku, product.name, category.name, product.costPrice')
-        .having('SUM(transaction.quantity) >= :minSalesVolume', { minSalesVolume: query.minSalesVolume || 1 })
+        .groupBy(
+          'product.id, product.sku, product.name, category.name, product.costPrice',
+        )
+        .having('SUM(transaction.quantity) >= :minSalesVolume', {
+          minSalesVolume: query.minSalesVolume || 1,
+        })
         .getRawMany();
 
       // Calculate additional performance metrics and rankings
-      const totalRevenue = performanceData.reduce((sum, item) => sum + (Number(item.totalRevenue) || 0), 0);
-      
+      const totalRevenue = performanceData.reduce(
+        (sum, item) => sum + (Number(item.totalRevenue) || 0),
+        0,
+      );
+
       const data: ProductPerformanceItemDto[] = performanceData
         .map((item, index) => {
           const revenue = Number(item.totalRevenue) || 0;
           const profit = Number(item.totalProfit) || 0;
           const unitsSold = Number(item.totalUnitsSold) || 0;
           const inventoryValue = Number(item.currentInventoryValue) || 0;
-          
+
           // Calculate metrics
           const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
-          const revenueContribution = totalRevenue > 0 ? (revenue / totalRevenue) * 100 : 0;
-          const inventoryTurnover = inventoryValue > 0 ? (revenue / inventoryValue) : 0;
-          
+          const revenueContribution =
+            totalRevenue > 0 ? (revenue / totalRevenue) * 100 : 0;
+          const inventoryTurnover =
+            inventoryValue > 0 ? revenue / inventoryValue : 0;
+
           // Calculate performance score (weighted combination of metrics)
           const performanceScore = this.calculatePerformanceScore(
             revenueContribution,
             profitMargin,
             inventoryTurnover,
-            unitsSold
+            unitsSold,
           );
 
           return {
@@ -402,7 +481,11 @@ export class BusinessIntelligenceService {
             revenueContribution,
             growthRate: 0, // Will be calculated with historical data
             currentStockLevel: Number(item.currentStockLevel) || 0,
-            recommendation: 'maintain' as 'promote' | 'maintain' | 'review_pricing' | 'discontinue', // Will be determined based on performance
+            recommendation: 'maintain' as
+              | 'promote'
+              | 'maintain'
+              | 'review_pricing'
+              | 'discontinue', // Will be determined based on performance
           };
         })
         .sort((a, b) => b.performanceScore - a.performanceScore); // Sort by performance score
@@ -426,12 +509,22 @@ export class BusinessIntelligenceService {
       const summary = this.calculatePerformanceSummary(data);
 
       // Generate trend data
-      const trends = this.generatePerformanceTrends(tenantId, startDate, endDate, query.granularity);
+      const trends = this.generatePerformanceTrends(
+        tenantId,
+        startDate,
+        endDate,
+        query.granularity,
+      );
 
       // Generate comparison data if requested
       let comparison: ComparisonDataDto | undefined;
       if (query.includeComparison) {
-        comparison = await this.generatePerformanceComparison(tenantId, query, startDate, endDate);
+        comparison = await this.generatePerformanceComparison(
+          tenantId,
+          query,
+          startDate,
+          endDate,
+        );
       }
 
       // Generate alerts
@@ -456,10 +549,14 @@ export class BusinessIntelligenceService {
         comparison,
         alerts,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate product performance analytics: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to generate product performance analytics: ${error.message}`);
+      this.logger.error(
+        `Failed to generate product performance analytics: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to generate product performance analytics: ${error.message}`,
+      );
     }
   }
 
@@ -471,7 +568,7 @@ export class BusinessIntelligenceService {
     query: DashboardMetricsQueryDto,
   ): Promise<DashboardMetricsResponseDto> {
     const startTime = Date.now();
-    
+
     try {
       this.logger.debug(`Generating dashboard metrics for tenant ${tenantId}`);
 
@@ -490,7 +587,10 @@ export class BusinessIntelligenceService {
       kpis.push(...productKPIs);
 
       // Operational KPIs
-      const operationalKPIs = await this.calculateOperationalKPIs(tenantId, query);
+      const operationalKPIs = await this.calculateOperationalKPIs(
+        tenantId,
+        query,
+      );
       kpis.push(...operationalKPIs);
 
       // Calculate overall dashboard score
@@ -532,10 +632,14 @@ export class BusinessIntelligenceService {
         alerts,
         realTimeMetrics,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate dashboard metrics: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to generate dashboard metrics: ${error.message}`);
+      this.logger.error(
+        `Failed to generate dashboard metrics: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to generate dashboard metrics: ${error.message}`,
+      );
     }
   }
 
@@ -570,28 +674,35 @@ export class BusinessIntelligenceService {
       case TimeGranularity.DAILY:
         return 'DATE(transaction.transactionDate)';
       case TimeGranularity.WEEKLY:
-        return 'DATE_TRUNC(\'week\', transaction.transactionDate)';
+        return "DATE_TRUNC('week', transaction.transactionDate)";
       case TimeGranularity.MONTHLY:
-        return 'DATE_TRUNC(\'month\', transaction.transactionDate)';
+        return "DATE_TRUNC('month', transaction.transactionDate)";
       case TimeGranularity.QUARTERLY:
-        return 'DATE_TRUNC(\'quarter\', transaction.transactionDate)';
+        return "DATE_TRUNC('quarter', transaction.transactionDate)";
       case TimeGranularity.YEARLY:
-        return 'DATE_TRUNC(\'year\', transaction.transactionDate)';
+        return "DATE_TRUNC('year', transaction.transactionDate)";
       default:
-        return 'DATE_TRUNC(\'month\', transaction.transactionDate)';
+        return "DATE_TRUNC('month', transaction.transactionDate)";
     }
   }
 
   private calculateRevenueSummary(data: RevenueBreakdownDto[]) {
     const totalRevenue = data.reduce((sum, item) => sum + item.totalRevenue, 0);
-    const totalGrossProfit = data.reduce((sum, item) => sum + item.grossProfit, 0);
-    const averageGrossProfitMargin = data.length > 0 
-      ? data.reduce((sum, item) => sum + item.grossProfitMargin, 0) / data.length 
-      : 0;
+    const totalGrossProfit = data.reduce(
+      (sum, item) => sum + item.grossProfit,
+      0,
+    );
+    const averageGrossProfitMargin =
+      data.length > 0
+        ? data.reduce((sum, item) => sum + item.grossProfitMargin, 0) /
+          data.length
+        : 0;
 
     const revenueValues = data.map(item => item.totalRevenue);
-    const bestPerformingPeriod = data[revenueValues.indexOf(Math.max(...revenueValues))]?.period || '';
-    const worstPerformingPeriod = data[revenueValues.indexOf(Math.min(...revenueValues))]?.period || '';
+    const bestPerformingPeriod =
+      data[revenueValues.indexOf(Math.max(...revenueValues))]?.period || '';
+    const worstPerformingPeriod =
+      data[revenueValues.indexOf(Math.min(...revenueValues))]?.period || '';
 
     return {
       totalRevenue,
@@ -607,9 +718,11 @@ export class BusinessIntelligenceService {
   private generateTrendData(data: any[], valueField: string): TrendDataDto[] {
     return data.map((item, index) => {
       const currentValue = item[valueField];
-      const previousValue = index > 0 ? data[index - 1][valueField] : currentValue;
+      const previousValue =
+        index > 0 ? data[index - 1][valueField] : currentValue;
       const change = currentValue - previousValue;
-      const changePercent = previousValue > 0 ? (change / previousValue) * 100 : 0;
+      const changePercent =
+        previousValue > 0 ? (change / previousValue) * 100 : 0;
 
       return {
         period: item.period,
@@ -624,10 +737,10 @@ export class BusinessIntelligenceService {
 
   private calculateGrowthRate(data: any[], field: string): number {
     if (data.length < 2) return 0;
-    
+
     const firstValue = data[0][field];
     const lastValue = data[data.length - 1][field];
-    
+
     return firstValue > 0 ? ((lastValue - firstValue) / firstValue) * 100 : 0;
   }
 
@@ -648,8 +761,10 @@ export class BusinessIntelligenceService {
     salesVelocity: number,
   ): 'increase_stock' | 'reduce_stock' | 'maintain' | 'discontinue' {
     if (turnoverRatio <= 0.1) return 'discontinue';
-    if (turnoverRatio >= 6 && currentStock < salesVelocity * 30) return 'increase_stock';
-    if (turnoverRatio <= 1 && currentStock > salesVelocity * 90) return 'reduce_stock';
+    if (turnoverRatio >= 6 && currentStock < salesVelocity * 30)
+      return 'increase_stock';
+    if (turnoverRatio <= 1 && currentStock > salesVelocity * 90)
+      return 'reduce_stock';
     return 'maintain';
   }
 
@@ -699,7 +814,9 @@ export class BusinessIntelligenceService {
     });
   }
 
-  private generatePerformanceRecommendation(item: ProductPerformanceItemDto): 'promote' | 'maintain' | 'review_pricing' | 'discontinue' {
+  private generatePerformanceRecommendation(
+    item: ProductPerformanceItemDto,
+  ): 'promote' | 'maintain' | 'review_pricing' | 'discontinue' {
     if (item.performanceScore >= 80) return 'promote';
     if (item.performanceScore <= 30) return 'discontinue';
     if (item.profitMargin < 10) return 'review_pricing';
@@ -707,12 +824,22 @@ export class BusinessIntelligenceService {
   }
 
   // Placeholder methods for complex calculations
-  private async calculateCOGS(tenantId: string, startDate: Date, endDate: Date, granularity: TimeGranularity): Promise<any[]> {
+  private async calculateCOGS(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+    granularity: TimeGranularity,
+  ): Promise<any[]> {
     // Implementation for COGS calculation
     return [];
   }
 
-  private async generateRevenueComparison(tenantId: string, query: RevenueAnalyticsQueryDto, startDate: Date, endDate: Date): Promise<ComparisonDataDto> {
+  private async generateRevenueComparison(
+    tenantId: string,
+    query: RevenueAnalyticsQueryDto,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<ComparisonDataDto> {
     // Implementation for revenue comparison
     return {
       current: 0,
@@ -724,7 +851,10 @@ export class BusinessIntelligenceService {
     };
   }
 
-  private generateRevenueAlerts(data: RevenueBreakdownDto[], summary: any): KPIAlertDto[] {
+  private generateRevenueAlerts(
+    data: RevenueBreakdownDto[],
+    summary: any,
+  ): KPIAlertDto[] {
     // Implementation for revenue alerts
     return [];
   }
@@ -744,12 +874,22 @@ export class BusinessIntelligenceService {
     };
   }
 
-  private async generateTurnoverTrends(tenantId: string, startDate: Date, endDate: Date, granularity: TimeGranularity): Promise<TrendDataDto[]> {
+  private async generateTurnoverTrends(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+    granularity: TimeGranularity,
+  ): Promise<TrendDataDto[]> {
     // Implementation for turnover trends
     return [];
   }
 
-  private async generateTurnoverComparison(tenantId: string, query: InventoryTurnoverQueryDto, startDate: Date, endDate: Date): Promise<ComparisonDataDto> {
+  private async generateTurnoverComparison(
+    tenantId: string,
+    query: InventoryTurnoverQueryDto,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<ComparisonDataDto> {
     // Implementation for turnover comparison
     return {
       current: 0,
@@ -761,7 +901,10 @@ export class BusinessIntelligenceService {
     };
   }
 
-  private generateTurnoverAlerts(data: InventoryTurnoverItemDto[], summary: any): KPIAlertDto[] {
+  private generateTurnoverAlerts(
+    data: InventoryTurnoverItemDto[],
+    summary: any,
+  ): KPIAlertDto[] {
     // Implementation for turnover alerts
     return [];
   }
@@ -773,22 +916,37 @@ export class BusinessIntelligenceService {
       topPerformers: data.filter(p => p.abcClassification === 'A').length,
       mediumPerformers: data.filter(p => p.abcClassification === 'B').length,
       underperformers: data.filter(p => p.abcClassification === 'C').length,
-      averagePerformanceScore: data.reduce((sum, p) => sum + p.performanceScore, 0) / data.length,
+      averagePerformanceScore:
+        data.reduce((sum, p) => sum + p.performanceScore, 0) / data.length,
       totalRevenue: data.reduce((sum, p) => sum + p.totalRevenue, 0),
       totalProfit: data.reduce((sum, p) => sum + p.totalProfit, 0),
-      averageProfitMargin: data.reduce((sum, p) => sum + p.profitMargin, 0) / data.length,
+      averageProfitMargin:
+        data.reduce((sum, p) => sum + p.profitMargin, 0) / data.length,
       topRevenueProduct: data[0]?.productName || '',
-      topProfitProduct: data.sort((a, b) => b.totalProfit - a.totalProfit)[0]?.productName || '',
-      fastestGrowingProduct: data.sort((a, b) => b.growthRate - a.growthRate)[0]?.productName || '',
+      topProfitProduct:
+        data.sort((a, b) => b.totalProfit - a.totalProfit)[0]?.productName ||
+        '',
+      fastestGrowingProduct:
+        data.sort((a, b) => b.growthRate - a.growthRate)[0]?.productName || '',
     };
   }
 
-  private async generatePerformanceTrends(tenantId: string, startDate: Date, endDate: Date, granularity: TimeGranularity): Promise<TrendDataDto[]> {
+  private async generatePerformanceTrends(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+    granularity: TimeGranularity,
+  ): Promise<TrendDataDto[]> {
     // Implementation for performance trends
     return [];
   }
 
-  private async generatePerformanceComparison(tenantId: string, query: ProductPerformanceQueryDto, startDate: Date, endDate: Date): Promise<ComparisonDataDto> {
+  private async generatePerformanceComparison(
+    tenantId: string,
+    query: ProductPerformanceQueryDto,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<ComparisonDataDto> {
     // Implementation for performance comparison
     return {
       current: 0,
@@ -800,27 +958,42 @@ export class BusinessIntelligenceService {
     };
   }
 
-  private generatePerformanceAlerts(data: ProductPerformanceItemDto[], summary: any): KPIAlertDto[] {
+  private generatePerformanceAlerts(
+    data: ProductPerformanceItemDto[],
+    summary: any,
+  ): KPIAlertDto[] {
     // Implementation for performance alerts
     return [];
   }
 
-  private async calculateRevenueKPIs(tenantId: string, query: DashboardMetricsQueryDto): Promise<DashboardKPIDto[]> {
+  private async calculateRevenueKPIs(
+    tenantId: string,
+    query: DashboardMetricsQueryDto,
+  ): Promise<DashboardKPIDto[]> {
     // Implementation for revenue KPIs
     return [];
   }
 
-  private async calculateInventoryKPIs(tenantId: string, query: DashboardMetricsQueryDto): Promise<DashboardKPIDto[]> {
+  private async calculateInventoryKPIs(
+    tenantId: string,
+    query: DashboardMetricsQueryDto,
+  ): Promise<DashboardKPIDto[]> {
     // Implementation for inventory KPIs
     return [];
   }
 
-  private async calculateProductKPIs(tenantId: string, query: DashboardMetricsQueryDto): Promise<DashboardKPIDto[]> {
+  private async calculateProductKPIs(
+    tenantId: string,
+    query: DashboardMetricsQueryDto,
+  ): Promise<DashboardKPIDto[]> {
     // Implementation for product KPIs
     return [];
   }
 
-  private async calculateOperationalKPIs(tenantId: string, query: DashboardMetricsQueryDto): Promise<DashboardKPIDto[]> {
+  private async calculateOperationalKPIs(
+    tenantId: string,
+    query: DashboardMetricsQueryDto,
+  ): Promise<DashboardKPIDto[]> {
     // Implementation for operational KPIs
     return [];
   }

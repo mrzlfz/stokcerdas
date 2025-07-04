@@ -49,11 +49,11 @@ export enum ReportPeriod {
 }
 
 export enum ConsolidationMethod {
-  FULL = 'full',                    // 100% consolidation
-  PROPORTIONAL = 'proportional',    // Based on ownership percentage
-  EQUITY = 'equity',                // Equity method
-  COST = 'cost',                    // Cost method
-  ELIMINATION = 'elimination',      // With inter-company eliminations
+  FULL = 'full', // 100% consolidation
+  PROPORTIONAL = 'proportional', // Based on ownership percentage
+  EQUITY = 'equity', // Equity method
+  COST = 'cost', // Cost method
+  ELIMINATION = 'elimination', // With inter-company eliminations
 }
 
 export enum DataAggregation {
@@ -149,7 +149,11 @@ export class ConsolidatedReport extends AuditableEntity {
   @Column({ name: 'eliminate_inter_company', type: 'boolean', default: true })
   eliminateInterCompany: boolean;
 
-  @Column({ name: 'apply_ownership_percentage', type: 'boolean', default: false })
+  @Column({
+    name: 'apply_ownership_percentage',
+    type: 'boolean',
+    default: false,
+  })
   applyOwnershipPercentage: boolean;
 
   @Column({ name: 'currency_conversion', type: 'boolean', default: true })
@@ -257,7 +261,12 @@ export class ConsolidatedReport extends AuditableEntity {
   @Column({ name: 'consolidation_adjustments', type: 'jsonb', nullable: true })
   consolidationAdjustments: Array<{
     id: string;
-    type: 'elimination' | 'reclassification' | 'currency' | 'ownership' | 'other';
+    type:
+      | 'elimination'
+      | 'reclassification'
+      | 'currency'
+      | 'ownership'
+      | 'other';
     description: string;
     fromCompanyId?: string;
     toCompanyId?: string;
@@ -270,22 +279,28 @@ export class ConsolidatedReport extends AuditableEntity {
 
   // Calculations and formulas
   @Column({ name: 'calculation_formulas', type: 'jsonb', nullable: true })
-  calculationFormulas: Record<string, {
-    formula: string;
-    description: string;
-    dependencies: string[];
-    resultType: 'number' | 'percentage' | 'currency' | 'text';
-  }>;
+  calculationFormulas: Record<
+    string,
+    {
+      formula: string;
+      description: string;
+      dependencies: string[];
+      resultType: 'number' | 'percentage' | 'currency' | 'text';
+    }
+  >;
 
   @Column({ name: 'derived_metrics', type: 'jsonb', nullable: true })
-  derivedMetrics: Record<string, {
-    value: number;
-    unit: string;
-    calculation: string;
-    benchmark?: number;
-    variance?: number;
-    variancePercentage?: number;
-  }>;
+  derivedMetrics: Record<
+    string,
+    {
+      value: number;
+      unit: string;
+      calculation: string;
+      benchmark?: number;
+      variance?: number;
+      variancePercentage?: number;
+    }
+  >;
 
   // Performance benchmarks
   @Column({ name: 'benchmarks', type: 'jsonb', nullable: true })
@@ -298,7 +313,13 @@ export class ConsolidatedReport extends AuditableEntity {
   };
 
   // Quality and validation
-  @Column({ name: 'data_quality_score', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({
+    name: 'data_quality_score',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
   dataQualityScore: number; // 0-100
 
   @Column({ name: 'validation_rules', type: 'jsonb', nullable: true })
@@ -320,7 +341,13 @@ export class ConsolidatedReport extends AuditableEntity {
     severity: 'critical' | 'major' | 'minor';
   }>;
 
-  @Column({ name: 'data_completeness', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({
+    name: 'data_completeness',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
   dataCompleteness: number; // Percentage of complete data
 
   // Approval and authorization
@@ -344,7 +371,12 @@ export class ConsolidatedReport extends AuditableEntity {
   @Column({ name: 'is_confidential', type: 'boolean', default: false })
   isConfidential: boolean;
 
-  @Column({ name: 'access_level', type: 'varchar', length: 50, default: 'internal' })
+  @Column({
+    name: 'access_level',
+    type: 'varchar',
+    length: 50,
+    default: 'internal',
+  })
   accessLevel: 'public' | 'internal' | 'confidential' | 'restricted';
 
   @Column({ name: 'authorized_viewers', type: 'simple-array', nullable: true })
@@ -444,7 +476,11 @@ export class ConsolidatedReport extends AuditableEntity {
   }
 
   canBeApproved(): boolean {
-    return this.status === ReportStatus.COMPLETED && this.requiresApproval && !this.approvedDate;
+    return (
+      this.status === ReportStatus.COMPLETED &&
+      this.requiresApproval &&
+      !this.approvedDate
+    );
   }
 
   canBePublished(): boolean {
@@ -464,12 +500,15 @@ export class ConsolidatedReport extends AuditableEntity {
   getCurrentPeriodLabel(): string {
     const start = this.periodStart.toLocaleDateString('id-ID');
     const end = this.periodEnd.toLocaleDateString('id-ID');
-    
+
     switch (this.reportPeriod) {
       case ReportPeriod.DAILY:
         return start;
       case ReportPeriod.MONTHLY:
-        return `${this.periodStart.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`;
+        return `${this.periodStart.toLocaleDateString('id-ID', {
+          month: 'long',
+          year: 'numeric',
+        })}`;
       case ReportPeriod.QUARTERLY:
         return `Q${this.fiscalQuarter} ${this.fiscalYear}`;
       case ReportPeriod.ANNUALLY:
@@ -481,13 +520,13 @@ export class ConsolidatedReport extends AuditableEntity {
 
   calculateDataCompleteness(): number {
     if (!this.reportData || !this.reportData.details) return 0;
-    
+
     const details = this.reportData.details;
     if (details.length === 0) return 0;
-    
+
     const totalFields = Object.keys(details[0] || {}).length;
     let completeFields = 0;
-    
+
     details.forEach(record => {
       Object.values(record).forEach(value => {
         if (value !== null && value !== undefined && value !== '') {
@@ -495,7 +534,7 @@ export class ConsolidatedReport extends AuditableEntity {
         }
       });
     });
-    
+
     return Math.round((completeFields / (details.length * totalFields)) * 100);
   }
 
@@ -510,7 +549,9 @@ export class ConsolidatedReport extends AuditableEntity {
   }
 
   removeIncludedCompany(companyId: string): void {
-    this.includedCompanies = this.includedCompanies.filter(id => id !== companyId);
+    this.includedCompanies = this.includedCompanies.filter(
+      id => id !== companyId,
+    );
   }
 
   addExcludedCompany(companyId: string): void {
@@ -525,11 +566,15 @@ export class ConsolidatedReport extends AuditableEntity {
 
   removeExcludedCompany(companyId: string): void {
     if (this.excludedCompanies) {
-      this.excludedCompanies = this.excludedCompanies.filter(id => id !== companyId);
+      this.excludedCompanies = this.excludedCompanies.filter(
+        id => id !== companyId,
+      );
     }
   }
 
-  addConsolidationAdjustment(adjustment: ConsolidatedReport['consolidationAdjustments'][0]): void {
+  addConsolidationAdjustment(
+    adjustment: ConsolidatedReport['consolidationAdjustments'][0],
+  ): void {
     if (!this.consolidationAdjustments) {
       this.consolidationAdjustments = [];
     }
@@ -538,7 +583,9 @@ export class ConsolidatedReport extends AuditableEntity {
 
   removeConsolidationAdjustment(adjustmentId: string): void {
     if (this.consolidationAdjustments) {
-      this.consolidationAdjustments = this.consolidationAdjustments.filter(adj => adj.id !== adjustmentId);
+      this.consolidationAdjustments = this.consolidationAdjustments.filter(
+        adj => adj.id !== adjustmentId,
+      );
     }
   }
 
@@ -636,19 +683,31 @@ export class ConsolidatedReport extends AuditableEntity {
       // Calculate next generation date based on cron expression
       // This would typically use a cron parser library
       const now = new Date();
-      
+
       switch (this.reportPeriod) {
         case ReportPeriod.DAILY:
-          this.nextGenerationDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          this.nextGenerationDate = new Date(
+            now.getTime() + 24 * 60 * 60 * 1000,
+          );
           break;
         case ReportPeriod.WEEKLY:
-          this.nextGenerationDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          this.nextGenerationDate = new Date(
+            now.getTime() + 7 * 24 * 60 * 60 * 1000,
+          );
           break;
         case ReportPeriod.MONTHLY:
-          this.nextGenerationDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          this.nextGenerationDate = new Date(
+            now.getFullYear(),
+            now.getMonth() + 1,
+            1,
+          );
           break;
         case ReportPeriod.QUARTERLY:
-          this.nextGenerationDate = new Date(now.getFullYear(), now.getMonth() + 3, 1);
+          this.nextGenerationDate = new Date(
+            now.getFullYear(),
+            now.getMonth() + 3,
+            1,
+          );
           break;
         case ReportPeriod.ANNUALLY:
           this.nextGenerationDate = new Date(now.getFullYear() + 1, 0, 1);
@@ -658,10 +717,11 @@ export class ConsolidatedReport extends AuditableEntity {
   }
 
   validateReportData(): boolean {
-    if (!this.includedCompanies || this.includedCompanies.length === 0) return false;
+    if (!this.includedCompanies || this.includedCompanies.length === 0)
+      return false;
     if (!this.periodStart || !this.periodEnd) return false;
     if (this.periodStart >= this.periodEnd) return false;
-    
+
     return true;
   }
 

@@ -19,7 +19,7 @@ export enum SyncEntityType {
 }
 
 export enum SyncDirection {
-  INBOUND = 'inbound',   // From external platform to our system
+  INBOUND = 'inbound', // From external platform to our system
   OUTBOUND = 'outbound', // From our system to external platform
   BIDIRECTIONAL = 'bidirectional',
 }
@@ -143,7 +143,13 @@ export class SyncStatus {
   @Column({ name: 'priority', default: 5 })
   priority: number;
 
-  @Column({ name: 'progress_percentage', type: 'decimal', precision: 5, scale: 2, default: 0 })
+  @Column({
+    name: 'progress_percentage',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+  })
   progressPercentage: number;
 
   @Column({ name: 'estimated_completion', nullable: true })
@@ -180,7 +186,7 @@ export class SyncStatus {
     this.processedRecords = processed;
     this.successfulRecords = successful;
     this.failedRecords = failed;
-    
+
     if (this.totalRecords > 0) {
       this.progressPercentage = (processed / this.totalRecords) * 100;
     }

@@ -47,12 +47,18 @@ export class BulkCreatePurchaseOrderDto {
 export class BulkUpdatePurchaseOrderDto {
   @ApiProperty({
     description: 'Daftar ID purchase orders yang akan diupdate',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d7-b789-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d7-b789-123456789abc',
+    ],
     type: [String],
   })
   @IsArray({ message: 'Purchase order IDs harus berupa array' })
   @ArrayMinSize(1, { message: 'Minimal harus ada 1 purchase order ID' })
-  @IsUUID(4, { each: true, message: 'Setiap PO ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap PO ID harus berupa UUID yang valid',
+  })
   purchaseOrderIds: string[];
 
   @ApiProperty({
@@ -76,12 +82,18 @@ export class BulkUpdatePurchaseOrderDto {
 export class BulkDeletePurchaseOrderDto {
   @ApiProperty({
     description: 'Daftar ID purchase orders yang akan dihapus',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d7-b789-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d7-b789-123456789abc',
+    ],
     type: [String],
   })
   @IsArray({ message: 'Purchase order IDs harus berupa array' })
   @ArrayMinSize(1, { message: 'Minimal harus ada 1 purchase order ID' })
-  @IsUUID(4, { each: true, message: 'Setiap PO ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap PO ID harus berupa UUID yang valid',
+  })
   purchaseOrderIds: string[];
 
   @ApiPropertyOptional({
@@ -105,12 +117,18 @@ export class BulkDeletePurchaseOrderDto {
 export class BulkStatusUpdateDto {
   @ApiProperty({
     description: 'Daftar ID purchase orders yang akan diupdate statusnya',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d7-b789-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d7-b789-123456789abc',
+    ],
     type: [String],
   })
   @IsArray({ message: 'Purchase order IDs harus berupa array' })
   @ArrayMinSize(1, { message: 'Minimal harus ada 1 purchase order ID' })
-  @IsUUID(4, { each: true, message: 'Setiap PO ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap PO ID harus berupa UUID yang valid',
+  })
   purchaseOrderIds: string[];
 
   @ApiProperty({
@@ -143,12 +161,18 @@ export class BulkStatusUpdateDto {
 export class BulkSendToSupplierDto {
   @ApiProperty({
     description: 'Daftar ID purchase orders yang akan dikirim ke supplier',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d7-b789-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d7-b789-123456789abc',
+    ],
     type: [String],
   })
   @IsArray({ message: 'Purchase order IDs harus berupa array' })
   @ArrayMinSize(1, { message: 'Minimal harus ada 1 purchase order ID' })
-  @IsUUID(4, { each: true, message: 'Setiap PO ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap PO ID harus berupa UUID yang valid',
+  })
   purchaseOrderIds: string[];
 
   @ApiPropertyOptional({
@@ -194,7 +218,10 @@ export class BulkPurchaseOrderResponseDto {
   @ApiProperty({ description: 'Jumlah PO yang gagal diproses' })
   failed: number;
 
-  @ApiProperty({ description: 'Daftar ID PO yang berhasil diproses', type: [String] })
+  @ApiProperty({
+    description: 'Daftar ID PO yang berhasil diproses',
+    type: [String],
+  })
   successfulIds: string[];
 
   @ApiProperty({ description: 'Daftar error yang terjadi', type: [Object] })
@@ -256,7 +283,9 @@ export class ExportPurchaseOrdersDto {
     default: 'excel',
   })
   @IsOptional()
-  @IsEnum(['excel', 'csv', 'pdf'], { message: 'Format harus excel, csv, atau pdf' })
+  @IsEnum(['excel', 'csv', 'pdf'], {
+    message: 'Format harus excel, csv, atau pdf',
+  })
   format?: 'excel' | 'csv' | 'pdf' = 'excel';
 
   @ApiPropertyOptional({
@@ -265,7 +294,10 @@ export class ExportPurchaseOrdersDto {
   })
   @IsOptional()
   @IsArray({ message: 'Purchase order IDs harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap PO ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap PO ID harus berupa UUID yang valid',
+  })
   purchaseOrderIds?: string[];
 
   @ApiPropertyOptional({

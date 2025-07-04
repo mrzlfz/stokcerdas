@@ -20,7 +20,14 @@ import {
   ApiProperty,
   ApiPropertyOptional,
 } from '@nestjs/swagger';
-import { IsEmail, IsString, IsOptional, IsArray, IsEnum, IsBoolean } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsBoolean,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -67,7 +74,9 @@ class SendAlertNotificationDto {
   @IsString()
   alertId: string;
 
-  @ApiPropertyOptional({ description: 'Additional recipient emails (optional)' })
+  @ApiPropertyOptional({
+    description: 'Additional recipient emails (optional)',
+  })
   @IsOptional()
   @IsArray()
   @IsEmail({}, { each: true })
@@ -90,7 +99,9 @@ class BulkAlertNotificationDto {
   @IsString({ each: true })
   alertIds: string[];
 
-  @ApiPropertyOptional({ description: 'Additional recipient emails (optional)' })
+  @ApiPropertyOptional({
+    description: 'Additional recipient emails (optional)',
+  })
   @IsOptional()
   @IsArray()
   @IsEmail({}, { each: true })
@@ -177,10 +188,14 @@ export class EmailNotificationController {
   async testEmailConfiguration(
     @Body() testEmailDto: TestEmailDto,
   ): Promise<EmailTestResponseDto> {
-    const success = await this.emailNotificationService.testEmailConfiguration(testEmailDto.email);
+    const success = await this.emailNotificationService.testEmailConfiguration(
+      testEmailDto.email,
+    );
 
     if (!success) {
-      throw new BadRequestException('Failed to send test email. Please check email configuration.');
+      throw new BadRequestException(
+        'Failed to send test email. Please check email configuration.',
+      );
     }
 
     return {
@@ -274,7 +289,10 @@ export class EmailNotificationController {
     @Body() alertNotificationDto: SendAlertNotificationDto,
   ): Promise<AlertNotificationResponseDto> {
     // Get the alert
-    const alert = await this.alertManagementService.findOne(tenantId, alertNotificationDto.alertId);
+    const alert = await this.alertManagementService.findOne(
+      tenantId,
+      alertNotificationDto.alertId,
+    );
 
     const success = await this.emailNotificationService.sendAlertNotification({
       tenantId,
@@ -330,32 +348,44 @@ export class EmailNotificationController {
       successful: 0,
       failed: 0,
       total: bulkNotificationDto.alertIds.length,
-      details: [] as Array<{ alertId: string; success: boolean; error?: string }>,
+      details: [] as Array<{
+        alertId: string;
+        success: boolean;
+        error?: string;
+      }>,
     };
 
     for (const alertId of bulkNotificationDto.alertIds) {
       try {
-        const alert = await this.alertManagementService.findOne(tenantId, alertId);
-        
-        const success = await this.emailNotificationService.sendAlertNotification({
+        const alert = await this.alertManagementService.findOne(
           tenantId,
-          alert,
-          recipients: bulkNotificationDto.additionalRecipients,
-        });
+          alertId,
+        );
+
+        const success =
+          await this.emailNotificationService.sendAlertNotification({
+            tenantId,
+            alert,
+            recipients: bulkNotificationDto.additionalRecipients,
+          });
 
         if (success) {
           results.successful++;
           results.details.push({ alertId, success: true });
         } else {
           results.failed++;
-          results.details.push({ alertId, success: false, error: 'Failed to send notification' });
+          results.details.push({
+            alertId,
+            success: false,
+            error: 'Failed to send notification',
+          });
         }
       } catch (error) {
         results.failed++;
-        results.details.push({ 
-          alertId, 
-          success: false, 
-          error: error.message || 'Unknown error' 
+        results.details.push({
+          alertId,
+          success: false,
+          error: error.message || 'Unknown error',
         });
       }
     }
@@ -447,7 +477,10 @@ export class EmailNotificationController {
     };
   }> {
     // Get alert statistics for the period
-    const alertStats = await this.alertManagementService.getStatistics(tenantId, query.days);
+    const alertStats = await this.alertManagementService.getStatistics(
+      tenantId,
+      query.days,
+    );
 
     // This is a simplified implementation
     // In a real application, you would track actual email sending statistics
@@ -495,7 +528,7 @@ export class EmailNotificationController {
     const smtpHost = process.env.SMTP_HOST || 'Not configured';
     const smtpPort = parseInt(process.env.SMTP_PORT || '0') || 0;
     const smtpUser = process.env.SMTP_USER;
-    
+
     const configured = !!(smtpHost && smtpPort && smtpUser);
 
     return {

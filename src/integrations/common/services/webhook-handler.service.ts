@@ -6,7 +6,12 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import * as crypto from 'crypto';
 
-import { WebhookEvent, WebhookEventType, WebhookProcessingStatus, WebhookPriority } from '../../entities/webhook-event.entity';
+import {
+  WebhookEvent,
+  WebhookEventType,
+  WebhookProcessingStatus,
+  WebhookPriority,
+} from '../../entities/webhook-event.entity';
 import { IntegrationLogService } from './integration-log.service';
 import { RateLimiterService } from './rate-limiter.service';
 
@@ -158,14 +163,16 @@ export class WebhookHandlerService {
       await this.queueWebhookProcessing(webhookEvent);
 
       const processingTime = Date.now() - startTime;
-      
+
       return {
         success: true,
         webhookId: webhookEvent.id,
       };
-
     } catch (error) {
-      this.logger.error(`Webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       if (webhookEvent) {
         webhookEvent.markAsFailed(error.message);
@@ -205,12 +212,16 @@ export class WebhookHandlerService {
       }
 
       // Generate expected signature
-      const hmac = crypto.createHmac(config.signatureAlgorithm, config.secretKey);
+      const hmac = crypto.createHmac(
+        config.signatureAlgorithm,
+        config.secretKey,
+      );
       hmac.update(payload);
-      
-      const expectedSignature = config.signatureFormat === 'base64'
-        ? hmac.digest('base64')
-        : hmac.digest('hex');
+
+      const expectedSignature =
+        config.signatureFormat === 'base64'
+          ? hmac.digest('base64')
+          : hmac.digest('hex');
 
       // Extract actual signature (remove prefix if present)
       const actualSignature = signature.replace(/^(sha256=|sha1=)/, '');
@@ -222,9 +233,10 @@ export class WebhookHandlerService {
       );
 
       return { verified };
-
     } catch (error) {
-      this.logger.error(`Webhook signature verification error: ${error.message}`);
+      this.logger.error(
+        `Webhook signature verification error: ${error.message}`,
+      );
       return {
         verified: false,
         error: error.message,
@@ -288,7 +300,9 @@ export class WebhookHandlerService {
   /**
    * Queue webhook for processing
    */
-  private async queueWebhookProcessing(webhookEvent: WebhookEvent): Promise<void> {
+  private async queueWebhookProcessing(
+    webhookEvent: WebhookEvent,
+  ): Promise<void> {
     const jobData = {
       webhookId: webhookEvent.id,
       tenantId: webhookEvent.tenantId,
@@ -344,7 +358,7 @@ export class WebhookHandlerService {
 
     webhook.markAsProcessed(processingDetails);
     webhook.processingDurationMs = Date.now() - webhook.createdAt.getTime();
-    
+
     return await this.webhookRepository.save(webhook);
   }
 
@@ -365,13 +379,13 @@ export class WebhookHandlerService {
     }
 
     let nextRetryAt: Date | undefined;
-    
+
     if (scheduleRetry && webhook.canRetry) {
       nextRetryAt = webhook.calculateNextRetryTime();
     }
 
     webhook.markAsFailed(error, nextRetryAt);
-    
+
     const savedWebhook = await this.webhookRepository.save(webhook);
 
     // Schedule retry if applicable
@@ -390,7 +404,7 @@ export class WebhookHandlerService {
     retryAt: Date,
   ): Promise<void> {
     const delay = retryAt.getTime() - Date.now();
-    
+
     if (delay > 0) {
       const jobData = {
         webhookId: webhook.id,
@@ -427,7 +441,7 @@ export class WebhookHandlerService {
     successRate: number;
   }> {
     const whereCondition: any = { tenantId };
-    
+
     if (channelId) {
       whereCondition.channelId = channelId;
     }
@@ -474,11 +488,16 @@ export class WebhookHandlerService {
       select: ['processingDurationMs'],
     });
 
-    const avgProcessingTime = processedWebhooks.length > 0
-      ? processedWebhooks.reduce((sum, webhook) => sum + (webhook.processingDurationMs || 0), 0) / processedWebhooks.length
-      : 0;
+    const avgProcessingTime =
+      processedWebhooks.length > 0
+        ? processedWebhooks.reduce(
+            (sum, webhook) => sum + (webhook.processingDurationMs || 0),
+            0,
+          ) / processedWebhooks.length
+        : 0;
 
-    const successRate = totalWebhooks > 0 ? (processed / totalWebhooks) * 100 : 0;
+    const successRate =
+      totalWebhooks > 0 ? (processed / totalWebhooks) * 100 : 0;
 
     return {
       totalWebhooks,
@@ -493,9 +512,11 @@ export class WebhookHandlerService {
   /**
    * Get failed webhooks for retry
    */
-  async getFailedWebhooksForRetry(limit: number = 100): Promise<WebhookEvent[]> {
+  async getFailedWebhooksForRetry(
+    limit: number = 100,
+  ): Promise<WebhookEvent[]> {
     const now = new Date();
-    
+
     return await this.webhookRepository.find({
       where: {
         processingStatus: WebhookProcessingStatus.FAILED,
@@ -534,8 +555,10 @@ export class WebhookHandlerService {
       .execute();
 
     const deletedCount = deleteResult.affected || 0;
-    this.logger.log(`Cleaned up ${deletedCount} old webhooks for tenant ${tenantId}`);
-    
+    this.logger.log(
+      `Cleaned up ${deletedCount} old webhooks for tenant ${tenantId}`,
+    );
+
     return deletedCount;
   }
 

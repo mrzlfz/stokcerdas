@@ -5,7 +5,12 @@ import { lastValueFrom, map, catchError } from 'rxjs';
 import { throwError } from 'rxjs';
 import * as crypto from 'crypto';
 
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../common/services/base-api.service';
 import { RateLimiterService } from '../../common/services/rate-limiter.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
@@ -62,7 +67,7 @@ export class LazadaApiService extends BaseApiService {
 
   private readonly sandboxUrls = {
     MY: 'https://api.lazada.com.my/rest',
-    SG: 'https://api.lazada.sg/rest', 
+    SG: 'https://api.lazada.sg/rest',
     TH: 'https://api.lazada.co.th/rest',
     ID: 'https://api.lazada.co.id/rest',
     PH: 'https://api.lazada.com.ph/rest',
@@ -111,12 +116,19 @@ export class LazadaApiService extends BaseApiService {
       headers: request.headers,
     };
 
-    const result = await this.makeLazadaRequest(tenantId, channelId, lazadaConfig, lazadaRequest);
-    
+    const result = await this.makeLazadaRequest(
+      tenantId,
+      channelId,
+      lazadaConfig,
+      lazadaRequest,
+    );
+
     return {
       success: result.success,
       data: result.data,
-      error: result.error ? { message: result.error, code: 'LAZADA_ERROR' } : undefined,
+      error: result.error
+        ? { message: result.error, code: 'LAZADA_ERROR' }
+        : undefined,
       metadata: {
         requestId: this.generateRequestId(),
         timestamp: new Date(),
@@ -138,20 +150,33 @@ export class LazadaApiService extends BaseApiService {
 
     try {
       // Check rate limits
-      const rateLimitKey = `${tenantId}:${channelId}:${requestConfig.rateLimitKey || 'default'}`;
+      const rateLimitKey = `${tenantId}:${channelId}:${
+        requestConfig.rateLimitKey || 'default'
+      }`;
       const rateLimitConfig = this.getRateLimitConfig();
-      
-      const rateLimitResult = await this.rateLimiter.checkRateLimit(rateLimitKey, rateLimitConfig);
+
+      const rateLimitResult = await this.rateLimiter.checkRateLimit(
+        rateLimitKey,
+        rateLimitConfig,
+      );
       if (!rateLimitResult.allowed) {
-        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter}ms`);
+        throw new Error(
+          `Rate limit exceeded. Retry after ${rateLimitResult.retryAfter}ms`,
+        );
       }
 
       // Get base URL
-      const baseUrl = config.sandbox ? this.sandboxUrls[config.region] : this.baseUrls[config.region];
-      const authUrl = config.sandbox ? this.sandboxUrls.AUTH : this.baseUrls.AUTH;
-      
+      const baseUrl = config.sandbox
+        ? this.sandboxUrls[config.region]
+        : this.baseUrls[config.region];
+      const authUrl = config.sandbox
+        ? this.sandboxUrls.AUTH
+        : this.baseUrls.AUTH;
+
       // Determine API URL
-      const apiUrl = requestConfig.path.startsWith('/auth/') ? authUrl : baseUrl;
+      const apiUrl = requestConfig.path.startsWith('/auth/')
+        ? authUrl
+        : baseUrl;
       const fullUrl = `${apiUrl}${requestConfig.path}`;
 
       // Prepare request parameters
@@ -168,7 +193,12 @@ export class LazadaApiService extends BaseApiService {
       }
 
       // Generate API signature
-      const signature = this.generateSignature(requestConfig.method, requestConfig.path, params, config.appSecret);
+      const signature = this.generateSignature(
+        requestConfig.method,
+        requestConfig.path,
+        params,
+        config.appSecret,
+      );
       params.sign = signature;
 
       // Log API request
@@ -186,32 +216,42 @@ export class LazadaApiService extends BaseApiService {
       // Make HTTP request
       if (requestConfig.method === 'GET') {
         response = await lastValueFrom(
-          this.httpService.get(fullUrl, { 
-            params,
-            headers: this.getDefaultHeaders(),
-          }).pipe(
-            map(res => res.data),
-            catchError(err => {
-              this.logger.error(`Lazada API request failed: ${err.message}`, err.stack);
-              return throwError(() => err);
+          this.httpService
+            .get(fullUrl, {
+              params,
+              headers: this.getDefaultHeaders(),
             })
-          )
+            .pipe(
+              map(res => res.data),
+              catchError(err => {
+                this.logger.error(
+                  `Lazada API request failed: ${err.message}`,
+                  err.stack,
+                );
+                return throwError(() => err);
+              }),
+            ),
         );
       } else {
         response = await lastValueFrom(
-          this.httpService.request({
-            method: requestConfig.method,
-            url: fullUrl,
-            params,
-            data: requestConfig.body,
-            headers: this.getDefaultHeaders(),
-          }).pipe(
-            map(res => res.data),
-            catchError(err => {
-              this.logger.error(`Lazada API request failed: ${err.message}`, err.stack);
-              return throwError(() => err);
+          this.httpService
+            .request({
+              method: requestConfig.method,
+              url: fullUrl,
+              params,
+              data: requestConfig.body,
+              headers: this.getDefaultHeaders(),
             })
-          )
+            .pipe(
+              map(res => res.data),
+              catchError(err => {
+                this.logger.error(
+                  `Lazada API request failed: ${err.message}`,
+                  err.stack,
+                );
+                return throwError(() => err);
+              }),
+            ),
         );
       }
 
@@ -248,23 +288,20 @@ export class LazadaApiService extends BaseApiService {
           error: `${lazadaResponse.type}: ${lazadaResponse.message}`,
         };
       }
-
     } catch (error) {
-      this.logger.error(`Lazada API request failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Lazada API request failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        {
-          requestId,
-          metadata: {
-            path: requestConfig.path,
-            method: requestConfig.method,
-          },
+      await this.logService.logError(tenantId, channelId, error, {
+        requestId,
+        metadata: {
+          path: requestConfig.path,
+          method: requestConfig.method,
         },
-      );
+      });
 
       return {
         success: false,
@@ -286,7 +323,7 @@ export class LazadaApiService extends BaseApiService {
     try {
       // Sort parameters by key
       const sortedKeys = Object.keys(params).sort();
-      
+
       // Build query string
       const queryString = sortedKeys
         .map(key => `${key}${params[key]}`)
@@ -303,9 +340,11 @@ export class LazadaApiService extends BaseApiService {
         .toUpperCase();
 
       return signature;
-
     } catch (error) {
-      this.logger.error(`Failed to generate Lazada signature: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate Lazada signature: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`Signature generation failed: ${error.message}`);
     }
   }
@@ -346,17 +385,24 @@ export class LazadaApiService extends BaseApiService {
     channelId: string,
     config: LazadaConfig,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const result = await this.makeRequest({
-      baseUrl: config.sandbox ? this.sandboxUrls[config.region] : this.baseUrls[config.region],
-      authentication: {
-        type: 'signature',
-        credentials: config,
+    const result = await this.makeRequest(
+      {
+        baseUrl: config.sandbox
+          ? this.sandboxUrls[config.region]
+          : this.baseUrls[config.region],
+        authentication: {
+          type: 'signature',
+          credentials: config,
+        },
       },
-    }, {
-      method: 'GET',
-      endpoint: '/seller/get',
-    }, tenantId, channelId);
-    
+      {
+        method: 'GET',
+        endpoint: '/seller/get',
+      },
+      tenantId,
+      channelId,
+    );
+
     return {
       success: result.success,
       data: result.data,

@@ -163,18 +163,30 @@ export class SOC2Control extends BaseEntity {
   }
 
   get hasActiveExceptions(): boolean {
-    return this.exceptions?.some(ex => ex.status === 'open' || ex.status === 'in_progress') || false;
+    return (
+      this.exceptions?.some(
+        ex => ex.status === 'open' || ex.status === 'in_progress',
+      ) || false
+    );
   }
 
   get riskScore(): number {
     let score = 0;
-    
+
     // Base risk level score
     switch (this.riskLevel) {
-      case RiskLevel.CRITICAL: score += 40; break;
-      case RiskLevel.HIGH: score += 30; break;
-      case RiskLevel.MEDIUM: score += 20; break;
-      case RiskLevel.LOW: score += 10; break;
+      case RiskLevel.CRITICAL:
+        score += 40;
+        break;
+      case RiskLevel.HIGH:
+        score += 30;
+        break;
+      case RiskLevel.MEDIUM:
+        score += 20;
+        break;
+      case RiskLevel.LOW:
+        score += 10;
+        break;
     }
 
     // Add points for overdue testing
@@ -182,9 +194,10 @@ export class SOC2Control extends BaseEntity {
 
     // Add points for active exceptions
     if (this.hasActiveExceptions) {
-      const criticalExceptions = this.exceptions?.filter(ex => 
-        ex.severity === RiskLevel.CRITICAL && ex.status !== 'closed'
-      ).length || 0;
+      const criticalExceptions =
+        this.exceptions?.filter(
+          ex => ex.severity === RiskLevel.CRITICAL && ex.status !== 'closed',
+        ).length || 0;
       score += criticalExceptions * 15;
     }
 
@@ -330,6 +343,8 @@ export class SOC2ControlTest extends BaseEntity {
   }
 
   get criticalDeficiencies(): any[] {
-    return this.deficiencies?.filter(d => d.severity === RiskLevel.CRITICAL) || [];
+    return (
+      this.deficiencies?.filter(d => d.severity === RiskLevel.CRITICAL) || []
+    );
   }
 }

@@ -3,10 +3,17 @@ import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { LazadaApiService, LazadaConfig, LazadaRegion } from './lazada-api.service';
+import {
+  LazadaApiService,
+  LazadaConfig,
+  LazadaRegion,
+} from './lazada-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { Channel } from '../../../channels/entities/channel.entity';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface LazadaAuthConfig {
   appKey: string;
@@ -106,9 +113,11 @@ export class LazadaAuthService {
         authUrl: fullAuthUrl,
         state: authState,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate authorization URL: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate authorization URL: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`Authorization URL generation failed: ${error.message}`);
     }
   }
@@ -160,8 +169,10 @@ export class LazadaAuthService {
 
       // Calculate expiration dates
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + (tokenData.expires_in * 1000));
-      const refreshExpiresAt = new Date(now.getTime() + (tokenData.refresh_expires_in * 1000));
+      const expiresAt = new Date(now.getTime() + tokenData.expires_in * 1000);
+      const refreshExpiresAt = new Date(
+        now.getTime() + tokenData.refresh_expires_in * 1000,
+      );
 
       const tokenInfo: LazadaTokenInfo = {
         accessToken: tokenData.access_token,
@@ -193,22 +204,16 @@ export class LazadaAuthService {
       });
 
       return tokenInfo;
-
     } catch (error) {
       this.logger.error(`Token exchange failed: ${error.message}`, error.stack);
 
       // Log authentication failure
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        {
-          metadata: {
-            tokenExchange: true,
-            region: config.region as LazadaRegion,
-          },
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: {
+          tokenExchange: true,
+          region: config.region as LazadaRegion,
         },
-      );
+      });
 
       throw new Error(`Token exchange failed: ${error.message}`);
     }
@@ -229,7 +234,7 @@ export class LazadaAuthService {
 
       // Get current credentials
       const credentials = await this.getValidCredentials(tenantId, channelId);
-      
+
       if (!credentials.refreshToken) {
         throw new Error('No refresh token available');
       }
@@ -270,8 +275,10 @@ export class LazadaAuthService {
 
       // Calculate new expiration dates
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + (tokenData.expires_in * 1000));
-      const refreshExpiresAt = new Date(now.getTime() + (tokenData.refresh_expires_in * 1000));
+      const expiresAt = new Date(now.getTime() + tokenData.expires_in * 1000);
+      const refreshExpiresAt = new Date(
+        now.getTime() + tokenData.refresh_expires_in * 1000,
+      );
 
       const tokenInfo: LazadaTokenInfo = {
         accessToken: tokenData.access_token,
@@ -308,21 +315,15 @@ export class LazadaAuthService {
       });
 
       return tokenInfo;
-
     } catch (error) {
       this.logger.error(`Token refresh failed: ${error.message}`, error.stack);
 
       // Log refresh failure
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        {
-          metadata: {
-            tokenRefresh: true,
-          },
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: {
+          tokenRefresh: true,
         },
-      );
+      });
 
       throw new Error(`Token refresh failed: ${error.message}`);
     }
@@ -367,14 +368,20 @@ export class LazadaAuthService {
 
       if (now.getTime() + bufferTime >= credentials.expiresAt.getTime()) {
         // Token is expired or will expire soon, refresh it
-        this.logger.debug('Access token expired or expiring soon, refreshing...', {
+        this.logger.debug(
+          'Access token expired or expiring soon, refreshing...',
+          {
+            tenantId,
+            channelId,
+            expiresAt: credentials.expiresAt.toISOString(),
+          },
+        );
+
+        const refreshedToken = await this.refreshAccessToken(
           tenantId,
           channelId,
-          expiresAt: credentials.expiresAt.toISOString(),
-        });
+        );
 
-        const refreshedToken = await this.refreshAccessToken(tenantId, channelId);
-        
         return {
           ...credentials,
           accessToken: refreshedToken.accessToken,
@@ -385,9 +392,11 @@ export class LazadaAuthService {
       }
 
       return credentials;
-
     } catch (error) {
-      this.logger.error(`Failed to get valid credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get valid credentials: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`Credential validation failed: ${error.message}`);
     }
   }
@@ -410,7 +419,11 @@ export class LazadaAuthService {
       };
 
       // Test with shop info endpoint
-      const result = await this.lazadaApi.getShopInfo(tenantId, channelId, lazadaConfig);
+      const result = await this.lazadaApi.getShopInfo(
+        tenantId,
+        channelId,
+        lazadaConfig,
+      );
 
       if (result.success) {
         await this.logService.log({
@@ -432,9 +445,11 @@ export class LazadaAuthService {
           error: result.error,
         };
       }
-
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
       return {
         valid: false,
         error: error.message,
@@ -464,9 +479,11 @@ export class LazadaAuthService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -516,9 +533,11 @@ export class LazadaAuthService {
         { id: channelId, tenantId },
         { config: updatedConfig },
       );
-
     } catch (error) {
-      this.logger.error(`Failed to store credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to store credentials: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`Credential storage failed: ${error.message}`);
     }
   }
@@ -546,9 +565,11 @@ export class LazadaAuthService {
         { id: channelId, tenantId },
         { config: updatedConfig },
       );
-
     } catch (error) {
-      this.logger.error(`Failed to clear credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to clear credentials: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`Credential clearing failed: ${error.message}`);
     }
   }

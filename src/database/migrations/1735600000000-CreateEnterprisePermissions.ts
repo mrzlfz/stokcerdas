@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateEnterprisePermissions1735600000000 implements MigrationInterface {
+export class CreateEnterprisePermissions1735600000000
+  implements MigrationInterface
+{
   name = 'CreateEnterprisePermissions1735600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -470,51 +472,125 @@ export class CreateEnterprisePermissions1735600000000 implements MigrationInterf
     `);
 
     // Create indexes for performance
-    await queryRunner.query(`CREATE INDEX "IDX_departments_tenant_deleted" ON "departments" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_departments_tenant_code" ON "departments" ("tenant_id", "code")`);
-    await queryRunner.query(`CREATE INDEX "IDX_departments_tenant_parent" ON "departments" ("tenant_id", "parentId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_departments_active" ON "departments" ("isActive")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_departments_tenant_deleted" ON "departments" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_departments_tenant_code" ON "departments" ("tenant_id", "code")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_departments_tenant_parent" ON "departments" ("tenant_id", "parentId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_departments_active" ON "departments" ("isActive")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_hierarchical_roles_tenant_deleted" ON "hierarchical_roles" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_hierarchical_roles_tenant_code" ON "hierarchical_roles" ("tenant_id", "code")`);
-    await queryRunner.query(`CREATE INDEX "IDX_hierarchical_roles_level" ON "hierarchical_roles" ("level")`);
-    await queryRunner.query(`CREATE INDEX "IDX_hierarchical_roles_active" ON "hierarchical_roles" ("isActive")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_hierarchical_roles_tenant_deleted" ON "hierarchical_roles" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_hierarchical_roles_tenant_code" ON "hierarchical_roles" ("tenant_id", "code")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_hierarchical_roles_level" ON "hierarchical_roles" ("level")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_hierarchical_roles_active" ON "hierarchical_roles" ("isActive")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_permission_sets_tenant_deleted" ON "permission_sets" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_permission_sets_type" ON "permission_sets" ("type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_permission_sets_active" ON "permission_sets" ("isActive")`);
-    await queryRunner.query(`CREATE INDEX "IDX_permission_sets_template" ON "permission_sets" ("isTemplate")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_permission_sets_tenant_deleted" ON "permission_sets" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_permission_sets_type" ON "permission_sets" ("type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_permission_sets_active" ON "permission_sets" ("isActive")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_permission_sets_template" ON "permission_sets" ("isTemplate")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_user_roles_tenant_deleted" ON "user_roles" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_roles_tenant_user" ON "user_roles" ("tenant_id", "user_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_roles_tenant_role" ON "user_roles" ("tenant_id", "role_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_roles_tenant_department" ON "user_roles" ("tenant_id", "department_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_roles_status" ON "user_roles" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_roles_assignment_type" ON "user_roles" ("assignmentType")`);
-    await queryRunner.query(`CREATE INDEX "IDX_user_roles_priority" ON "user_roles" ("priority")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_roles_tenant_deleted" ON "user_roles" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_roles_tenant_user" ON "user_roles" ("tenant_id", "user_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_roles_tenant_role" ON "user_roles" ("tenant_id", "role_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_roles_tenant_department" ON "user_roles" ("tenant_id", "department_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_roles_status" ON "user_roles" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_roles_assignment_type" ON "user_roles" ("assignmentType")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_user_roles_priority" ON "user_roles" ("priority")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_role_hierarchies_tenant_deleted" ON "role_hierarchies" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_role_hierarchies_tenant_parent" ON "role_hierarchies" ("tenant_id", "parent_role_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_role_hierarchies_tenant_child" ON "role_hierarchies" ("tenant_id", "child_role_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_role_hierarchies_status" ON "role_hierarchies" ("status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_role_hierarchies_tenant_deleted" ON "role_hierarchies" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_role_hierarchies_tenant_parent" ON "role_hierarchies" ("tenant_id", "parent_role_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_role_hierarchies_tenant_child" ON "role_hierarchies" ("tenant_id", "child_role_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_role_hierarchies_status" ON "role_hierarchies" ("status")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_approval_chains_tenant_deleted" ON "approval_chains" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_chains_resource_type" ON "approval_chains" ("resourceType")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_chains_active" ON "approval_chains" ("isActive")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_chains_default" ON "approval_chains" ("isDefault")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_chains_tenant_deleted" ON "approval_chains" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_chains_resource_type" ON "approval_chains" ("resourceType")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_chains_active" ON "approval_chains" ("isActive")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_chains_default" ON "approval_chains" ("isDefault")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_approval_steps_tenant_deleted" ON "approval_steps" ("tenant_id", "isDeleted")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_steps_chain_order" ON "approval_steps" ("approval_chain_id", "stepOrder")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_steps_approver" ON "approval_steps" ("approverType", "approverId")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_steps_tenant_deleted" ON "approval_steps" ("tenant_id", "isDeleted")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_steps_chain_order" ON "approval_steps" ("approval_chain_id", "stepOrder")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_steps_approver" ON "approval_steps" ("approverType", "approverId")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_approval_instances_tenant_resource" ON "approval_instances" ("tenant_id", "resourceType", "resourceId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_instances_status" ON "approval_instances" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_instances_requester" ON "approval_instances" ("requesterId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_instances_expires" ON "approval_instances" ("expiresAt")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_instances_tenant_resource" ON "approval_instances" ("tenant_id", "resourceType", "resourceId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_instances_status" ON "approval_instances" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_instances_requester" ON "approval_instances" ("requesterId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_instances_expires" ON "approval_instances" ("expiresAt")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_approval_actions_instance" ON "approval_actions" ("approval_instance_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_actions_approver" ON "approval_actions" ("approverId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_approval_actions_date" ON "approval_actions" ("actionDate")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_actions_instance" ON "approval_actions" ("approval_instance_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_actions_approver" ON "approval_actions" ("approverId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_approval_actions_date" ON "approval_actions" ("actionDate")`,
+    );
 
     // Create unique constraints
     await queryRunner.query(`
@@ -599,79 +675,201 @@ export class CreateEnterprisePermissions1735600000000 implements MigrationInterf
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop triggers
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_approval_actions_updated_at ON "approval_actions"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_approval_instances_updated_at ON "approval_instances"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_approval_steps_updated_at ON "approval_steps"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_approval_chains_updated_at ON "approval_chains"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_role_hierarchies_updated_at ON "role_hierarchies"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_user_roles_updated_at ON "user_roles"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_permission_sets_updated_at ON "permission_sets"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_hierarchical_roles_updated_at ON "hierarchical_roles"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_departments_updated_at ON "departments"`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_approval_actions_updated_at ON "approval_actions"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_approval_instances_updated_at ON "approval_instances"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_approval_steps_updated_at ON "approval_steps"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_approval_chains_updated_at ON "approval_chains"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_role_hierarchies_updated_at ON "role_hierarchies"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_user_roles_updated_at ON "user_roles"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_permission_sets_updated_at ON "permission_sets"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_hierarchical_roles_updated_at ON "hierarchical_roles"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_departments_updated_at ON "departments"`,
+    );
 
     // Drop indexes
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_actions_date"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_actions_approver"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_actions_instance"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_instances_expires"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_instances_requester"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_instances_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_instances_tenant_resource"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_steps_approver"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_steps_chain_order"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_steps_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_chains_default"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_chains_active"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_chains_resource_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_approval_chains_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_hierarchies_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_hierarchies_tenant_child"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_hierarchies_tenant_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_hierarchies_tenant_deleted"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_actions_approver"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_actions_instance"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_instances_expires"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_instances_requester"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_instances_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_instances_tenant_resource"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_steps_approver"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_steps_chain_order"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_steps_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_chains_default"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_chains_active"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_chains_resource_type"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_approval_chains_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_role_hierarchies_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_role_hierarchies_tenant_child"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_role_hierarchies_tenant_parent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_role_hierarchies_tenant_deleted"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_priority"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_assignment_type"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_roles_assignment_type"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_tenant_department"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_tenant_role"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_tenant_user"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permission_sets_template"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permission_sets_active"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_roles_tenant_department"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_roles_tenant_role"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_roles_tenant_user"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_user_roles_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_permission_sets_template"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_permission_sets_active"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permission_sets_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permission_sets_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_hierarchical_roles_active"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_hierarchical_roles_level"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_hierarchical_roles_tenant_code"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_hierarchical_roles_tenant_deleted"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_permission_sets_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_hierarchical_roles_active"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_hierarchical_roles_level"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_hierarchical_roles_tenant_code"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_hierarchical_roles_tenant_deleted"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_departments_active"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_departments_tenant_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_departments_tenant_code"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_departments_tenant_deleted"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_departments_tenant_parent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_departments_tenant_code"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_departments_tenant_deleted"`,
+    );
 
     // Drop unique constraints
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_hierarchies_unique"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_role_hierarchies_unique"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_roles_unique"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_hierarchical_roles_tenant_code_unique"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_departments_tenant_code_unique"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_hierarchical_roles_tenant_code_unique"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_departments_tenant_code_unique"`,
+    );
 
     // Drop foreign key constraints
-    await queryRunner.query(`ALTER TABLE "approval_actions" DROP CONSTRAINT IF EXISTS "FK_approval_actions_step"`);
-    await queryRunner.query(`ALTER TABLE "approval_actions" DROP CONSTRAINT IF EXISTS "FK_approval_actions_instance"`);
-    await queryRunner.query(`ALTER TABLE "approval_instances" DROP CONSTRAINT IF EXISTS "FK_approval_instances_step"`);
-    await queryRunner.query(`ALTER TABLE "approval_instances" DROP CONSTRAINT IF EXISTS "FK_approval_instances_chain"`);
-    await queryRunner.query(`ALTER TABLE "approval_steps" DROP CONSTRAINT IF EXISTS "FK_approval_steps_chain"`);
-    await queryRunner.query(`ALTER TABLE "role_hierarchies" DROP CONSTRAINT IF EXISTS "FK_role_hierarchies_child"`);
-    await queryRunner.query(`ALTER TABLE "role_hierarchies" DROP CONSTRAINT IF EXISTS "FK_role_hierarchies_parent"`);
-    await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_permission_set"`);
-    await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_department"`);
-    await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_role"`);
-    await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_user"`);
-    await queryRunner.query(`ALTER TABLE "permission_sets_permissions" DROP CONSTRAINT IF EXISTS "FK_permission_sets_permissions_permission"`);
-    await queryRunner.query(`ALTER TABLE "permission_sets_permissions" DROP CONSTRAINT IF EXISTS "FK_permission_sets_permissions_set"`);
-    await queryRunner.query(`ALTER TABLE "hierarchical_roles_closure" DROP CONSTRAINT IF EXISTS "FK_hierarchical_roles_closure_descendant"`);
-    await queryRunner.query(`ALTER TABLE "hierarchical_roles_closure" DROP CONSTRAINT IF EXISTS "FK_hierarchical_roles_closure_ancestor"`);
-    await queryRunner.query(`ALTER TABLE "departments_closure" DROP CONSTRAINT IF EXISTS "FK_departments_closure_descendant"`);
-    await queryRunner.query(`ALTER TABLE "departments_closure" DROP CONSTRAINT IF EXISTS "FK_departments_closure_ancestor"`);
+    await queryRunner.query(
+      `ALTER TABLE "approval_actions" DROP CONSTRAINT IF EXISTS "FK_approval_actions_step"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "approval_actions" DROP CONSTRAINT IF EXISTS "FK_approval_actions_instance"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "approval_instances" DROP CONSTRAINT IF EXISTS "FK_approval_instances_step"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "approval_instances" DROP CONSTRAINT IF EXISTS "FK_approval_instances_chain"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "approval_steps" DROP CONSTRAINT IF EXISTS "FK_approval_steps_chain"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "role_hierarchies" DROP CONSTRAINT IF EXISTS "FK_role_hierarchies_child"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "role_hierarchies" DROP CONSTRAINT IF EXISTS "FK_role_hierarchies_parent"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_permission_set"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_department"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_role"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "user_roles" DROP CONSTRAINT IF EXISTS "FK_user_roles_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "permission_sets_permissions" DROP CONSTRAINT IF EXISTS "FK_permission_sets_permissions_permission"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "permission_sets_permissions" DROP CONSTRAINT IF EXISTS "FK_permission_sets_permissions_set"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "hierarchical_roles_closure" DROP CONSTRAINT IF EXISTS "FK_hierarchical_roles_closure_descendant"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "hierarchical_roles_closure" DROP CONSTRAINT IF EXISTS "FK_hierarchical_roles_closure_ancestor"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "departments_closure" DROP CONSTRAINT IF EXISTS "FK_departments_closure_descendant"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "departments_closure" DROP CONSTRAINT IF EXISTS "FK_departments_closure_ancestor"`,
+    );
 
     // Drop tables in reverse order
     await queryRunner.query(`DROP TABLE "approval_actions"`);

@@ -37,8 +37,16 @@ export class TokopediaWebhookController {
   @ApiOperation({ summary: 'Receive Tokopedia webhook notifications' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-tokopedia-signature', description: 'Webhook signature', required: false })
-  @ApiHeader({ name: 'x-signature', description: 'Alternative webhook signature', required: false })
+  @ApiHeader({
+    name: 'x-tokopedia-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiHeader({
+    name: 'x-signature',
+    description: 'Alternative webhook signature',
+    required: false,
+  })
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid webhook data' })
   @ApiResponse({ status: 401, description: 'Invalid signature' })
@@ -111,13 +119,16 @@ export class TokopediaWebhookController {
           processingTime,
         });
       } else {
-        this.logger.warn(`Tokopedia webhook processing failed: ${result.error}`, {
-          tenantId,
-          channelId,
-          error: result.error,
-          processingTime,
-          requestId,
-        });
+        this.logger.warn(
+          `Tokopedia webhook processing failed: ${result.error}`,
+          {
+            tenantId,
+            channelId,
+            error: result.error,
+            processingTime,
+            requestId,
+          },
+        );
 
         res.status(HttpStatus.BAD_REQUEST).json({
           success: false,
@@ -126,10 +137,9 @@ export class TokopediaWebhookController {
           processingTime,
         });
       }
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.error(`Tokopedia webhook error: ${error.message}`, {
         tenantId,
         channelId,
@@ -168,8 +178,15 @@ export class TokopediaWebhookController {
   @ApiOperation({ summary: 'Receive Tokopedia order created webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-tokopedia-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Order created webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-tokopedia-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order created webhook processed successfully',
+  })
   async handleOrderCreatedWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -205,15 +222,19 @@ export class TokopediaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Order created webhook processed' : result.error,
+        message: result.success
+          ? 'Order created webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Order created webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Order created webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -229,8 +250,15 @@ export class TokopediaWebhookController {
   @ApiOperation({ summary: 'Receive Tokopedia order updated webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-tokopedia-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Order updated webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-tokopedia-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order updated webhook processed successfully',
+  })
   async handleOrderUpdatedWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -266,15 +294,19 @@ export class TokopediaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Order updated webhook processed' : result.error,
+        message: result.success
+          ? 'Order updated webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Order updated webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Order updated webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -290,8 +322,15 @@ export class TokopediaWebhookController {
   @ApiOperation({ summary: 'Receive Tokopedia product updated webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-tokopedia-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Product updated webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-tokopedia-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Product updated webhook processed successfully',
+  })
   async handleProductUpdatedWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -327,15 +366,19 @@ export class TokopediaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Product updated webhook processed' : result.error,
+        message: result.success
+          ? 'Product updated webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Product updated webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Product updated webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -351,8 +394,15 @@ export class TokopediaWebhookController {
   @ApiOperation({ summary: 'Receive Tokopedia inventory updated webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-tokopedia-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Inventory updated webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-tokopedia-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory updated webhook processed successfully',
+  })
   async handleInventoryUpdatedWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -388,15 +438,19 @@ export class TokopediaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Inventory updated webhook processed' : result.error,
+        message: result.success
+          ? 'Inventory updated webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Inventory updated webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Inventory updated webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -412,8 +466,15 @@ export class TokopediaWebhookController {
   @ApiOperation({ summary: 'Receive Tokopedia payment confirmed webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-tokopedia-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Payment confirmed webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-tokopedia-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment confirmed webhook processed successfully',
+  })
   async handlePaymentConfirmedWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -449,15 +510,19 @@ export class TokopediaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Payment confirmed webhook processed' : result.error,
+        message: result.success
+          ? 'Payment confirmed webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Payment confirmed webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Payment confirmed webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -473,8 +538,15 @@ export class TokopediaWebhookController {
   @ApiOperation({ summary: 'Receive Tokopedia system notification webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-tokopedia-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'System notification webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-tokopedia-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'System notification webhook processed successfully',
+  })
   async handleSystemNotificationWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -510,15 +582,19 @@ export class TokopediaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'System notification webhook processed' : result.error,
+        message: result.success
+          ? 'System notification webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`System notification webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `System notification webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -546,7 +622,9 @@ export class TokopediaWebhookController {
   // Private helper methods
 
   private generateRequestId(): string {
-    return `tokopedia_webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `tokopedia_webhook_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
   }
 
   private getClientIpAddress(req: Request): string {
@@ -560,9 +638,11 @@ export class TokopediaWebhookController {
     );
   }
 
-  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+  private sanitizeHeaders(
+    headers: Record<string, string>,
+  ): Record<string, string> {
     const sanitized = { ...headers };
-    
+
     // Remove sensitive headers for logging
     const sensitiveHeaders = [
       'authorization',
@@ -572,7 +652,7 @@ export class TokopediaWebhookController {
       'cookie',
       'set-cookie',
     ];
-    
+
     sensitiveHeaders.forEach(header => {
       if (sanitized[header]) {
         sanitized[header] = '[REDACTED]';
@@ -581,7 +661,7 @@ export class TokopediaWebhookController {
         sanitized[header.toLowerCase()] = '[REDACTED]';
       }
     });
-    
+
     return sanitized;
   }
 }

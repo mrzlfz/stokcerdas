@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { WebhookHandlerService, WebhookPayload, WebhookConfig } from '../../common/services/webhook-handler.service';
+import {
+  WebhookHandlerService,
+  WebhookPayload,
+  WebhookConfig,
+} from '../../common/services/webhook-handler.service';
 import { ShopeeAuthService } from './shopee-auth.service';
 import { ShopeeOrderService } from './shopee-order.service';
 import { ShopeeProductService } from './shopee-product.service';
@@ -64,10 +68,10 @@ export class ShopeeWebhookService {
     try {
       // Parse Shopee payload
       const shopeePayload: ShopeeWebhookPayload = JSON.parse(payload);
-      
+
       // Map webhook type to our event type
       const eventType = this.mapShopeeWebhookType(webhookType);
-      
+
       if (!eventType) {
         throw new Error(`Unsupported Shopee webhook type: ${webhookType}`);
       }
@@ -89,12 +93,18 @@ export class ShopeeWebhookService {
         userAgent,
         webhookUrl: headers['x-original-uri'] || headers['x-forwarded-uri'],
         eventTimestamp: new Date(shopeePayload.timestamp * 1000),
-        externalEventId: this.generateExternalEventId(shopeePayload, webhookType),
+        externalEventId: this.generateExternalEventId(
+          shopeePayload,
+          webhookType,
+        ),
         priority: this.getWebhookPriority(eventType),
       };
 
       // Process webhook through handler
-      const result = await this.webhookHandler.processWebhook(webhookData, config);
+      const result = await this.webhookHandler.processWebhook(
+        webhookData,
+        config,
+      );
 
       if (result.success) {
         await this.logService.logWebhook(
@@ -103,7 +113,7 @@ export class ShopeeWebhookService {
           eventType,
           'received',
           `Shopee webhook ${webhookType} received successfully`,
-          { 
+          {
             webhookId: result.webhookId,
             shopeeCode: shopeePayload.code,
             shopId: shopeePayload.shop_id,
@@ -112,10 +122,12 @@ export class ShopeeWebhookService {
       }
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Shopee webhook processing failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Shopee webhook processing failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logWebhook(
         tenantId,
         channelId,
@@ -154,27 +166,33 @@ export class ShopeeWebhookService {
         case WebhookEventType.ORDER_CREATED:
         case WebhookEventType.ORDER_UPDATED:
           return await this.handleOrderWebhook(tenantId, channelId, payload);
-          
+
         case WebhookEventType.ORDER_CANCELLED:
-          return await this.handleOrderCancellation(tenantId, channelId, payload);
-          
+          return await this.handleOrderCancellation(
+            tenantId,
+            channelId,
+            payload,
+          );
+
         case WebhookEventType.ORDER_COMPLETED:
           return await this.handleOrderCompletion(tenantId, channelId, payload);
-          
+
         case WebhookEventType.PRODUCT_UPDATED:
           return await this.handleProductUpdate(tenantId, channelId, payload);
-          
+
         case WebhookEventType.INVENTORY_UPDATED:
           return await this.handleInventoryUpdate(tenantId, channelId, payload);
-          
+
         default:
           this.logger.warn(`Unhandled Shopee webhook event type: ${eventType}`);
           return { success: true }; // Mark as handled but no action needed
       }
-
     } catch (error) {
-      this.logger.error(`Webhook event handling failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Webhook event handling failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logWebhook(
         tenantId,
         channelId,
@@ -203,7 +221,7 @@ export class ShopeeWebhookService {
     try {
       // Shopee webhook signature format: {webhook_url}|{request_body}
       const stringToSign = `${webhookUrl}|${payload}`;
-      
+
       const crypto = require('crypto');
       const expectedSignature = crypto
         .createHmac('sha256', partnerKey)
@@ -212,13 +230,15 @@ export class ShopeeWebhookService {
 
       // Extract signature from Authorization header
       const receivedSignature = signature.replace(/^sha256=/, '');
-      
+
       return crypto.timingSafeEqual(
         Buffer.from(expectedSignature, 'hex'),
         Buffer.from(receivedSignature, 'hex'),
       );
     } catch (error) {
-      this.logger.error(`Shopee webhook signature verification failed: ${error.message}`);
+      this.logger.error(
+        `Shopee webhook signature verification failed: ${error.message}`,
+      );
       return false;
     }
   }
@@ -227,11 +247,11 @@ export class ShopeeWebhookService {
 
   private mapShopeeWebhookType(webhookType: string): WebhookEventType | null {
     const typeMap: Record<string, WebhookEventType> = {
-      'order_status_update': WebhookEventType.ORDER_UPDATED,
-      'order_trackingno_update': WebhookEventType.ORDER_UPDATED,
-      'banned_item': WebhookEventType.PRODUCT_UPDATED,
-      'item_promotion_update': WebhookEventType.PRODUCT_UPDATED,
-      'reserved_stock_change': WebhookEventType.INVENTORY_UPDATED,
+      order_status_update: WebhookEventType.ORDER_UPDATED,
+      order_trackingno_update: WebhookEventType.ORDER_UPDATED,
+      banned_item: WebhookEventType.PRODUCT_UPDATED,
+      item_promotion_update: WebhookEventType.PRODUCT_UPDATED,
+      reserved_stock_change: WebhookEventType.INVENTORY_UPDATED,
     };
 
     return typeMap[webhookType] || null;
@@ -243,10 +263,15 @@ export class ShopeeWebhookService {
   ): Promise<WebhookConfig | undefined> {
     try {
       // Get partner key from channel credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       if (!credentials.partnerKey) {
-        this.logger.warn(`No partner key found for Shopee channel ${channelId}`);
+        this.logger.warn(
+          `No partner key found for Shopee channel ${channelId}`,
+        );
         return undefined;
       }
 
@@ -259,7 +284,6 @@ export class ShopeeWebhookService {
         maxRetries: 3,
         retryDelay: 5000,
       };
-
     } catch (error) {
       this.logger.error(`Failed to get webhook config: ${error.message}`);
       return undefined;
@@ -271,10 +295,11 @@ export class ShopeeWebhookService {
     webhookType: string,
   ): string {
     // Generate unique ID based on payload content
-    const identifier = payload.data.ordersn || 
-                      payload.data.item_id?.toString() || 
-                      payload.shop_id.toString();
-    
+    const identifier =
+      payload.data.ordersn ||
+      payload.data.item_id?.toString() ||
+      payload.shop_id.toString();
+
     return `shopee_${webhookType}_${identifier}_${payload.timestamp}`;
   }
 
@@ -335,9 +360,11 @@ export class ShopeeWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Order webhook handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Order webhook handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -373,9 +400,11 @@ export class ShopeeWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Order cancellation webhook handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Order cancellation webhook handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -411,9 +440,11 @@ export class ShopeeWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Order completion webhook handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Order completion webhook handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -452,9 +483,11 @@ export class ShopeeWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Product update webhook handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Product update webhook handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -500,9 +533,11 @@ export class ShopeeWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Inventory update webhook handling failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Inventory update webhook handling failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,

@@ -54,7 +54,11 @@ export abstract class AuditableEntity extends BaseEntity {
   @Exclude({ toPlainOnly: true })
   isDeleted: boolean;
 
-  @Column({ type: 'timestamp with time zone', name: 'deleted_at', nullable: true })
+  @Column({
+    type: 'timestamp with time zone',
+    name: 'deleted_at',
+    nullable: true,
+  })
   @Exclude({ toPlainOnly: true })
   deletedAt?: Date;
 

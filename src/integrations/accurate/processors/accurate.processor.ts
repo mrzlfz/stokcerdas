@@ -1,4 +1,10 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -8,7 +14,10 @@ import { AccurateTaxComplianceService } from '../services/accurate-tax-complianc
 import { AccurateMultiCurrencyService } from '../services/accurate-multi-currency.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogLevel, IntegrationLogType } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogLevel,
+  IntegrationLogType,
+} from '../../entities/integration-log.entity';
 
 export interface AccurateWebhookJobData {
   webhookId: string;
@@ -32,7 +41,12 @@ export interface AccurateItemSyncJobData {
 export interface AccurateTaxJobData {
   tenantId: string;
   accountingAccountId: string;
-  operation: 'configure' | 'calculate' | 'generate_efaktur' | 'generate_report' | 'check_compliance';
+  operation:
+    | 'configure'
+    | 'calculate'
+    | 'generate_efaktur'
+    | 'generate_report'
+    | 'check_compliance';
   entityId?: string;
   entityType?: 'order' | 'invoice';
   config?: any;
@@ -43,7 +57,12 @@ export interface AccurateTaxJobData {
 export interface AccurateCurrencyJobData {
   tenantId: string;
   accountingAccountId: string;
-  operation: 'configure' | 'update_rates' | 'convert' | 'revaluation' | 'generate_report';
+  operation:
+    | 'configure'
+    | 'update_rates'
+    | 'convert'
+    | 'revaluation'
+    | 'generate_report';
   config?: any;
   fromCurrency?: string;
   toCurrency?: string;
@@ -111,15 +130,18 @@ export class AccurateProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`Accurate job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `Accurate job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -127,8 +149,9 @@ export class AccurateProcessor {
    */
   @Process('process-webhook')
   async processWebhook(job: Job<AccurateWebhookJobData>) {
-    const { webhookId, tenantId, channelId, eventType, databaseId, isRetry } = job.data;
-    
+    const { webhookId, tenantId, channelId, eventType, databaseId, isRetry } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Accurate webhook: ${eventType}`, {
         webhookId,
@@ -140,8 +163,10 @@ export class AccurateProcessor {
       });
 
       // Mark webhook as processing
-      const webhook = await this.webhookHandler.markWebhookAsProcessing(webhookId);
-      
+      const webhook = await this.webhookHandler.markWebhookAsProcessing(
+        webhookId,
+      );
+
       if (!webhook) {
         throw new Error(`Webhook not found: ${webhookId}`);
       }
@@ -155,29 +180,64 @@ export class AccurateProcessor {
         case 'item_created':
         case 'item_updated':
         case 'item_deleted':
-          result = await this.processItemWebhook(tenantId, channelId, payload, eventType);
+          result = await this.processItemWebhook(
+            tenantId,
+            channelId,
+            payload,
+            eventType,
+          );
           break;
         case 'invoice_created':
         case 'invoice_updated':
         case 'invoice_paid':
-          result = await this.processInvoiceWebhook(tenantId, channelId, payload, eventType);
+          result = await this.processInvoiceWebhook(
+            tenantId,
+            channelId,
+            payload,
+            eventType,
+          );
           break;
         case 'customer_created':
         case 'customer_updated':
-          result = await this.processCustomerWebhook(tenantId, channelId, payload, eventType);
+          result = await this.processCustomerWebhook(
+            tenantId,
+            channelId,
+            payload,
+            eventType,
+          );
           break;
         case 'account_updated':
-          result = await this.processAccountWebhook(tenantId, channelId, payload, eventType);
+          result = await this.processAccountWebhook(
+            tenantId,
+            channelId,
+            payload,
+            eventType,
+          );
           break;
         case 'tax_rate_updated':
-          result = await this.processTaxWebhook(tenantId, channelId, payload, eventType);
+          result = await this.processTaxWebhook(
+            tenantId,
+            channelId,
+            payload,
+            eventType,
+          );
           break;
         case 'currency_rate_updated':
-          result = await this.processCurrencyWebhook(tenantId, channelId, payload, eventType);
+          result = await this.processCurrencyWebhook(
+            tenantId,
+            channelId,
+            payload,
+            eventType,
+          );
           break;
         default:
-          this.logger.warn(`Unhandled Accurate webhook event type: ${eventType}`);
-          result = { success: true, message: `Event type ${eventType} acknowledged but not processed` };
+          this.logger.warn(
+            `Unhandled Accurate webhook event type: ${eventType}`,
+          );
+          result = {
+            success: true,
+            message: `Event type ${eventType} acknowledged but not processed`,
+          };
       }
 
       if (result.success) {
@@ -214,9 +274,11 @@ export class AccurateProcessor {
 
         throw new Error(result.error || 'Webhook processing failed');
       }
-
     } catch (error) {
-      this.logger.error(`Accurate webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Accurate webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Mark webhook as failed
       await this.webhookHandler.markWebhookAsFailed(
@@ -244,8 +306,16 @@ export class AccurateProcessor {
    */
   @Process('item-sync')
   async processItemSync(job: Job<AccurateItemSyncJobData>) {
-    const { tenantId, accountingAccountId, itemId, accurateItemId, syncDirection, itemType, options } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      itemId,
+      accurateItemId,
+      syncDirection,
+      itemType,
+      options,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing Accurate item sync: ${syncDirection}`, {
         tenantId,
@@ -267,9 +337,9 @@ export class AccurateProcessor {
             await this.getCredentials(accountingAccountId, tenantId),
             tenantId,
             accountingAccountId,
-            { take: 100, itemType }
+            { take: 100, itemType },
           );
-          
+
           if (itemsResponse.success) {
             result = {
               success: true,
@@ -277,7 +347,9 @@ export class AccurateProcessor {
               items: itemsResponse.data,
             };
           } else {
-            throw new Error(`Failed to fetch items from Accurate: ${itemsResponse.error?.message}`);
+            throw new Error(
+              `Failed to fetch items from Accurate: ${itemsResponse.error?.message}`,
+            );
           }
           break;
 
@@ -286,7 +358,7 @@ export class AccurateProcessor {
           if (!itemId) {
             throw new Error('Item ID is required for outbound sync');
           }
-          
+
           // This would require implementation of item creation in Accurate
           result = {
             success: true,
@@ -329,9 +401,11 @@ export class AccurateProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Accurate item sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Accurate item sync failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
       await this.logService.logSync(
@@ -352,8 +426,17 @@ export class AccurateProcessor {
    */
   @Process('tax-operation')
   async processTaxOperation(job: Job<AccurateTaxJobData>) {
-    const { tenantId, accountingAccountId, operation, entityId, entityType, config, month, year } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      operation,
+      entityId,
+      entityType,
+      config,
+      month,
+      year,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing Accurate tax operation: ${operation}`, {
         tenantId,
@@ -381,7 +464,9 @@ export class AccurateProcessor {
 
         case 'calculate':
           if (!entityId || !entityType) {
-            throw new Error('Entity ID and type are required for tax calculation');
+            throw new Error(
+              'Entity ID and type are required for tax calculation',
+            );
           }
           result = await this.accurateTaxComplianceService.calculateTax(
             accountingAccountId,
@@ -404,7 +489,9 @@ export class AccurateProcessor {
 
         case 'generate_report':
           if (!month || !year) {
-            throw new Error('Month and year are required for tax report generation');
+            throw new Error(
+              'Month and year are required for tax report generation',
+            );
           }
           result = await this.accurateTaxComplianceService.generateTaxReport(
             accountingAccountId,
@@ -431,8 +518,8 @@ export class AccurateProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `Accurate tax ${operation} completed successfully`,
-        metadata: { 
-          accountingAccountId, 
+        metadata: {
+          accountingAccountId,
           operation,
           entityId,
           entityType,
@@ -453,26 +540,23 @@ export class AccurateProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Accurate tax operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Accurate tax operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { 
-            accountingAccountId, 
-            operation,
-            entityId,
-            entityType,
-            month,
-            year,
-          },
+      await this.logService.logError(tenantId, '', error, {
+        metadata: {
+          accountingAccountId,
+          operation,
+          entityId,
+          entityType,
+          month,
+          year,
         },
-      );
+      });
 
       throw error;
     }
@@ -483,18 +567,30 @@ export class AccurateProcessor {
    */
   @Process('currency-operation')
   async processCurrencyOperation(job: Job<AccurateCurrencyJobData>) {
-    const { tenantId, accountingAccountId, operation, config, fromCurrency, toCurrency, amount, date } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      operation,
+      config,
+      fromCurrency,
+      toCurrency,
+      amount,
+      date,
+    } = job.data;
+
     try {
-      this.logger.debug(`Processing Accurate currency operation: ${operation}`, {
-        tenantId,
-        accountingAccountId,
-        operation,
-        fromCurrency,
-        toCurrency,
-        amount,
-        date,
-      });
+      this.logger.debug(
+        `Processing Accurate currency operation: ${operation}`,
+        {
+          tenantId,
+          accountingAccountId,
+          operation,
+          fromCurrency,
+          toCurrency,
+          amount,
+          date,
+        },
+      );
 
       let result;
 
@@ -521,7 +617,9 @@ export class AccurateProcessor {
 
         case 'convert':
           if (!fromCurrency || !toCurrency || amount === undefined) {
-            throw new Error('From currency, to currency, and amount are required for conversion');
+            throw new Error(
+              'From currency, to currency, and amount are required for conversion',
+            );
           }
           result = await this.accurateMultiCurrencyService.convertCurrency(
             accountingAccountId,
@@ -542,11 +640,12 @@ export class AccurateProcessor {
           break;
 
         case 'generate_report':
-          result = await this.accurateMultiCurrencyService.generateCurrencyReport(
-            accountingAccountId,
-            tenantId,
-            date ? new Date(date) : undefined,
-          );
+          result =
+            await this.accurateMultiCurrencyService.generateCurrencyReport(
+              accountingAccountId,
+              tenantId,
+              date ? new Date(date) : undefined,
+            );
           break;
 
         default:
@@ -559,8 +658,8 @@ export class AccurateProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `Accurate currency ${operation} completed successfully`,
-        metadata: { 
-          accountingAccountId, 
+        metadata: {
+          accountingAccountId,
           operation,
           fromCurrency,
           toCurrency,
@@ -583,26 +682,23 @@ export class AccurateProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Accurate currency operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Accurate currency operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { 
-            accountingAccountId, 
-            operation,
-            fromCurrency,
-            toCurrency,
-            amount,
-            date,
-          },
+      await this.logService.logError(tenantId, '', error, {
+        metadata: {
+          accountingAccountId,
+          operation,
+          fromCurrency,
+          toCurrency,
+          amount,
+          date,
         },
-      );
+      });
 
       throw error;
     }
@@ -613,8 +709,16 @@ export class AccurateProcessor {
    */
   @Process('invoice-operation')
   async processInvoiceOperation(job: Job<AccurateInvoiceJobData>) {
-    const { tenantId, accountingAccountId, operation, invoiceId, orderId, targetCurrency, options } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      operation,
+      invoiceId,
+      orderId,
+      targetCurrency,
+      options,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing Accurate invoice operation: ${operation}`, {
         tenantId,
@@ -642,14 +746,17 @@ export class AccurateProcessor {
 
         case 'multi_currency_create':
           if (!invoiceId) {
-            throw new Error('Invoice ID is required for multi-currency creation');
+            throw new Error(
+              'Invoice ID is required for multi-currency creation',
+            );
           }
-          result = await this.accurateMultiCurrencyService.createMultiCurrencyInvoice(
-            accountingAccountId,
-            invoiceId,
-            tenantId,
-            targetCurrency,
-          );
+          result =
+            await this.accurateMultiCurrencyService.createMultiCurrencyInvoice(
+              accountingAccountId,
+              invoiceId,
+              tenantId,
+              targetCurrency,
+            );
           break;
 
         case 'sync':
@@ -680,8 +787,8 @@ export class AccurateProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `Accurate invoice ${operation} completed successfully`,
-        metadata: { 
-          accountingAccountId, 
+        metadata: {
+          accountingAccountId,
           operation,
           invoiceId,
           orderId,
@@ -702,25 +809,22 @@ export class AccurateProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Accurate invoice operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Accurate invoice operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { 
-            accountingAccountId, 
-            operation,
-            invoiceId,
-            orderId,
-            targetCurrency,
-          },
+      await this.logService.logError(tenantId, '', error, {
+        metadata: {
+          accountingAccountId,
+          operation,
+          invoiceId,
+          orderId,
+          targetCurrency,
         },
-      );
+      });
 
       throw error;
     }
@@ -732,7 +836,7 @@ export class AccurateProcessor {
   @Process('auth-operation')
   async processAuthOperation(job: Job<AccurateAuthJobData>) {
     const { tenantId, accountingAccountId, operation, credentials } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Accurate auth operation: ${operation}`, {
         tenantId,
@@ -782,8 +886,8 @@ export class AccurateProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `Accurate auth ${operation} completed successfully`,
-        metadata: { 
-          accountingAccountId, 
+        metadata: {
+          accountingAccountId,
           operation,
           result,
         },
@@ -798,19 +902,16 @@ export class AccurateProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Accurate auth operation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Accurate auth operation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { accountingAccountId, operation },
-        },
-      );
+      await this.logService.logError(tenantId, '', error, {
+        metadata: { accountingAccountId, operation },
+      });
 
       throw error;
     }
@@ -821,16 +922,26 @@ export class AccurateProcessor {
    */
   @Process('report-generation')
   async processReportGeneration(job: Job<AccurateReportJobData>) {
-    const { tenantId, accountingAccountId, reportType, startDate, endDate, parameters } = job.data;
-    
+    const {
+      tenantId,
+      accountingAccountId,
+      reportType,
+      startDate,
+      endDate,
+      parameters,
+    } = job.data;
+
     try {
-      this.logger.debug(`Processing Accurate report generation: ${reportType}`, {
-        tenantId,
-        accountingAccountId,
-        reportType,
-        startDate,
-        endDate,
-      });
+      this.logger.debug(
+        `Processing Accurate report generation: ${reportType}`,
+        {
+          tenantId,
+          accountingAccountId,
+          reportType,
+          startDate,
+          endDate,
+        },
+      );
 
       let result;
 
@@ -848,18 +959,19 @@ export class AccurateProcessor {
           break;
 
         case 'currency':
-          result = await this.accurateMultiCurrencyService.generateCurrencyReport(
-            accountingAccountId,
-            tenantId,
-            endDate ? new Date(endDate) : undefined,
-          );
+          result =
+            await this.accurateMultiCurrencyService.generateCurrencyReport(
+              accountingAccountId,
+              tenantId,
+              endDate ? new Date(endDate) : undefined,
+            );
           break;
 
         case 'financial':
         case 'audit_trail':
           // These would be implemented with Accurate reporting API
-          result = { 
-            success: true, 
+          result = {
+            success: true,
             message: `${reportType} report generation not yet implemented`,
             reportType,
             startDate,
@@ -877,10 +989,10 @@ export class AccurateProcessor {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `Accurate ${reportType} report generated successfully`,
-        metadata: { 
-          accountingAccountId, 
-          reportType, 
-          startDate, 
+        metadata: {
+          accountingAccountId,
+          reportType,
+          startDate,
           endDate,
           result,
         },
@@ -897,24 +1009,21 @@ export class AccurateProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Accurate report generation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Accurate report generation failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        '',
-        error,
-        {
-          metadata: { 
-            accountingAccountId, 
-            reportType, 
-            startDate, 
-            endDate,
-          },
+      await this.logService.logError(tenantId, '', error, {
+        metadata: {
+          accountingAccountId,
+          reportType,
+          startDate,
+          endDate,
         },
-      );
+      });
 
       throw error;
     }
@@ -922,7 +1031,10 @@ export class AccurateProcessor {
 
   // Private helper methods
 
-  private async getCredentials(accountingAccountId: string, tenantId: string): Promise<any> {
+  private async getCredentials(
+    accountingAccountId: string,
+    tenantId: string,
+  ): Promise<any> {
     // This would typically fetch credentials from the accounting account
     // For now, return a placeholder
     return {
@@ -932,9 +1044,17 @@ export class AccurateProcessor {
     };
   }
 
-  private async processItemWebhook(tenantId: string, channelId: string, payload: any, eventType: string): Promise<any> {
-    this.logger.debug(`Processing Accurate ${eventType} webhook`, { tenantId, payload });
-    
+  private async processItemWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+    eventType: string,
+  ): Promise<any> {
+    this.logger.debug(`Processing Accurate ${eventType} webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process item change notification
     return {
       success: true,
@@ -944,9 +1064,17 @@ export class AccurateProcessor {
     };
   }
 
-  private async processInvoiceWebhook(tenantId: string, channelId: string, payload: any, eventType: string): Promise<any> {
-    this.logger.debug(`Processing Accurate ${eventType} webhook`, { tenantId, payload });
-    
+  private async processInvoiceWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+    eventType: string,
+  ): Promise<any> {
+    this.logger.debug(`Processing Accurate ${eventType} webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process invoice change notification
     return {
       success: true,
@@ -956,9 +1084,17 @@ export class AccurateProcessor {
     };
   }
 
-  private async processCustomerWebhook(tenantId: string, channelId: string, payload: any, eventType: string): Promise<any> {
-    this.logger.debug(`Processing Accurate ${eventType} webhook`, { tenantId, payload });
-    
+  private async processCustomerWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+    eventType: string,
+  ): Promise<any> {
+    this.logger.debug(`Processing Accurate ${eventType} webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process customer change notification
     return {
       success: true,
@@ -968,9 +1104,17 @@ export class AccurateProcessor {
     };
   }
 
-  private async processAccountWebhook(tenantId: string, channelId: string, payload: any, eventType: string): Promise<any> {
-    this.logger.debug(`Processing Accurate ${eventType} webhook`, { tenantId, payload });
-    
+  private async processAccountWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+    eventType: string,
+  ): Promise<any> {
+    this.logger.debug(`Processing Accurate ${eventType} webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process account change notification
     return {
       success: true,
@@ -980,9 +1124,17 @@ export class AccurateProcessor {
     };
   }
 
-  private async processTaxWebhook(tenantId: string, channelId: string, payload: any, eventType: string): Promise<any> {
-    this.logger.debug(`Processing Accurate ${eventType} webhook`, { tenantId, payload });
-    
+  private async processTaxWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+    eventType: string,
+  ): Promise<any> {
+    this.logger.debug(`Processing Accurate ${eventType} webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process tax rate change notification
     return {
       success: true,
@@ -992,9 +1144,17 @@ export class AccurateProcessor {
     };
   }
 
-  private async processCurrencyWebhook(tenantId: string, channelId: string, payload: any, eventType: string): Promise<any> {
-    this.logger.debug(`Processing Accurate ${eventType} webhook`, { tenantId, payload });
-    
+  private async processCurrencyWebhook(
+    tenantId: string,
+    channelId: string,
+    payload: any,
+    eventType: string,
+  ): Promise<any> {
+    this.logger.debug(`Processing Accurate ${eventType} webhook`, {
+      tenantId,
+      payload,
+    });
+
     // Process currency rate change notification
     return {
       success: true,

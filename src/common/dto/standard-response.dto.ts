@@ -13,40 +13,40 @@ export interface StandardResponseMeta {
 }
 
 export class StandardResponse<T = any> {
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Indicates if the request was successful',
-    example: true
+    example: true,
   })
   success: boolean;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'HTTP status code',
     example: 200,
-    required: false
+    required: false,
   })
   statusCode?: number;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Response message (in Indonesian)',
-    example: 'Data berhasil diambil'
+    example: 'Data berhasil diambil',
   })
   message: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Response data',
-    required: false
+    required: false,
   })
   data?: T;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Additional metadata',
-    required: false
+    required: false,
   })
   meta?: StandardResponseMeta;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Error details (only present when success is false)',
-    required: false
+    required: false,
   })
   error?: {
     code?: string;
@@ -70,10 +70,10 @@ export class StandardResponse<T = any> {
 
   // Static factory methods for common responses
   static success<T>(
-    data?: T, 
-    message: string = 'Operasi berhasil', 
+    data?: T,
+    message: string = 'Operasi berhasil',
     meta?: StandardResponseMeta,
-    statusCode: number = 200
+    statusCode: number = 200,
   ): StandardResponse<T> {
     return new StandardResponse<T>({
       success: true,
@@ -82,26 +82,28 @@ export class StandardResponse<T = any> {
       data,
       meta: {
         ...meta,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 
   static created<T>(
-    data?: T, 
-    message: string = 'Data berhasil dibuat'
+    data?: T,
+    message: string = 'Data berhasil dibuat',
   ): StandardResponse<T> {
     return StandardResponse.success(data, message, undefined, 201);
   }
 
   static updated<T>(
-    data?: T, 
-    message: string = 'Data berhasil diperbarui'
+    data?: T,
+    message: string = 'Data berhasil diperbarui',
   ): StandardResponse<T> {
     return StandardResponse.success(data, message, undefined, 200);
   }
 
-  static deleted(message: string = 'Data berhasil dihapus'): StandardResponse<null> {
+  static deleted(
+    message: string = 'Data berhasil dihapus',
+  ): StandardResponse<null> {
     return StandardResponse.success(null, message, undefined, 200);
   }
 
@@ -110,7 +112,7 @@ export class StandardResponse<T = any> {
     statusCode: number = 500,
     code?: string,
     details?: string,
-    validationErrors?: Array<{ field: string; message: string; value?: any }>
+    validationErrors?: Array<{ field: string; message: string; value?: any }>,
   ): StandardResponse<null> {
     return new StandardResponse<null>({
       success: false,
@@ -120,47 +122,49 @@ export class StandardResponse<T = any> {
       error: {
         code,
         details,
-        validationErrors
+        validationErrors,
       },
       meta: {
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 
   static badRequest(
     message: string = 'Permintaan tidak valid',
-    validationErrors?: Array<{ field: string; message: string; value?: any }>
+    validationErrors?: Array<{ field: string; message: string; value?: any }>,
   ): StandardResponse<null> {
-    return StandardResponse.error(message, 400, 'BAD_REQUEST', undefined, validationErrors);
+    return StandardResponse.error(
+      message,
+      400,
+      'BAD_REQUEST',
+      undefined,
+      validationErrors,
+    );
   }
 
   static unauthorized(
-    message: string = 'Akses tidak diizinkan'
+    message: string = 'Akses tidak diizinkan',
   ): StandardResponse<null> {
     return StandardResponse.error(message, 401, 'UNAUTHORIZED');
   }
 
-  static forbidden(
-    message: string = 'Akses dilarang'
-  ): StandardResponse<null> {
+  static forbidden(message: string = 'Akses dilarang'): StandardResponse<null> {
     return StandardResponse.error(message, 403, 'FORBIDDEN');
   }
 
   static notFound(
-    message: string = 'Data tidak ditemukan'
+    message: string = 'Data tidak ditemukan',
   ): StandardResponse<null> {
     return StandardResponse.error(message, 404, 'NOT_FOUND');
   }
 
-  static conflict(
-    message: string = 'Data sudah ada'
-  ): StandardResponse<null> {
+  static conflict(message: string = 'Data sudah ada'): StandardResponse<null> {
     return StandardResponse.error(message, 409, 'CONFLICT');
   }
 
   static internalError(
-    message: string = 'Kesalahan server internal'
+    message: string = 'Kesalahan server internal',
   ): StandardResponse<null> {
     return StandardResponse.error(message, 500, 'INTERNAL_ERROR');
   }
@@ -171,25 +175,21 @@ export class StandardResponse<T = any> {
     page: number,
     limit: number,
     total: number,
-    message: string = 'Data berhasil diambil'
+    message: string = 'Data berhasil diambil',
   ): StandardResponse<T[]> {
     const totalPages = Math.ceil(total / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    return StandardResponse.success(
-      data,
-      message,
-      {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage,
-        hasPrevPage,
-        timestamp: new Date().toISOString()
-      }
-    );
+    return StandardResponse.success(data, message, {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+      timestamp: new Date().toISOString(),
+    });
   }
 }
 

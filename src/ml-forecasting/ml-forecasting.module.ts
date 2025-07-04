@@ -36,14 +36,14 @@ import { MLTrainingProcessor } from './processors/ml-training.processor';
   imports: [
     ConfigModule,
     EventEmitterModule,
-    
+
     // Database entities
     TypeOrmModule.forFeature([
       // ML-specific entities
       MLModel,
       TrainingJob,
       Prediction,
-      
+
       // External entities needed for ML operations
       Product,
       ProductCategory,
@@ -51,7 +51,7 @@ import { MLTrainingProcessor } from './processors/ml-training.processor';
       InventoryItem,
       User,
     ]),
-    
+
     // Bull queue for async ML training
     BullModule.registerQueue({
       name: 'ml-training',
@@ -66,13 +66,13 @@ import { MLTrainingProcessor } from './processors/ml-training.processor';
       },
     }),
   ],
-  
+
   controllers: [
     MLTrainingController,
     MLPredictionsController,
     ForecastingController,
   ],
-  
+
   providers: [
     // Core services
     DataPipelineService,
@@ -81,11 +81,11 @@ import { MLTrainingProcessor } from './processors/ml-training.processor';
     ForecastingService,
     AccuracyTrackingService,
     ModelRetrainingService,
-    
+
     // Queue processors
     MLTrainingProcessor,
   ],
-  
+
   exports: [
     // Export services for use by other modules
     DataPipelineService,

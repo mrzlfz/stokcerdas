@@ -69,7 +69,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Perform comprehensive predictive analysis',
-    description: 'Execute various types of predictive analytics based on the specified analysis type',
+    description:
+      'Execute various types of predictive analytics based on the specified analysis type',
   })
   @ApiResponse({
     status: 200,
@@ -82,7 +83,9 @@ export class PredictiveAnalyticsController {
     @Body() query: PredictiveAnalyticsQueryDto,
   ): Promise<PredictiveAnalyticsResponseDto> {
     try {
-      this.logger.debug(`Performing ${query.analysisType} analysis for tenant ${user.tenantId}`);
+      this.logger.debug(
+        `Performing ${query.analysisType} analysis for tenant ${user.tenantId}`,
+      );
 
       let data: any;
       let summary: any;
@@ -91,10 +94,13 @@ export class PredictiveAnalyticsController {
 
       switch (query.analysisType) {
         case PredictiveAnalysisType.STOCKOUT_PREDICTION:
-          const stockoutResult = await this.predictiveAnalyticsService.generateStockoutPredictions(
-            user.tenantId,
-            query.parameters as StockoutPredictionQueryDto || { timeHorizon: TimeHorizon.NEXT_30_DAYS },
-          );
+          const stockoutResult =
+            await this.predictiveAnalyticsService.generateStockoutPredictions(
+              user.tenantId,
+              (query.parameters as StockoutPredictionQueryDto) || {
+                timeHorizon: TimeHorizon.NEXT_30_DAYS,
+              },
+            );
           data = stockoutResult.data;
           summary = stockoutResult.summary;
           insights = stockoutResult.insights;
@@ -102,10 +108,11 @@ export class PredictiveAnalyticsController {
           break;
 
         case PredictiveAnalysisType.SLOW_MOVING_DETECTION:
-          const slowMovingResult = await this.predictiveAnalyticsService.detectSlowMovingItems(
-            user.tenantId,
-            query.parameters as SlowMovingDetectionQueryDto || {},
-          );
+          const slowMovingResult =
+            await this.predictiveAnalyticsService.detectSlowMovingItems(
+              user.tenantId,
+              (query.parameters as SlowMovingDetectionQueryDto) || {},
+            );
           data = slowMovingResult.data;
           summary = slowMovingResult.summary;
           insights = slowMovingResult.insights;
@@ -113,10 +120,11 @@ export class PredictiveAnalyticsController {
           break;
 
         case PredictiveAnalysisType.OPTIMAL_REORDER:
-          const reorderResult = await this.predictiveAnalyticsService.generateOptimalReorders(
-            user.tenantId,
-            query.parameters as OptimalReorderQueryDto || {},
-          );
+          const reorderResult =
+            await this.predictiveAnalyticsService.generateOptimalReorders(
+              user.tenantId,
+              (query.parameters as OptimalReorderQueryDto) || {},
+            );
           data = reorderResult.data;
           summary = reorderResult.summary;
           insights = reorderResult.insights;
@@ -124,10 +132,11 @@ export class PredictiveAnalyticsController {
           break;
 
         case PredictiveAnalysisType.PRICE_OPTIMIZATION:
-          const priceResult = await this.priceOptimizationService.generatePriceOptimizations(
-            user.tenantId,
-            query.parameters as PriceOptimizationQueryDto || {},
-          );
+          const priceResult =
+            await this.priceOptimizationService.generatePriceOptimizations(
+              user.tenantId,
+              (query.parameters as PriceOptimizationQueryDto) || {},
+            );
           data = priceResult.data;
           summary = priceResult.summary;
           insights = priceResult.insights;
@@ -135,10 +144,11 @@ export class PredictiveAnalyticsController {
           break;
 
         case PredictiveAnalysisType.DEMAND_ANOMALY:
-          const anomalyResult = await this.demandAnomalyService.detectDemandAnomalies(
-            user.tenantId,
-            query.parameters as DemandAnomalyQueryDto || {},
-          );
+          const anomalyResult =
+            await this.demandAnomalyService.detectDemandAnomalies(
+              user.tenantId,
+              (query.parameters as DemandAnomalyQueryDto) || {},
+            );
           data = anomalyResult.data;
           summary = anomalyResult.summary;
           insights = anomalyResult.insights;
@@ -146,10 +156,11 @@ export class PredictiveAnalyticsController {
           break;
 
         case PredictiveAnalysisType.SEASONAL_ANALYSIS:
-          const seasonalResult = await this.demandAnomalyService.performSeasonalAnalysis(
-            user.tenantId,
-            query.parameters as SeasonalAnalysisQueryDto || {},
-          );
+          const seasonalResult =
+            await this.demandAnomalyService.performSeasonalAnalysis(
+              user.tenantId,
+              (query.parameters as SeasonalAnalysisQueryDto) || {},
+            );
           data = seasonalResult.data;
           summary = seasonalResult.summary;
           insights = seasonalResult.insights;
@@ -164,10 +175,16 @@ export class PredictiveAnalyticsController {
       }
 
       // Generate correlations between different metrics (if applicable)
-      const correlations = await this.generateCrossAnalysisCorrelations(user.tenantId, query.analysisType);
+      const correlations = await this.generateCrossAnalysisCorrelations(
+        user.tenantId,
+        query.analysisType,
+      );
 
       // Suggest next recommended analysis
-      const nextRecommendedAnalysis = this.suggestNextAnalysis(query.analysisType, summary);
+      const nextRecommendedAnalysis = this.suggestNextAnalysis(
+        query.analysisType,
+        summary,
+      );
 
       return {
         analysisType: query.analysisType,
@@ -178,9 +195,11 @@ export class PredictiveAnalyticsController {
         correlations,
         nextRecommendedAnalysis,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to perform predictive analysis: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to perform predictive analysis: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -196,7 +215,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Predict stockout risks',
-    description: 'Analyze inventory levels and demand patterns to predict stockout risks',
+    description:
+      'Analyze inventory levels and demand patterns to predict stockout risks',
   })
   @ApiResponse({
     status: 200,
@@ -208,9 +228,15 @@ export class PredictiveAnalyticsController {
     @Query() query: StockoutPredictionQueryDto,
   ): Promise<StockoutPredictionResponseDto> {
     try {
-      return await this.predictiveAnalyticsService.generateStockoutPredictions(user.tenantId, query);
+      return await this.predictiveAnalyticsService.generateStockoutPredictions(
+        user.tenantId,
+        query,
+      );
     } catch (error) {
-      this.logger.error(`Failed to predict stockout risk: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to predict stockout risk: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -226,7 +252,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Detect slow-moving inventory items',
-    description: 'Identify products with low turnover rates and provide optimization recommendations',
+    description:
+      'Identify products with low turnover rates and provide optimization recommendations',
   })
   @ApiResponse({
     status: 200,
@@ -238,9 +265,15 @@ export class PredictiveAnalyticsController {
     @Query() query: SlowMovingDetectionQueryDto,
   ): Promise<SlowMovingDetectionResponseDto> {
     try {
-      return await this.predictiveAnalyticsService.detectSlowMovingItems(user.tenantId, query);
+      return await this.predictiveAnalyticsService.detectSlowMovingItems(
+        user.tenantId,
+        query,
+      );
     } catch (error) {
-      this.logger.error(`Failed to detect slow-moving items: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to detect slow-moving items: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -256,7 +289,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Generate optimal reorder recommendations',
-    description: 'Calculate optimal reorder quantities and timing based on demand forecasts and inventory levels',
+    description:
+      'Calculate optimal reorder quantities and timing based on demand forecasts and inventory levels',
   })
   @ApiResponse({
     status: 200,
@@ -268,9 +302,15 @@ export class PredictiveAnalyticsController {
     @Query() query: OptimalReorderQueryDto,
   ): Promise<OptimalReorderResponseDto> {
     try {
-      return await this.predictiveAnalyticsService.generateOptimalReorders(user.tenantId, query);
+      return await this.predictiveAnalyticsService.generateOptimalReorders(
+        user.tenantId,
+        query,
+      );
     } catch (error) {
-      this.logger.error(`Failed to generate optimal reorders: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate optimal reorders: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -286,7 +326,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Generate price optimization recommendations',
-    description: 'Analyze demand elasticity, competitive positioning, and margin optimization to recommend optimal pricing',
+    description:
+      'Analyze demand elasticity, competitive positioning, and margin optimization to recommend optimal pricing',
   })
   @ApiResponse({
     status: 200,
@@ -298,9 +339,15 @@ export class PredictiveAnalyticsController {
     @Query() query: PriceOptimizationQueryDto,
   ): Promise<PriceOptimizationResponseDto> {
     try {
-      return await this.priceOptimizationService.generatePriceOptimizations(user.tenantId, query);
+      return await this.priceOptimizationService.generatePriceOptimizations(
+        user.tenantId,
+        query,
+      );
     } catch (error) {
-      this.logger.error(`Failed to optimize pricing: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to optimize pricing: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -316,7 +363,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Detect demand anomalies',
-    description: 'Identify unusual patterns in demand data and provide insights into potential causes',
+    description:
+      'Identify unusual patterns in demand data and provide insights into potential causes',
   })
   @ApiResponse({
     status: 200,
@@ -328,9 +376,15 @@ export class PredictiveAnalyticsController {
     @Query() query: DemandAnomalyQueryDto,
   ): Promise<DemandAnomalyResponseDto> {
     try {
-      return await this.demandAnomalyService.detectDemandAnomalies(user.tenantId, query);
+      return await this.demandAnomalyService.detectDemandAnomalies(
+        user.tenantId,
+        query,
+      );
     } catch (error) {
-      this.logger.error(`Failed to detect demand anomalies: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to detect demand anomalies: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -346,7 +400,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Perform seasonal demand analysis',
-    description: 'Analyze seasonal patterns in product demand and provide strategic recommendations',
+    description:
+      'Analyze seasonal patterns in product demand and provide strategic recommendations',
   })
   @ApiResponse({
     status: 200,
@@ -358,9 +413,15 @@ export class PredictiveAnalyticsController {
     @Query() query: SeasonalAnalysisQueryDto,
   ): Promise<SeasonalAnalysisResponseDto> {
     try {
-      return await this.demandAnomalyService.performSeasonalAnalysis(user.tenantId, query);
+      return await this.demandAnomalyService.performSeasonalAnalysis(
+        user.tenantId,
+        query,
+      );
     } catch (error) {
-      this.logger.error(`Failed to perform seasonal analysis: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to perform seasonal analysis: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -376,7 +437,8 @@ export class PredictiveAnalyticsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
     summary: 'Get predictive analytics insights summary',
-    description: 'Comprehensive summary of all predictive analytics insights with prioritized recommendations',
+    description:
+      'Comprehensive summary of all predictive analytics insights with prioritized recommendations',
   })
   @ApiResponse({
     status: 200,
@@ -387,13 +449,27 @@ export class PredictiveAnalyticsController {
     @Query('timeframe') timeframe: '7d' | '30d' | '90d' = '30d',
   ) {
     try {
-      this.logger.debug(`Generating predictive insights summary for tenant ${user.tenantId}`);
+      this.logger.debug(
+        `Generating predictive insights summary for tenant ${user.tenantId}`,
+      );
 
       // Generate quick insights from each analysis type
-      const stockoutInsights = await this.generateQuickStockoutInsights(user.tenantId, timeframe);
-      const slowMovingInsights = await this.generateQuickSlowMovingInsights(user.tenantId, timeframe);
-      const priceInsights = await this.generateQuickPriceInsights(user.tenantId, timeframe);
-      const anomalyInsights = await this.generateQuickAnomalyInsights(user.tenantId, timeframe);
+      const stockoutInsights = await this.generateQuickStockoutInsights(
+        user.tenantId,
+        timeframe,
+      );
+      const slowMovingInsights = await this.generateQuickSlowMovingInsights(
+        user.tenantId,
+        timeframe,
+      );
+      const priceInsights = await this.generateQuickPriceInsights(
+        user.tenantId,
+        timeframe,
+      );
+      const anomalyInsights = await this.generateQuickAnomalyInsights(
+        user.tenantId,
+        timeframe,
+      );
 
       // Prioritize recommendations
       const prioritizedRecommendations = this.prioritizeRecommendations([
@@ -416,9 +492,11 @@ export class PredictiveAnalyticsController {
         prioritizedRecommendations,
         nextSteps: this.generateNextSteps(prioritizedRecommendations),
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate insights summary: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate insights summary: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -473,15 +551,17 @@ export class PredictiveAnalyticsController {
   private async generateCrossAnalysisCorrelations(
     tenantId: string,
     analysisType: PredictiveAnalysisType,
-  ): Promise<Array<{
-    metric1: string;
-    metric2: string;
-    correlation: number;
-    significance: 'low' | 'medium' | 'high';
-  }>> {
+  ): Promise<
+    Array<{
+      metric1: string;
+      metric2: string;
+      correlation: number;
+      significance: 'low' | 'medium' | 'high';
+    }>
+  > {
     // Simplified correlation analysis - in a real implementation, this would
     // perform statistical correlation analysis between different metrics
-    
+
     const correlations = [];
 
     if (analysisType === PredictiveAnalysisType.STOCKOUT_PREDICTION) {
@@ -508,28 +588,32 @@ export class PredictiveAnalyticsController {
   private suggestNextAnalysis(
     currentAnalysis: PredictiveAnalysisType,
     summary: any,
-  ): {
-    analysisType: PredictiveAnalysisType;
-    reasoning: string;
-    priority: 'low' | 'medium' | 'high';
-  } | undefined {
-    
+  ):
+    | {
+        analysisType: PredictiveAnalysisType;
+        reasoning: string;
+        priority: 'low' | 'medium' | 'high';
+      }
+    | undefined {
     switch (currentAnalysis) {
       case PredictiveAnalysisType.STOCKOUT_PREDICTION:
         if (summary.criticalRiskProducts > 0) {
           return {
             analysisType: PredictiveAnalysisType.OPTIMAL_REORDER,
-            reasoning: 'High stockout risk detected - optimize reorder parameters',
+            reasoning:
+              'High stockout risk detected - optimize reorder parameters',
             priority: 'high',
           };
         }
         break;
 
       case PredictiveAnalysisType.SLOW_MOVING_DETECTION:
-        if (summary.slowMovingValue > 10000000) { // 10M IDR
+        if (summary.slowMovingValue > 10000000) {
+          // 10M IDR
           return {
             analysisType: PredictiveAnalysisType.PRICE_OPTIMIZATION,
-            reasoning: 'Significant slow-moving inventory value - consider price optimization',
+            reasoning:
+              'Significant slow-moving inventory value - consider price optimization',
             priority: 'medium',
           };
         }
@@ -553,7 +637,10 @@ export class PredictiveAnalyticsController {
     return undefined;
   }
 
-  private async generateQuickStockoutInsights(tenantId: string, timeframe: string) {
+  private async generateQuickStockoutInsights(
+    tenantId: string,
+    timeframe: string,
+  ) {
     // Simplified quick insights - in a real implementation, this would run
     // a lightweight version of the stockout analysis
     return {
@@ -563,13 +650,22 @@ export class PredictiveAnalyticsController {
         averageRiskScore: 0.35,
       },
       recommendations: [
-        { text: 'Urgent reorder needed for 2 critical products', priority: 'high' },
-        { text: 'Review safety stock levels for high-risk items', priority: 'medium' },
+        {
+          text: 'Urgent reorder needed for 2 critical products',
+          priority: 'high',
+        },
+        {
+          text: 'Review safety stock levels for high-risk items',
+          priority: 'medium',
+        },
       ],
     };
   }
 
-  private async generateQuickSlowMovingInsights(tenantId: string, timeframe: string) {
+  private async generateQuickSlowMovingInsights(
+    tenantId: string,
+    timeframe: string,
+  ) {
     return {
       summary: {
         slowMovingItems: 15,
@@ -577,13 +673,22 @@ export class PredictiveAnalyticsController {
         potentialRecovery: 18000000,
       },
       recommendations: [
-        { text: 'Implement markdown strategy for Rp 25M slow-moving inventory', priority: 'high' },
-        { text: 'Review purchasing patterns for identified slow-movers', priority: 'medium' },
+        {
+          text: 'Implement markdown strategy for Rp 25M slow-moving inventory',
+          priority: 'high',
+        },
+        {
+          text: 'Review purchasing patterns for identified slow-movers',
+          priority: 'medium',
+        },
       ],
     };
   }
 
-  private async generateQuickPriceInsights(tenantId: string, timeframe: string) {
+  private async generateQuickPriceInsights(
+    tenantId: string,
+    timeframe: string,
+  ) {
     return {
       summary: {
         optimizationOpportunities: 8,
@@ -591,13 +696,22 @@ export class PredictiveAnalyticsController {
         averageMarginImprovement: 3.5,
       },
       recommendations: [
-        { text: 'Price optimization could increase revenue by Rp 5M', priority: 'medium' },
-        { text: 'Test price increases for 8 identified products', priority: 'low' },
+        {
+          text: 'Price optimization could increase revenue by Rp 5M',
+          priority: 'medium',
+        },
+        {
+          text: 'Test price increases for 8 identified products',
+          priority: 'low',
+        },
       ],
     };
   }
 
-  private async generateQuickAnomalyInsights(tenantId: string, timeframe: string) {
+  private async generateQuickAnomalyInsights(
+    tenantId: string,
+    timeframe: string,
+  ) {
     return {
       summary: {
         anomaliesDetected: 12,
@@ -605,22 +719,35 @@ export class PredictiveAnalyticsController {
         drops: 5,
       },
       recommendations: [
-        { text: 'Investigate 7 demand spikes for replication opportunities', priority: 'medium' },
+        {
+          text: 'Investigate 7 demand spikes for replication opportunities',
+          priority: 'medium',
+        },
         { text: 'Address root causes of 5 demand drops', priority: 'high' },
       ],
     };
   }
 
-  private prioritizeRecommendations(recommendations: Array<{ text: string; priority: string }>) {
+  private prioritizeRecommendations(
+    recommendations: Array<{ text: string; priority: string }>,
+  ) {
     const priorityOrder = { high: 3, medium: 2, low: 1 };
     return recommendations
-      .sort((a, b) => priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder])
+      .sort(
+        (a, b) =>
+          priorityOrder[b.priority as keyof typeof priorityOrder] -
+          priorityOrder[a.priority as keyof typeof priorityOrder],
+      )
       .slice(0, 10); // Top 10 recommendations
   }
 
-  private generateNextSteps(recommendations: Array<{ text: string; priority: string }>) {
-    const highPriorityCount = recommendations.filter(r => r.priority === 'high').length;
-    
+  private generateNextSteps(
+    recommendations: Array<{ text: string; priority: string }>,
+  ) {
+    const highPriorityCount = recommendations.filter(
+      r => r.priority === 'high',
+    ).length;
+
     if (highPriorityCount > 0) {
       return [
         `Address ${highPriorityCount} high-priority recommendations immediately`,

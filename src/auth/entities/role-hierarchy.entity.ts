@@ -1,19 +1,13 @@
-import {
-  Entity,
-  Column,
-  Index,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { AuditableEntity } from '../../common/entities/base.entity';
 import { HierarchicalRole } from './hierarchical-role.entity';
 
 export enum InheritanceType {
-  FULL = 'full',           // Inherit all permissions
-  PARTIAL = 'partial',     // Inherit selected permissions
-  ADDITIVE = 'additive',   // Add permissions to existing ones
-  OVERRIDE = 'override',   // Override specific permissions
+  FULL = 'full', // Inherit all permissions
+  PARTIAL = 'partial', // Inherit selected permissions
+  ADDITIVE = 'additive', // Add permissions to existing ones
+  OVERRIDE = 'override', // Override specific permissions
 }
 
 export enum HierarchyStatus {
@@ -26,7 +20,10 @@ export enum HierarchyStatus {
 @Index(['tenantId', 'isDeleted'])
 @Index(['tenantId', 'parentRoleId'])
 @Index(['tenantId', 'childRoleId'])
-@Index(['parentRoleId', 'childRoleId'], { unique: true, where: 'is_deleted = false' })
+@Index(['parentRoleId', 'childRoleId'], {
+  unique: true,
+  where: 'is_deleted = false',
+})
 export class RoleHierarchy extends AuditableEntity {
   // Parent role (grants permissions)
   @Column({ type: 'uuid', name: 'parent_role_id' })
@@ -76,7 +73,8 @@ export class RoleHierarchy extends AuditableEntity {
   excludedPermissions?: string[]; // Permissions to exclude from inheritance
 
   @Column({ type: 'jsonb', nullable: true })
-  overriddenPermissions?: { // Override specific permissions
+  overriddenPermissions?: {
+    // Override specific permissions
     [permissionKey: string]: {
       action: 'grant' | 'deny';
       reason?: string;
@@ -94,7 +92,7 @@ export class RoleHierarchy extends AuditableEntity {
     timeRestriction?: {
       validFrom?: string;
       validUntil?: string;
-      allowedHours?: Record<string, { start: string; end: string; }>;
+      allowedHours?: Record<string, { start: string; end: string }>;
     };
     contextRestriction?: {
       requiresSameLocation?: boolean;
@@ -159,7 +157,11 @@ export class RoleHierarchy extends AuditableEntity {
 
   // Computed properties
   get isActive(): boolean {
-    return this.status === HierarchyStatus.ACTIVE && !this.isDeleted && this.isValidNow;
+    return (
+      this.status === HierarchyStatus.ACTIVE &&
+      !this.isDeleted &&
+      this.isValidNow
+    );
   }
 
   get isValidNow(): boolean {
@@ -207,7 +209,7 @@ export class RoleHierarchy extends AuditableEntity {
 
   getPermissionOverride(permissionKey: string): 'grant' | 'deny' | null {
     if (!this.overriddenPermissions) return null;
-    
+
     const override = this.overriddenPermissions[permissionKey];
     return override?.action || null;
   }
@@ -236,20 +238,28 @@ export class RoleHierarchy extends AuditableEntity {
     const now = new Date();
 
     // Check date range
-    if (timeRestriction.validFrom && now < new Date(timeRestriction.validFrom)) {
+    if (
+      timeRestriction.validFrom &&
+      now < new Date(timeRestriction.validFrom)
+    ) {
       return false;
     }
-    if (timeRestriction.validUntil && now > new Date(timeRestriction.validUntil)) {
+    if (
+      timeRestriction.validUntil &&
+      now > new Date(timeRestriction.validUntil)
+    ) {
       return false;
     }
 
     // Check allowed hours
     if (timeRestriction.allowedHours) {
-      const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase();
+      const dayOfWeek = now
+        .toLocaleDateString('en', { weekday: 'long' })
+        .toLowerCase();
       const schedule = timeRestriction.allowedHours[dayOfWeek];
-      
+
       if (!schedule) return false;
-      
+
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
       return currentTime >= schedule.start && currentTime <= schedule.end;
     }
@@ -306,15 +316,15 @@ export class RoleHierarchy extends AuditableEntity {
 
   // Override a specific permission
   overridePermission(
-    permissionKey: string, 
-    action: 'grant' | 'deny', 
+    permissionKey: string,
+    action: 'grant' | 'deny',
     reason?: string,
-    conditions?: Record<string, any>
+    conditions?: Record<string, any>,
   ): void {
     if (!this.overriddenPermissions) {
       this.overriddenPermissions = {};
     }
-    
+
     this.overriddenPermissions[permissionKey] = {
       action,
       reason,

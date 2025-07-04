@@ -21,7 +21,18 @@ import {
   ApiParam,
   ApiProperty,
 } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsArray, IsObject, IsNumber, Min, Max, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  IsArray,
+  IsObject,
+  IsNumber,
+  Min,
+  Max,
+  IsBoolean,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -30,7 +41,10 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { GetTenant } from '../../common/decorators/tenant.decorator';
 import { UserRole } from '../../users/entities/user.entity';
 
-import { ModelServingService, PredictionRequest } from '../services/model-serving.service';
+import {
+  ModelServingService,
+  PredictionRequest,
+} from '../services/model-serving.service';
 import { PredictionType } from '../entities/prediction.entity';
 
 // DTOs
@@ -59,7 +73,9 @@ class CreatePredictionDto {
   @IsEnum(PredictionType)
   predictionType: PredictionType;
 
-  @ApiProperty({ description: 'Target date for prediction (optional, defaults to today)' })
+  @ApiProperty({
+    description: 'Target date for prediction (optional, defaults to today)',
+  })
   @IsOptional()
   @IsDateString()
   targetDate?: string;
@@ -97,7 +113,9 @@ class BatchPredictionDto {
   @IsEnum(PredictionType)
   predictionType: PredictionType;
 
-  @ApiProperty({ description: 'Target date for prediction (optional, defaults to today)' })
+  @ApiProperty({
+    description: 'Target date for prediction (optional, defaults to today)',
+  })
   @IsOptional()
   @IsDateString()
   targetDate?: string;
@@ -184,16 +202,15 @@ class PredictionQueryDto {
 @Controller('api/v1/ml/predictions')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MLPredictionsController {
-  constructor(
-    private readonly modelServingService: ModelServingService,
-  ) {}
+  constructor(private readonly modelServingService: ModelServingService) {}
 
   @Post('predict')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Prediction',
-    description: 'Generate a machine learning prediction for demand forecasting, stockout risk, or other predictions',
+    description:
+      'Generate a machine learning prediction for demand forecasting, stockout risk, or other predictions',
   })
   @ApiResponse({
     status: 200,
@@ -282,7 +299,9 @@ export class MLPredictionsController {
       categoryId: predictionDto.categoryId,
       locationId: predictionDto.locationId,
       predictionType: predictionDto.predictionType,
-      targetDate: predictionDto.targetDate ? new Date(predictionDto.targetDate) : undefined,
+      targetDate: predictionDto.targetDate
+        ? new Date(predictionDto.targetDate)
+        : undefined,
       forecastDays: predictionDto.forecastDays,
       includeConfidenceInterval: predictionDto.includeConfidenceInterval,
       features: predictionDto.features,
@@ -361,7 +380,9 @@ export class MLPredictionsController {
     };
   }> {
     if (!batchDto.productIds?.length) {
-      throw new BadRequestException('Product IDs are required for batch prediction');
+      throw new BadRequestException(
+        'Product IDs are required for batch prediction',
+      );
     }
 
     if (batchDto.productIds.length > 50) {
@@ -372,7 +393,9 @@ export class MLPredictionsController {
       modelId: batchDto.modelId,
       productIds: batchDto.productIds,
       predictionType: batchDto.predictionType,
-      targetDate: batchDto.targetDate ? new Date(batchDto.targetDate) : undefined,
+      targetDate: batchDto.targetDate
+        ? new Date(batchDto.targetDate)
+        : undefined,
       forecastDays: batchDto.forecastDays,
     });
 
@@ -382,7 +405,7 @@ export class MLPredictionsController {
       failed: 0,
     };
 
-    Object.values(results).forEach((result) => {
+    Object.values(results).forEach(result => {
       if (result.success) {
         summary.successful++;
       } else {
@@ -629,7 +652,8 @@ export class MLPredictionsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Validate Predictions',
-    description: 'Validate prediction accuracy against actual values for a date range',
+    description:
+      'Validate prediction accuracy against actual values for a date range',
   })
   @ApiResponse({
     status: 200,
@@ -637,7 +661,8 @@ export class MLPredictionsController {
   })
   async validatePredictions(
     @GetTenant() tenantId: string,
-    @Body() body: {
+    @Body()
+    body: {
       startDate: string;
       endDate: string;
     },
@@ -660,9 +685,10 @@ export class MLPredictionsController {
     return {
       totalPredictions: validation.totalPredictions,
       accuratePredictions: validation.accuratePredictions,
-      accuracyRate: validation.totalPredictions > 0 
-        ? validation.accuratePredictions / validation.totalPredictions 
-        : 0,
+      accuracyRate:
+        validation.totalPredictions > 0
+          ? validation.accuratePredictions / validation.totalPredictions
+          : 0,
       averageErrorRate: validation.averageErrorRate,
       modelPerformance: validation.modelPerformance,
     };
@@ -672,7 +698,7 @@ export class MLPredictionsController {
   private getConfidenceLevel(confidence: number): string {
     if (confidence >= 0.95) return 'Sangat Tinggi';
     if (confidence >= 0.85) return 'Tinggi';
-    if (confidence >= 0.70) return 'Sedang';
+    if (confidence >= 0.7) return 'Sedang';
     return 'Rendah';
   }
 

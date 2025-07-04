@@ -7,7 +7,7 @@ export class UpdatePurchaseOrderDto extends PartialType(
 ) {
   // All fields from CreatePurchaseOrderDto are optional for updates
   // Items are handled separately through dedicated endpoints
-  
+
   @IsOptional()
   @IsString()
   updatedBy?: string;

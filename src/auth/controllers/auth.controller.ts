@@ -20,7 +20,11 @@ import {
   ApiHeader,
 } from '@nestjs/swagger';
 
-import { AuthService, LoginResponse, AuthTokens } from '../services/auth.service';
+import {
+  AuthService,
+  LoginResponse,
+  AuthTokens,
+} from '../services/auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
@@ -44,9 +48,9 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'User login',
-    description: 'Authenticate user with email and password' 
+    description: 'Authenticate user with email and password',
   })
   @ApiHeader({
     name: 'x-tenant-id',
@@ -99,18 +103,22 @@ export class AuthController {
     @Req() req: Request,
   ): Promise<{ success: boolean; data: LoginResponse; meta: any }> {
     const tenantId = req.headers['x-tenant-id'] as string;
-    
+
     if (!tenantId) {
       throw new BadRequestException('Tenant ID diperlukan');
     }
 
     const clientIp = req.ip || req.connection.remoteAddress;
-    
-    this.logger.log(`Login attempt for ${loginDto.email} from ${clientIp} (tenant: ${tenantId})`);
-    
+
+    this.logger.log(
+      `Login attempt for ${loginDto.email} from ${clientIp} (tenant: ${tenantId})`,
+    );
+
     const result = await this.authService.login(loginDto, tenantId, clientIp);
-    
-    this.logger.log(`Login successful for ${loginDto.email} (${result.user.id})`);
+
+    this.logger.log(
+      `Login successful for ${loginDto.email} (${result.user.id})`,
+    );
 
     return {
       success: true,
@@ -125,9 +133,9 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'User registration',
-    description: 'Register a new user account' 
+    description: 'Register a new user account',
   })
   @ApiHeader({
     name: 'x-tenant-id',
@@ -147,21 +155,26 @@ export class AuthController {
     @Req() req: Request,
   ): Promise<{ success: boolean; data: { message: string }; meta: any }> {
     const tenantId = req.headers['x-tenant-id'] as string;
-    
+
     if (!tenantId) {
       throw new BadRequestException('Tenant ID diperlukan');
     }
 
-    this.logger.log(`Registration attempt for ${registerDto.email} (tenant: ${tenantId})`);
-    
+    this.logger.log(
+      `Registration attempt for ${registerDto.email} (tenant: ${tenantId})`,
+    );
+
     const user = await this.authService.register(registerDto, tenantId);
-    
-    this.logger.log(`Registration successful for ${registerDto.email} (${user.id})`);
+
+    this.logger.log(
+      `Registration successful for ${registerDto.email} (${user.id})`,
+    );
 
     return {
       success: true,
       data: {
-        message: 'Registrasi berhasil. Silakan periksa email untuk verifikasi akun.',
+        message:
+          'Registrasi berhasil. Silakan periksa email untuk verifikasi akun.',
       },
       meta: {
         timestamp: new Date().toISOString(),
@@ -173,9 +186,9 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Refresh access token',
-    description: 'Generate new access token using refresh token' 
+    description: 'Generate new access token using refresh token',
   })
   @ApiResponse({
     status: 200,
@@ -190,9 +203,9 @@ export class AuthController {
     @Req() req: Request,
   ): Promise<{ success: boolean; data: AuthTokens; meta: any }> {
     this.logger.log('Token refresh attempt');
-    
+
     const tokens = await this.authService.refreshToken(refreshTokenDto);
-    
+
     this.logger.log('Token refresh successful');
 
     return {
@@ -207,9 +220,9 @@ export class AuthController {
 
   @Get('profile')
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get user profile',
-    description: 'Get current authenticated user profile' 
+    description: 'Get current authenticated user profile',
   })
   @ApiResponse({
     status: 200,
@@ -247,9 +260,9 @@ export class AuthController {
 
   @Get('permissions')
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get user permissions',
-    description: 'Get current authenticated user permissions' 
+    description: 'Get current authenticated user permissions',
   })
   @ApiResponse({
     status: 200,
@@ -276,9 +289,9 @@ export class AuthController {
   @Post('logout')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'User logout',
-    description: 'Logout current user session' 
+    description: 'Logout current user session',
   })
   @ApiResponse({
     status: 200,
@@ -292,7 +305,7 @@ export class AuthController {
 
     // Note: In a production app, you might want to invalidate the JWT token
     // This could be done by maintaining a blacklist of tokens or using a shorter expiry
-    
+
     return {
       success: true,
       data: {

@@ -14,11 +14,11 @@ import { AuditableEntity } from '../../common/entities/base.entity';
 import { Company } from './company.entity';
 
 export enum DepartmentType {
-  ROOT = 'root',           // Root organization
-  DIVISION = 'division',   // Major divisions (Sales, Operations, Finance)
+  ROOT = 'root', // Root organization
+  DIVISION = 'division', // Major divisions (Sales, Operations, Finance)
   DEPARTMENT = 'department', // Departments within divisions
-  TEAM = 'team',          // Teams within departments
-  GROUP = 'group',        // Small groups within teams
+  TEAM = 'team', // Teams within departments
+  GROUP = 'group', // Small groups within teams
 }
 
 export enum DepartmentStatus {
@@ -117,13 +117,13 @@ export class Department extends AuditableEntity {
   // Business hours
   @Column({ type: 'jsonb', nullable: true })
   businessHours?: {
-    monday?: { start: string; end: string; };
-    tuesday?: { start: string; end: string; };
-    wednesday?: { start: string; end: string; };
-    thursday?: { start: string; end: string; };
-    friday?: { start: string; end: string; };
-    saturday?: { start: string; end: string; };
-    sunday?: { start: string; end: string; };
+    monday?: { start: string; end: string };
+    tuesday?: { start: string; end: string };
+    wednesday?: { start: string; end: string };
+    thursday?: { start: string; end: string };
+    friday?: { start: string; end: string };
+    saturday?: { start: string; end: string };
+    sunday?: { start: string; end: string };
   };
 
   // Methods

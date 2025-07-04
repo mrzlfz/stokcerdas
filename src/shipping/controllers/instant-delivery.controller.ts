@@ -47,7 +47,11 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/entities/user.entity';
 
 // Services
-import { InstantDeliveryService, InstantDeliveryQuoteRequest, InstantDeliveryRequest } from '../services/instant-delivery.service';
+import {
+  InstantDeliveryService,
+  InstantDeliveryQuoteRequest,
+  InstantDeliveryRequest,
+} from '../services/instant-delivery.service';
 
 // DTOs
 export class LocationDto {
@@ -238,7 +242,10 @@ export class InstantDeliveryController {
   @Post('quotes')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get instant delivery quotes from all providers' })
-  @ApiResponse({ status: 200, description: 'Instant delivery quotes retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Instant delivery quotes retrieved successfully',
+  })
   @ApiResponse({ status: 400, description: 'Invalid request data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiBody({ type: GetInstantDeliveryQuotesDto })
@@ -247,7 +254,9 @@ export class InstantDeliveryController {
     @Body() getQuotesDto: GetInstantDeliveryQuotesDto,
   ) {
     try {
-      this.logger.log(`Getting instant delivery quotes for tenant ${user.tenantId}`);
+      this.logger.log(
+        `Getting instant delivery quotes for tenant ${user.tenantId}`,
+      );
 
       const request: InstantDeliveryQuoteRequest = {
         pickup: getQuotesDto.pickup,
@@ -267,12 +276,16 @@ export class InstantDeliveryController {
         data: quotes,
         meta: {
           total: quotes.length,
-          availableQuotes: quotes.filter(q => q.availability.isServiceable).length,
+          availableQuotes: quotes.filter(q => q.availability.isServiceable)
+            .length,
           providers: [...new Set(quotes.map(q => q.provider))],
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get instant delivery quotes: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get instant delivery quotes: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -280,7 +293,10 @@ export class InstantDeliveryController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Create instant delivery shipment' })
-  @ApiResponse({ status: 201, description: 'Instant delivery created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Instant delivery created successfully',
+  })
   @ApiResponse({ status: 400, description: 'Invalid request data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiBody({ type: CreateInstantDeliveryDto })
@@ -289,7 +305,9 @@ export class InstantDeliveryController {
     @Body() createDeliveryDto: CreateInstantDeliveryDto,
   ) {
     try {
-      this.logger.log(`Creating instant delivery for order ${createDeliveryDto.orderId}`);
+      this.logger.log(
+        `Creating instant delivery for order ${createDeliveryDto.orderId}`,
+      );
 
       const request: InstantDeliveryRequest = {
         orderId: createDeliveryDto.orderId,
@@ -323,14 +341,17 @@ export class InstantDeliveryController {
         paymentMethod: createDeliveryDto.paymentMethod,
         isCod: createDeliveryDto.isCod,
         codAmount: createDeliveryDto.codAmount,
-        scheduledAt: createDeliveryDto.scheduledAt ? new Date(createDeliveryDto.scheduledAt) : undefined,
+        scheduledAt: createDeliveryDto.scheduledAt
+          ? new Date(createDeliveryDto.scheduledAt)
+          : undefined,
         specialInstructions: createDeliveryDto.specialInstructions,
       };
 
-      const shippingLabel = await this.instantDeliveryService.createInstantDelivery(
-        user.tenantId,
-        request,
-      );
+      const shippingLabel =
+        await this.instantDeliveryService.createInstantDelivery(
+          user.tenantId,
+          request,
+        );
 
       return {
         success: true,
@@ -351,7 +372,10 @@ export class InstantDeliveryController {
         message: 'Instant delivery created successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to create instant delivery: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create instant delivery: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -362,7 +386,10 @@ export class InstantDeliveryController {
   @ApiResponse({ status: 200, description: 'Tracking updated successfully' })
   @ApiResponse({ status: 404, description: 'Delivery not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiParam({ name: 'trackingNumber', description: 'Tracking number of the delivery' })
+  @ApiParam({
+    name: 'trackingNumber',
+    description: 'Tracking number of the delivery',
+  })
   @ApiBody({ type: UpdateTrackingDto })
   async updateTracking(
     @CurrentUser() user: any,
@@ -370,7 +397,9 @@ export class InstantDeliveryController {
     @Body() updateTrackingDto: UpdateTrackingDto,
   ) {
     try {
-      this.logger.log(`Updating tracking for ${trackingNumber} (${updateTrackingDto.provider})`);
+      this.logger.log(
+        `Updating tracking for ${trackingNumber} (${updateTrackingDto.provider})`,
+      );
 
       await this.instantDeliveryService.updateInstantDeliveryTracking(
         user.tenantId,
@@ -383,7 +412,10 @@ export class InstantDeliveryController {
         message: 'Tracking updated successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to update tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update tracking: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -394,7 +426,10 @@ export class InstantDeliveryController {
   @ApiResponse({ status: 200, description: 'Delivery cancelled successfully' })
   @ApiResponse({ status: 404, description: 'Delivery not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiParam({ name: 'trackingNumber', description: 'Tracking number of the delivery' })
+  @ApiParam({
+    name: 'trackingNumber',
+    description: 'Tracking number of the delivery',
+  })
   @ApiBody({ type: CancelDeliveryDto })
   async cancelDelivery(
     @CurrentUser() user: any,
@@ -402,7 +437,9 @@ export class InstantDeliveryController {
     @Body() cancelDeliveryDto: CancelDeliveryDto,
   ) {
     try {
-      this.logger.log(`Cancelling delivery ${trackingNumber} (${cancelDeliveryDto.provider})`);
+      this.logger.log(
+        `Cancelling delivery ${trackingNumber} (${cancelDeliveryDto.provider})`,
+      );
 
       await this.instantDeliveryService.cancelInstantDelivery(
         user.tenantId,
@@ -416,7 +453,10 @@ export class InstantDeliveryController {
         message: 'Delivery cancelled successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to cancel delivery: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel delivery: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -426,22 +466,34 @@ export class InstantDeliveryController {
   @ApiOperation({ summary: 'Test instant delivery provider connection' })
   @ApiResponse({ status: 200, description: 'Connection test completed' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiParam({ name: 'provider', enum: ['gojek', 'grab'], description: 'Instant delivery provider' })
+  @ApiParam({
+    name: 'provider',
+    enum: ['gojek', 'grab'],
+    description: 'Instant delivery provider',
+  })
   async testProviderConnection(
     @CurrentUser() user: any,
     @Param('provider') provider: 'gojek' | 'grab',
   ) {
     try {
-      this.logger.log(`Testing ${provider} connection for tenant ${user.tenantId}`);
+      this.logger.log(
+        `Testing ${provider} connection for tenant ${user.tenantId}`,
+      );
 
       let result: { success: boolean; message: string };
 
       if (provider === 'gojek') {
         // Note: We would need to expose this method from GojekShippingService
-        result = { success: true, message: 'Gojek connection test not implemented yet' };
+        result = {
+          success: true,
+          message: 'Gojek connection test not implemented yet',
+        };
       } else if (provider === 'grab') {
         // Note: We would need to expose this method from GrabShippingService
-        result = { success: true, message: 'Grab connection test not implemented yet' };
+        result = {
+          success: true,
+          message: 'Grab connection test not implemented yet',
+        };
       } else {
         throw new HttpException('Unsupported provider', HttpStatus.BAD_REQUEST);
       }
@@ -455,7 +507,10 @@ export class InstantDeliveryController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to test ${provider} connection: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to test ${provider} connection: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -516,7 +571,10 @@ export class InstantDeliveryController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get providers: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get providers: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

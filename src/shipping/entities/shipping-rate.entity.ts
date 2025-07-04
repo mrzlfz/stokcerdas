@@ -270,12 +270,12 @@ export class ShippingRate extends BaseEntity {
   // Virtual fields
   get isCurrentlyActive(): boolean {
     if (!this.isActive) return false;
-    
+
     const now = new Date();
-    
+
     if (this.effectiveFrom && now < this.effectiveFrom) return false;
     if (this.effectiveUntil && now > this.effectiveUntil) return false;
-    
+
     return true;
   }
 
@@ -284,19 +284,24 @@ export class ShippingRate extends BaseEntity {
   }
 
   get isExpressService(): boolean {
-    return [RateType.EXPRESS, RateType.SAME_DAY, RateType.NEXT_DAY, RateType.INSTANT].includes(this.rateType);
+    return [
+      RateType.EXPRESS,
+      RateType.SAME_DAY,
+      RateType.NEXT_DAY,
+      RateType.INSTANT,
+    ].includes(this.rateType);
   }
 
   get maxInsuranceValue(): number {
     // Most Indonesian carriers have insurance limits
     const limits: Record<string, number> = {
-      'JNE': 10000000, // 10 million IDR
-      'JT': 5000000,   // 5 million IDR
-      'SICEPAT': 10000000,
-      'ANTERAJA': 5000000,
-      'NINJA': 2000000,
+      JNE: 10000000, // 10 million IDR
+      JT: 5000000, // 5 million IDR
+      SICEPAT: 10000000,
+      ANTERAJA: 5000000,
+      NINJA: 2000000,
     };
-    
+
     return limits[this.carrierId.toUpperCase()] || 1000000; // Default 1 million IDR
   }
 
@@ -307,12 +312,16 @@ export class ShippingRate extends BaseEntity {
       }
       return `${this.minDays}-${this.maxDays} hari`;
     }
-    
+
     return `${this.estimatedDays} hari`;
   }
 
   // Methods
-  calculateShippingCost(weight: number, distance?: number, insuranceValue?: number): {
+  calculateShippingCost(
+    weight: number,
+    distance?: number,
+    insuranceValue?: number,
+  ): {
     baseCost: number;
     weightCost: number;
     distanceCost: number;
@@ -322,18 +331,23 @@ export class ShippingRate extends BaseEntity {
     totalCost: number;
   } {
     const weightInKg = weight / 1000; // Convert grams to kg
-    
+
     const weightCost = weightInKg > 1 ? (weightInKg - 1) * this.perKgCost : 0;
     const distanceCost = distance ? distance * this.perKmCost : 0;
-    
+
     let insuranceCost = 0;
     if (insuranceValue && this.isInsuranceAvailable) {
       insuranceCost = (insuranceValue * this.insuranceRate) / 100;
     }
-    
-    const totalCost = this.baseCost + weightCost + distanceCost + insuranceCost + 
-                     this.fuelSurcharge + this.adminFee;
-    
+
+    const totalCost =
+      this.baseCost +
+      weightCost +
+      distanceCost +
+      insuranceCost +
+      this.fuelSurcharge +
+      this.adminFee;
+
     return {
       baseCost: this.baseCost,
       weightCost,
@@ -358,7 +372,7 @@ export class ShippingRate extends BaseEntity {
     reasons: string[];
   } {
     const reasons: string[] = [];
-    
+
     // Check weight limits
     if (packageInfo.weight < this.minWeight) {
       reasons.push(`Weight too low (min: ${this.minWeight}g)`);
@@ -366,7 +380,7 @@ export class ShippingRate extends BaseEntity {
     if (packageInfo.weight > this.maxWeight) {
       reasons.push(`Weight too high (max: ${this.maxWeight}g)`);
     }
-    
+
     // Check dimension limits
     if (this.maxLength && packageInfo.length > this.maxLength) {
       reasons.push(`Length too long (max: ${this.maxLength}cm)`);
@@ -377,7 +391,7 @@ export class ShippingRate extends BaseEntity {
     if (this.maxHeight && packageInfo.height > this.maxHeight) {
       reasons.push(`Height too tall (max: ${this.maxHeight}cm)`);
     }
-    
+
     // Check special requirements
     if (packageInfo.isFragile && !this.allowsFragile) {
       reasons.push('Fragile items not allowed');
@@ -385,12 +399,12 @@ export class ShippingRate extends BaseEntity {
     if (packageInfo.isHazardous && !this.allowsHazardous) {
       reasons.push('Hazardous items not allowed');
     }
-    
+
     // Check insurance requirements
     if (this.isInsuranceRequired && !this.isInsuranceAvailable) {
       reasons.push('Insurance required but not available');
     }
-    
+
     return {
       valid: reasons.length === 0,
       reasons,
@@ -400,24 +414,32 @@ export class ShippingRate extends BaseEntity {
   isAvailableForPickup(pickupDate: Date): boolean {
     if (!this.isCurrentlyActive) return false;
     if (!this.operatingDays) return true; // Assume available if not specified
-    
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+    const dayNames = [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ];
     const dayOfWeek = dayNames[pickupDate.getDay()];
-    
+
     return this.operatingDays[dayOfWeek] || false;
   }
 
   getEstimatedDeliveryDate(pickupDate: Date): Date {
     const deliveryDate = new Date(pickupDate);
     deliveryDate.setDate(deliveryDate.getDate() + this.estimatedDays);
-    
+
     // Skip weekends for non-express services (simplified logic)
     if (!this.isExpressService) {
       while (deliveryDate.getDay() === 0 || deliveryDate.getDay() === 6) {
         deliveryDate.setDate(deliveryDate.getDate() + 1);
       }
     }
-    
+
     return deliveryDate;
   }
 

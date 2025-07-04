@@ -1,10 +1,4 @@
-import {
-  Entity,
-  Column,
-  Index,
-  OneToMany,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, Column, Index, OneToMany, CreateDateColumn } from 'typeorm';
 import { AuditableEntity } from '../../common/entities/base.entity';
 import { Product } from '../../products/entities/product.entity';
 import { PurchaseOrder } from '../../purchase-orders/entities/purchase-order.entity';
@@ -206,10 +200,10 @@ export class Supplier extends AuditableEntity {
   primaryContactPosition?: string;
 
   // Relationships
-  @OneToMany(() => Product, (product) => product.supplier)
+  @OneToMany(() => Product, product => product.supplier)
   products: Product[];
 
-  @OneToMany(() => PurchaseOrder, (purchaseOrder) => purchaseOrder.supplier)
+  @OneToMany(() => PurchaseOrder, purchaseOrder => purchaseOrder.supplier)
   purchaseOrders: PurchaseOrder[];
 
   // @OneToMany(() => ReorderRule, (rule) => rule.primarySupplier)
@@ -224,21 +218,28 @@ export class Supplier extends AuditableEntity {
   }) {
     this.totalOrders += 1;
     this.totalPurchaseAmount += orderData.amount;
-    
+
     // Update on-time delivery rate
-    const currentOnTimeCount = Math.round((this.onTimeDeliveryRate / 100) * (this.totalOrders - 1));
+    const currentOnTimeCount = Math.round(
+      (this.onTimeDeliveryRate / 100) * (this.totalOrders - 1),
+    );
     const newOnTimeCount = currentOnTimeCount + (orderData.onTime ? 1 : 0);
     this.onTimeDeliveryRate = (newOnTimeCount / this.totalOrders) * 100;
-    
+
     // Update quality score (weighted average)
-    this.qualityScore = ((this.qualityScore * (this.totalOrders - 1)) + orderData.qualityScore) / this.totalOrders;
-    
+    this.qualityScore =
+      (this.qualityScore * (this.totalOrders - 1) + orderData.qualityScore) /
+      this.totalOrders;
+
     // Update lead time (weighted average)
-    this.leadTimeDays = Math.round(((this.leadTimeDays * (this.totalOrders - 1)) + orderData.leadTime) / this.totalOrders);
-    
+    this.leadTimeDays = Math.round(
+      (this.leadTimeDays * (this.totalOrders - 1) + orderData.leadTime) /
+        this.totalOrders,
+    );
+
     // Calculate overall rating based on performance metrics
     this.updateRating();
-    
+
     this.lastOrderDate = new Date();
   }
 
@@ -247,17 +248,19 @@ export class Supplier extends AuditableEntity {
     const onTimeWeight = 0.4;
     const qualityWeight = 0.4;
     const reliabilityWeight = 0.2;
-    
+
     const onTimeScore = this.onTimeDeliveryRate / 20; // Convert to 0-5 scale
     const qualityRating = this.qualityScore / 20; // Convert to 0-5 scale
     const reliabilityScore = Math.min(5, this.totalOrders / 10); // Bonus for order history
-    
-    this.rating = Math.round(
-      (onTimeScore * onTimeWeight + 
-       qualityRating * qualityWeight + 
-       reliabilityScore * reliabilityWeight) * 100
-    ) / 100;
-    
+
+    this.rating =
+      Math.round(
+        (onTimeScore * onTimeWeight +
+          qualityRating * qualityWeight +
+          reliabilityScore * reliabilityWeight) *
+          100,
+      ) / 100;
+
     // Ensure rating is within bounds
     this.rating = Math.max(0, Math.min(5, this.rating));
   }
@@ -266,13 +269,13 @@ export class Supplier extends AuditableEntity {
     if (!this.notes) {
       this.notes = [];
     }
-    
+
     this.notes.unshift({
       note,
       createdBy,
       createdAt: new Date(),
     });
-    
+
     // Keep only last 50 notes
     if (this.notes.length > 50) {
       this.notes = this.notes.slice(0, 50);
@@ -287,7 +290,7 @@ export class Supplier extends AuditableEntity {
     if (!this.contractStartDate || !this.contractEndDate) {
       return true; // No contract restrictions
     }
-    
+
     const now = new Date();
     return now >= this.contractStartDate && now <= this.contractEndDate;
   }

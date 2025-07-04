@@ -8,7 +8,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { User, UserRole, UserStatus } from '../../users/entities/user.entity';
-import { Permission, PermissionResource, PermissionAction } from '../entities/permission.entity';
+import {
+  Permission,
+  PermissionResource,
+  PermissionAction,
+} from '../entities/permission.entity';
 import { HierarchicalRole } from '../entities/hierarchical-role.entity';
 import { Department } from '../entities/department.entity';
 import { PermissionSet } from '../entities/permission-set.entity';
@@ -89,7 +93,12 @@ export class EnterpriseAuthService {
     action: PermissionAction,
     context?: EnterprisePermissionContext,
   ): Promise<boolean> {
-    const result = await this.checkEnterprisePermission(userId, resource, action, context);
+    const result = await this.checkEnterprisePermission(
+      userId,
+      resource,
+      action,
+      context,
+    );
     return result.granted;
   }
 
@@ -149,15 +158,21 @@ export class EnterpriseAuthService {
       }
 
       // 3. Fallback to legacy role-based permissions
-      const legacyGranted = await this.authService.hasPermission(userId, resource, action);
+      const legacyGranted = await this.authService.hasPermission(
+        userId,
+        resource,
+        action,
+      );
       return {
         granted: legacyGranted,
         source: 'legacy',
         details: { roleId: user.role },
       };
-
     } catch (error) {
-      this.logger.error(`Error checking enterprise permission: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error checking enterprise permission: ${error.message}`,
+        error.stack,
+      );
       return {
         granted: false,
         source: 'legacy',
@@ -184,15 +199,26 @@ export class EnterpriseAuthService {
       }
 
       // Get legacy permissions
-      const directPermissions = await this.authService.getUserPermissions(userId);
+      const directPermissions = await this.authService.getUserPermissions(
+        userId,
+      );
 
       // Get hierarchical role permissions
-      const hierarchicalRoles = await this.getUserHierarchicalRoles(userId, tenantId);
-      const inheritedPermissions = await this.getHierarchicalRolePermissions(hierarchicalRoles, context);
+      const hierarchicalRoles = await this.getUserHierarchicalRoles(
+        userId,
+        tenantId,
+      );
+      const inheritedPermissions = await this.getHierarchicalRolePermissions(
+        hierarchicalRoles,
+        context,
+      );
 
       // Get permission set permissions
       const permissionSets = await this.getUserPermissionSets(userId, tenantId);
-      const permissionSetPermissions = await this.getPermissionSetPermissions(permissionSets, context);
+      const permissionSetPermissions = await this.getPermissionSetPermissions(
+        permissionSets,
+        context,
+      );
 
       // Calculate effective permissions
       const allPermissions = new Set([
@@ -202,7 +228,11 @@ export class EnterpriseAuthService {
       ]);
 
       // Get restrictions
-      const restrictions = await this.getUserRestrictions(userId, tenantId, context);
+      const restrictions = await this.getUserRestrictions(
+        userId,
+        tenantId,
+        context,
+      );
 
       return {
         directPermissions,
@@ -216,9 +246,11 @@ export class EnterpriseAuthService {
           permissionSets: permissionSets.map(ps => ps.name),
         },
       };
-
     } catch (error) {
-      this.logger.error(`Error getting user permission summary: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting user permission summary: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -254,14 +286,21 @@ export class EnterpriseAuthService {
 
       if (requiresApproval) {
         // Trigger approval workflow
-        await this.triggerRoleAssignmentApproval(userId, roleId, tenantId, assignedBy);
+        await this.triggerRoleAssignmentApproval(
+          userId,
+          roleId,
+          tenantId,
+          assignedBy,
+        );
       } else {
         // Direct assignment
         await this.performRoleAssignment(userId, roleId, tenantId, assignedBy);
       }
-
     } catch (error) {
-      this.logger.error(`Error assigning hierarchical role: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error assigning hierarchical role: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -297,14 +336,26 @@ export class EnterpriseAuthService {
 
       if (requiresApproval || permissionSet.requiresApproval) {
         // Trigger approval workflow
-        await this.triggerPermissionSetAssignmentApproval(userId, permissionSetId, tenantId, assignedBy);
+        await this.triggerPermissionSetAssignmentApproval(
+          userId,
+          permissionSetId,
+          tenantId,
+          assignedBy,
+        );
       } else {
         // Direct assignment
-        await this.performPermissionSetAssignment(userId, permissionSetId, tenantId, assignedBy);
+        await this.performPermissionSetAssignment(
+          userId,
+          permissionSetId,
+          tenantId,
+          assignedBy,
+        );
       }
-
     } catch (error) {
-      this.logger.error(`Error assigning permission set: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error assigning permission set: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -320,7 +371,7 @@ export class EnterpriseAuthService {
     try {
       // Get user's department assignments
       const userDepartments = await this.getUserDepartments(userId, tenantId);
-      
+
       // Check direct access
       if (userDepartments.some(dept => dept.id === departmentId)) {
         return true;
@@ -338,15 +389,19 @@ export class EnterpriseAuthService {
 
       // Check if user has access to parent departments
       for (const userDept of userDepartments) {
-        if (await this.isDepartmentParentOf(userDept.id, departmentId, tenantId)) {
+        if (
+          await this.isDepartmentParentOf(userDept.id, departmentId, tenantId)
+        ) {
           return true;
         }
       }
 
       return false;
-
     } catch (error) {
-      this.logger.error(`Error checking department access: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error checking department access: ${error.message}`,
+        error.stack,
+      );
       return false;
     }
   }
@@ -360,7 +415,10 @@ export class EnterpriseAuthService {
     context?: EnterprisePermissionContext,
   ): Promise<PermissionCheckResult> {
     try {
-      const hierarchicalRoles = await this.getUserHierarchicalRoles(userId, tenantId);
+      const hierarchicalRoles = await this.getUserHierarchicalRoles(
+        userId,
+        tenantId,
+      );
 
       for (const role of hierarchicalRoles) {
         // Check role validity
@@ -368,7 +426,11 @@ export class EnterpriseAuthService {
 
         // Check context restrictions
         const restrictions = this.checkRoleRestrictions(role, context);
-        if (!restrictions.timeValid || !restrictions.ipValid || !restrictions.departmentValid) {
+        if (
+          !restrictions.timeValid ||
+          !restrictions.ipValid ||
+          !restrictions.departmentValid
+        ) {
           continue;
         }
 
@@ -383,7 +445,10 @@ export class EnterpriseAuthService {
         }
 
         // Check inherited permission
-        if (role.inheritsPermissions && await this.checkInheritedPermission(role, permissionKey)) {
+        if (
+          role.inheritsPermissions &&
+          (await this.checkInheritedPermission(role, permissionKey))
+        ) {
           return {
             granted: true,
             source: 'hierarchical_role',
@@ -394,9 +459,10 @@ export class EnterpriseAuthService {
       }
 
       return { granted: false, source: 'hierarchical_role', details: {} };
-
     } catch (error) {
-      this.logger.error(`Error checking hierarchical role permissions: ${error.message}`);
+      this.logger.error(
+        `Error checking hierarchical role permissions: ${error.message}`,
+      );
       return { granted: false, source: 'hierarchical_role', details: {} };
     }
   }
@@ -411,11 +477,12 @@ export class EnterpriseAuthService {
       const permissionSets = await this.getUserPermissionSets(userId, tenantId);
 
       for (const permissionSet of permissionSets) {
-        const effectivePermissions = await this.permissionSetService.getEffectivePermissions(
-          permissionSet.id,
-          tenantId,
-          context,
-        );
+        const effectivePermissions =
+          await this.permissionSetService.getEffectivePermissions(
+            permissionSet.id,
+            tenantId,
+            context,
+          );
 
         if (effectivePermissions.includes(permissionKey)) {
           return {
@@ -430,9 +497,10 @@ export class EnterpriseAuthService {
       }
 
       return { granted: false, source: 'permission_set', details: {} };
-
     } catch (error) {
-      this.logger.error(`Error checking permission set permissions: ${error.message}`);
+      this.logger.error(
+        `Error checking permission set permissions: ${error.message}`,
+      );
       return { granted: false, source: 'permission_set', details: {} };
     }
   }
@@ -552,7 +620,9 @@ export class EnterpriseAuthService {
   ): Promise<void> {
     // This would trigger the approval workflow
     // Implementation depends on the approval chain system
-    this.logger.log(`Role assignment approval triggered for user ${userId}, role ${roleId}`);
+    this.logger.log(
+      `Role assignment approval triggered for user ${userId}, role ${roleId}`,
+    );
   }
 
   private async triggerPermissionSetAssignmentApproval(
@@ -563,7 +633,9 @@ export class EnterpriseAuthService {
   ): Promise<void> {
     // This would trigger the approval workflow
     // Implementation depends on the approval chain system
-    this.logger.log(`Permission set assignment approval triggered for user ${userId}, set ${permissionSetId}`);
+    this.logger.log(
+      `Permission set assignment approval triggered for user ${userId}, set ${permissionSetId}`,
+    );
   }
 
   private async performRoleAssignment(
@@ -574,7 +646,9 @@ export class EnterpriseAuthService {
   ): Promise<void> {
     // This would perform the actual role assignment
     // Implementation depends on user-role assignment entities
-    this.logger.log(`Role assigned to user ${userId}: role ${roleId} by ${assignedBy}`);
+    this.logger.log(
+      `Role assigned to user ${userId}: role ${roleId} by ${assignedBy}`,
+    );
   }
 
   private async performPermissionSetAssignment(
@@ -585,6 +659,8 @@ export class EnterpriseAuthService {
   ): Promise<void> {
     // This would perform the actual permission set assignment
     // Implementation depends on user-permission set assignment entities
-    this.logger.log(`Permission set assigned to user ${userId}: set ${permissionSetId} by ${assignedBy}`);
+    this.logger.log(
+      `Permission set assigned to user ${userId}: set ${permissionSetId} by ${assignedBy}`,
+    );
   }
 }

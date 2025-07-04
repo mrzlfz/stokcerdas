@@ -171,7 +171,9 @@ export class ChannelInventory extends BaseEntity {
   notes?: string;
 
   // Relations
-  @ManyToOne(() => Channel, channel => channel.inventoryAllocations, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Channel, channel => channel.inventoryAllocations, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'channelId' })
   channel: Channel;
 
@@ -189,7 +191,11 @@ export class ChannelInventory extends BaseEntity {
   }
 
   get hasDiscount(): boolean {
-    if (!this.discountPrice || !this.discountStartDate || !this.discountEndDate) {
+    if (
+      !this.discountPrice ||
+      !this.discountStartDate ||
+      !this.discountEndDate
+    ) {
       return false;
     }
     const now = new Date();
@@ -204,8 +210,10 @@ export class ChannelInventory extends BaseEntity {
   }
 
   get needsRebalancing(): boolean {
-    return this.allocationStrategy === AllocationStrategy.DYNAMIC && 
-           (this.isOutOfStock || this.isLowStock);
+    return (
+      this.allocationStrategy === AllocationStrategy.DYNAMIC &&
+      (this.isOutOfStock || this.isLowStock)
+    );
   }
 
   // Methods
@@ -214,7 +222,7 @@ export class ChannelInventory extends BaseEntity {
     this.allocatedQuantity = newQuantity;
     this.availableQuantity = Math.max(0, newQuantity - this.reservedQuantity);
     this.lastStockUpdateAt = new Date();
-    
+
     // Update status based on stock level
     if (this.isOutOfStock) {
       this.status = AllocationStatus.OUT_OF_STOCK;
@@ -226,7 +234,10 @@ export class ChannelInventory extends BaseEntity {
   reserve(quantity: number): boolean {
     if (this.actualAvailable >= quantity) {
       this.reservedQuantity += quantity;
-      this.availableQuantity = Math.max(0, this.allocatedQuantity - this.reservedQuantity);
+      this.availableQuantity = Math.max(
+        0,
+        this.allocatedQuantity - this.reservedQuantity,
+      );
       return true;
     }
     return false;
@@ -234,31 +245,36 @@ export class ChannelInventory extends BaseEntity {
 
   releaseReservation(quantity: number): void {
     this.reservedQuantity = Math.max(0, this.reservedQuantity - quantity);
-    this.availableQuantity = Math.max(0, this.allocatedQuantity - this.reservedQuantity);
+    this.availableQuantity = Math.max(
+      0,
+      this.allocatedQuantity - this.reservedQuantity,
+    );
   }
 
   calculateAllocation(totalStock: number): number {
     switch (this.allocationStrategy) {
       case AllocationStrategy.PERCENTAGE:
         return Math.floor(totalStock * (this.allocationValue / 100));
-      
+
       case AllocationStrategy.FIXED_AMOUNT:
         return Math.min(this.allocationValue, totalStock);
-      
+
       case AllocationStrategy.DYNAMIC:
         // Dynamic allocation based on sales velocity and other factors
-        const baseAllocation = Math.floor(totalStock * (this.allocationValue / 100));
+        const baseAllocation = Math.floor(
+          totalStock * (this.allocationValue / 100),
+        );
         const salesVelocity = this.metrics?.totalSales || 0;
         const conversionRate = this.metrics?.conversionRate || 0;
-        
+
         // Adjust based on performance
         const performanceMultiplier = (salesVelocity * conversionRate) / 100;
         return Math.floor(baseAllocation * (1 + performanceMultiplier));
-      
+
       case AllocationStrategy.PRIORITY:
         // Will be calculated at service level considering all channels
         return this.allocatedQuantity;
-      
+
       default:
         return 0;
     }
@@ -280,17 +296,18 @@ export class ChannelInventory extends BaseEntity {
       totalRevenue: (this.metrics?.totalRevenue || 0) + amount,
       lastSaleAt: new Date().toISOString(),
     };
-    
+
     // Update average order value
     if (this.metrics.totalSales > 0) {
-      this.metrics.averageOrderValue = this.metrics.totalRevenue / this.metrics.totalSales;
+      this.metrics.averageOrderValue =
+        this.metrics.totalRevenue / this.metrics.totalSales;
     }
   }
 
   updateSyncStatus(status: string, error?: string): void {
     this.syncStatus = status as any;
     this.lastSyncAt = new Date();
-    
+
     if (error) {
       this.syncError = error;
       this.syncRetryCount += 1;

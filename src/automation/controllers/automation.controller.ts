@@ -88,7 +88,8 @@ export class AutomationController {
   @Post('reorder-rules')
   @ApiOperation({
     summary: 'Create new reorder rule',
-    description: 'Create a new automated reorder rule for a product and location',
+    description:
+      'Create a new automated reorder rule for a product and location',
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -117,16 +118,21 @@ export class AutomationController {
       );
     } catch (error) {
       if (error.message.includes('already exists')) {
-        throw new ConflictException('Reorder rule already exists for this product/location combination');
+        throw new ConflictException(
+          'Reorder rule already exists for this product/location combination',
+        );
       }
-      throw new BadRequestException(`Failed to create reorder rule: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create reorder rule: ${error.message}`,
+      );
     }
   }
 
   @Get('reorder-rules')
   @ApiOperation({
     summary: 'Get reorder rules',
-    description: 'Retrieve reorder rules with filtering, sorting, and pagination',
+    description:
+      'Retrieve reorder rules with filtering, sorting, and pagination',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -144,11 +150,14 @@ export class AutomationController {
     limit: number;
     totalPages: number;
   }> {
-    const rules = await this.reorderCalculationService.findReorderRules(req.user.tenantId, query);
+    const rules = await this.reorderCalculationService.findReorderRules(
+      req.user.tenantId,
+      query,
+    );
     const total = rules.length; // In a real implementation, this would be a separate count query
     const page = query.page || 1;
     const limit = query.limit || 20;
-    
+
     return {
       data: rules,
       total,
@@ -161,7 +170,8 @@ export class AutomationController {
   @Get('reorder-rules/:id')
   @ApiOperation({
     summary: 'Get reorder rule by ID',
-    description: 'Retrieve a specific reorder rule with its details and execution history',
+    description:
+      'Retrieve a specific reorder rule with its details and execution history',
   })
   @ApiParam({
     name: 'id',
@@ -183,7 +193,10 @@ export class AutomationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
   ): Promise<ReorderRule> {
-    const rule = await this.reorderCalculationService.findReorderRuleById(req.user.tenantId, id);
+    const rule = await this.reorderCalculationService.findReorderRuleById(
+      req.user.tenantId,
+      id,
+    );
     if (!rule) {
       throw new NotFoundException(`Reorder rule with ID ${id} not found`);
     }
@@ -228,7 +241,9 @@ export class AutomationController {
       if (error.message.includes('not found')) {
         throw new NotFoundException(`Reorder rule with ID ${id} not found`);
       }
-      throw new BadRequestException(`Failed to update reorder rule: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update reorder rule: ${error.message}`,
+      );
     }
   }
 
@@ -259,12 +274,18 @@ export class AutomationController {
     @CurrentUser() user: User,
   ): Promise<void> {
     try {
-      await this.reorderCalculationService.deleteReorderRule(req.user.tenantId, id, user.id);
+      await this.reorderCalculationService.deleteReorderRule(
+        req.user.tenantId,
+        id,
+        user.id,
+      );
     } catch (error) {
       if (error.message.includes('not found')) {
         throw new NotFoundException(`Reorder rule with ID ${id} not found`);
       }
-      throw new BadRequestException(`Failed to delete reorder rule: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to delete reorder rule: ${error.message}`,
+      );
     }
   }
 
@@ -321,13 +342,18 @@ export class AutomationController {
     @Request() req: any,
     @CurrentUser() user: User,
   ): Promise<ReorderRule> {
-    return this.reorderCalculationService.resumeReorderRule(req.user.tenantId, id, user.id);
+    return this.reorderCalculationService.resumeReorderRule(
+      req.user.tenantId,
+      id,
+      user.id,
+    );
   }
 
   @Post('reorder-rules/:id/test')
   @ApiOperation({
     summary: 'Test reorder rule',
-    description: 'Test a reorder rule execution without creating actual purchase order',
+    description:
+      'Test a reorder rule execution without creating actual purchase order',
   })
   @ApiParam({
     name: 'id',
@@ -362,7 +388,8 @@ export class AutomationController {
   @Post('reorder-rules/bulk-action')
   @ApiOperation({
     summary: 'Bulk action on reorder rules',
-    description: 'Perform bulk actions (activate, deactivate, pause, resume, delete, test) on multiple reorder rules',
+    description:
+      'Perform bulk actions (activate, deactivate, pause, resume, delete, test) on multiple reorder rules',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -436,11 +463,14 @@ export class AutomationController {
     limit: number;
     totalPages: number;
   }> {
-    const schedules = await this.automationRuleEngine.findAutomationSchedules(req.user.tenantId, query);
+    const schedules = await this.automationRuleEngine.findAutomationSchedules(
+      req.user.tenantId,
+      query,
+    );
     const total = schedules.length;
     const page = query.page || 1;
     const limit = query.limit || 20;
-    
+
     return {
       data: schedules,
       total,
@@ -453,7 +483,8 @@ export class AutomationController {
   @Get('schedules/:id')
   @ApiOperation({
     summary: 'Get automation schedule by ID',
-    description: 'Retrieve a specific automation schedule with execution history',
+    description:
+      'Retrieve a specific automation schedule with execution history',
   })
   @ApiParam({
     name: 'id',
@@ -476,7 +507,9 @@ export class AutomationController {
       id,
     );
     if (!schedule) {
-      throw new NotFoundException(`Automation schedule with ID ${id} not found`);
+      throw new NotFoundException(
+        `Automation schedule with ID ${id} not found`,
+      );
     }
     return schedule;
   }
@@ -534,7 +567,11 @@ export class AutomationController {
     @Request() req: any,
     @CurrentUser() user: User,
   ): Promise<void> {
-    await this.automationRuleEngine.deleteAutomationSchedule(req.user.tenantId, id, user.id);
+    await this.automationRuleEngine.deleteAutomationSchedule(
+      req.user.tenantId,
+      id,
+      user.id,
+    );
   }
 
   @Patch('schedules/:id/pause')
@@ -590,7 +627,11 @@ export class AutomationController {
     @Request() req: any,
     @CurrentUser() user: User,
   ): Promise<AutomationSchedule> {
-    return this.automationRuleEngine.resumeAutomationSchedule(req.user.tenantId, id, user.id);
+    return this.automationRuleEngine.resumeAutomationSchedule(
+      req.user.tenantId,
+      id,
+      user.id,
+    );
   }
 
   @Post('schedules/:id/execute')
@@ -614,7 +655,11 @@ export class AutomationController {
     @Body() executeDto: ExecuteScheduleDto,
     @Request() req: any,
   ): Promise<{ success: boolean; message: string; jobId?: string }> {
-    return this.automationRuleEngine.executeAutomationSchedule(req.user.tenantId, id, executeDto);
+    return this.automationRuleEngine.executeAutomationSchedule(
+      req.user.tenantId,
+      id,
+      executeDto,
+    );
   }
 
   @Post('schedules/bulk-action')
@@ -673,11 +718,15 @@ export class AutomationController {
     limit: number;
     totalPages: number;
   }> {
-    const executions = await this.automationRuleEngine.getScheduleExecutions(req.user.tenantId, id, query);
+    const executions = await this.automationRuleEngine.getScheduleExecutions(
+      req.user.tenantId,
+      id,
+      query,
+    );
     const total = executions.length;
     const page = query.page || 1;
     const limit = query.limit || 20;
-    
+
     return {
       data: executions,
       total,
@@ -694,7 +743,8 @@ export class AutomationController {
   @Post('execute/single')
   @ApiOperation({
     summary: 'Execute automated purchase',
-    description: 'Execute automated purchasing for a single reorder rule or product',
+    description:
+      'Execute automated purchasing for a single reorder rule or product',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -715,7 +765,8 @@ export class AutomationController {
   @Post('execute/bulk')
   @ApiOperation({
     summary: 'Execute bulk automated purchase',
-    description: 'Execute automated purchasing for multiple reorder rules or products',
+    description:
+      'Execute automated purchasing for multiple reorder rules or products',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -757,7 +808,9 @@ export class AutomationController {
       },
       budgetConstraints: {
         dailyLimit: processDto.budgetConstraint,
-        monthlyLimit: processDto.budgetConstraint ? processDto.budgetConstraint * 30 : undefined,
+        monthlyLimit: processDto.budgetConstraint
+          ? processDto.budgetConstraint * 30
+          : undefined,
       },
       systemLoad: {
         cpuUsage: 50,
@@ -765,8 +818,11 @@ export class AutomationController {
         activeJobs: 5,
       },
     };
-    
-    return this.automationRuleEngine.processAutomationRules(req.user.tenantId, context);
+
+    return this.automationRuleEngine.processAutomationRules(
+      req.user.tenantId,
+      context,
+    );
   }
 
   @Get('eligible-rules')
@@ -781,7 +837,9 @@ export class AutomationController {
   })
   @RequirePermissions('automation:rules:read')
   async getEligibleReorderRules(@Request() req: any): Promise<ReorderRule[]> {
-    return this.automatedPurchasingService.getEligibleReorderRulesForExecution(req.user.tenantId);
+    return this.automatedPurchasingService.getEligibleReorderRulesForExecution(
+      req.user.tenantId,
+    );
   }
 
   // =============================================
@@ -867,7 +925,10 @@ export class AutomationController {
       }>;
     };
   }> {
-    return this.reorderCalculationService.getReorderRuleMetrics(req.user.tenantId, id);
+    return this.reorderCalculationService.getReorderRuleMetrics(
+      req.user.tenantId,
+      id,
+    );
   }
 
   @Get('health')
@@ -945,13 +1006,17 @@ export class AutomationController {
       recommendations: string[];
     };
   }> {
-    return this.reorderCalculationService.debugReorderRule(req.user.tenantId, id);
+    return this.reorderCalculationService.debugReorderRule(
+      req.user.tenantId,
+      id,
+    );
   }
 
   @Post('debug/simulate/:id')
   @ApiOperation({
     summary: 'Simulate reorder rule execution',
-    description: 'Simulate the execution of a reorder rule with detailed step-by-step information',
+    description:
+      'Simulate the execution of a reorder rule with detailed step-by-step information',
   })
   @ApiParam({
     name: 'id',

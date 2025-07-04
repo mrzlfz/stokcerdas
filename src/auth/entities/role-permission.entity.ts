@@ -28,7 +28,7 @@ export class RolePermission {
   @Exclude({ toPlainOnly: true })
   permissionId: string;
 
-  @ManyToOne(() => Permission, (permission) => permission.rolePermissions, {
+  @ManyToOne(() => Permission, permission => permission.rolePermissions, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'permission_id' })

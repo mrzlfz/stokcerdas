@@ -29,6 +29,10 @@ import { OrdersModule } from './orders/orders.module';
 import { ChannelsModule } from './channels/channels.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { AutomationModule } from './automation/automation.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ComplianceModule } from './compliance/compliance.module';
+import { ShippingModule } from './shipping/shipping.module';
 
 // Common modules
 import { DatabaseModule } from './database/database.module';
@@ -132,7 +136,11 @@ import { CommonModule } from './common/common.module';
     AutomationModule,
     ReportsModule,
     AlertsModule,
-    MLForecastingModule,
+    MLForecastingModule, // Re-enabled - no circular dependencies found
+    AnalyticsModule, // Re-enabled - duplicate service provision fixed  
+    NotificationsModule,
+    ComplianceModule, // Re-enabled - EnterprisePermissionsGuard service layer fixes 
+    ShippingModule, // Re-enabled with forwardRef() fixes
   ],
   controllers: [AppController],
   providers: [AppService],

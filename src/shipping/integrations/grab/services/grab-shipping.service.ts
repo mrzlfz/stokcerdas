@@ -1,17 +1,37 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { ShippingLabel, ShippingServiceType, ShippingLabelStatus } from '../../../entities/shipping-label.entity';
-import { ShippingTracking, TrackingStatus } from '../../../entities/shipping-tracking.entity';
+import {
+  ShippingLabel,
+  ShippingServiceType,
+  ShippingLabelStatus,
+} from '../../../entities/shipping-label.entity';
+import {
+  ShippingTracking,
+  TrackingStatus,
+} from '../../../entities/shipping-tracking.entity';
 import { ShippingRate, RateType } from '../../../entities/shipping-rate.entity';
 
 // Services
-import { GrabApiService, GrabCredentials, GrabDeliveryRequest, GrabQuoteRequest } from './grab-api.service';
+import {
+  GrabApiService,
+  GrabCredentials,
+  GrabDeliveryRequest,
+  GrabQuoteRequest,
+} from './grab-api.service';
 import { IntegrationLogService } from '../../../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../../../integrations/entities/integration-log.entity';
 
 // Interfaces
 export interface GrabShippingQuote {
@@ -122,7 +142,9 @@ export class GrabShippingService {
   /**
    * Test Grab API connection
    */
-  async testConnection(tenantId: string): Promise<{ success: boolean; message: string }> {
+  async testConnection(
+    tenantId: string,
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const credentials = await this.getGrabCredentials(tenantId);
       const response = await this.grabApiService.testConnection(
@@ -145,8 +167,11 @@ export class GrabShippingService {
         throw new Error(response.error?.message || 'Connection test failed');
       }
     } catch (error) {
-      this.logger.error(`Grab connection test failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Grab connection test failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.log({
         tenantId,
         type: IntegrationLogType.INSTANT_DELIVERY,
@@ -172,7 +197,7 @@ export class GrabShippingService {
         dimensions: { length: number; width: number; height: number };
       }>;
       serviceTypes?: string[];
-    }
+    },
   ): Promise<GrabShippingQuote[]> {
     try {
       this.logger.debug(`Getting Grab shipping quotes for tenant ${tenantId}`);
@@ -181,7 +206,11 @@ export class GrabShippingService {
       const quotes: GrabShippingQuote[] = [];
 
       // Get quotes for different service types
-      const serviceTypes = request.serviceTypes || ['instant', 'same_day', 'express'];
+      const serviceTypes = request.serviceTypes || [
+        'instant',
+        'same_day',
+        'express',
+      ];
 
       for (const serviceType of serviceTypes) {
         try {
@@ -201,10 +230,16 @@ export class GrabShippingService {
 
           if (response.success && response.data?.quotes) {
             for (const quoteData of response.data.quotes) {
-              const estimatedPickupTime = new Date(quoteData.estimatedPickupTime);
-              const estimatedDeliveryTime = new Date(quoteData.estimatedDeliveryTime);
+              const estimatedPickupTime = new Date(
+                quoteData.estimatedPickupTime,
+              );
+              const estimatedDeliveryTime = new Date(
+                quoteData.estimatedDeliveryTime,
+              );
               const estimatedMinutes = Math.round(
-                (estimatedDeliveryTime.getTime() - estimatedPickupTime.getTime()) / (1000 * 60)
+                (estimatedDeliveryTime.getTime() -
+                  estimatedPickupTime.getTime()) /
+                  (1000 * 60),
               );
 
               const quote: GrabShippingQuote = {
@@ -212,7 +247,8 @@ export class GrabShippingService {
                 carrierName: 'Grab',
                 serviceCode: serviceType.toUpperCase(),
                 serviceName: this.getServiceName(serviceType),
-                serviceType: this.mapServiceTypeToShippingServiceType(serviceType),
+                serviceType:
+                  this.mapServiceTypeToShippingServiceType(serviceType),
                 cost: {
                   baseCost: quoteData.amount,
                   serviceFee: Math.round(quoteData.amount * 0.1), // Estimate 10% service fee
@@ -237,7 +273,9 @@ export class GrabShippingService {
             }
           }
         } catch (serviceError) {
-          this.logger.warn(`Failed to get quote for service type ${serviceType}: ${serviceError.message}`);
+          this.logger.warn(
+            `Failed to get quote for service type ${serviceType}: ${serviceError.message}`,
+          );
         }
       }
 
@@ -246,9 +284,11 @@ export class GrabShippingService {
 
       this.logger.debug(`Found ${quotes.length} Grab shipping quotes`);
       return quotes;
-
     } catch (error) {
-      this.logger.error(`Failed to get Grab shipping quotes: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Grab shipping quotes: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -258,7 +298,7 @@ export class GrabShippingService {
    */
   async createShipment(
     tenantId: string,
-    request: GrabShipmentRequest
+    request: GrabShipmentRequest,
   ): Promise<ShippingLabel> {
     try {
       this.logger.debug(`Creating Grab shipment for order ${request.orderId}`);
@@ -272,9 +312,11 @@ export class GrabShippingService {
         destination: request.destination,
         packages: request.packages,
         paymentMethod: request.paymentMethod,
-        cashOnDelivery: request.codAmount ? {
-          amount: request.codAmount,
-        } : undefined,
+        cashOnDelivery: request.codAmount
+          ? {
+              amount: request.codAmount,
+            }
+          : undefined,
         scheduledAt: request.scheduledAt?.toISOString(),
         specialRequests: request.specialRequests,
       };
@@ -289,7 +331,7 @@ export class GrabShippingService {
 
       if (!response.success || !response.data) {
         throw new BadRequestException(
-          response.error?.message || 'Failed to create Grab delivery'
+          response.error?.message || 'Failed to create Grab delivery',
         );
       }
 
@@ -299,7 +341,9 @@ export class GrabShippingService {
       shippingLabel.orderId = request.orderId;
       shippingLabel.carrierId = 'grab';
       shippingLabel.carrierName = 'Grab';
-      shippingLabel.serviceType = this.mapServiceTypeToShippingServiceType(request.serviceType);
+      shippingLabel.serviceType = this.mapServiceTypeToShippingServiceType(
+        request.serviceType,
+      );
       shippingLabel.serviceCode = request.serviceType.toUpperCase();
       shippingLabel.serviceName = this.getServiceName(request.serviceType);
       shippingLabel.status = ShippingLabelStatus.GENERATED;
@@ -338,9 +382,18 @@ export class GrabShippingService {
       };
 
       // Set package info (combine all packages)
-      const totalWeight = request.packages.reduce((sum, pkg) => sum + pkg.weight, 0);
-      const totalValue = request.packages.reduce((sum, pkg) => sum + pkg.value, 0);
-      const totalQuantity = request.packages.reduce((sum, pkg) => sum + pkg.quantity, 0);
+      const totalWeight = request.packages.reduce(
+        (sum, pkg) => sum + pkg.weight,
+        0,
+      );
+      const totalValue = request.packages.reduce(
+        (sum, pkg) => sum + pkg.value,
+        0,
+      );
+      const totalQuantity = request.packages.reduce(
+        (sum, pkg) => sum + pkg.quantity,
+        0,
+      );
 
       shippingLabel.packageInfo = {
         weight: totalWeight,
@@ -411,9 +464,11 @@ export class GrabShippingService {
       });
 
       return savedLabel;
-
     } catch (error) {
-      this.logger.error(`Failed to create Grab shipment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create Grab shipment: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -426,14 +481,16 @@ export class GrabShippingService {
       this.logger.debug(`Updating Grab tracking for ${deliveryId}`);
 
       const credentials = await this.getGrabCredentials(tenantId);
-      
+
       // Find shipping label
       const shippingLabel = await this.shippingLabelRepository.findOne({
         where: { tenantId, trackingNumber: deliveryId, carrierId: 'grab' },
       });
 
       if (!shippingLabel) {
-        throw new NotFoundException(`Shipping label not found for delivery ID: ${deliveryId}`);
+        throw new NotFoundException(
+          `Shipping label not found for delivery ID: ${deliveryId}`,
+        );
       }
 
       // Get tracking info from Grab
@@ -445,10 +502,14 @@ export class GrabShippingService {
       );
 
       if (!response.success || !response.data) {
-        throw new Error(response.error?.message || 'Failed to get Grab tracking info');
+        throw new Error(
+          response.error?.message || 'Failed to get Grab tracking info',
+        );
       }
 
-      const trackingData = this.grabApiService.formatTrackingData(response.data);
+      const trackingData = this.grabApiService.formatTrackingData(
+        response.data,
+      );
 
       // Update shipping label with latest info
       if (trackingData.driverInfo) {
@@ -468,7 +529,9 @@ export class GrabShippingService {
       }
 
       // Update status if needed
-      const latestStatus = this.mapGrabStatusToLabelStatus(response.data.status);
+      const latestStatus = this.mapGrabStatusToLabelStatus(
+        response.data.status,
+      );
       if (latestStatus !== shippingLabel.status) {
         shippingLabel.updateStatus(latestStatus, undefined);
       }
@@ -479,14 +542,15 @@ export class GrabShippingService {
       if (trackingData.timeline && trackingData.timeline.length > 0) {
         for (const event of trackingData.timeline) {
           // Check if this event already exists
-          const existingTracking = await this.shippingTrackingRepository.findOne({
-            where: {
-              tenantId,
-              trackingNumber: deliveryId,
-              eventTime: new Date(event.timestamp),
-              description: event.description,
-            },
-          });
+          const existingTracking =
+            await this.shippingTrackingRepository.findOne({
+              where: {
+                tenantId,
+                trackingNumber: deliveryId,
+                eventTime: new Date(event.timestamp),
+                description: event.description,
+              },
+            });
 
           if (!existingTracking) {
             await this.createTrackingEntry(tenantId, {
@@ -511,9 +575,11 @@ export class GrabShippingService {
         shippingLabel,
         trackingData,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to update Grab tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update Grab tracking: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -524,20 +590,22 @@ export class GrabShippingService {
   async cancelDelivery(
     tenantId: string,
     deliveryId: string,
-    reason: string
+    reason: string,
   ): Promise<void> {
     try {
       this.logger.debug(`Cancelling Grab delivery ${deliveryId}`);
 
       const credentials = await this.getGrabCredentials(tenantId);
-      
+
       // Find shipping label
       const shippingLabel = await this.shippingLabelRepository.findOne({
         where: { tenantId, trackingNumber: deliveryId, carrierId: 'grab' },
       });
 
       if (!shippingLabel) {
-        throw new NotFoundException(`Shipping label not found for delivery ID: ${deliveryId}`);
+        throw new NotFoundException(
+          `Shipping label not found for delivery ID: ${deliveryId}`,
+        );
       }
 
       // Cancel with Grab
@@ -551,7 +619,7 @@ export class GrabShippingService {
 
       if (!response.success) {
         throw new BadRequestException(
-          response.error?.message || 'Failed to cancel Grab delivery'
+          response.error?.message || 'Failed to cancel Grab delivery',
         );
       }
 
@@ -586,24 +654,29 @@ export class GrabShippingService {
         reason,
         cancellationFee: response.data?.cancellationFee,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to cancel Grab delivery: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel Grab delivery: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   // Private helper methods
 
-  private async createTrackingEntry(tenantId: string, data: {
-    shippingLabelId: string;
-    trackingNumber: string;
-    status: TrackingStatus | string;
-    description: string;
-    location?: any;
-    eventTime: Date;
-    additionalData?: any;
-  }): Promise<ShippingTracking> {
+  private async createTrackingEntry(
+    tenantId: string,
+    data: {
+      shippingLabelId: string;
+      trackingNumber: string;
+      status: TrackingStatus | string;
+      description: string;
+      location?: any;
+      eventTime: Date;
+      additionalData?: any;
+    },
+  ): Promise<ShippingTracking> {
     // Get sequence number
     const lastTracking = await this.shippingTrackingRepository.findOne({
       where: { tenantId, trackingNumber: data.trackingNumber },
@@ -635,7 +708,9 @@ export class GrabShippingService {
     return serviceNames[serviceType] || `Grab ${serviceType}`;
   }
 
-  private mapServiceTypeToShippingServiceType(serviceType: string): ShippingServiceType {
+  private mapServiceTypeToShippingServiceType(
+    serviceType: string,
+  ): ShippingServiceType {
     const mapping = {
       instant: ShippingServiceType.INSTANT,
       same_day: ShippingServiceType.SAME_DAY,
@@ -654,6 +729,8 @@ export class GrabShippingService {
       CANCELLED: ShippingLabelStatus.CANCELLED,
       FAILED: ShippingLabelStatus.CANCELLED,
     };
-    return statusMapping[grabStatus.toUpperCase()] || ShippingLabelStatus.GENERATED;
+    return (
+      statusMapping[grabStatus.toUpperCase()] || ShippingLabelStatus.GENERATED
+    );
   }
 }

@@ -49,10 +49,10 @@ export enum BusinessType {
 }
 
 export enum CompanySize {
-  MICRO = 'micro',         // < 10 employees
-  SMALL = 'small',         // 10-50 employees
-  MEDIUM = 'medium',       // 51-250 employees
-  LARGE = 'large',         // > 250 employees
+  MICRO = 'micro', // < 10 employees
+  SMALL = 'small', // 10-50 employees
+  MEDIUM = 'medium', // 51-250 employees
+  LARGE = 'large', // > 250 employees
 }
 
 @Entity('companies')
@@ -222,16 +222,40 @@ export class Company extends AuditableEntity {
   @Column({ name: 'currency', length: 3, default: 'IDR' })
   currency: string;
 
-  @Column({ name: 'initial_capital', type: 'decimal', precision: 20, scale: 2, nullable: true })
+  @Column({
+    name: 'initial_capital',
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    nullable: true,
+  })
   initialCapital: number;
 
-  @Column({ name: 'paid_up_capital', type: 'decimal', precision: 20, scale: 2, nullable: true })
+  @Column({
+    name: 'paid_up_capital',
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    nullable: true,
+  })
   paidUpCapital: number;
 
-  @Column({ name: 'authorized_capital', type: 'decimal', precision: 20, scale: 2, nullable: true })
+  @Column({
+    name: 'authorized_capital',
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    nullable: true,
+  })
   authorizedCapital: number;
 
-  @Column({ name: 'annual_revenue', type: 'decimal', precision: 20, scale: 2, nullable: true })
+  @Column({
+    name: 'annual_revenue',
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    nullable: true,
+  })
   annualRevenue: number;
 
   @Column({ name: 'fiscal_year_start', type: 'integer', default: 1 })
@@ -247,10 +271,18 @@ export class Company extends AuditableEntity {
   @Column({ name: 'is_holding_company', type: 'boolean', default: false })
   isHoldingCompany: boolean;
 
-  @Column({ name: 'allows_inter_company_transfers', type: 'boolean', default: true })
+  @Column({
+    name: 'allows_inter_company_transfers',
+    type: 'boolean',
+    default: true,
+  })
   allowsInterCompanyTransfers: boolean;
 
-  @Column({ name: 'requires_approval_for_transfers', type: 'boolean', default: true })
+  @Column({
+    name: 'requires_approval_for_transfers',
+    type: 'boolean',
+    default: true,
+  })
   requiresApprovalForTransfers: boolean;
 
   @Column({ name: 'consolidation_enabled', type: 'boolean', default: true })
@@ -449,7 +481,9 @@ export class Company extends AuditableEntity {
     return this.displayName || this.name;
   }
 
-  getBusinessHoursForDay(day: string): { open: string; close: string; isOpen: boolean } | null {
+  getBusinessHoursForDay(
+    day: string,
+  ): { open: string; close: string; isOpen: boolean } | null {
     return this.businessHours?.[day.toLowerCase()] || null;
   }
 
@@ -462,7 +496,10 @@ export class Company extends AuditableEntity {
     return this.financialSettings?.approvalThresholds?.[type] || 0;
   }
 
-  requiresApprovalForAmount(amount: number, type: 'purchase' | 'expense' | 'transfer'): boolean {
+  requiresApprovalForAmount(
+    amount: number,
+    type: 'purchase' | 'expense' | 'transfer',
+  ): boolean {
     const threshold = this.getApprovalThreshold(type);
     return threshold > 0 && amount >= threshold;
   }
@@ -495,7 +532,7 @@ export class Company extends AuditableEntity {
 
   calculateCompanySize(): CompanySize {
     if (!this.employeeCount) return CompanySize.MICRO;
-    
+
     if (this.employeeCount < 10) return CompanySize.MICRO;
     if (this.employeeCount <= 50) return CompanySize.SMALL;
     if (this.employeeCount <= 250) return CompanySize.MEDIUM;
@@ -515,7 +552,9 @@ export class Company extends AuditableEntity {
     return this.path || this.code;
   }
 
-  updatePerformanceMetrics(metrics: Partial<Company['performanceMetrics']>): void {
+  updatePerformanceMetrics(
+    metrics: Partial<Company['performanceMetrics']>,
+  ): void {
     this.performanceMetrics = {
       ...this.performanceMetrics,
       ...metrics,
@@ -565,16 +604,19 @@ export class Company extends AuditableEntity {
 
   validateBusinessHours(): boolean {
     if (!this.businessHours) return true;
-    
+
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    
+
     for (const day in this.businessHours) {
       const hours = this.businessHours[day];
-      if (hours.isOpen && (!timeRegex.test(hours.open) || !timeRegex.test(hours.close))) {
+      if (
+        hours.isOpen &&
+        (!timeRegex.test(hours.open) || !timeRegex.test(hours.close))
+      ) {
         return false;
       }
     }
-    
+
     return true;
   }
 }

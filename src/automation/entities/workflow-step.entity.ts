@@ -1,4 +1,11 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { AuditableEntity } from '../../common/entities/base.entity';
 import { Workflow } from './workflow.entity';
 import { WorkflowStepExecution } from './workflow-execution.entity';
@@ -9,47 +16,47 @@ export enum WorkflowStepType {
   LOOP = 'loop',
   DELAY = 'delay',
   PARALLEL = 'parallel',
-  
+
   // Data operations
   DATA_TRANSFORM = 'data_transform',
   DATA_VALIDATION = 'data_validation',
   DATA_FILTER = 'data_filter',
   DATA_AGGREGATION = 'data_aggregation',
-  
+
   // Inventory operations
   UPDATE_INVENTORY = 'update_inventory',
   CREATE_ADJUSTMENT = 'create_adjustment',
   TRANSFER_STOCK = 'transfer_stock',
   CHECK_STOCK_LEVEL = 'check_stock_level',
-  
+
   // Purchase order operations
   CREATE_PURCHASE_ORDER = 'create_purchase_order',
   APPROVE_PURCHASE_ORDER = 'approve_purchase_order',
   SEND_PO_TO_SUPPLIER = 'send_po_to_supplier',
   UPDATE_PO_STATUS = 'update_po_status',
-  
+
   // Supplier operations
   EVALUATE_SUPPLIER = 'evaluate_supplier',
   SELECT_SUPPLIER = 'select_supplier',
   UPDATE_SUPPLIER_INFO = 'update_supplier_info',
   REQUEST_QUOTE = 'request_quote',
-  
+
   // Notification operations
   SEND_EMAIL = 'send_email',
   SEND_SMS = 'send_sms',
   SEND_ALERT = 'send_alert',
   SEND_WEBHOOK = 'send_webhook',
-  
+
   // Reporting operations
   GENERATE_REPORT = 'generate_report',
   EXPORT_DATA = 'export_data',
   SCHEDULE_REPORT = 'schedule_report',
-  
+
   // Integration operations
   API_CALL = 'api_call',
   DATABASE_QUERY = 'database_query',
   FILE_OPERATION = 'file_operation',
-  
+
   // Custom operations
   CUSTOM_SCRIPT = 'custom_script',
   CUSTOM_FUNCTION = 'custom_function',
@@ -133,7 +140,7 @@ export class WorkflowStep extends AuditableEntity {
       trueStepId?: string;
       falseStepId?: string;
     };
-    
+
     // Loop step configuration
     loop?: {
       type: 'for' | 'while' | 'foreach';
@@ -143,7 +150,7 @@ export class WorkflowStep extends AuditableEntity {
       breakCondition?: string;
       dataSource?: string;
     };
-    
+
     // Delay step configuration
     delay?: {
       duration: number; // in milliseconds
@@ -151,7 +158,7 @@ export class WorkflowStep extends AuditableEntity {
       dynamic?: boolean;
       delayExpression?: string;
     };
-    
+
     // Parallel step configuration
     parallel?: {
       steps: string[]; // Step IDs to execute in parallel
@@ -159,7 +166,7 @@ export class WorkflowStep extends AuditableEntity {
       continueOnFirstCompletion?: boolean;
       continueOnFirstFailure?: boolean;
     };
-    
+
     // Data transformation configuration
     dataTransform?: {
       operation: DataTransformOperation;
@@ -168,7 +175,7 @@ export class WorkflowStep extends AuditableEntity {
       transformFunction?: string;
       parameters?: Record<string, any>;
     };
-    
+
     // Inventory operation configuration
     inventoryOperation?: {
       productId?: string;
@@ -178,7 +185,7 @@ export class WorkflowStep extends AuditableEntity {
       reason?: string;
       transferToLocationId?: string;
     };
-    
+
     // Purchase order configuration
     purchaseOrderOperation?: {
       supplierId?: string;
@@ -189,7 +196,7 @@ export class WorkflowStep extends AuditableEntity {
       autoApprove?: boolean;
       deliveryDate?: string;
     };
-    
+
     // Notification configuration
     notification?: {
       recipients: string[];
@@ -199,7 +206,7 @@ export class WorkflowStep extends AuditableEntity {
       attachments?: string[];
       priority?: 'low' | 'normal' | 'high' | 'critical';
     };
-    
+
     // API call configuration
     apiCall?: {
       url: string;
@@ -213,7 +220,7 @@ export class WorkflowStep extends AuditableEntity {
       timeout?: number;
       retries?: number;
     };
-    
+
     // Database operation configuration
     databaseOperation?: {
       query: string;
@@ -221,7 +228,7 @@ export class WorkflowStep extends AuditableEntity {
       operation: 'select' | 'insert' | 'update' | 'delete';
       targetTable?: string;
     };
-    
+
     // File operation configuration
     fileOperation?: {
       operation: 'read' | 'write' | 'delete' | 'move' | 'copy';
@@ -230,7 +237,7 @@ export class WorkflowStep extends AuditableEntity {
       content?: string;
       encoding?: string;
     };
-    
+
     // Custom script configuration
     customScript?: {
       language: 'javascript' | 'python' | 'sql';
@@ -239,7 +246,7 @@ export class WorkflowStep extends AuditableEntity {
       timeout?: number;
       environment?: Record<string, string>;
     };
-    
+
     // Report generation configuration
     reportGeneration?: {
       reportType: string;
@@ -252,20 +259,30 @@ export class WorkflowStep extends AuditableEntity {
 
   // Input/Output Mapping
   @Column({ type: 'jsonb', nullable: true })
-  inputMapping?: Record<string, {
-    source: 'workflow_variable' | 'previous_step' | 'static_value' | 'user_input';
-    path?: string;
-    defaultValue?: any;
-    required?: boolean;
-    validation?: Record<string, any>;
-  }>;
+  inputMapping?: Record<
+    string,
+    {
+      source:
+        | 'workflow_variable'
+        | 'previous_step'
+        | 'static_value'
+        | 'user_input';
+      path?: string;
+      defaultValue?: any;
+      required?: boolean;
+      validation?: Record<string, any>;
+    }
+  >;
 
   @Column({ type: 'jsonb', nullable: true })
-  outputMapping?: Record<string, {
-    target: 'workflow_variable' | 'next_step' | 'workflow_output';
-    path?: string;
-    transform?: string;
-  }>;
+  outputMapping?: Record<
+    string,
+    {
+      target: 'workflow_variable' | 'next_step' | 'workflow_output';
+      path?: string;
+      transform?: string;
+    }
+  >;
 
   // Error Handling
   @Column({ type: 'jsonb', nullable: true })
@@ -376,22 +393,27 @@ export class WorkflowStep extends AuditableEntity {
   };
 
   // Relationships
-  @ManyToOne(() => Workflow, (workflow) => workflow.steps, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Workflow, workflow => workflow.steps, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workflowId' })
   workflow: Workflow;
 
-  @OneToMany(() => WorkflowStepExecution, (execution) => execution.step)
+  @OneToMany(() => WorkflowStepExecution, execution => execution.step)
   executions: WorkflowStepExecution[];
 
   // Business Logic Methods
   canExecute(workflowVariables?: Record<string, any>): boolean {
     if (!this.isActive) return false;
-    
+
     // Check execution conditions
     if (this.executionConditions && this.executionConditions.length > 0) {
-      return this.evaluateConditions(this.executionConditions, workflowVariables);
+      return this.evaluateConditions(
+        this.executionConditions,
+        workflowVariables,
+      );
     }
-    
+
     return true;
   }
 
@@ -405,27 +427,35 @@ export class WorkflowStep extends AuditableEntity {
     variables?: Record<string, any>,
   ): boolean {
     if (!conditions || conditions.length === 0) return true;
-    
+
     let result = true;
     let operator: 'AND' | 'OR' = 'AND';
-    
+
     for (const condition of conditions) {
       const fieldValue = this.getVariableValue(condition.field, variables);
-      const conditionResult = this.evaluateCondition(fieldValue, condition.operator, condition.value);
-      
+      const conditionResult = this.evaluateCondition(
+        fieldValue,
+        condition.operator,
+        condition.value,
+      );
+
       if (operator === 'AND') {
         result = result && conditionResult;
       } else {
         result = result || conditionResult;
       }
-      
+
       operator = condition.logicalOperator || 'AND';
     }
-    
+
     return result;
   }
 
-  private evaluateCondition(fieldValue: any, operator: ConditionOperator, expectedValue: any): boolean {
+  private evaluateCondition(
+    fieldValue: any,
+    operator: ConditionOperator,
+    expectedValue: any,
+  ): boolean {
     switch (operator) {
       case ConditionOperator.EQUALS:
         return fieldValue === expectedValue;
@@ -444,9 +474,13 @@ export class WorkflowStep extends AuditableEntity {
       case ConditionOperator.NOT_CONTAINS:
         return !String(fieldValue).includes(String(expectedValue));
       case ConditionOperator.IN:
-        return Array.isArray(expectedValue) && expectedValue.includes(fieldValue);
+        return (
+          Array.isArray(expectedValue) && expectedValue.includes(fieldValue)
+        );
       case ConditionOperator.NOT_IN:
-        return Array.isArray(expectedValue) && !expectedValue.includes(fieldValue);
+        return (
+          Array.isArray(expectedValue) && !expectedValue.includes(fieldValue)
+        );
       case ConditionOperator.IS_NULL:
         return fieldValue === null || fieldValue === undefined;
       case ConditionOperator.IS_NOT_NULL:
@@ -458,13 +492,16 @@ export class WorkflowStep extends AuditableEntity {
     }
   }
 
-  private getVariableValue(fieldPath: string, variables?: Record<string, any>): any {
+  private getVariableValue(
+    fieldPath: string,
+    variables?: Record<string, any>,
+  ): any {
     if (!variables) return undefined;
-    
+
     // Support nested field access with dot notation
     const keys = fieldPath.split('.');
     let value = variables;
-    
+
     for (const key of keys) {
       if (value && typeof value === 'object' && key in value) {
         value = value[key];
@@ -472,16 +509,21 @@ export class WorkflowStep extends AuditableEntity {
         return undefined;
       }
     }
-    
+
     return value;
   }
 
-  recordExecution(success: boolean, duration: number, result?: any, error?: string): void {
+  recordExecution(
+    success: boolean,
+    duration: number,
+    result?: any,
+    error?: string,
+  ): void {
     this.totalExecutions += 1;
     this.lastExecutionAt = new Date();
     this.lastExecutionDuration = duration;
     this.lastExecutionResult = result;
-    
+
     if (success) {
       this.successfulExecutions += 1;
       this.lastExecutionStatus = WorkflowStepStatus.COMPLETED;
@@ -490,41 +532,48 @@ export class WorkflowStep extends AuditableEntity {
       this.lastExecutionStatus = WorkflowStepStatus.FAILED;
       this.lastErrorMessage = error;
     }
-    
+
     // Update success rate
-    this.successRate = this.totalExecutions > 0 ? 
-      (this.successfulExecutions / this.totalExecutions) : 0;
-    
+    this.successRate =
+      this.totalExecutions > 0
+        ? this.successfulExecutions / this.totalExecutions
+        : 0;
+
     // Update average execution time
-    const totalTime = ((this.averageExecutionTime || 0) * (this.totalExecutions - 1)) + (duration / 1000);
+    const totalTime =
+      (this.averageExecutionTime || 0) * (this.totalExecutions - 1) +
+      duration / 1000;
     this.averageExecutionTime = totalTime / this.totalExecutions;
   }
 
   getNextStepId(result?: any): string | null {
     // For condition steps, determine next step based on result
-    if (this.stepType === WorkflowStepType.CONDITION && this.stepConfig?.condition) {
+    if (
+      this.stepType === WorkflowStepType.CONDITION &&
+      this.stepConfig?.condition
+    ) {
       const conditionResult = result?.conditionResult || false;
-      return conditionResult ? 
-        this.stepConfig.condition.trueStepId || null :
-        this.stepConfig.condition.falseStepId || null;
+      return conditionResult
+        ? this.stepConfig.condition.trueStepId || null
+        : this.stepConfig.condition.falseStepId || null;
     }
-    
+
     // For other steps, execution continues to next step in order
     return null;
   }
 
   validateConfiguration(): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
+
     // Validate basic required fields
     if (!this.name || this.name.trim().length === 0) {
       errors.push('Nama step tidak boleh kosong');
     }
-    
+
     if (this.executionOrder < 0) {
       errors.push('Execution order harus >= 0');
     }
-    
+
     // Validate step-specific configuration
     switch (this.stepType) {
       case WorkflowStepType.CONDITION:
@@ -532,31 +581,34 @@ export class WorkflowStep extends AuditableEntity {
           errors.push('Condition field diperlukan untuk condition step');
         }
         break;
-        
+
       case WorkflowStepType.API_CALL:
         if (!this.stepConfig?.apiCall?.url) {
           errors.push('URL diperlukan untuk API call step');
         }
         break;
-        
+
       case WorkflowStepType.SEND_EMAIL:
         if (!this.stepConfig?.notification?.recipients?.length) {
           errors.push('Recipients diperlukan untuk email step');
         }
         break;
-        
+
       case WorkflowStepType.DELAY:
-        if (!this.stepConfig?.delay?.duration || this.stepConfig.delay.duration <= 0) {
+        if (
+          !this.stepConfig?.delay?.duration ||
+          this.stepConfig.delay.duration <= 0
+        ) {
           errors.push('Duration harus > 0 untuk delay step');
         }
         break;
     }
-    
+
     // Validate timeout settings
     if (this.timeoutSeconds && this.timeoutSeconds <= 0) {
       errors.push('Timeout harus > 0 jika diset');
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,

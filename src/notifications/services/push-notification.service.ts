@@ -19,10 +19,10 @@ export class PushNotificationService {
 
   async sendPushNotification(options: PushNotificationOptions): Promise<void> {
     this.logger.log(`Sending push notification: ${options.title}`);
-    
+
     // TODO: Implement actual push notification sending
     // This could use Firebase Cloud Messaging (FCM), Apple Push Notification Service (APNs), etc.
-    
+
     // For now, just log the notification
     this.logger.debug('Push notification content:', {
       deviceToken: options.deviceToken.substring(0, 20) + '...',
@@ -33,10 +33,10 @@ export class PushNotificationService {
   }
 
   async sendBulkPushNotification(
-    notifications: PushNotificationOptions[]
+    notifications: PushNotificationOptions[],
   ): Promise<void> {
     this.logger.log(`Sending ${notifications.length} push notifications`);
-    
+
     for (const notification of notifications) {
       await this.sendPushNotification(notification);
     }
@@ -52,7 +52,10 @@ export class PushNotificationService {
     // TODO: Implement topic subscription
   }
 
-  async unsubscribeFromTopic(deviceToken: string, topic: string): Promise<void> {
+  async unsubscribeFromTopic(
+    deviceToken: string,
+    topic: string,
+  ): Promise<void> {
     this.logger.log(`Unsubscribing device from topic: ${topic}`);
     // TODO: Implement topic unsubscription
   }

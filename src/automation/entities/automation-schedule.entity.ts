@@ -1,4 +1,11 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { AuditableEntity } from '../../common/entities/base.entity';
 
 export enum ScheduleType {
@@ -238,7 +245,10 @@ export class AutomationSchedule extends AuditableEntity {
   }
 
   get shouldBePaused(): boolean {
-    if (this.pauseOnConsecutiveFailures && this.consecutiveFailures >= this.maxConsecutiveFailures) {
+    if (
+      this.pauseOnConsecutiveFailures &&
+      this.consecutiveFailures >= this.maxConsecutiveFailures
+    ) {
       return true;
     }
     return false;
@@ -253,32 +263,39 @@ export class AutomationSchedule extends AuditableEntity {
     // This would use a proper cron parser library
     // For now, simple implementation based on cron expression
     const now = new Date();
-    
+
     // Parse simple patterns
-    if (this.cronExpression === '0 * * * *') { // Every hour
+    if (this.cronExpression === '0 * * * *') {
+      // Every hour
       const next = new Date(now);
       next.setHours(next.getHours() + 1, 0, 0, 0);
       return next;
-    } else if (this.cronExpression === '0 0 * * *') { // Daily at midnight
+    } else if (this.cronExpression === '0 0 * * *') {
+      // Daily at midnight
       const next = new Date(now);
       next.setDate(next.getDate() + 1);
       next.setHours(0, 0, 0, 0);
       return next;
-    } else if (this.cronExpression === '0 0 * * 0') { // Weekly on Sunday
+    } else if (this.cronExpression === '0 0 * * 0') {
+      // Weekly on Sunday
       const next = new Date(now);
       const daysUntilSunday = (7 - next.getDay()) % 7;
       next.setDate(next.getDate() + (daysUntilSunday || 7));
       next.setHours(0, 0, 0, 0);
       return next;
     }
-    
+
     // Default to next hour
     const next = new Date(now);
     next.setHours(next.getHours() + 1, 0, 0, 0);
     return next;
   }
 
-  updateExecutionStats(executionTimeMs: number, success: boolean, errorMessage?: string): void {
+  updateExecutionStats(
+    executionTimeMs: number,
+    success: boolean,
+    errorMessage?: string,
+  ): void {
     this.totalExecutions += 1;
     this.lastExecutionTimeMs = executionTimeMs;
     this.lastExecution = new Date();
@@ -300,7 +317,9 @@ export class AutomationSchedule extends AuditableEntity {
     // Update average execution time
     if (this.averageExecutionTimeMs) {
       this.averageExecutionTimeMs = Math.round(
-        (this.averageExecutionTimeMs * (this.totalExecutions - 1) + executionTimeMs) / this.totalExecutions
+        (this.averageExecutionTimeMs * (this.totalExecutions - 1) +
+          executionTimeMs) /
+          this.totalExecutions,
       );
     } else {
       this.averageExecutionTimeMs = executionTimeMs;
@@ -308,7 +327,9 @@ export class AutomationSchedule extends AuditableEntity {
 
     // Check if should be paused due to consecutive failures
     if (this.shouldBePaused && this.isActive) {
-      this.pause(`Paused due to ${this.consecutiveFailures} consecutive failures`);
+      this.pause(
+        `Paused due to ${this.consecutiveFailures} consecutive failures`,
+      );
     }
 
     // Calculate next execution
@@ -359,7 +380,11 @@ export class AutomationSchedule extends AuditableEntity {
     return this.nextExecution <= new Date();
   }
 
-  recordExecution(success: boolean, executionTime: number, errorMessage?: string): void {
+  recordExecution(
+    success: boolean,
+    executionTime: number,
+    errorMessage?: string,
+  ): void {
     this.totalExecutions += 1;
     this.lastExecution = new Date();
     this.averageExecutionTimeMs = this.averageExecutionTimeMs
@@ -459,7 +484,12 @@ export class ScheduleExecution extends AuditableEntity {
   }
 
   get isCompleted(): boolean {
-    return [ExecutionStatus.SUCCESS, ExecutionStatus.FAILED, ExecutionStatus.TIMEOUT, ExecutionStatus.CANCELLED].includes(this.status);
+    return [
+      ExecutionStatus.SUCCESS,
+      ExecutionStatus.FAILED,
+      ExecutionStatus.TIMEOUT,
+      ExecutionStatus.CANCELLED,
+    ].includes(this.status);
   }
 
   get wasSuccessful(): boolean {

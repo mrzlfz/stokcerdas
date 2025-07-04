@@ -5,7 +5,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, IsNull, Not, In, QueryRunner } from 'typeorm';
+import {
+  Repository,
+  Like,
+  Between,
+  IsNull,
+  Not,
+  In,
+  QueryRunner,
+} from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
@@ -19,7 +27,10 @@ import {
   BulkDeleteSupplierDto,
   BulkSupplierResponseDto,
 } from '../dto/bulk-supplier.dto';
-import { AddSupplierNoteDto, UpdateSupplierPerformanceDto } from '../dto/supplier-note.dto';
+import {
+  AddSupplierNoteDto,
+  UpdateSupplierPerformanceDto,
+} from '../dto/supplier-note.dto';
 
 @Injectable()
 export class SuppliersService {
@@ -30,7 +41,11 @@ export class SuppliersService {
     private readonly supplierQueue: Queue,
   ) {}
 
-  async create(tenantId: string, createSupplierDto: CreateSupplierDto, userId?: string): Promise<Supplier> {
+  async create(
+    tenantId: string,
+    createSupplierDto: CreateSupplierDto,
+    userId?: string,
+  ): Promise<Supplier> {
     // Validasi kode supplier unik per tenant
     await this.validateCodeUnique(tenantId, createSupplierDto.code);
 
@@ -40,13 +55,24 @@ export class SuppliersService {
     }
 
     // Validasi kontrak
-    if (createSupplierDto.contractStartDate && createSupplierDto.contractEndDate) {
-      this.validateContractDates(createSupplierDto.contractStartDate, createSupplierDto.contractEndDate);
+    if (
+      createSupplierDto.contractStartDate &&
+      createSupplierDto.contractEndDate
+    ) {
+      this.validateContractDates(
+        createSupplierDto.contractStartDate,
+        createSupplierDto.contractEndDate,
+      );
     }
 
     // Validasi payment terms custom
-    if (createSupplierDto.paymentTerms === 'custom' && !createSupplierDto.customPaymentDays) {
-      throw new BadRequestException('Custom payment days wajib diisi untuk payment terms CUSTOM');
+    if (
+      createSupplierDto.paymentTerms === 'custom' &&
+      !createSupplierDto.customPaymentDays
+    ) {
+      throw new BadRequestException(
+        'Custom payment days wajib diisi untuk payment terms CUSTOM',
+      );
     }
 
     const supplier = this.supplierRepository.create({
@@ -75,7 +101,10 @@ export class SuppliersService {
     return savedSupplier;
   }
 
-  async findAll(tenantId: string, query: SupplierQueryDto): Promise<{
+  async findAll(
+    tenantId: string,
+    query: SupplierQueryDto,
+  ): Promise<{
     data: Supplier[];
     meta: {
       total: number;
@@ -118,7 +147,9 @@ export class SuppliersService {
 
     // Filter soft delete
     if (!includeDeleted) {
-      queryBuilder.andWhere('supplier.isDeleted = :isDeleted', { isDeleted: false });
+      queryBuilder.andWhere('supplier.isDeleted = :isDeleted', {
+        isDeleted: false,
+      });
     }
 
     // Search across multiple fields
@@ -132,7 +163,7 @@ export class SuppliersService {
           supplier.description ILIKE :search OR
           supplier.primaryContactName ILIKE :search OR
           supplier.primaryContactEmail ILIKE :search)`,
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -148,7 +179,9 @@ export class SuppliersService {
 
     // Payment terms filter
     if (paymentTerms) {
-      queryBuilder.andWhere('supplier.paymentTerms = :paymentTerms', { paymentTerms });
+      queryBuilder.andWhere('supplier.paymentTerms = :paymentTerms', {
+        paymentTerms,
+      });
     }
 
     // Currency filter
@@ -161,10 +194,14 @@ export class SuppliersService {
       queryBuilder.andWhere('supplier.city ILIKE :city', { city: `%${city}%` });
     }
     if (province) {
-      queryBuilder.andWhere('supplier.province ILIKE :province', { province: `%${province}%` });
+      queryBuilder.andWhere('supplier.province ILIKE :province', {
+        province: `%${province}%`,
+      });
     }
     if (country) {
-      queryBuilder.andWhere('supplier.country ILIKE :country', { country: `%${country}%` });
+      queryBuilder.andWhere('supplier.country ILIKE :country', {
+        country: `%${country}%`,
+      });
     }
 
     // Rating filters
@@ -177,7 +214,9 @@ export class SuppliersService {
 
     // Lead time filter
     if (maxLeadTime !== undefined) {
-      queryBuilder.andWhere('supplier.leadTimeDays <= :maxLeadTime', { maxLeadTime });
+      queryBuilder.andWhere('supplier.leadTimeDays <= :maxLeadTime', {
+        maxLeadTime,
+      });
     }
 
     // Contract active filter
@@ -186,12 +225,12 @@ export class SuppliersService {
         queryBuilder.andWhere(
           `(supplier.contractStartDate IS NULL OR supplier.contractStartDate <= :now) AND
            (supplier.contractEndDate IS NULL OR supplier.contractEndDate >= :now)`,
-          { now: new Date() }
+          { now: new Date() },
         );
       } else {
         queryBuilder.andWhere(
           `supplier.contractEndDate IS NOT NULL AND supplier.contractEndDate < :now`,
-          { now: new Date() }
+          { now: new Date() },
         );
       }
     }
@@ -264,13 +303,20 @@ export class SuppliersService {
     });
 
     if (!supplier) {
-      throw new NotFoundException(`Supplier dengan kode "${code}" tidak ditemukan`);
+      throw new NotFoundException(
+        `Supplier dengan kode "${code}" tidak ditemukan`,
+      );
     }
 
     return supplier;
   }
 
-  async update(tenantId: string, id: string, updateSupplierDto: UpdateSupplierDto, userId?: string): Promise<Supplier> {
+  async update(
+    tenantId: string,
+    id: string,
+    updateSupplierDto: UpdateSupplierDto,
+    userId?: string,
+  ): Promise<Supplier> {
     const supplier = await this.findOne(tenantId, id);
 
     // Validasi kode supplier jika berubah
@@ -284,18 +330,28 @@ export class SuppliersService {
     }
 
     // Validasi kontrak jika berubah
-    if (updateSupplierDto.contractStartDate || updateSupplierDto.contractEndDate) {
-      const startDate = updateSupplierDto.contractStartDate ?? supplier.contractStartDate;
-      const endDate = updateSupplierDto.contractEndDate ?? supplier.contractEndDate;
-      
+    if (
+      updateSupplierDto.contractStartDate ||
+      updateSupplierDto.contractEndDate
+    ) {
+      const startDate =
+        updateSupplierDto.contractStartDate ?? supplier.contractStartDate;
+      const endDate =
+        updateSupplierDto.contractEndDate ?? supplier.contractEndDate;
+
       if (startDate && endDate) {
         this.validateContractDates(startDate, endDate);
       }
     }
 
     // Validasi payment terms custom
-    if (updateSupplierDto.paymentTerms === 'custom' && !updateSupplierDto.customPaymentDays) {
-      throw new BadRequestException('Custom payment days wajib diisi untuk payment terms CUSTOM');
+    if (
+      updateSupplierDto.paymentTerms === 'custom' &&
+      !updateSupplierDto.customPaymentDays
+    ) {
+      throw new BadRequestException(
+        'Custom payment days wajib diisi untuk payment terms CUSTOM',
+      );
     }
 
     // Update timestamps
@@ -312,13 +368,18 @@ export class SuppliersService {
     return this.findOne(tenantId, id);
   }
 
-  async remove(tenantId: string, id: string, hardDelete: boolean = false, userId?: string): Promise<void> {
+  async remove(
+    tenantId: string,
+    id: string,
+    hardDelete: boolean = false,
+    userId?: string,
+  ): Promise<void> {
     const supplier = await this.findOne(tenantId, id);
 
     // Check if supplier has active products
     if (supplier.products && supplier.products.length > 0 && !hardDelete) {
       throw new BadRequestException(
-        'Tidak dapat menghapus supplier yang masih memiliki produk aktif. Gunakan hard delete jika yakin.'
+        'Tidak dapat menghapus supplier yang masih memiliki produk aktif. Gunakan hard delete jika yakin.',
       );
     }
 
@@ -341,36 +402,45 @@ export class SuppliersService {
     });
   }
 
-  async addNote(tenantId: string, id: string, addNoteDto: AddSupplierNoteDto, userId: string): Promise<Supplier> {
+  async addNote(
+    tenantId: string,
+    id: string,
+    addNoteDto: AddSupplierNoteDto,
+    userId: string,
+  ): Promise<Supplier> {
     const supplier = await this.findOne(tenantId, id);
-    
+
     supplier.addNote(addNoteDto.note, userId);
-    
+
     await this.supplierRepository.save(supplier);
-    
+
     return supplier;
   }
 
   async updatePerformance(
     tenantId: string,
     id: string,
-    performanceDto: UpdateSupplierPerformanceDto
+    performanceDto: UpdateSupplierPerformanceDto,
   ): Promise<Supplier> {
     const supplier = await this.findOne(tenantId, id);
-    
+
     supplier.updatePerformance({
       amount: performanceDto.amount,
       onTime: performanceDto.onTime,
       qualityScore: performanceDto.qualityScore,
       leadTime: performanceDto.leadTime,
     });
-    
+
     await this.supplierRepository.save(supplier);
-    
+
     return supplier;
   }
 
-  async bulkCreate(tenantId: string, bulkCreateDto: BulkCreateSupplierDto, userId?: string): Promise<BulkSupplierResponseDto> {
+  async bulkCreate(
+    tenantId: string,
+    bulkCreateDto: BulkCreateSupplierDto,
+    userId?: string,
+  ): Promise<BulkSupplierResponseDto> {
     const result: BulkSupplierResponseDto = {
       successful: 0,
       failed: 0,
@@ -378,19 +448,20 @@ export class SuppliersService {
       successfulIds: [],
     };
 
-    const queryRunner = this.supplierRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.supplierRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
 
     for (let i = 0; i < bulkCreateDto.suppliers.length; i++) {
       const supplierDto = bulkCreateDto.suppliers[i];
-      
+
       try {
         await queryRunner.startTransaction();
-        
+
         const supplier = await this.create(tenantId, supplierDto, userId);
         result.successful++;
         result.successfulIds.push(supplier.id);
-        
+
         await queryRunner.commitTransaction();
       } catch (error) {
         await queryRunner.rollbackTransaction();
@@ -407,7 +478,11 @@ export class SuppliersService {
     return result;
   }
 
-  async bulkUpdate(tenantId: string, bulkUpdateDto: BulkUpdateSupplierDto, userId?: string): Promise<BulkSupplierResponseDto> {
+  async bulkUpdate(
+    tenantId: string,
+    bulkUpdateDto: BulkUpdateSupplierDto,
+    userId?: string,
+  ): Promise<BulkSupplierResponseDto> {
     const result: BulkSupplierResponseDto = {
       successful: 0,
       failed: 0,
@@ -417,7 +492,12 @@ export class SuppliersService {
 
     for (const supplierId of bulkUpdateDto.supplierIds) {
       try {
-        await this.update(tenantId, supplierId, bulkUpdateDto.updateData, userId);
+        await this.update(
+          tenantId,
+          supplierId,
+          bulkUpdateDto.updateData,
+          userId,
+        );
         result.successful++;
         result.successfulIds.push(supplierId);
       } catch (error) {
@@ -432,7 +512,11 @@ export class SuppliersService {
     return result;
   }
 
-  async bulkDelete(tenantId: string, bulkDeleteDto: BulkDeleteSupplierDto, userId?: string): Promise<BulkSupplierResponseDto> {
+  async bulkDelete(
+    tenantId: string,
+    bulkDeleteDto: BulkDeleteSupplierDto,
+    userId?: string,
+  ): Promise<BulkSupplierResponseDto> {
     const result: BulkSupplierResponseDto = {
       successful: 0,
       failed: 0,
@@ -442,7 +526,12 @@ export class SuppliersService {
 
     for (const supplierId of bulkDeleteDto.supplierIds) {
       try {
-        await this.remove(tenantId, supplierId, bulkDeleteDto.hardDelete, userId);
+        await this.remove(
+          tenantId,
+          supplierId,
+          bulkDeleteDto.hardDelete,
+          userId,
+        );
         result.successful++;
         result.successfulIds.push(supplierId);
       } catch (error) {
@@ -495,7 +584,7 @@ export class SuppliersService {
     // Contracts expiring in next 30 days
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    
+
     const contractExpiring = await this.supplierRepository.count({
       where: {
         tenantId,
@@ -515,9 +604,13 @@ export class SuppliersService {
   }
 
   // Private helper methods
-  private async validateCodeUnique(tenantId: string, code: string, excludeId?: string): Promise<void> {
+  private async validateCodeUnique(
+    tenantId: string,
+    code: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, code, isDeleted: false };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -531,9 +624,13 @@ export class SuppliersService {
     }
   }
 
-  private async validateEmailUnique(tenantId: string, email: string, excludeId?: string): Promise<void> {
+  private async validateEmailUnique(
+    tenantId: string,
+    email: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, email, isDeleted: false };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -543,16 +640,20 @@ export class SuppliersService {
     });
 
     if (existingSupplier) {
-      throw new ConflictException(`Email "${email}" sudah digunakan oleh supplier lain`);
+      throw new ConflictException(
+        `Email "${email}" sudah digunakan oleh supplier lain`,
+      );
     }
   }
 
   private validateContractDates(startDate: Date, endDate: Date): void {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     if (start >= end) {
-      throw new BadRequestException('Tanggal mulai kontrak harus lebih awal dari tanggal akhir');
+      throw new BadRequestException(
+        'Tanggal mulai kontrak harus lebih awal dari tanggal akhir',
+      );
     }
   }
 }

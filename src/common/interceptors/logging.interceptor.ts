@@ -22,30 +22,27 @@ export class LoggingInterceptor implements NestInterceptor {
     const ip = headers['x-forwarded-for'] || request.connection.remoteAddress;
     const tenantId = headers['x-tenant-id'];
     const userId = (request as any).user?.id;
-    
+
     const startTime = Date.now();
     const requestId = headers['x-request-id'] || this.generateRequestId();
-    
+
     // Set request ID in response headers
     response.setHeader('x-request-id', requestId);
 
-    this.logger.log(
-      `→ ${method} ${url}`,
-      {
-        requestId,
-        tenantId,
-        userId,
-        ip,
-        userAgent,
-        query,
-        params,
-        body: this.sanitizeBody(body),
-      },
-    );
+    this.logger.log(`→ ${method} ${url}`, {
+      requestId,
+      tenantId,
+      userId,
+      ip,
+      userAgent,
+      query,
+      params,
+      body: this.sanitizeBody(body),
+    });
 
     return next.handle().pipe(
       tap(
-        (data) => {
+        data => {
           const duration = Date.now() - startTime;
           this.logger.log(
             `← ${method} ${url} ${response.statusCode} - ${duration}ms`,
@@ -59,19 +56,16 @@ export class LoggingInterceptor implements NestInterceptor {
             },
           );
         },
-        (error) => {
+        error => {
           const duration = Date.now() - startTime;
-          this.logger.error(
-            `← ${method} ${url} ERROR - ${duration}ms`,
-            {
-              requestId,
-              tenantId,
-              userId,
-              duration,
-              error: error.message,
-              stack: error.stack,
-            },
-          );
+          this.logger.error(`← ${method} ${url} ERROR - ${duration}ms`, {
+            requestId,
+            tenantId,
+            userId,
+            duration,
+            error: error.message,
+            stack: error.stack,
+          });
         },
       ),
     );
@@ -83,16 +77,22 @@ export class LoggingInterceptor implements NestInterceptor {
 
   private sanitizeBody(body: any): any {
     if (!body) return body;
-    
+
     const sanitized = { ...body };
-    const sensitiveFields = ['password', 'token', 'secret', 'key', 'authorization'];
-    
+    const sensitiveFields = [
+      'password',
+      'token',
+      'secret',
+      'key',
+      'authorization',
+    ];
+
     for (const field of sensitiveFields) {
       if (sanitized[field]) {
         sanitized[field] = '[REDACTED]';
       }
     }
-    
+
     return sanitized;
   }
 }

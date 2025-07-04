@@ -53,7 +53,15 @@ export class CreateWorkflowTables1735595000000 implements MigrationInterface {
           {
             name: 'category',
             type: 'enum',
-            enum: ['INVENTORY_MANAGEMENT', 'PURCHASE_ORDER', 'ALERT_NOTIFICATION', 'SUPPLIER_MANAGEMENT', 'REPORT_GENERATION', 'DATA_SYNC', 'CUSTOM'],
+            enum: [
+              'INVENTORY_MANAGEMENT',
+              'PURCHASE_ORDER',
+              'ALERT_NOTIFICATION',
+              'SUPPLIER_MANAGEMENT',
+              'REPORT_GENERATION',
+              'DATA_SYNC',
+              'CUSTOM',
+            ],
             default: "'CUSTOM'",
           },
           {
@@ -671,51 +679,129 @@ export class CreateWorkflowTables1735595000000 implements MigrationInterface {
     // =============================================
 
     // Workflows indexes
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_tenant_id" ON "workflows" ("tenant_id")`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_workflows_tenant_name" ON "workflows" ("tenant_id", "name")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_category" ON "workflows" ("category")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_status" ON "workflows" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_trigger_type" ON "workflows" ("trigger_type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_active" ON "workflows" ("is_active")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_next_execution" ON "workflows" ("next_execution_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_last_execution" ON "workflows" ("last_execution_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_success_rate" ON "workflows" ("success_rate")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_created_at" ON "workflows" ("created_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflows_environment" ON "workflows" ("environment")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_tenant_id" ON "workflows" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_workflows_tenant_name" ON "workflows" ("tenant_id", "name")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_category" ON "workflows" ("category")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_status" ON "workflows" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_trigger_type" ON "workflows" ("trigger_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_active" ON "workflows" ("is_active")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_next_execution" ON "workflows" ("next_execution_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_last_execution" ON "workflows" ("last_execution_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_success_rate" ON "workflows" ("success_rate")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_created_at" ON "workflows" ("created_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflows_environment" ON "workflows" ("environment")`,
+    );
 
     // Workflow Steps indexes
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_tenant_id" ON "workflow_steps" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_workflow_id" ON "workflow_steps" ("workflow_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_execution_order" ON "workflow_steps" ("workflow_id", "execution_order")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_step_type" ON "workflow_steps" ("step_type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_active" ON "workflow_steps" ("is_active")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_parent" ON "workflow_steps" ("parent_step_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_next" ON "workflow_steps" ("next_step_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_steps_created_at" ON "workflow_steps" ("created_at")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_tenant_id" ON "workflow_steps" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_workflow_id" ON "workflow_steps" ("workflow_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_execution_order" ON "workflow_steps" ("workflow_id", "execution_order")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_step_type" ON "workflow_steps" ("step_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_active" ON "workflow_steps" ("is_active")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_parent" ON "workflow_steps" ("parent_step_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_next" ON "workflow_steps" ("next_step_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_steps_created_at" ON "workflow_steps" ("created_at")`,
+    );
 
     // Workflow Executions indexes
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_tenant_id" ON "workflow_executions" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_workflow_id" ON "workflow_executions" ("workflow_id")`);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_workflow_executions_execution_id" ON "workflow_executions" ("execution_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_status" ON "workflow_executions" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_trigger" ON "workflow_executions" ("trigger")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_started_at" ON "workflow_executions" ("started_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_completed_at" ON "workflow_executions" ("completed_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_current_step" ON "workflow_executions" ("current_step_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_triggered_by" ON "workflow_executions" ("triggered_by_user_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_parent" ON "workflow_executions" ("parent_execution_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_executions_recent" ON "workflow_executions" ("tenant_id", "started_at")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_tenant_id" ON "workflow_executions" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_workflow_id" ON "workflow_executions" ("workflow_id")`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_workflow_executions_execution_id" ON "workflow_executions" ("execution_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_status" ON "workflow_executions" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_trigger" ON "workflow_executions" ("trigger")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_started_at" ON "workflow_executions" ("started_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_completed_at" ON "workflow_executions" ("completed_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_current_step" ON "workflow_executions" ("current_step_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_triggered_by" ON "workflow_executions" ("triggered_by_user_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_parent" ON "workflow_executions" ("parent_execution_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_executions_recent" ON "workflow_executions" ("tenant_id", "started_at")`,
+    );
 
     // Workflow Step Executions indexes
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_tenant_id" ON "workflow_step_executions" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_workflow_execution" ON "workflow_step_executions" ("workflow_execution_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_workflow_step" ON "workflow_step_executions" ("workflow_step_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_execution_order" ON "workflow_step_executions" ("workflow_execution_id", "execution_order")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_status" ON "workflow_step_executions" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_started_at" ON "workflow_step_executions" ("started_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_completed_at" ON "workflow_step_executions" ("completed_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_external_job" ON "workflow_step_executions" ("external_job_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_workflow_step_executions_retry_count" ON "workflow_step_executions" ("retry_count")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_tenant_id" ON "workflow_step_executions" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_workflow_execution" ON "workflow_step_executions" ("workflow_execution_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_workflow_step" ON "workflow_step_executions" ("workflow_step_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_execution_order" ON "workflow_step_executions" ("workflow_execution_id", "execution_order")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_status" ON "workflow_step_executions" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_started_at" ON "workflow_step_executions" ("started_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_completed_at" ON "workflow_step_executions" ("completed_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_external_job" ON "workflow_step_executions" ("external_job_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_workflow_step_executions_retry_count" ON "workflow_step_executions" ("retry_count")`,
+    );
 
     // =============================================
     // CREATE FOREIGN KEY CONSTRAINTS
@@ -805,60 +891,148 @@ export class CreateWorkflowTables1735595000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop triggers first
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_workflow_step_executions_updated_at ON workflow_step_executions`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_workflow_executions_updated_at ON workflow_executions`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_workflow_steps_updated_at ON workflow_steps`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_workflows_updated_at ON workflows`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_workflow_step_executions_updated_at ON workflow_step_executions`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_workflow_executions_updated_at ON workflow_executions`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_workflow_steps_updated_at ON workflow_steps`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_workflows_updated_at ON workflows`,
+    );
 
     // Drop foreign key constraints
-    await queryRunner.query(`ALTER TABLE "workflow_step_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_step_executions_workflow_step_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_step_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_step_executions_workflow_execution_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_executions_parent_execution_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_executions_current_step_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_executions_workflow_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_error_step_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_parent_step_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_failure_step_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_success_step_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_next_step_id"`);
-    await queryRunner.query(`ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_workflow_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "workflow_step_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_step_executions_workflow_step_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_step_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_step_executions_workflow_execution_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_executions_parent_execution_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_executions_current_step_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_executions" DROP CONSTRAINT IF EXISTS "FK_workflow_executions_workflow_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_error_step_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_parent_step_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_failure_step_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_success_step_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_next_step_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "workflow_steps" DROP CONSTRAINT IF EXISTS "FK_workflow_steps_workflow_id"`,
+    );
 
     // Drop indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_retry_count"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_external_job"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_completed_at"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_started_at"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_execution_order"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_workflow_step"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_workflow_execution"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_step_executions_tenant_id"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_recent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_triggered_by"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_current_step"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_completed_at"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_started_at"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_trigger"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_execution_id"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_workflow_id"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_executions_tenant_id"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_created_at"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_retry_count"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_external_job"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_completed_at"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_started_at"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_execution_order"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_workflow_step"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_workflow_execution"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_step_executions_tenant_id"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_recent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_parent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_triggered_by"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_current_step"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_completed_at"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_started_at"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_trigger"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_execution_id"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_workflow_id"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_executions_tenant_id"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_steps_created_at"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_next"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_parent"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_active"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_step_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_execution_order"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_workflow_id"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflow_steps_tenant_id"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_steps_step_type"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_steps_execution_order"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_steps_workflow_id"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflow_steps_tenant_id"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_environment"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_created_at"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_success_rate"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_last_execution"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_next_execution"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflows_success_rate"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflows_last_execution"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflows_next_execution"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_active"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_trigger_type"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_workflows_trigger_type"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_status"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_category"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workflows_tenant_name"`);
@@ -871,7 +1045,9 @@ export class CreateWorkflowTables1735595000000 implements MigrationInterface {
     await queryRunner.dropTable('workflows');
 
     // Drop ENUM types
-    await queryRunner.query(`DROP TYPE IF EXISTS "workflows_trigger_type_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "workflows_trigger_type_enum"`,
+    );
     await queryRunner.query(`DROP TYPE IF EXISTS "workflows_status_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "workflows_category_enum"`);
   }

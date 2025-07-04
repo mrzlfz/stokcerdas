@@ -1,4 +1,10 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -9,7 +15,10 @@ import { TokopediaOrderService } from '../services/tokopedia-order.service';
 import { TokopediaInventoryService } from '../services/tokopedia-inventory.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface TokopediaWebhookJobData {
   webhookId: string;
@@ -82,15 +91,18 @@ export class TokopediaProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`Tokopedia job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `Tokopedia job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -98,8 +110,9 @@ export class TokopediaProcessor {
    */
   @Process('process-webhook')
   async processWebhook(job: Job<TokopediaWebhookJobData>) {
-    const { webhookId, tenantId, channelId, eventType, eventSource, isRetry } = job.data;
-    
+    const { webhookId, tenantId, channelId, eventType, eventSource, isRetry } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Tokopedia webhook: ${eventType}`, {
         webhookId,
@@ -110,8 +123,10 @@ export class TokopediaProcessor {
       });
 
       // Mark webhook as processing
-      const webhook = await this.webhookHandler.markWebhookAsProcessing(webhookId);
-      
+      const webhook = await this.webhookHandler.markWebhookAsProcessing(
+        webhookId,
+      );
+
       // Get webhook payload
       const payload = webhook.payload;
 
@@ -157,9 +172,11 @@ export class TokopediaProcessor {
 
         throw new Error(result.error || 'Webhook processing failed');
       }
-
     } catch (error) {
-      this.logger.error(`Webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Mark webhook as failed
       await this.webhookHandler.markWebhookAsFailed(
@@ -187,8 +204,15 @@ export class TokopediaProcessor {
    */
   @Process('product-sync')
   async processProductSync(job: Job<TokopediaProductSyncJobData>) {
-    const { tenantId, channelId, productId, tokopediaProductId, syncDirection, options } = job.data;
-    
+    const {
+      tenantId,
+      channelId,
+      productId,
+      tokopediaProductId,
+      syncDirection,
+      options,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing Tokopedia product sync: ${syncDirection}`, {
         tenantId,
@@ -204,17 +228,24 @@ export class TokopediaProcessor {
         // Sync from Tokopedia to local system
         if (tokopediaProductId) {
           // Sync specific product
-          const productDetails = await this.productService.getTokopediaProductDetails(
-            tenantId,
-            channelId,
-            tokopediaProductId,
-          );
+          const productDetails =
+            await this.productService.getTokopediaProductDetails(
+              tenantId,
+              channelId,
+              tokopediaProductId,
+            );
 
           if (productDetails.success) {
             // Process the product data
-            result = { success: true, tokopediaProductId, data: productDetails.data };
+            result = {
+              success: true,
+              tokopediaProductId,
+              data: productDetails.data,
+            };
           } else {
-            throw new Error(`Failed to get product details: ${productDetails.error}`);
+            throw new Error(
+              `Failed to get product details: ${productDetails.error}`,
+            );
           }
         } else {
           // Sync all products
@@ -258,7 +289,6 @@ export class TokopediaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Product sync failed: ${error.message}`, error.stack);
 
@@ -281,8 +311,15 @@ export class TokopediaProcessor {
    */
   @Process('order-sync')
   async processOrderSync(job: Job<TokopediaOrderSyncJobData>) {
-    const { tenantId, channelId, orderId, tokopediaOrderId, syncDirection, options } = job.data;
-    
+    const {
+      tenantId,
+      channelId,
+      orderId,
+      tokopediaOrderId,
+      syncDirection,
+      options,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing Tokopedia order sync: ${syncDirection}`, {
         tenantId,
@@ -305,9 +342,15 @@ export class TokopediaProcessor {
           );
 
           if (orderDetails.success) {
-            result = { success: true, tokopediaOrderId, data: orderDetails.data };
+            result = {
+              success: true,
+              tokopediaOrderId,
+              data: orderDetails.data,
+            };
           } else {
-            throw new Error(`Failed to get order details: ${orderDetails.error}`);
+            throw new Error(
+              `Failed to get order details: ${orderDetails.error}`,
+            );
           }
         } else {
           // Sync all orders
@@ -324,7 +367,10 @@ export class TokopediaProcessor {
         }
 
         // This would typically involve updating order status in Tokopedia
-        result = { success: true, message: 'Outbound order sync not implemented yet' };
+        result = {
+          success: true,
+          message: 'Outbound order sync not implemented yet',
+        };
       }
 
       // Log success
@@ -348,7 +394,6 @@ export class TokopediaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Order sync failed: ${error.message}`, error.stack);
 
@@ -371,8 +416,9 @@ export class TokopediaProcessor {
    */
   @Process('inventory-sync')
   async processInventorySync(job: Job<TokopediaInventorySyncJobData>) {
-    const { tenantId, channelId, productId, productSku, syncType, updates } = job.data;
-    
+    const { tenantId, channelId, productId, productSku, syncType, updates } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Tokopedia inventory sync: ${syncType}`, {
         tenantId,
@@ -471,7 +517,6 @@ export class TokopediaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Inventory sync failed: ${error.message}`, error.stack);
 
@@ -493,15 +538,17 @@ export class TokopediaProcessor {
    * Process batch sync jobs
    */
   @Process('batch-sync')
-  async processBatchSync(job: Job<{
-    tenantId: string;
-    channelId: string;
-    syncType: 'products' | 'orders' | 'inventory';
-    batchData: any[];
-    options?: any;
-  }>) {
+  async processBatchSync(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+      syncType: 'products' | 'orders' | 'inventory';
+      batchData: any[];
+      options?: any;
+    }>,
+  ) {
     const { tenantId, channelId, syncType, batchData, options } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Tokopedia batch sync: ${syncType}`, {
         tenantId,
@@ -549,17 +596,16 @@ export class TokopediaProcessor {
 
           results.push({ item, result, success: true });
           successCount++;
-
         } catch (error) {
           this.logger.error(`Batch item sync failed: ${error.message}`, {
             item,
             error: error.message,
           });
 
-          results.push({ 
-            item, 
-            error: error.message, 
-            success: false 
+          results.push({
+            item,
+            error: error.message,
+            success: false,
           });
           errorCount++;
         }
@@ -592,7 +638,6 @@ export class TokopediaProcessor {
       });
 
       return batchResult;
-
     } catch (error) {
       this.logger.error(`Batch sync failed: ${error.message}`, error.stack);
 
@@ -614,12 +659,14 @@ export class TokopediaProcessor {
    * Process auth token refresh jobs
    */
   @Process('auth-refresh')
-  async processAuthRefresh(job: Job<{
-    tenantId: string;
-    channelId: string;
-  }>) {
+  async processAuthRefresh(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+    }>,
+  ) {
     const { tenantId, channelId } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Tokopedia auth refresh`, {
         tenantId,
@@ -641,17 +688,13 @@ export class TokopediaProcessor {
       });
 
       return { success: true, message: 'Auth refresh completed' };
-
     } catch (error) {
       this.logger.error(`Auth refresh failed: ${error.message}`, error.stack);
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { metadata: { jobId: job.id } },
-      );
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { jobId: job.id },
+      });
 
       throw error;
     }
@@ -661,13 +704,15 @@ export class TokopediaProcessor {
    * Process health check jobs
    */
   @Process('health-check')
-  async processHealthCheck(job: Job<{
-    tenantId: string;
-    channelId: string;
-    checkType: 'auth' | 'api' | 'webhooks';
-  }>) {
+  async processHealthCheck(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+      checkType: 'auth' | 'api' | 'webhooks';
+    }>,
+  ) {
     const { tenantId, channelId, checkType } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Tokopedia health check: ${checkType}`, {
         tenantId,
@@ -708,17 +753,13 @@ export class TokopediaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Health check failed: ${error.message}`, error.stack);
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { metadata: { checkType } },
-      );
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { checkType },
+      });
 
       throw error;
     }
@@ -728,14 +769,16 @@ export class TokopediaProcessor {
    * Process TikTok Shop migration jobs
    */
   @Process('tiktok-migration')
-  async processTikTokMigration(job: Job<{
-    tenantId: string;
-    channelId: string;
-    tiktokAuthCode: string;
-    config: any;
-  }>) {
+  async processTikTokMigration(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+      tiktokAuthCode: string;
+      config: any;
+    }>,
+  ) {
     const { tenantId, channelId, tiktokAuthCode, config } = job.data;
-    
+
     try {
       this.logger.debug(`Processing TikTok Shop migration`, {
         tenantId,
@@ -756,17 +799,16 @@ export class TokopediaProcessor {
       });
 
       return { success: true, message: 'TikTok Shop migration completed' };
-
     } catch (error) {
-      this.logger.error(`TikTok Shop migration failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `TikTok Shop migration failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { metadata: { jobId: job.id } },
-      );
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { jobId: job.id },
+      });
 
       throw error;
     }

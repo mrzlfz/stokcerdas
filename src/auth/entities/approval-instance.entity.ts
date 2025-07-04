@@ -134,7 +134,11 @@ export class ApprovalInstance extends AuditableEntity {
   };
 
   // Timing and deadlines
-  @Column({ name: 'submitted_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    name: 'submitted_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   submittedAt: Date;
 
   @Column({ name: 'started_at', type: 'timestamp', nullable: true })
@@ -149,7 +153,11 @@ export class ApprovalInstance extends AuditableEntity {
   @Column({ name: 'escalation_date', type: 'timestamp', nullable: true })
   escalationDate: Date;
 
-  @Column({ name: 'last_activity_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    name: 'last_activity_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   lastActivityAt: Date;
 
   // Progress tracking
@@ -162,7 +170,13 @@ export class ApprovalInstance extends AuditableEntity {
   @Column({ name: 'completed_steps', type: 'integer', default: 0 })
   completedSteps: number;
 
-  @Column({ name: 'progress_percentage', type: 'decimal', precision: 5, scale: 2, default: 0 })
+  @Column({
+    name: 'progress_percentage',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+  })
   progressPercentage: number;
 
   // Approval tracking
@@ -182,7 +196,11 @@ export class ApprovalInstance extends AuditableEntity {
   @Column({ name: 'is_parallel_approval', type: 'boolean', default: false })
   isParallelApproval: boolean;
 
-  @Column({ name: 'parallel_approvals_needed', type: 'integer', nullable: true })
+  @Column({
+    name: 'parallel_approvals_needed',
+    type: 'integer',
+    nullable: true,
+  })
   parallelApprovalsNeeded: number;
 
   @Column({ name: 'parallel_approvals_received', type: 'integer', default: 0 })
@@ -212,10 +230,21 @@ export class ApprovalInstance extends AuditableEntity {
   };
 
   // Business context
-  @Column({ name: 'business_impact', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'business_impact',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   businessImpact: 'low' | 'medium' | 'high' | 'critical';
 
-  @Column({ name: 'financial_impact', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'financial_impact',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   financialImpact: number;
 
   @Column({ name: 'compliance_required', type: 'boolean', default: false })
@@ -228,7 +257,13 @@ export class ApprovalInstance extends AuditableEntity {
   @Column({ name: 'sla_target_hours', type: 'integer', nullable: true })
   slaTargetHours: number;
 
-  @Column({ name: 'processing_time_hours', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'processing_time_hours',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   processingTimeHours: number;
 
   @Column({ name: 'is_sla_breached', type: 'boolean', default: false })
@@ -238,10 +273,20 @@ export class ApprovalInstance extends AuditableEntity {
   breachReason: string;
 
   // External integrations
-  @Column({ name: 'external_reference_id', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'external_reference_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   externalReferenceId: string;
 
-  @Column({ name: 'external_system', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'external_system',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   externalSystem: string;
 
   @Column({ name: 'external_url', type: 'text', nullable: true })
@@ -261,7 +306,12 @@ export class ApprovalInstance extends AuditableEntity {
   @Column({ name: 'is_confidential', type: 'boolean', default: false })
   isConfidential: boolean;
 
-  @Column({ name: 'access_level', type: 'varchar', length: 50, default: 'normal' })
+  @Column({
+    name: 'access_level',
+    type: 'varchar',
+    length: 50,
+    default: 'normal',
+  })
   accessLevel: 'public' | 'internal' | 'confidential' | 'restricted';
 
   @Column({ name: 'allowed_viewers', type: 'simple-array', nullable: true })
@@ -303,20 +353,35 @@ export class ApprovalInstance extends AuditableEntity {
 
   isOverdue(): boolean {
     if (!this.dueDate) return false;
-    return new Date() > this.dueDate && 
-           ![ApprovalInstanceStatus.APPROVED, ApprovalInstanceStatus.REJECTED, 
-             ApprovalInstanceStatus.CANCELLED].includes(this.status);
+    return (
+      new Date() > this.dueDate &&
+      ![
+        ApprovalInstanceStatus.APPROVED,
+        ApprovalInstanceStatus.REJECTED,
+        ApprovalInstanceStatus.CANCELLED,
+      ].includes(this.status)
+    );
   }
 
   needsEscalation(): boolean {
     if (!this.escalationDate) return false;
-    return new Date() > this.escalationDate && 
-           this.status === ApprovalInstanceStatus.PENDING;
+    return (
+      new Date() > this.escalationDate &&
+      this.status === ApprovalInstanceStatus.PENDING
+    );
   }
 
-  canBeApprovedBy(userId: string, userRoles: string[], userDepartments: string[]): boolean {
+  canBeApprovedBy(
+    userId: string,
+    userRoles: string[],
+    userDepartments: string[],
+  ): boolean {
     if (!this.currentStep) return false;
-    return this.currentStep.isEligibleApprover(userId, userRoles, userDepartments);
+    return this.currentStep.isEligibleApprover(
+      userId,
+      userRoles,
+      userDepartments,
+    );
   }
 
   getTimeRemaining(): number | null {
@@ -381,7 +446,11 @@ export class ApprovalInstance extends AuditableEntity {
     this.updateLastActivity();
   }
 
-  markAsCompleted(finalStatus: ApprovalInstanceStatus.APPROVED | ApprovalInstanceStatus.REJECTED): void {
+  markAsCompleted(
+    finalStatus:
+      | ApprovalInstanceStatus.APPROVED
+      | ApprovalInstanceStatus.REJECTED,
+  ): void {
     this.completedAt = new Date();
     this.status = finalStatus;
     this.progressPercentage = 100;
@@ -434,10 +503,13 @@ export class ApprovalInstance extends AuditableEntity {
   shouldSendReminder(): boolean {
     if (!this.notificationSettings?.reminderFrequencyHours) return false;
     if (!this.lastReminderSentAt) return true;
-    
-    const hoursSinceLastReminder = 
-      (new Date().getTime() - this.lastReminderSentAt.getTime()) / (1000 * 60 * 60);
-    
-    return hoursSinceLastReminder >= this.notificationSettings.reminderFrequencyHours;
+
+    const hoursSinceLastReminder =
+      (new Date().getTime() - this.lastReminderSentAt.getTime()) /
+      (1000 * 60 * 60);
+
+    return (
+      hoursSinceLastReminder >= this.notificationSettings.reminderFrequencyHours
+    );
   }
 }

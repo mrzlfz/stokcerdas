@@ -1,15 +1,27 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { LazadaWebhookService, LazadaWebhookPayload } from '../services/lazada-webhook.service';
+import {
+  LazadaWebhookService,
+  LazadaWebhookPayload,
+} from '../services/lazada-webhook.service';
 import { LazadaProductService } from '../services/lazada-product.service';
 import { LazadaOrderService } from '../services/lazada-order.service';
 import { LazadaInventoryService } from '../services/lazada-inventory.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface LazadaWebhookJobData {
   webhookId: string;
@@ -82,15 +94,18 @@ export class LazadaProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`Lazada job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `Lazada job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -98,8 +113,9 @@ export class LazadaProcessor {
    */
   @Process('process-webhook')
   async processWebhook(job: Job<LazadaWebhookJobData>) {
-    const { webhookId, tenantId, channelId, eventType, eventSource, isRetry } = job.data;
-    
+    const { webhookId, tenantId, channelId, eventType, eventSource, isRetry } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Lazada webhook: ${eventType}`, {
         webhookId,
@@ -110,8 +126,10 @@ export class LazadaProcessor {
       });
 
       // Mark webhook as processing
-      const webhook = await this.webhookHandler.markWebhookAsProcessing(webhookId);
-      
+      const webhook = await this.webhookHandler.markWebhookAsProcessing(
+        webhookId,
+      );
+
       // Get webhook payload
       const payload = webhook.payload;
 
@@ -157,9 +175,11 @@ export class LazadaProcessor {
 
         throw new Error(result.error || 'Webhook processing failed');
       }
-
     } catch (error) {
-      this.logger.error(`Webhook processing failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Webhook processing failed: ${error.message}`,
+        error.stack,
+      );
 
       // Mark webhook as failed
       await this.webhookHandler.markWebhookAsFailed(
@@ -187,8 +207,9 @@ export class LazadaProcessor {
    */
   @Process('product-sync')
   async processProductSync(job: Job<LazadaProductSyncJobData>) {
-    const { tenantId, channelId, productId, itemId, syncDirection, options } = job.data;
-    
+    const { tenantId, channelId, productId, itemId, syncDirection, options } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Lazada product sync: ${syncDirection}`, {
         tenantId,
@@ -204,17 +225,20 @@ export class LazadaProcessor {
         // Sync from Lazada to local system
         if (itemId) {
           // Sync specific product
-          const productDetails = await this.productService.getLazadaProductDetails(
-            tenantId,
-            channelId,
-            itemId,
-          );
+          const productDetails =
+            await this.productService.getLazadaProductDetails(
+              tenantId,
+              channelId,
+              itemId,
+            );
 
           if (productDetails.success) {
             // Process the product data
             result = { success: true, itemId, data: productDetails.data };
           } else {
-            throw new Error(`Failed to get product details: ${productDetails.error}`);
+            throw new Error(
+              `Failed to get product details: ${productDetails.error}`,
+            );
           }
         } else {
           // Sync all products
@@ -258,7 +282,6 @@ export class LazadaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Product sync failed: ${error.message}`, error.stack);
 
@@ -281,8 +304,15 @@ export class LazadaProcessor {
    */
   @Process('order-sync')
   async processOrderSync(job: Job<LazadaOrderSyncJobData>) {
-    const { tenantId, channelId, orderId, orderNumber, syncDirection, options } = job.data;
-    
+    const {
+      tenantId,
+      channelId,
+      orderId,
+      orderNumber,
+      syncDirection,
+      options,
+    } = job.data;
+
     try {
       this.logger.debug(`Processing Lazada order sync: ${syncDirection}`, {
         tenantId,
@@ -307,7 +337,9 @@ export class LazadaProcessor {
           if (orderDetails.success) {
             result = { success: true, orderNumber, data: orderDetails.data };
           } else {
-            throw new Error(`Failed to get order details: ${orderDetails.error}`);
+            throw new Error(
+              `Failed to get order details: ${orderDetails.error}`,
+            );
           }
         } else {
           // Sync all orders
@@ -324,7 +356,10 @@ export class LazadaProcessor {
         }
 
         // This would typically involve updating order status in Lazada
-        result = { success: true, message: 'Outbound order sync not implemented yet' };
+        result = {
+          success: true,
+          message: 'Outbound order sync not implemented yet',
+        };
       }
 
       // Log success
@@ -348,7 +383,6 @@ export class LazadaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Order sync failed: ${error.message}`, error.stack);
 
@@ -371,8 +405,9 @@ export class LazadaProcessor {
    */
   @Process('inventory-sync')
   async processInventorySync(job: Job<LazadaInventorySyncJobData>) {
-    const { tenantId, channelId, productId, sellerSku, syncType, updates } = job.data;
-    
+    const { tenantId, channelId, productId, sellerSku, syncType, updates } =
+      job.data;
+
     try {
       this.logger.debug(`Processing Lazada inventory sync: ${syncType}`, {
         tenantId,
@@ -471,7 +506,6 @@ export class LazadaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Inventory sync failed: ${error.message}`, error.stack);
 
@@ -493,15 +527,17 @@ export class LazadaProcessor {
    * Process batch sync jobs
    */
   @Process('batch-sync')
-  async processBatchSync(job: Job<{
-    tenantId: string;
-    channelId: string;
-    syncType: 'products' | 'orders' | 'inventory';
-    batchData: any[];
-    options?: any;
-  }>) {
+  async processBatchSync(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+      syncType: 'products' | 'orders' | 'inventory';
+      batchData: any[];
+      options?: any;
+    }>,
+  ) {
     const { tenantId, channelId, syncType, batchData, options } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Lazada batch sync: ${syncType}`, {
         tenantId,
@@ -549,17 +585,16 @@ export class LazadaProcessor {
 
           results.push({ item, result, success: true });
           successCount++;
-
         } catch (error) {
           this.logger.error(`Batch item sync failed: ${error.message}`, {
             item,
             error: error.message,
           });
 
-          results.push({ 
-            item, 
-            error: error.message, 
-            success: false 
+          results.push({
+            item,
+            error: error.message,
+            success: false,
           });
           errorCount++;
         }
@@ -592,7 +627,6 @@ export class LazadaProcessor {
       });
 
       return batchResult;
-
     } catch (error) {
       this.logger.error(`Batch sync failed: ${error.message}`, error.stack);
 
@@ -614,12 +648,14 @@ export class LazadaProcessor {
    * Process auth token refresh jobs
    */
   @Process('auth-refresh')
-  async processAuthRefresh(job: Job<{
-    tenantId: string;
-    channelId: string;
-  }>) {
+  async processAuthRefresh(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+    }>,
+  ) {
     const { tenantId, channelId } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Lazada auth refresh`, {
         tenantId,
@@ -641,17 +677,13 @@ export class LazadaProcessor {
       });
 
       return { success: true, message: 'Auth refresh completed' };
-
     } catch (error) {
       this.logger.error(`Auth refresh failed: ${error.message}`, error.stack);
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { metadata: { jobId: job.id } },
-      );
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { jobId: job.id },
+      });
 
       throw error;
     }
@@ -661,13 +693,15 @@ export class LazadaProcessor {
    * Process health check jobs
    */
   @Process('health-check')
-  async processHealthCheck(job: Job<{
-    tenantId: string;
-    channelId: string;
-    checkType: 'auth' | 'api' | 'webhooks';
-  }>) {
+  async processHealthCheck(
+    job: Job<{
+      tenantId: string;
+      channelId: string;
+      checkType: 'auth' | 'api' | 'webhooks';
+    }>,
+  ) {
     const { tenantId, channelId, checkType } = job.data;
-    
+
     try {
       this.logger.debug(`Processing Lazada health check: ${checkType}`, {
         tenantId,
@@ -708,17 +742,13 @@ export class LazadaProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Health check failed: ${error.message}`, error.stack);
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        { metadata: { checkType } },
-      );
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { checkType },
+      });
 
       throw error;
     }

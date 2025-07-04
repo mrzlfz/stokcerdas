@@ -4,14 +4,28 @@ import { Queue } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Services
-import { GojekShippingService, GojekShippingQuote, GojekShipmentRequest } from '../integrations/gojek/services/gojek-shipping.service';
-import { GrabShippingService, GrabShippingQuote, GrabShipmentRequest } from '../integrations/grab/services/grab-shipping.service';
+import {
+  GojekShippingService,
+  GojekShippingQuote,
+  GojekShipmentRequest,
+} from '../integrations/gojek/services/gojek-shipping.service';
+import {
+  GrabShippingService,
+  GrabShippingQuote,
+  GrabShipmentRequest,
+} from '../integrations/grab/services/grab-shipping.service';
 import { ShippingService } from './shipping.service';
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../integrations/entities/integration-log.entity';
 
 // Entities
-import { ShippingLabel, ShippingServiceType } from '../entities/shipping-label.entity';
+import {
+  ShippingLabel,
+  ShippingServiceType,
+} from '../entities/shipping-label.entity';
 
 // Interfaces
 export interface InstantDeliveryQuoteRequest {
@@ -142,17 +156,19 @@ export class InstantDeliveryService {
    */
   async getInstantDeliveryQuotes(
     tenantId: string,
-    request: InstantDeliveryQuoteRequest
+    request: InstantDeliveryQuoteRequest,
   ): Promise<InstantDeliveryQuote[]> {
     try {
-      this.logger.debug(`Getting instant delivery quotes for tenant ${tenantId}`);
+      this.logger.debug(
+        `Getting instant delivery quotes for tenant ${tenantId}`,
+      );
 
       const allQuotes: InstantDeliveryQuote[] = [];
       const providers = request.providers || ['gojek', 'grab'];
       const serviceTypes = request.serviceTypes || ['instant', 'same_day'];
 
       // Get quotes from each provider in parallel
-      const quotePromises = providers.map(async (provider) => {
+      const quotePromises = providers.map(async provider => {
         try {
           if (provider === 'gojek') {
             return await this.getGojekQuotes(tenantId, request, serviceTypes);
@@ -161,13 +177,15 @@ export class InstantDeliveryService {
           }
           return [];
         } catch (error) {
-          this.logger.warn(`Failed to get quotes from ${provider}: ${error.message}`);
+          this.logger.warn(
+            `Failed to get quotes from ${provider}: ${error.message}`,
+          );
           return [];
         }
       });
 
       const providerQuotes = await Promise.all(quotePromises);
-      
+
       // Flatten all quotes
       for (const quotes of providerQuotes) {
         allQuotes.push(...quotes);
@@ -176,9 +194,11 @@ export class InstantDeliveryService {
       // Sort quotes by total cost and availability
       allQuotes.sort((a, b) => {
         // Prioritize available services
-        if (a.availability.isServiceable && !b.availability.isServiceable) return -1;
-        if (!a.availability.isServiceable && b.availability.isServiceable) return 1;
-        
+        if (a.availability.isServiceable && !b.availability.isServiceable)
+          return -1;
+        if (!a.availability.isServiceable && b.availability.isServiceable)
+          return 1;
+
         // Then sort by cost
         return a.cost.totalCost - b.cost.totalCost;
       });
@@ -193,14 +213,17 @@ export class InstantDeliveryService {
           providers,
           serviceTypes,
           quotesCount: allQuotes.length,
-          availableQuotes: allQuotes.filter(q => q.availability.isServiceable).length,
+          availableQuotes: allQuotes.filter(q => q.availability.isServiceable)
+            .length,
         },
       });
 
       return allQuotes;
-
     } catch (error) {
-      this.logger.error(`Failed to get instant delivery quotes: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get instant delivery quotes: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -210,10 +233,12 @@ export class InstantDeliveryService {
    */
   async createInstantDelivery(
     tenantId: string,
-    request: InstantDeliveryRequest
+    request: InstantDeliveryRequest,
   ): Promise<ShippingLabel> {
     try {
-      this.logger.debug(`Creating instant delivery for order ${request.orderId} with ${request.provider}`);
+      this.logger.debug(
+        `Creating instant delivery for order ${request.orderId} with ${request.provider}`,
+      );
 
       let shippingLabel: ShippingLabel;
 
@@ -222,11 +247,17 @@ export class InstantDeliveryService {
       } else if (request.provider === 'grab') {
         shippingLabel = await this.createGrabDelivery(tenantId, request);
       } else {
-        throw new BadRequestException(`Unsupported instant delivery provider: ${request.provider}`);
+        throw new BadRequestException(
+          `Unsupported instant delivery provider: ${request.provider}`,
+        );
       }
 
       // Schedule tracking updates
-      await this.scheduleTrackingUpdates(tenantId, shippingLabel.trackingNumber, request.provider);
+      await this.scheduleTrackingUpdates(
+        tenantId,
+        shippingLabel.trackingNumber,
+        request.provider,
+      );
 
       // Log the creation
       await this.logService.log({
@@ -253,9 +284,11 @@ export class InstantDeliveryService {
       });
 
       return shippingLabel;
-
     } catch (error) {
-      this.logger.error(`Failed to create instant delivery: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create instant delivery: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -266,13 +299,18 @@ export class InstantDeliveryService {
   async updateInstantDeliveryTracking(
     tenantId: string,
     trackingNumber: string,
-    provider: 'gojek' | 'grab'
+    provider: 'gojek' | 'grab',
   ): Promise<void> {
     try {
-      this.logger.debug(`Updating instant delivery tracking: ${trackingNumber} (${provider})`);
+      this.logger.debug(
+        `Updating instant delivery tracking: ${trackingNumber} (${provider})`,
+      );
 
       if (provider === 'gojek') {
-        await this.gojekShippingService.updateTracking(tenantId, trackingNumber);
+        await this.gojekShippingService.updateTracking(
+          tenantId,
+          trackingNumber,
+        );
       } else if (provider === 'grab') {
         await this.grabShippingService.updateTracking(tenantId, trackingNumber);
       } else {
@@ -285,9 +323,11 @@ export class InstantDeliveryService {
         trackingNumber,
         provider,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to update instant delivery tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update instant delivery tracking: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -299,15 +339,25 @@ export class InstantDeliveryService {
     tenantId: string,
     trackingNumber: string,
     provider: 'gojek' | 'grab',
-    reason: string
+    reason: string,
   ): Promise<void> {
     try {
-      this.logger.debug(`Cancelling instant delivery: ${trackingNumber} (${provider})`);
+      this.logger.debug(
+        `Cancelling instant delivery: ${trackingNumber} (${provider})`,
+      );
 
       if (provider === 'gojek') {
-        await this.gojekShippingService.cancelDelivery(tenantId, trackingNumber, reason);
+        await this.gojekShippingService.cancelDelivery(
+          tenantId,
+          trackingNumber,
+          reason,
+        );
       } else if (provider === 'grab') {
-        await this.grabShippingService.cancelDelivery(tenantId, trackingNumber, reason);
+        await this.grabShippingService.cancelDelivery(
+          tenantId,
+          trackingNumber,
+          reason,
+        );
       } else {
         throw new BadRequestException(`Unsupported provider: ${provider}`);
       }
@@ -319,9 +369,11 @@ export class InstantDeliveryService {
         provider,
         reason,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to cancel instant delivery: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel instant delivery: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -331,77 +383,104 @@ export class InstantDeliveryService {
   private async getGojekQuotes(
     tenantId: string,
     request: InstantDeliveryQuoteRequest,
-    serviceTypes: string[]
+    serviceTypes: string[],
   ): Promise<InstantDeliveryQuote[]> {
-    const gojekQuotes = await this.gojekShippingService.getShippingQuotes(tenantId, {
-      pickup: { latitude: request.pickup.latitude, longitude: request.pickup.longitude },
-      delivery: { latitude: request.delivery.latitude, longitude: request.delivery.longitude },
-      package: { weight: request.package.weight, value: request.package.value },
-      serviceTypes,
-    });
+    const gojekQuotes = await this.gojekShippingService.getShippingQuotes(
+      tenantId,
+      {
+        pickup: {
+          latitude: request.pickup.latitude,
+          longitude: request.pickup.longitude,
+        },
+        delivery: {
+          latitude: request.delivery.latitude,
+          longitude: request.delivery.longitude,
+        },
+        package: {
+          weight: request.package.weight,
+          value: request.package.value,
+        },
+        serviceTypes,
+      },
+    );
 
-    return gojekQuotes.map((quote: GojekShippingQuote): InstantDeliveryQuote => ({
-      provider: 'gojek',
-      carrierId: quote.carrierId,
-      carrierName: quote.carrierName,
-      serviceCode: quote.serviceCode,
-      serviceName: quote.serviceName,
-      serviceType: quote.serviceType,
-      cost: quote.cost,
-      timeframe: {
-        estimatedMinutes: quote.timeframe.estimatedMinutes,
-        estimatedDeliveryTime: quote.timeframe.estimatedDeliveryTime,
-      },
-      features: quote.features,
-      availability: {
-        isServiceable: true, // Gojek service check would be done in the shipping service
-      },
-    }));
+    return gojekQuotes.map(
+      (quote: GojekShippingQuote): InstantDeliveryQuote => ({
+        provider: 'gojek',
+        carrierId: quote.carrierId,
+        carrierName: quote.carrierName,
+        serviceCode: quote.serviceCode,
+        serviceName: quote.serviceName,
+        serviceType: quote.serviceType,
+        cost: quote.cost,
+        timeframe: {
+          estimatedMinutes: quote.timeframe.estimatedMinutes,
+          estimatedDeliveryTime: quote.timeframe.estimatedDeliveryTime,
+        },
+        features: quote.features,
+        availability: {
+          isServiceable: true, // Gojek service check would be done in the shipping service
+        },
+      }),
+    );
   }
 
   private async getGrabQuotes(
     tenantId: string,
     request: InstantDeliveryQuoteRequest,
-    serviceTypes: string[]
+    serviceTypes: string[],
   ): Promise<InstantDeliveryQuote[]> {
-    const grabQuotes = await this.grabShippingService.getShippingQuotes(tenantId, {
-      origin: { latitude: request.pickup.latitude, longitude: request.pickup.longitude },
-      destination: { latitude: request.delivery.latitude, longitude: request.delivery.longitude },
-      packages: [{
-        weight: request.package.weight,
-        dimensions: {
-          length: request.package.length,
-          width: request.package.width,
-          height: request.package.height,
+    const grabQuotes = await this.grabShippingService.getShippingQuotes(
+      tenantId,
+      {
+        origin: {
+          latitude: request.pickup.latitude,
+          longitude: request.pickup.longitude,
         },
-      }],
-      serviceTypes,
-    });
+        destination: {
+          latitude: request.delivery.latitude,
+          longitude: request.delivery.longitude,
+        },
+        packages: [
+          {
+            weight: request.package.weight,
+            dimensions: {
+              length: request.package.length,
+              width: request.package.width,
+              height: request.package.height,
+            },
+          },
+        ],
+        serviceTypes,
+      },
+    );
 
-    return grabQuotes.map((quote: GrabShippingQuote): InstantDeliveryQuote => ({
-      provider: 'grab',
-      carrierId: quote.carrierId,
-      carrierName: quote.carrierName,
-      serviceCode: quote.serviceCode,
-      serviceName: quote.serviceName,
-      serviceType: quote.serviceType,
-      cost: quote.cost,
-      timeframe: {
-        estimatedMinutes: quote.timeframe.estimatedMinutes,
-        estimatedPickupTime: quote.timeframe.estimatedPickupTime,
-        estimatedDeliveryTime: quote.timeframe.estimatedDeliveryTime,
-      },
-      features: quote.features,
-      distance: quote.distance,
-      availability: {
-        isServiceable: true, // Grab service check would be done in the shipping service
-      },
-    }));
+    return grabQuotes.map(
+      (quote: GrabShippingQuote): InstantDeliveryQuote => ({
+        provider: 'grab',
+        carrierId: quote.carrierId,
+        carrierName: quote.carrierName,
+        serviceCode: quote.serviceCode,
+        serviceName: quote.serviceName,
+        serviceType: quote.serviceType,
+        cost: quote.cost,
+        timeframe: {
+          estimatedMinutes: quote.timeframe.estimatedMinutes,
+          estimatedPickupTime: quote.timeframe.estimatedPickupTime,
+          estimatedDeliveryTime: quote.timeframe.estimatedDeliveryTime,
+        },
+        features: quote.features,
+        distance: quote.distance,
+        availability: {
+          isServiceable: true, // Grab service check would be done in the shipping service
+        },
+      }),
+    );
   }
 
   private async createGojekDelivery(
     tenantId: string,
-    request: InstantDeliveryRequest
+    request: InstantDeliveryRequest,
   ): Promise<ShippingLabel> {
     const gojekRequest: GojekShipmentRequest = {
       orderId: request.orderId,
@@ -424,7 +503,7 @@ export class InstantDeliveryService {
 
   private async createGrabDelivery(
     tenantId: string,
-    request: InstantDeliveryRequest
+    request: InstantDeliveryRequest,
   ): Promise<ShippingLabel> {
     const grabRequest: GrabShipmentRequest = {
       orderId: request.orderId,
@@ -455,18 +534,20 @@ export class InstantDeliveryService {
         },
         note: request.delivery.notes,
       },
-      packages: [{
-        name: request.package.description,
-        description: request.package.description,
-        quantity: request.package.quantity || 1,
-        weight: request.package.weight,
-        dimensions: {
-          length: request.package.length,
-          width: request.package.width,
-          height: request.package.height,
+      packages: [
+        {
+          name: request.package.description,
+          description: request.package.description,
+          quantity: request.package.quantity || 1,
+          weight: request.package.weight,
+          dimensions: {
+            length: request.package.length,
+            width: request.package.width,
+            height: request.package.height,
+          },
+          value: request.package.value,
         },
-        value: request.package.value,
-      }],
+      ],
       paymentMethod: this.mapPaymentMethodForGrab(request.paymentMethod),
       codAmount: request.codAmount,
       scheduledAt: request.scheduledAt,
@@ -476,7 +557,9 @@ export class InstantDeliveryService {
     return this.grabShippingService.createShipment(tenantId, grabRequest);
   }
 
-  private mapServiceTypeForGojek(serviceType: string): 'instant' | 'same_day' | 'next_day' {
+  private mapServiceTypeForGojek(
+    serviceType: string,
+  ): 'instant' | 'same_day' | 'next_day' {
     const mapping = {
       instant: 'instant',
       same_day: 'same_day',
@@ -486,7 +569,9 @@ export class InstantDeliveryService {
     return mapping[serviceType] || 'instant';
   }
 
-  private mapPaymentMethodForGojek(paymentMethod: string): 'cash' | 'gopay' | 'corporate' {
+  private mapPaymentMethodForGojek(
+    paymentMethod: string,
+  ): 'cash' | 'gopay' | 'corporate' {
     const mapping = {
       cash: 'cash',
       cashless: 'gopay',
@@ -503,7 +588,7 @@ export class InstantDeliveryService {
   private async scheduleTrackingUpdates(
     tenantId: string,
     trackingNumber: string,
-    provider: 'gojek' | 'grab'
+    provider: 'gojek' | 'grab',
   ): Promise<void> {
     // Schedule periodic tracking updates
     const trackingUpdateJob = {
@@ -519,16 +604,24 @@ export class InstantDeliveryService {
 
     // Schedule periodic updates every 2 minutes for the first hour
     for (let i = 1; i <= 30; i++) {
-      await this.instantDeliveryQueue.add('update-tracking', trackingUpdateJob, {
-        delay: i * 2 * 60 * 1000, // Every 2 minutes
-      });
+      await this.instantDeliveryQueue.add(
+        'update-tracking',
+        trackingUpdateJob,
+        {
+          delay: i * 2 * 60 * 1000, // Every 2 minutes
+        },
+      );
     }
 
     // Then every 10 minutes for the next 4 hours
     for (let i = 1; i <= 24; i++) {
-      await this.instantDeliveryQueue.add('update-tracking', trackingUpdateJob, {
-        delay: (30 * 2 * 60 * 1000) + (i * 10 * 60 * 1000), // After first hour, every 10 minutes
-      });
+      await this.instantDeliveryQueue.add(
+        'update-tracking',
+        trackingUpdateJob,
+        {
+          delay: 30 * 2 * 60 * 1000 + i * 10 * 60 * 1000, // After first hour, every 10 minutes
+        },
+      );
     }
   }
 }

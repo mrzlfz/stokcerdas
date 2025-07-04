@@ -32,7 +32,7 @@ export class TenantGuard implements CanActivate {
 
     // Extract tenant ID from headers
     const tenantId = request.headers['x-tenant-id'] as string;
-    
+
     if (!tenantId) {
       this.logger.warn('Missing tenant ID in request headers');
       throw new BadRequestException({
@@ -43,7 +43,8 @@ export class TenantGuard implements CanActivate {
     }
 
     // Validate tenant ID format (UUID)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(tenantId)) {
       this.logger.warn(`Invalid tenant ID format: ${tenantId}`);
       throw new BadRequestException({
@@ -56,7 +57,9 @@ export class TenantGuard implements CanActivate {
     // If user is authenticated, verify they belong to this tenant
     const user = (request as any).user;
     if (user && user.tenantId && user.tenantId !== tenantId) {
-      this.logger.warn(`Tenant mismatch for user ${user.id}: expected ${tenantId}, got ${user.tenantId}`);
+      this.logger.warn(
+        `Tenant mismatch for user ${user.id}: expected ${tenantId}, got ${user.tenantId}`,
+      );
       throw new UnauthorizedException({
         code: 'TENANT_MISMATCH',
         message: 'Akses ditolak untuk tenant ini',
@@ -73,5 +76,5 @@ export class TenantGuard implements CanActivate {
 }
 
 // Decorator for skipping tenant checks
-export const SkipTenantCheck = () => 
+export const SkipTenantCheck = () =>
   Reflect.metadata(SKIP_TENANT_CHECK_KEY, true);

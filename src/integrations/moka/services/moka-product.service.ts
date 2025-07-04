@@ -3,9 +3,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { MokaApiService, MokaCredentials, MokaProduct, MokaApiRequest } from './moka-api.service';
+import {
+  MokaApiService,
+  MokaCredentials,
+  MokaProduct,
+  MokaApiRequest,
+} from './moka-api.service';
 import { MokaAuthService } from './moka-auth.service';
-import { Product, ProductStatus } from '../../../products/entities/product.entity';
+import {
+  Product,
+  ProductStatus,
+} from '../../../products/entities/product.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
@@ -51,8 +59,11 @@ export class MokaProductService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -65,7 +76,11 @@ export class MokaProductService {
       // Get categories first if needed
       let categoryMapping: Record<string, string> = {};
       if (options.includeCategories) {
-        categoryMapping = await this.syncCategoriesFromMoka(tenantId, channelId, credentials);
+        categoryMapping = await this.syncCategoriesFromMoka(
+          tenantId,
+          channelId,
+          credentials,
+        );
       }
 
       // Get all products from Moka with pagination
@@ -83,11 +98,13 @@ export class MokaProductService {
           );
 
           if (!productList.success || !productList.data) {
-            throw new Error(`Failed to get product list: ${productList.error?.message}`);
+            throw new Error(
+              `Failed to get product list: ${productList.error?.message}`,
+            );
           }
 
           const products = productList.data.data;
-          
+
           // Process products in this page
           for (const mokaProduct of products) {
             try {
@@ -100,8 +117,12 @@ export class MokaProductService {
               );
               syncedCount++;
             } catch (error) {
-              this.logger.error(`Failed to sync product ${mokaProduct.id}: ${error.message}`);
-              errors.push(`Product ${mokaProduct.name} (${mokaProduct.id}): ${error.message}`);
+              this.logger.error(
+                `Failed to sync product ${mokaProduct.id}: ${error.message}`,
+              );
+              errors.push(
+                `Product ${mokaProduct.name} (${mokaProduct.id}): ${error.message}`,
+              );
               errorCount++;
             }
           }
@@ -109,9 +130,11 @@ export class MokaProductService {
           // Check if there are more pages
           hasMorePages = page < productList.data.pagination.total_pages;
           page++;
-
         } catch (error) {
-          this.logger.error(`Product batch sync failed for page ${page}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Product batch sync failed for page ${page}: ${error.message}`,
+            error.stack,
+          );
           errorCount += limit; // Estimate failed items
           errors.push(`Page ${page} sync failed: ${error.message}`);
           break;
@@ -119,7 +142,7 @@ export class MokaProductService {
       }
 
       const duration = Date.now() - startTime;
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -135,10 +158,9 @@ export class MokaProductService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Product sync failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -166,7 +188,10 @@ export class MokaProductService {
     productId: string,
   ): Promise<{ success: boolean; externalId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const product = await this.getProductWithDetails(tenantId, productId);
 
       if (!product) {
@@ -229,10 +254,12 @@ export class MokaProductService {
       } else {
         throw new Error(result.error?.message || 'Unknown error');
       }
-
     } catch (error) {
-      this.logger.error(`Product sync to Moka failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Product sync to Moka failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -258,7 +285,10 @@ export class MokaProductService {
     mokaProductId: string,
   ): Promise<{ success: boolean; data?: MokaProduct; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const response = await this.mokaApiService.getProduct(
         credentials,
@@ -278,9 +308,11 @@ export class MokaProductService {
           error: response.error?.message || 'Product not found',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Moka product details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Moka product details: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -297,7 +329,10 @@ export class MokaProductService {
     mokaProductId: string,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const response = await this.mokaApiService.deleteProduct(
         credentials,
@@ -331,9 +366,11 @@ export class MokaProductService {
           error: response.error?.message || 'Delete failed',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to delete Moka product: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete Moka product: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -361,7 +398,7 @@ export class MokaProductService {
       }
 
       const mapping: Record<string, string> = {};
-      
+
       // For now, we'll just log the categories
       // In a full implementation, you'd create/update categories in your system
       for (const category of response.data) {
@@ -370,7 +407,6 @@ export class MokaProductService {
       }
 
       return mapping;
-
     } catch (error) {
       this.logger.error(`Failed to sync categories: ${error.message}`);
       return {};
@@ -408,7 +444,11 @@ export class MokaProductService {
       }
     } else {
       // Create new product
-      product = await this.createProductFromMoka(tenantId, mokaProduct, categoryMapping);
+      product = await this.createProductFromMoka(
+        tenantId,
+        mokaProduct,
+        categoryMapping,
+      );
       await this.productRepository.save(product);
 
       // Create mapping
@@ -422,7 +462,11 @@ export class MokaProductService {
     }
 
     // Sync variants if enabled and product has variants
-    if (options.includeVariants && mokaProduct.variants && mokaProduct.variants.length > 0) {
+    if (
+      options.includeVariants &&
+      mokaProduct.variants &&
+      mokaProduct.variants.length > 0
+    ) {
       await this.syncProductVariants(
         tenantId,
         channelId,
@@ -451,7 +495,9 @@ export class MokaProductService {
       name: mokaProduct.name,
       description: mokaProduct.description,
       sku: mokaProduct.sku,
-      status: this.mokaApiService.mapMokaProductStatus(mokaProduct.is_active) as ProductStatus,
+      status: this.mokaApiService.mapMokaProductStatus(
+        mokaProduct.is_active,
+      ) as ProductStatus,
       costPrice: mokaProduct.cost,
       sellingPrice: mokaProduct.price,
       unit: mokaProduct.unit,
@@ -483,7 +529,9 @@ export class MokaProductService {
     product.name = mokaProduct.name;
     product.description = mokaProduct.description;
     product.sku = mokaProduct.sku;
-    product.status = this.mokaApiService.mapMokaProductStatus(mokaProduct.is_active) as ProductStatus;
+    product.status = this.mokaApiService.mapMokaProductStatus(
+      mokaProduct.is_active,
+    ) as ProductStatus;
     product.costPrice = mokaProduct.cost;
     product.sellingPrice = mokaProduct.price;
     product.unit = mokaProduct.unit;
@@ -491,8 +539,9 @@ export class MokaProductService {
     product.image = mokaProduct.image_url;
     product.trackStock = mokaProduct.track_stock;
     product.allowBackorder = mokaProduct.allow_out_of_stock;
-    product.categoryId = categoryMapping[mokaProduct.category_id] || product.categoryId;
-    
+    product.categoryId =
+      categoryMapping[mokaProduct.category_id] || product.categoryId;
+
     product.metadata = {
       ...product.metadata,
       moka: {
@@ -607,14 +656,16 @@ export class MokaProductService {
     // Implementation for syncing product variants
     // This would involve creating/updating ProductVariant entities
     // Similar to the main product sync logic but for variants
-    this.logger.debug(`Syncing ${mokaVariants.length} variants for product ${productId}`);
-    
+    this.logger.debug(
+      `Syncing ${mokaVariants.length} variants for product ${productId}`,
+    );
+
     // For each variant:
     // 1. Check if mapping exists
     // 2. Create or update ProductVariant entity
     // 3. Create channel mapping
     // 4. Emit events
-    
+
     // Omitted detailed implementation for brevity
   }
 }

@@ -15,27 +15,44 @@ import {
   ValidationPipe,
   UsePipes,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsDateString, IsNumber, IsBoolean, ValidateNested } from 'class-validator';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsNumber,
+  IsBoolean,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { EnterprisePermissionsGuard } from '../../auth/guards/enterprise-permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionResource, PermissionAction } from '../../auth/entities/permission.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../../auth/entities/permission.entity';
 import { SOC2ControlService } from '../services/soc2-control.service';
 import { SOC2AuditLogService } from '../services/soc2-audit-log.service';
-import { 
-  SOC2Control, 
-  TrustServiceCriteria, 
-  ControlStatus, 
-  RiskLevel 
+import {
+  SOC2Control,
+  TrustServiceCriteria,
+  ControlStatus,
+  RiskLevel,
 } from '../entities/soc2-control.entity';
-import { 
-  SOC2AuditLog, 
-  AuditEventType, 
-  AuditEventSeverity, 
-  AuditEventOutcome 
+import {
+  SOC2AuditLog,
+  AuditEventType,
+  AuditEventSeverity,
+  AuditEventOutcome,
 } from '../entities/soc2-audit-log.entity';
 
 // DTOs
@@ -199,7 +216,10 @@ export class SOC2ComplianceController {
   @Get('controls')
   @ApiOperation({ summary: 'Get all SOC 2 controls' })
   @ApiResponse({ status: 200, description: 'Controls retrieved successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.READ,
+  })
   @UsePipes(new ValidationPipe({ transform: true }))
   async getControls(
     @Request() req: any,
@@ -228,7 +248,10 @@ export class SOC2ComplianceController {
   @Get('controls/:controlId')
   @ApiOperation({ summary: 'Get specific SOC 2 control' })
   @ApiResponse({ status: 200, description: 'Control retrieved successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.READ,
+  })
   async getControl(
     @Request() req: any,
     @Param('controlId') controlId: string,
@@ -237,7 +260,10 @@ export class SOC2ComplianceController {
     data: SOC2Control;
   }> {
     const tenantId = req.user.tenantId;
-    const control = await this.soc2ControlService.getControl(tenantId, controlId);
+    const control = await this.soc2ControlService.getControl(
+      tenantId,
+      controlId,
+    );
 
     return {
       success: true,
@@ -247,8 +273,14 @@ export class SOC2ComplianceController {
 
   @Put('controls/:controlId/status')
   @ApiOperation({ summary: 'Update control status' })
-  @ApiResponse({ status: 200, description: 'Control status updated successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.UPDATE })
+  @ApiResponse({
+    status: 200,
+    description: 'Control status updated successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.UPDATE,
+  })
   async updateControlStatus(
     @Request() req: any,
     @Param('controlId') controlId: string,
@@ -274,7 +306,7 @@ export class SOC2ComplianceController {
       `Updated SOC 2 control ${controlId} status to ${updateDto.status}`,
       AuditEventOutcome.SUCCESS,
       { controlId, previousStatus: control.status },
-      { controlId, newStatus: updateDto.status, notes: updateDto.notes }
+      { controlId, newStatus: updateDto.status, notes: updateDto.notes },
     );
 
     return {
@@ -286,8 +318,14 @@ export class SOC2ComplianceController {
 
   @Post('controls/:controlId/tests')
   @ApiOperation({ summary: 'Record control test result' })
-  @ApiResponse({ status: 201, description: 'Test result recorded successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.CREATE })
+  @ApiResponse({
+    status: 201,
+    description: 'Test result recorded successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.CREATE,
+  })
   async recordTestResult(
     @Request() req: any,
     @Param('controlId') controlId: string,
@@ -308,7 +346,10 @@ export class SOC2ComplianceController {
     await this.soc2AuditLogService.logEvent(tenantId, {
       eventType: AuditEventType.CONTROL_TEST,
       eventDescription: `Recorded test result for control ${controlId}: ${testDto.testResult}`,
-      severity: testDto.testResult === 'failed' ? AuditEventSeverity.HIGH : AuditEventSeverity.LOW,
+      severity:
+        testDto.testResult === 'failed'
+          ? AuditEventSeverity.HIGH
+          : AuditEventSeverity.LOW,
       outcome: AuditEventOutcome.SUCCESS,
       userId: req.user.id,
       userEmail: req.user.email,
@@ -319,7 +360,9 @@ export class SOC2ComplianceController {
       sourceModule: 'Compliance',
       additionalData: {
         testResult: testDto.testResult,
-        hasDeficiencies: !!(testDto.deficiencies && testDto.deficiencies.length > 0),
+        hasDeficiencies: !!(
+          testDto.deficiencies && testDto.deficiencies.length > 0
+        ),
       },
     });
 
@@ -333,7 +376,10 @@ export class SOC2ComplianceController {
   @Post('controls/:controlId/evidence')
   @ApiOperation({ summary: 'Collect evidence for control' })
   @ApiResponse({ status: 201, description: 'Evidence collected successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.CREATE,
+  })
   async collectEvidence(
     @Request() req: any,
     @Param('controlId') controlId: string,
@@ -344,12 +390,16 @@ export class SOC2ComplianceController {
     message: string;
   }> {
     const tenantId = req.user.tenantId;
-    const evidence = await this.soc2ControlService.collectEvidence(tenantId, controlId, {
-      ...evidenceDto,
-      periodStart: new Date(evidenceDto.periodStart),
-      periodEnd: new Date(evidenceDto.periodEnd),
-      collectedBy: req.user.id,
-    });
+    const evidence = await this.soc2ControlService.collectEvidence(
+      tenantId,
+      controlId,
+      {
+        ...evidenceDto,
+        periodStart: new Date(evidenceDto.periodStart),
+        periodEnd: new Date(evidenceDto.periodEnd),
+        collectedBy: req.user.id,
+      },
+    );
 
     // Log the evidence collection
     await this.soc2AuditLogService.logEvent(tenantId, {
@@ -381,16 +431,22 @@ export class SOC2ComplianceController {
 
   @Get('reports/compliance')
   @ApiOperation({ summary: 'Generate compliance report' })
-  @ApiResponse({ status: 200, description: 'Compliance report generated successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.READ })
-  async generateComplianceReport(
-    @Request() req: any,
-  ): Promise<{
+  @ApiResponse({
+    status: 200,
+    description: 'Compliance report generated successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.READ,
+  })
+  async generateComplianceReport(@Request() req: any): Promise<{
     success: boolean;
     data: any;
   }> {
     const tenantId = req.user.tenantId;
-    const report = await this.soc2ControlService.generateComplianceReport(tenantId);
+    const report = await this.soc2ControlService.generateComplianceReport(
+      tenantId,
+    );
 
     // Log report generation
     await this.soc2AuditLogService.logEvent(tenantId, {
@@ -420,12 +476,16 @@ export class SOC2ComplianceController {
 
   @Post('initialize')
   @ApiOperation({ summary: 'Initialize default SOC 2 controls' })
-  @ApiResponse({ status: 201, description: 'SOC 2 controls initialized successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.MANAGE_SYSTEM })
+  @ApiResponse({
+    status: 201,
+    description: 'SOC 2 controls initialized successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.MANAGE_SYSTEM,
+  })
   @HttpCode(HttpStatus.CREATED)
-  async initializeControls(
-    @Request() req: any,
-  ): Promise<{
+  async initializeControls(@Request() req: any): Promise<{
     success: boolean;
     message: string;
   }> {
@@ -440,7 +500,7 @@ export class SOC2ComplianceController {
       'Initialized default SOC 2 controls',
       AuditEventOutcome.SUCCESS,
       {},
-      { action: 'initialize_soc2_controls' }
+      { action: 'initialize_soc2_controls' },
     );
 
     return {
@@ -453,8 +513,14 @@ export class SOC2ComplianceController {
 
   @Get('audit-logs')
   @ApiOperation({ summary: 'Query audit logs' })
-  @ApiResponse({ status: 200, description: 'Audit logs retrieved successfully' })
-  @Permissions({ resource: PermissionResource.AUDIT_LOGS, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Audit logs retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.AUDIT_LOGS,
+    action: PermissionAction.READ,
+  })
   @UsePipes(new ValidationPipe({ transform: true }))
   async queryAuditLogs(
     @Request() req: any,
@@ -470,7 +536,7 @@ export class SOC2ComplianceController {
     };
   }> {
     const tenantId = req.user.tenantId;
-    
+
     const queryParams = {
       tenantId,
       ...query,
@@ -483,7 +549,9 @@ export class SOC2ComplianceController {
     // Log audit log access (for compliance purposes)
     await this.soc2AuditLogService.logEvent(tenantId, {
       eventType: AuditEventType.AUDIT_LOG_ACCESS,
-      eventDescription: `Accessed audit logs with filters: ${JSON.stringify(query)}`,
+      eventDescription: `Accessed audit logs with filters: ${JSON.stringify(
+        query,
+      )}`,
       severity: AuditEventSeverity.MEDIUM,
       outcome: AuditEventOutcome.SUCCESS,
       userId: req.user.id,
@@ -511,8 +579,14 @@ export class SOC2ComplianceController {
 
   @Get('security-analysis')
   @ApiOperation({ summary: 'Generate security analysis report' })
-  @ApiResponse({ status: 200, description: 'Security analysis generated successfully' })
-  @Permissions({ resource: PermissionResource.AUDIT_LOGS, action: PermissionAction.READ })
+  @ApiResponse({
+    status: 200,
+    description: 'Security analysis generated successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.AUDIT_LOGS,
+    action: PermissionAction.READ,
+  })
   async generateSecurityAnalysis(
     @Request() req: any,
     @Query() query: SecurityAnalysisQueryDto,
@@ -560,11 +634,15 @@ export class SOC2ComplianceController {
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get SOC 2 compliance dashboard data' })
-  @ApiResponse({ status: 200, description: 'Dashboard data retrieved successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.READ })
-  async getComplianceDashboard(
-    @Request() req: any,
-  ): Promise<{
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard data retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.READ,
+  })
+  async getComplianceDashboard(@Request() req: any): Promise<{
     success: boolean;
     data: {
       overview: any;
@@ -577,15 +655,19 @@ export class SOC2ComplianceController {
     const tenantId = req.user.tenantId;
 
     // Get compliance report for overview
-    const complianceReport = await this.soc2ControlService.generateComplianceReport(tenantId);
+    const complianceReport =
+      await this.soc2ControlService.generateComplianceReport(tenantId);
 
     // Get overdue controls
-    const overdueControls = await this.soc2ControlService.getControls(tenantId, { overdue: true });
+    const overdueControls = await this.soc2ControlService.getControls(
+      tenantId,
+      { overdue: true },
+    );
 
     // Get recent security events (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
+
     const securityEventsQuery = await this.soc2AuditLogService.queryLogs({
       tenantId,
       eventTypes: [
@@ -631,11 +713,15 @@ export class SOC2ComplianceController {
 
   @Get('health')
   @ApiOperation({ summary: 'Get SOC 2 compliance health status' })
-  @ApiResponse({ status: 200, description: 'Health status retrieved successfully' })
-  @Permissions({ resource: PermissionResource.COMPLIANCE, action: PermissionAction.READ })
-  async getComplianceHealth(
-    @Request() req: any,
-  ): Promise<{
+  @ApiResponse({
+    status: 200,
+    description: 'Health status retrieved successfully',
+  })
+  @Permissions({
+    resource: PermissionResource.COMPLIANCE,
+    action: PermissionAction.READ,
+  })
+  async getComplianceHealth(@Request() req: any): Promise<{
     success: boolean;
     data: {
       status: 'healthy' | 'warning' | 'critical';
@@ -651,15 +737,21 @@ export class SOC2ComplianceController {
   }> {
     const tenantId = req.user.tenantId;
     const controls = await this.soc2ControlService.getControls(tenantId);
-    const complianceReport = await this.soc2ControlService.generateComplianceReport(tenantId);
+    const complianceReport =
+      await this.soc2ControlService.generateComplianceReport(tenantId);
 
     const totalControls = controls.length;
     const overdueControls = controls.filter(c => c.isOverdue).length;
-    const controlsWithExceptions = controls.filter(c => c.hasActiveExceptions).length;
-    const averageRiskScore = controls.reduce((sum, c) => sum + c.riskScore, 0) / totalControls;
+    const controlsWithExceptions = controls.filter(
+      c => c.hasActiveExceptions,
+    ).length;
+    const averageRiskScore =
+      controls.reduce((sum, c) => sum + c.riskScore, 0) / totalControls;
 
-    const controlCoverage = (complianceReport.passedControls / totalControls) * 100;
-    const testingCurrency = ((totalControls - overdueControls) / totalControls) * 100;
+    const controlCoverage =
+      (complianceReport.passedControls / totalControls) * 100;
+    const testingCurrency =
+      ((totalControls - overdueControls) / totalControls) * 100;
     const exceptionRate = (controlsWithExceptions / totalControls) * 100;
 
     const issues: string[] = [];

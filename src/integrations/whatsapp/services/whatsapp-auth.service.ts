@@ -4,11 +4,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { Channel, ChannelStatus } from '../../../channels/entities/channel.entity';
+import {
+  Channel,
+  ChannelStatus,
+} from '../../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { WhatsAppApiService, WhatsAppConfig, WhatsAppApiResponse } from './whatsapp-api.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  WhatsAppApiService,
+  WhatsAppConfig,
+  WhatsAppApiResponse,
+} from './whatsapp-api.service';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface WhatsAppAuthConfig {
   appId: string;
@@ -66,11 +76,14 @@ export class WhatsAppAuthService {
     credentials: WhatsAppAuthConfig,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      this.logger.debug(`Storing WhatsApp credentials for channel ${channelId}`, {
-        tenantId,
-        channelId,
-        phoneNumberId: credentials.phoneNumberId,
-      });
+      this.logger.debug(
+        `Storing WhatsApp credentials for channel ${channelId}`,
+        {
+          tenantId,
+          channelId,
+          phoneNumberId: credentials.phoneNumberId,
+        },
+      );
 
       // Find the channel
       const channel = await this.channelRepository.findOne({
@@ -89,7 +102,11 @@ export class WhatsAppAuthService {
       }
 
       // Validate credentials before storing
-      const validation = await this.validateCredentials(tenantId, channelId, credentials);
+      const validation = await this.validateCredentials(
+        tenantId,
+        channelId,
+        credentials,
+      );
       if (!validation.isValid) {
         return {
           success: false,
@@ -166,14 +183,16 @@ export class WhatsAppAuthService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to store WhatsApp credentials: ${error.message}`, {
-        tenantId,
-        channelId,
-        error: error.message,
-        stack: error.stack,
-      });
+      this.logger.error(
+        `Failed to store WhatsApp credentials: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          error: error.message,
+          stack: error.stack,
+        },
+      );
 
       await this.logService.logError(tenantId, channelId, error, {
         metadata: { operation: 'store_credentials' },
@@ -210,22 +229,27 @@ export class WhatsAppAuthService {
 
       // Check if credentials are still valid (if we have expiration)
       if (credentials.expiresAt && credentials.expiresAt < new Date()) {
-        this.logger.warn(`WhatsApp credentials expired for channel ${channelId}`, {
-          tenantId,
-          channelId,
-          expiresAt: credentials.expiresAt,
-        });
+        this.logger.warn(
+          `WhatsApp credentials expired for channel ${channelId}`,
+          {
+            tenantId,
+            channelId,
+            expiresAt: credentials.expiresAt,
+          },
+        );
         return null;
       }
 
       return credentials;
-
     } catch (error) {
-      this.logger.error(`Failed to get WhatsApp credentials: ${error.message}`, {
-        tenantId,
-        channelId,
-        error: error.message,
-      });
+      this.logger.error(
+        `Failed to get WhatsApp credentials: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          error: error.message,
+        },
+      );
       return null;
     }
   }
@@ -242,11 +266,14 @@ export class WhatsAppAuthService {
     const warnings: string[] = [];
 
     try {
-      this.logger.debug(`Validating WhatsApp credentials for channel ${channelId}`, {
-        tenantId,
-        channelId,
-        phoneNumberId: config.phoneNumberId,
-      });
+      this.logger.debug(
+        `Validating WhatsApp credentials for channel ${channelId}`,
+        {
+          tenantId,
+          channelId,
+          phoneNumberId: config.phoneNumberId,
+        },
+      );
 
       // Basic validation
       if (!config.accessToken) {
@@ -292,7 +319,9 @@ export class WhatsAppAuthService {
       );
 
       if (!accountResult.success) {
-        errors.push(`Account validation failed: ${accountResult.error?.message}`);
+        errors.push(
+          `Account validation failed: ${accountResult.error?.message}`,
+        );
         return { isValid: false, errors };
       }
 
@@ -304,7 +333,9 @@ export class WhatsAppAuthService {
       );
 
       if (!phoneResult.success) {
-        errors.push(`Phone number validation failed: ${phoneResult.error?.message}`);
+        errors.push(
+          `Phone number validation failed: ${phoneResult.error?.message}`,
+        );
         return { isValid: false, errors };
       }
 
@@ -325,15 +356,21 @@ export class WhatsAppAuthService {
       // Check quality rating
       const qualityRating = phoneResult.data?.quality_rating;
       if (qualityRating === 'RED') {
-        warnings.push('Phone number has RED quality rating - messaging may be limited');
+        warnings.push(
+          'Phone number has RED quality rating - messaging may be limited',
+        );
       } else if (qualityRating === 'YELLOW') {
-        warnings.push('Phone number has YELLOW quality rating - monitor message quality');
+        warnings.push(
+          'Phone number has YELLOW quality rating - monitor message quality',
+        );
       }
 
       // Check business verification
       const accountInfo = accountResult.data;
       if (accountInfo?.business_verification_status !== 'verified') {
-        warnings.push('Business account is not verified - some features may be limited');
+        warnings.push(
+          'Business account is not verified - some features may be limited',
+        );
       }
 
       return {
@@ -343,14 +380,16 @@ export class WhatsAppAuthService {
         errors: errors.length > 0 ? errors : undefined,
         warnings: warnings.length > 0 ? warnings : undefined,
       };
-
     } catch (error) {
-      this.logger.error(`WhatsApp credential validation error: ${error.message}`, {
-        tenantId,
-        channelId,
-        error: error.message,
-        stack: error.stack,
-      });
+      this.logger.error(
+        `WhatsApp credential validation error: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          error: error.message,
+          stack: error.stack,
+        },
+      );
 
       errors.push(`Validation error: ${error.message}`);
       return { isValid: false, errors };
@@ -363,7 +402,12 @@ export class WhatsAppAuthService {
   async testAuthentication(
     tenantId: string,
     channelId: string,
-  ): Promise<{ success: boolean; error?: string; accountInfo?: any; phoneNumberInfo?: any }> {
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    accountInfo?: any;
+    phoneNumberInfo?: any;
+  }> {
     try {
       const credentials = await this.getCredentials(tenantId, channelId);
       if (!credentials) {
@@ -382,7 +426,11 @@ export class WhatsAppAuthService {
         verifyToken: credentials.verifyToken,
       };
 
-      const testResult = await this.apiService.testConnection(tenantId, channelId, config);
+      const testResult = await this.apiService.testConnection(
+        tenantId,
+        channelId,
+        config,
+      );
 
       if (testResult.success) {
         // Update last verified timestamp
@@ -398,8 +446,16 @@ export class WhatsAppAuthService {
         );
 
         // Get detailed info for response
-        const accountResult = await this.apiService.getAccountInfo(tenantId, channelId, config);
-        const phoneResult = await this.apiService.getPhoneNumberInfo(tenantId, channelId, config);
+        const accountResult = await this.apiService.getAccountInfo(
+          tenantId,
+          channelId,
+          config,
+        );
+        const phoneResult = await this.apiService.getPhoneNumberInfo(
+          tenantId,
+          channelId,
+          config,
+        );
 
         return {
           success: true,
@@ -412,13 +468,15 @@ export class WhatsAppAuthService {
           error: testResult.error?.message || 'Authentication test failed',
         };
       }
-
     } catch (error) {
-      this.logger.error(`WhatsApp authentication test failed: ${error.message}`, {
-        tenantId,
-        channelId,
-        error: error.message,
-      });
+      this.logger.error(
+        `WhatsApp authentication test failed: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          error: error.message,
+        },
+      );
 
       return {
         success: false,
@@ -435,10 +493,13 @@ export class WhatsAppAuthService {
     channelId: string,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      this.logger.log(`Revoking WhatsApp authentication for channel ${channelId}`, {
-        tenantId,
-        channelId,
-      });
+      this.logger.log(
+        `Revoking WhatsApp authentication for channel ${channelId}`,
+        {
+          tenantId,
+          channelId,
+        },
+      );
 
       // Update channel to inactive
       await this.channelRepository.update(
@@ -472,13 +533,15 @@ export class WhatsAppAuthService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to revoke WhatsApp authentication: ${error.message}`, {
-        tenantId,
-        channelId,
-        error: error.message,
-      });
+      this.logger.error(
+        `Failed to revoke WhatsApp authentication: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          error: error.message,
+        },
+      );
 
       return {
         success: false,
@@ -532,7 +595,6 @@ export class WhatsAppAuthService {
       });
 
       return { success: true };
-
     } catch (error) {
       this.logger.error(`Failed to update webhook URL: ${error.message}`, {
         tenantId,
@@ -582,7 +644,7 @@ export class WhatsAppAuthService {
 
       // Test current authentication
       const testResult = await this.testAuthentication(tenantId, channelId);
-      
+
       const issues: string[] = [];
       let healthStatus: 'healthy' | 'warning' | 'error' = 'healthy';
 
@@ -602,7 +664,10 @@ export class WhatsAppAuthService {
           }
 
           if (phoneInfo.status !== 'CONNECTED') {
-            if (phoneInfo.status === 'RESTRICTED' || phoneInfo.status === 'FLAGGED') {
+            if (
+              phoneInfo.status === 'RESTRICTED' ||
+              phoneInfo.status === 'FLAGGED'
+            ) {
               healthStatus = 'error';
             } else {
               healthStatus = 'warning';
@@ -612,7 +677,10 @@ export class WhatsAppAuthService {
         }
 
         const accountInfo = testResult.accountInfo;
-        if (accountInfo && accountInfo.business_verification_status !== 'verified') {
+        if (
+          accountInfo &&
+          accountInfo.business_verification_status !== 'verified'
+        ) {
           if (healthStatus !== 'error') {
             healthStatus = 'warning';
           }
@@ -628,7 +696,6 @@ export class WhatsAppAuthService {
         healthStatus,
         issues: issues.length > 0 ? issues : undefined,
       };
-
     } catch (error) {
       this.logger.error(`Failed to get channel status: ${error.message}`, {
         tenantId,

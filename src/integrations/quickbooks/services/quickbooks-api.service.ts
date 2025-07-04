@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 import { AccountingAccount } from '../../entities/accounting-account.entity';
 
@@ -192,7 +197,7 @@ export interface QuickBooksCustomer {
 @Injectable()
 export class QuickBooksApiService extends BaseApiService {
   protected readonly logger = new Logger(QuickBooksApiService.name);
-  
+
   constructor(
     protected readonly httpService: HttpService,
     protected readonly configService: ConfigService,
@@ -204,9 +209,10 @@ export class QuickBooksApiService extends BaseApiService {
    * Get QuickBooks API configuration
    */
   private getApiConfig(credentials: QuickBooksCredentials): ApiConfig {
-    const baseUrl = credentials.environment === 'sandbox' 
-      ? 'https://sandbox-quickbooks.api.intuit.com'
-      : 'https://quickbooks.api.intuit.com';
+    const baseUrl =
+      credentials.environment === 'sandbox'
+        ? 'https://sandbox-quickbooks.api.intuit.com'
+        : 'https://quickbooks.api.intuit.com';
 
     return {
       baseUrl,
@@ -235,7 +241,7 @@ export class QuickBooksApiService extends BaseApiService {
     channelId: string,
   ): Promise<ApiResponse<T>> {
     const config = this.getApiConfig(credentials);
-    
+
     // Prepare the endpoint with realmId
     const endpoint = `${credentials.realmId}${request.endpoint}`;
 
@@ -243,7 +249,7 @@ export class QuickBooksApiService extends BaseApiService {
       ...request,
       endpoint,
       headers: {
-        'Accept': request.acceptType || 'application/json',
+        Accept: request.acceptType || 'application/json',
         'Content-Type': 'application/json',
         'User-Agent': 'StokCerdas/1.0',
         ...request.headers,
@@ -309,7 +315,7 @@ export class QuickBooksApiService extends BaseApiService {
     scope: string = 'com.intuit.quickbooks.accounting',
   ): string {
     const baseUrl = 'https://appcenter.intuit.com/connect/oauth2';
-    
+
     const params = new URLSearchParams({
       client_id: clientId,
       scope,
@@ -331,13 +337,15 @@ export class QuickBooksApiService extends BaseApiService {
     authCode: string,
     redirectUri: string,
     tenantId: string,
-  ): Promise<ApiResponse<{
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-    token_type: string;
-    realmId: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      token_type: string;
+      realmId: string;
+    }>
+  > {
     const config: ApiConfig = {
       baseUrl: 'https://oauth.platform.intuit.com',
       apiVersion: 'oauth2/v1',
@@ -354,7 +362,9 @@ export class QuickBooksApiService extends BaseApiService {
       }).toString(),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+        Authorization: `Basic ${Buffer.from(
+          `${clientId}:${clientSecret}`,
+        ).toString('base64')}`,
       },
     };
 
@@ -367,12 +377,14 @@ export class QuickBooksApiService extends BaseApiService {
   async refreshAccessToken(
     credentials: QuickBooksCredentials,
     tenantId: string,
-  ): Promise<ApiResponse<{
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-    token_type: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      token_type: string;
+    }>
+  > {
     const config: ApiConfig = {
       baseUrl: 'https://oauth.platform.intuit.com',
       apiVersion: 'oauth2/v1',
@@ -388,7 +400,9 @@ export class QuickBooksApiService extends BaseApiService {
       }).toString(),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString('base64')}`,
+        Authorization: `Basic ${Buffer.from(
+          `${credentials.clientId}:${credentials.clientSecret}`,
+        ).toString('base64')}`,
       },
     };
 
@@ -402,21 +416,23 @@ export class QuickBooksApiService extends BaseApiService {
     credentials: QuickBooksCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    CompanyInfo: {
-      Id: string;
-      Name: string;
-      CompanyName: string;
-      LegalName: string;
-      Country: string;
-      FiscalYearStartMonth: string;
-      SupportedLanguages: string;
-      DefaultCurrency: {
-        value: string;
-        name: string;
+  ): Promise<
+    ApiResponse<{
+      CompanyInfo: {
+        Id: string;
+        Name: string;
+        CompanyName: string;
+        LegalName: string;
+        Country: string;
+        FiscalYearStartMonth: string;
+        SupportedLanguages: string;
+        DefaultCurrency: {
+          value: string;
+          name: string;
+        };
       };
-    };
-  }>> {
+    }>
+  > {
     const request: QuickBooksApiRequest = {
       method: 'GET',
       endpoint: '/companyinfo/1',
@@ -515,8 +531,8 @@ export class QuickBooksApiService extends BaseApiService {
     tenantId?: string,
     channelId?: string,
   ): Promise<ApiResponse<{ QueryResponse: { Item: QuickBooksItem[] } }>> {
-    const sqlQuery = query || "SELECT * FROM Item WHERE Active = true";
-    
+    const sqlQuery = query || 'SELECT * FROM Item WHERE Active = true';
+
     const request: QuickBooksApiRequest = {
       method: 'GET',
       endpoint: '/query',
@@ -618,9 +634,11 @@ export class QuickBooksApiService extends BaseApiService {
     query?: string,
     tenantId?: string,
     channelId?: string,
-  ): Promise<ApiResponse<{ QueryResponse: { Customer: QuickBooksCustomer[] } }>> {
-    const sqlQuery = query || "SELECT * FROM Customer WHERE Active = true";
-    
+  ): Promise<
+    ApiResponse<{ QueryResponse: { Customer: QuickBooksCustomer[] } }>
+  > {
+    const sqlQuery = query || 'SELECT * FROM Customer WHERE Active = true';
+
     const request: QuickBooksApiRequest = {
       method: 'GET',
       endpoint: '/query',
@@ -650,7 +668,7 @@ export class QuickBooksApiService extends BaseApiService {
       method: 'GET',
       endpoint: '/query',
       params: {
-        query: "SELECT * FROM Account WHERE Active = true",
+        query: 'SELECT * FROM Account WHERE Active = true',
       },
       requiresAuth: true,
     };
@@ -675,7 +693,7 @@ export class QuickBooksApiService extends BaseApiService {
       method: 'GET',
       endpoint: '/query',
       params: {
-        query: "SELECT * FROM TaxCode WHERE Active = true",
+        query: 'SELECT * FROM TaxCode WHERE Active = true',
       },
       requiresAuth: true,
     };
@@ -691,14 +709,27 @@ export class QuickBooksApiService extends BaseApiService {
   /**
    * Handle QuickBooks API errors
    */
-  handleQuickBooksError(error: any): { code: string; message: string; retryable: boolean } {
+  handleQuickBooksError(error: any): {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } {
     const errorCode = error.Fault?.Error?.[0]?.code || error.code;
-    const errorMessage = error.Fault?.Error?.[0]?.Detail || error.message || 'Unknown QuickBooks API error';
+    const errorMessage =
+      error.Fault?.Error?.[0]?.Detail ||
+      error.message ||
+      'Unknown QuickBooks API error';
 
     // Map common QuickBooks error codes
     const errorMap: Record<string, { message: string; retryable: boolean }> = {
-      '401': { message: 'Unauthorized - invalid or expired token', retryable: false },
-      '403': { message: 'Forbidden - insufficient permissions', retryable: false },
+      '401': {
+        message: 'Unauthorized - invalid or expired token',
+        retryable: false,
+      },
+      '403': {
+        message: 'Forbidden - insufficient permissions',
+        retryable: false,
+      },
       '429': { message: 'Rate limit exceeded', retryable: true },
       '500': { message: 'Internal server error', retryable: true },
       '503': { message: 'Service temporarily unavailable', retryable: true },
@@ -709,7 +740,7 @@ export class QuickBooksApiService extends BaseApiService {
     };
 
     const mappedError = errorMap[errorCode];
-    
+
     return {
       code: errorCode || 'QUICKBOOKS_API_ERROR',
       message: mappedError?.message || errorMessage,

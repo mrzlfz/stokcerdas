@@ -80,23 +80,23 @@ export class AlertConfiguration {
     reorderPoint?: number;
     maxStock?: number;
     reorderQuantity?: number;
-    
+
     // For expiry alerts
     expiryWarningDays?: number;
-    
+
     // For system alerts
     maintenanceMessage?: string;
     scheduledMaintenanceAt?: string;
-    
+
     // Notification settings
     enablePushNotification?: boolean;
     enableEmailNotification?: boolean;
     enableSmsNotification?: boolean;
-    
+
     // Snooze settings
     allowSnooze?: boolean;
     maxSnoozeHours?: number;
-    
+
     // Escalation settings
     escalateAfterHours?: number;
     escalateToUserId?: string;
@@ -120,7 +120,7 @@ export class AlertConfiguration {
     timezone?: string;
     quietHours?: {
       start: string; // HH:mm format
-      end: string;   // HH:mm format
+      end: string; // HH:mm format
     };
     days?: number[]; // 0-6 (Sunday-Saturday)
   };

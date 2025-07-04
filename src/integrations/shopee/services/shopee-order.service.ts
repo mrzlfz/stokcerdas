@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, MoreThan } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { ShopeeApiService, ShopeeCredentials, ShopeeApiRequest } from './shopee-api.service';
+import {
+  ShopeeApiService,
+  ShopeeCredentials,
+  ShopeeApiRequest,
+} from './shopee-api.service';
 import { ShopeeAuthService } from './shopee-auth.service';
 import { Order, OrderStatus } from '../../../orders/entities/order.entity';
 import { OrderItem } from '../../../orders/entities/order.entity';
@@ -140,8 +144,11 @@ export class ShopeeOrderService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -160,16 +167,20 @@ export class ShopeeOrderService {
       );
 
       if (!orderList.success || !orderList.data) {
-        throw new Error(`Failed to get order list: ${orderList.error?.message}`);
+        throw new Error(
+          `Failed to get order list: ${orderList.error?.message}`,
+        );
       }
 
-      const orderSns = orderList.data.order_list.map((order: any) => order.order_sn);
+      const orderSns = orderList.data.order_list.map(
+        (order: any) => order.order_sn,
+      );
       const batchSize = options.batchSize || 20;
 
       // Process orders in batches
       for (let i = 0; i < orderSns.length; i += batchSize) {
         const batch = orderSns.slice(i, i + batchSize);
-        
+
         try {
           const batchResult = await this.syncOrderBatch(
             credentials,
@@ -182,16 +193,18 @@ export class ShopeeOrderService {
           syncedCount += batchResult.syncedCount;
           errorCount += batchResult.errorCount;
           errors.push(...batchResult.errors);
-
         } catch (error) {
-          this.logger.error(`Order batch sync failed: ${error.message}`, error.stack);
+          this.logger.error(
+            `Order batch sync failed: ${error.message}`,
+            error.stack,
+          );
           errorCount += batch.length;
           errors.push(`Batch sync failed: ${error.message}`);
         }
       }
 
       const duration = Date.now() - startTime;
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -207,10 +220,9 @@ export class ShopeeOrderService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Order sync failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -238,7 +250,10 @@ export class ShopeeOrderService {
     orderSn: string,
   ): Promise<{ success: boolean; data?: ShopeeOrder; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const request: ShopeeApiRequest = {
         method: 'GET',
@@ -294,9 +309,11 @@ export class ShopeeOrderService {
           error: response.error?.message || 'Order not found',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Shopee order details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Shopee order details: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -315,7 +332,10 @@ export class ShopeeOrderService {
     params?: Record<string, any>,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       let endpoint: string;
       let data: Record<string, any>;
@@ -371,10 +391,12 @@ export class ShopeeOrderService {
           error: response.error?.message || 'Status update failed',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to update Shopee order status: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to update Shopee order status: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -400,7 +422,10 @@ export class ShopeeOrderService {
     orderSn: string,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const request: ShopeeApiRequest = {
         method: 'GET',
@@ -428,9 +453,11 @@ export class ShopeeOrderService {
           error: response.error?.message || 'Shipment info not found',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Shopee order shipment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Shopee order shipment: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -448,7 +475,8 @@ export class ShopeeOrderService {
     cursor: string = '',
     pageSize: number = 100,
   ): Promise<any> {
-    const timeFrom = options.timeFrom || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+    const timeFrom =
+      options.timeFrom || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
     const timeTo = options.timeTo || new Date();
 
     const request: ShopeeApiRequest = {
@@ -470,9 +498,7 @@ export class ShopeeOrderService {
           'TO_RETURN',
           'COMPLETED',
         ],
-        response_optional_fields: [
-          'order_status',
-        ],
+        response_optional_fields: ['order_status'],
       },
     };
 
@@ -550,15 +576,12 @@ export class ShopeeOrderService {
     // Process each order
     for (const shopeeOrder of response.data.order_list) {
       try {
-        await this.syncSingleOrder(
-          tenantId,
-          channelId,
-          shopeeOrder,
-          options,
-        );
+        await this.syncSingleOrder(tenantId, channelId, shopeeOrder, options);
         syncedCount++;
       } catch (error) {
-        this.logger.error(`Failed to sync order ${shopeeOrder.order_sn}: ${error.message}`);
+        this.logger.error(
+          `Failed to sync order ${shopeeOrder.order_sn}: ${error.message}`,
+        );
         errors.push(`Order ${shopeeOrder.order_sn}: ${error.message}`);
         errorCount++;
       }
@@ -598,7 +621,11 @@ export class ShopeeOrderService {
       }
     } else {
       // Create new order
-      order = await this.createOrderFromShopee(tenantId, channelId, shopeeOrder);
+      order = await this.createOrderFromShopee(
+        tenantId,
+        channelId,
+        shopeeOrder,
+      );
       await this.orderRepository.save(order);
 
       // Create mapping
@@ -638,7 +665,8 @@ export class ShopeeOrderService {
       status: this.mapShopeeOrderStatus(shopeeOrder.order_status),
       totalAmount: 0, // Will be calculated from items
       currency: 'IDR', // Default for Indonesia
-      customerName: shopeeOrder.recipient_address?.name || shopeeOrder.buyer_username,
+      customerName:
+        shopeeOrder.recipient_address?.name || shopeeOrder.buyer_username,
       customerEmail: '', // Not provided by Shopee
       customerPhone: shopeeOrder.recipient_address?.phone || '',
       shippingAddress: {
@@ -671,13 +699,10 @@ export class ShopeeOrderService {
     return order;
   }
 
-  private updateOrderFromShopee(
-    order: Order,
-    shopeeOrder: ShopeeOrder,
-  ): void {
+  private updateOrderFromShopee(order: Order, shopeeOrder: ShopeeOrder): void {
     order.status = this.mapShopeeOrderStatus(shopeeOrder.order_status);
     order.notes = shopeeOrder.note || '';
-    
+
     order.channelMetadata = {
       ...order.channelMetadata,
       shopee: {
@@ -701,7 +726,7 @@ export class ShopeeOrderService {
 
     // Create new items
     const orderItems: OrderItem[] = [];
-    
+
     for (const shopeeItem of shopeeOrder.item_list) {
       const orderItem = this.orderItemRepository.create({
         orderId: order.id,
@@ -711,7 +736,9 @@ export class ShopeeOrderService {
         // variantSku: shopeeItem.model_sku,
         quantity: shopeeItem.model_quantity_purchased,
         unitPrice: shopeeItem.model_discounted_price,
-        totalPrice: shopeeItem.model_discounted_price * shopeeItem.model_quantity_purchased,
+        totalPrice:
+          shopeeItem.model_discounted_price *
+          shopeeItem.model_quantity_purchased,
         attributes: {
           shopee: {
             itemId: shopeeItem.item_id,
@@ -733,7 +760,10 @@ export class ShopeeOrderService {
     await this.orderItemRepository.save(orderItems);
 
     // Update order total
-    order.totalAmount = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    order.totalAmount = orderItems.reduce(
+      (sum, item) => sum + item.totalPrice,
+      0,
+    );
     await this.orderRepository.save(order);
   }
 
@@ -759,14 +789,14 @@ export class ShopeeOrderService {
 
   private mapShopeeOrderStatus(shopeeStatus: string): OrderStatus {
     const statusMap: Record<string, OrderStatus> = {
-      'UNPAID': OrderStatus.PENDING,
-      'TO_SHIP': OrderStatus.CONFIRMED,
-      'SHIPPED': OrderStatus.SHIPPED,
-      'TO_CONFIRM_RECEIVE': OrderStatus.DELIVERED,
-      'IN_CANCEL': OrderStatus.CANCELLED,
-      'CANCELLED': OrderStatus.CANCELLED,
-      'TO_RETURN': OrderStatus.RETURNED,
-      'COMPLETED': OrderStatus.DELIVERED,
+      UNPAID: OrderStatus.PENDING,
+      TO_SHIP: OrderStatus.CONFIRMED,
+      SHIPPED: OrderStatus.SHIPPED,
+      TO_CONFIRM_RECEIVE: OrderStatus.DELIVERED,
+      IN_CANCEL: OrderStatus.CANCELLED,
+      CANCELLED: OrderStatus.CANCELLED,
+      TO_RETURN: OrderStatus.RETURNED,
+      COMPLETED: OrderStatus.DELIVERED,
     };
 
     return statusMap[shopeeStatus] || OrderStatus.PENDING;

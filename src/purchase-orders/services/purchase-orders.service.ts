@@ -6,7 +6,15 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, IsNull, Not, In, QueryRunner } from 'typeorm';
+import {
+  Repository,
+  Like,
+  Between,
+  IsNull,
+  Not,
+  In,
+  QueryRunner,
+} from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
@@ -69,21 +77,32 @@ export class PurchaseOrdersService {
     userId?: string,
   ): Promise<PurchaseOrder> {
     // Validate supplier exists and is active
-    const supplier = await this.validateSupplier(tenantId, createPurchaseOrderDto.supplierId);
+    const supplier = await this.validateSupplier(
+      tenantId,
+      createPurchaseOrderDto.supplierId,
+    );
 
     // Generate PO number if not provided
-    const poNumber = createPurchaseOrderDto.poNumber || await this.generatePoNumber(tenantId);
+    const poNumber =
+      createPurchaseOrderDto.poNumber ||
+      (await this.generatePoNumber(tenantId));
 
     // Validate PO number is unique
     await this.validatePoNumberUnique(tenantId, poNumber);
 
     // Validate items
-    if (!createPurchaseOrderDto.items || createPurchaseOrderDto.items.length === 0) {
-      throw new BadRequestException('Purchase order harus memiliki minimal 1 item');
+    if (
+      !createPurchaseOrderDto.items ||
+      createPurchaseOrderDto.items.length === 0
+    ) {
+      throw new BadRequestException(
+        'Purchase order harus memiliki minimal 1 item',
+      );
     }
 
     // Create PO with transaction
-    const queryRunner = this.purchaseOrderRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.purchaseOrderRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -96,19 +115,24 @@ export class PurchaseOrdersService {
         createdBy: userId,
         updatedBy: userId,
         itemCount: createPurchaseOrderDto.items.length,
-        orderDate: createPurchaseOrderDto.orderDate 
-          ? new Date(createPurchaseOrderDto.orderDate) 
+        orderDate: createPurchaseOrderDto.orderDate
+          ? new Date(createPurchaseOrderDto.orderDate)
           : new Date(),
       });
 
       // Set default values from supplier
-      purchaseOrder.paymentTerms = createPurchaseOrderDto.paymentTerms || supplier.paymentTerms;
-      purchaseOrder.currency = createPurchaseOrderDto.currency || supplier.currency;
+      purchaseOrder.paymentTerms =
+        createPurchaseOrderDto.paymentTerms || supplier.paymentTerms;
+      purchaseOrder.currency =
+        createPurchaseOrderDto.currency || supplier.currency;
 
       // Generate payment due date
       purchaseOrder.generatePaymentDueDate();
 
-      const savedPurchaseOrder = await queryRunner.manager.save(PurchaseOrder, purchaseOrder);
+      const savedPurchaseOrder = await queryRunner.manager.save(
+        PurchaseOrder,
+        purchaseOrder,
+      );
 
       // Create items
       let subtotal = 0;
@@ -119,8 +143,8 @@ export class PurchaseOrdersService {
           tenantId,
           createdBy: userId,
           updatedBy: userId,
-          expectedDeliveryDate: itemDto.expectedDeliveryDate 
-            ? new Date(itemDto.expectedDeliveryDate) 
+          expectedDeliveryDate: itemDto.expectedDeliveryDate
+            ? new Date(itemDto.expectedDeliveryDate)
             : undefined,
         });
 
@@ -135,8 +159,10 @@ export class PurchaseOrdersService {
       savedPurchaseOrder.calculateTotals();
 
       // Check if requires approval
-      const approvalThreshold = createPurchaseOrderDto.approvalThreshold || 10000000; // 10 million IDR
-      const requiresApproval = savedPurchaseOrder.requiresApprovalCheck(approvalThreshold);
+      const approvalThreshold =
+        createPurchaseOrderDto.approvalThreshold || 10000000; // 10 million IDR
+      const requiresApproval =
+        savedPurchaseOrder.requiresApprovalCheck(approvalThreshold);
 
       if (requiresApproval) {
         savedPurchaseOrder.status = PurchaseOrderStatus.PENDING_APPROVAL;
@@ -171,7 +197,10 @@ export class PurchaseOrdersService {
     }
   }
 
-  async findAll(tenantId: string, query: PurchaseOrderQueryDto): Promise<{
+  async findAll(
+    tenantId: string,
+    query: PurchaseOrderQueryDto,
+  ): Promise<{
     data: PurchaseOrder[];
     meta: {
       total: number;
@@ -235,7 +264,7 @@ export class PurchaseOrdersService {
     if (search) {
       queryBuilder.andWhere(
         '(po.poNumber ILIKE :search OR po.description ILIKE :search OR po.notes ILIKE :search OR supplier.name ILIKE :search OR supplier.code ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -253,7 +282,9 @@ export class PurchaseOrdersService {
     }
 
     if (approvalStatus) {
-      queryBuilder.andWhere('po.approvalStatus = :approvalStatus', { approvalStatus });
+      queryBuilder.andWhere('po.approvalStatus = :approvalStatus', {
+        approvalStatus,
+      });
     }
 
     // Supplier filters
@@ -262,7 +293,9 @@ export class PurchaseOrdersService {
     }
 
     if (supplierName) {
-      queryBuilder.andWhere('supplier.name ILIKE :supplierName', { supplierName: `%${supplierName}%` });
+      queryBuilder.andWhere('supplier.name ILIKE :supplierName', {
+        supplierName: `%${supplierName}%`,
+      });
     }
 
     // Date filters
@@ -272,23 +305,30 @@ export class PurchaseOrdersService {
         endDate: new Date(endDate),
       });
     } else if (startDate) {
-      queryBuilder.andWhere('po.orderDate >= :startDate', { startDate: new Date(startDate) });
+      queryBuilder.andWhere('po.orderDate >= :startDate', {
+        startDate: new Date(startDate),
+      });
     } else if (endDate) {
-      queryBuilder.andWhere('po.orderDate <= :endDate', { endDate: new Date(endDate) });
+      queryBuilder.andWhere('po.orderDate <= :endDate', {
+        endDate: new Date(endDate),
+      });
     }
 
     if (deliveryStartDate && deliveryEndDate) {
-      queryBuilder.andWhere('po.expectedDeliveryDate BETWEEN :deliveryStartDate AND :deliveryEndDate', {
-        deliveryStartDate: new Date(deliveryStartDate),
-        deliveryEndDate: new Date(deliveryEndDate),
-      });
+      queryBuilder.andWhere(
+        'po.expectedDeliveryDate BETWEEN :deliveryStartDate AND :deliveryEndDate',
+        {
+          deliveryStartDate: new Date(deliveryStartDate),
+          deliveryEndDate: new Date(deliveryEndDate),
+        },
+      );
     } else if (deliveryStartDate) {
-      queryBuilder.andWhere('po.expectedDeliveryDate >= :deliveryStartDate', { 
-        deliveryStartDate: new Date(deliveryStartDate) 
+      queryBuilder.andWhere('po.expectedDeliveryDate >= :deliveryStartDate', {
+        deliveryStartDate: new Date(deliveryStartDate),
       });
     } else if (deliveryEndDate) {
-      queryBuilder.andWhere('po.expectedDeliveryDate <= :deliveryEndDate', { 
-        deliveryEndDate: new Date(deliveryEndDate) 
+      queryBuilder.andWhere('po.expectedDeliveryDate <= :deliveryEndDate', {
+        deliveryEndDate: new Date(deliveryEndDate),
       });
     }
 
@@ -306,18 +346,21 @@ export class PurchaseOrdersService {
     }
 
     if (requiresApproval !== undefined) {
-      queryBuilder.andWhere('po.requiresApproval = :requiresApproval', { requiresApproval });
+      queryBuilder.andWhere('po.requiresApproval = :requiresApproval', {
+        requiresApproval,
+      });
     }
 
     if (isOverdue !== undefined && isOverdue) {
-      queryBuilder.andWhere('po.expectedDeliveryDate < :now', { now: new Date() })
-                  .andWhere('po.status NOT IN (:...completedStatuses)', { 
-                    completedStatuses: [
-                      PurchaseOrderStatus.RECEIVED,
-                      PurchaseOrderStatus.CLOSED,
-                      PurchaseOrderStatus.CANCELLED
-                    ]
-                  });
+      queryBuilder
+        .andWhere('po.expectedDeliveryDate < :now', { now: new Date() })
+        .andWhere('po.status NOT IN (:...completedStatuses)', {
+          completedStatuses: [
+            PurchaseOrderStatus.RECEIVED,
+            PurchaseOrderStatus.CLOSED,
+            PurchaseOrderStatus.CANCELLED,
+          ],
+        });
     }
 
     // Tag filter
@@ -348,8 +391,8 @@ export class PurchaseOrdersService {
       'completionPercentage',
     ];
 
-    let sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
-    
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+
     if (sortBy === 'supplierName') {
       queryBuilder.orderBy('supplier.name', sortOrder);
     } else {
@@ -395,14 +438,19 @@ export class PurchaseOrdersService {
     return purchaseOrder;
   }
 
-  async findByPoNumber(tenantId: string, poNumber: string): Promise<PurchaseOrder> {
+  async findByPoNumber(
+    tenantId: string,
+    poNumber: string,
+  ): Promise<PurchaseOrder> {
     const purchaseOrder = await this.purchaseOrderRepository.findOne({
       where: { poNumber, tenantId, isDeleted: false },
       relations: ['supplier', 'items', 'approvals', 'statusHistory'],
     });
 
     if (!purchaseOrder) {
-      throw new NotFoundException(`Purchase order dengan nomor "${poNumber}" tidak ditemukan`);
+      throw new NotFoundException(
+        `Purchase order dengan nomor "${poNumber}" tidak ditemukan`,
+      );
     }
 
     return purchaseOrder;
@@ -418,16 +466,28 @@ export class PurchaseOrdersService {
 
     // Check if PO is editable
     if (!purchaseOrder.isEditable) {
-      throw new ForbiddenException('Purchase order tidak dapat diedit pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat diedit pada status ini',
+      );
     }
 
     // Validate PO number if changed
-    if (updatePurchaseOrderDto.poNumber && updatePurchaseOrderDto.poNumber !== purchaseOrder.poNumber) {
-      await this.validatePoNumberUnique(tenantId, updatePurchaseOrderDto.poNumber, id);
+    if (
+      updatePurchaseOrderDto.poNumber &&
+      updatePurchaseOrderDto.poNumber !== purchaseOrder.poNumber
+    ) {
+      await this.validatePoNumberUnique(
+        tenantId,
+        updatePurchaseOrderDto.poNumber,
+        id,
+      );
     }
 
     // Validate supplier if changed
-    if (updatePurchaseOrderDto.supplierId && updatePurchaseOrderDto.supplierId !== purchaseOrder.supplierId) {
+    if (
+      updatePurchaseOrderDto.supplierId &&
+      updatePurchaseOrderDto.supplierId !== purchaseOrder.supplierId
+    ) {
       await this.validateSupplier(tenantId, updatePurchaseOrderDto.supplierId);
     }
 
@@ -445,12 +505,19 @@ export class PurchaseOrdersService {
     return this.findOne(tenantId, id);
   }
 
-  async remove(tenantId: string, id: string, hardDelete: boolean = false, userId?: string): Promise<void> {
+  async remove(
+    tenantId: string,
+    id: string,
+    hardDelete: boolean = false,
+    userId?: string,
+  ): Promise<void> {
     const purchaseOrder = await this.findOne(tenantId, id);
 
     // Check if PO can be cancelled
     if (!purchaseOrder.canBeCancelled) {
-      throw new ForbiddenException('Purchase order tidak dapat dibatalkan pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat dibatalkan pada status ini',
+      );
     }
 
     if (hardDelete) {
@@ -497,11 +564,17 @@ export class PurchaseOrdersService {
     const purchaseOrder = await this.findOne(tenantId, id);
 
     if (!purchaseOrder.canBeApproved) {
-      throw new ForbiddenException('Purchase order tidak dapat di-approve pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat di-approve pada status ini',
+      );
     }
 
     // Update approval status
-    purchaseOrder.updateApprovalStatus(ApprovalStatus.APPROVED, userId, approveDto.comments);
+    purchaseOrder.updateApprovalStatus(
+      ApprovalStatus.APPROVED,
+      userId,
+      approveDto.comments,
+    );
 
     await this.purchaseOrderRepository.save(purchaseOrder);
 
@@ -537,11 +610,17 @@ export class PurchaseOrdersService {
     const purchaseOrder = await this.findOne(tenantId, id);
 
     if (!purchaseOrder.canBeRejected) {
-      throw new ForbiddenException('Purchase order tidak dapat di-reject pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat di-reject pada status ini',
+      );
     }
 
     // Update approval status
-    purchaseOrder.updateApprovalStatus(ApprovalStatus.REJECTED, userId, rejectDto.reason);
+    purchaseOrder.updateApprovalStatus(
+      ApprovalStatus.REJECTED,
+      userId,
+      rejectDto.reason,
+    );
 
     await this.purchaseOrderRepository.save(purchaseOrder);
 
@@ -569,11 +648,17 @@ export class PurchaseOrdersService {
     return this.findOne(tenantId, id);
   }
 
-  async sendToSupplier(tenantId: string, id: string, userId?: string): Promise<PurchaseOrder> {
+  async sendToSupplier(
+    tenantId: string,
+    id: string,
+    userId?: string,
+  ): Promise<PurchaseOrder> {
     const purchaseOrder = await this.findOne(tenantId, id);
 
     if (!purchaseOrder.canBeSentToSupplier) {
-      throw new ForbiddenException('Purchase order tidak dapat dikirim ke supplier pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat dikirim ke supplier pada status ini',
+      );
     }
 
     // Update status
@@ -607,7 +692,10 @@ export class PurchaseOrdersService {
   }
 
   // Helper methods
-  private async validateSupplier(tenantId: string, supplierId: string): Promise<Supplier> {
+  private async validateSupplier(
+    tenantId: string,
+    supplierId: string,
+  ): Promise<Supplier> {
     const supplier = await this.supplierRepository.findOne({
       where: { id: supplierId, tenantId, isDeleted: false },
     });
@@ -623,9 +711,13 @@ export class PurchaseOrdersService {
     return supplier;
   }
 
-  private async validatePoNumberUnique(tenantId: string, poNumber: string, excludeId?: string): Promise<void> {
+  private async validatePoNumberUnique(
+    tenantId: string,
+    poNumber: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, poNumber, isDeleted: false };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -649,7 +741,7 @@ export class PurchaseOrdersService {
         tenantId,
         orderDate: Between(
           new Date(currentYear, new Date().getMonth(), 1),
-          new Date(currentYear, new Date().getMonth() + 1, 0)
+          new Date(currentYear, new Date().getMonth() + 1, 0),
         ),
         isDeleted: false,
       },
@@ -688,7 +780,10 @@ export class PurchaseOrdersService {
     }
   }
 
-  private async queueBackgroundJobs(purchaseOrderId: string, action: string): Promise<void> {
+  private async queueBackgroundJobs(
+    purchaseOrderId: string,
+    action: string,
+  ): Promise<void> {
     // Queue untuk indexing ke Elasticsearch
     await this.purchaseOrderQueue.add('indexPurchaseOrder', {
       purchaseOrderId,
@@ -713,7 +808,9 @@ export class PurchaseOrdersService {
     const purchaseOrder = await this.findOne(tenantId, purchaseOrderId);
 
     if (!purchaseOrder.isEditable) {
-      throw new ForbiddenException('Purchase order tidak dapat diedit pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat diedit pada status ini',
+      );
     }
 
     const item = this.purchaseOrderItemRepository.create({
@@ -722,8 +819,8 @@ export class PurchaseOrdersService {
       tenantId,
       createdBy: userId,
       updatedBy: userId,
-      expectedDeliveryDate: addItemDto.expectedDeliveryDate 
-        ? new Date(addItemDto.expectedDeliveryDate) 
+      expectedDeliveryDate: addItemDto.expectedDeliveryDate
+        ? new Date(addItemDto.expectedDeliveryDate)
         : undefined,
     });
 
@@ -746,7 +843,9 @@ export class PurchaseOrdersService {
     const purchaseOrder = await this.findOne(tenantId, purchaseOrderId);
 
     if (!purchaseOrder.isEditable) {
-      throw new ForbiddenException('Purchase order tidak dapat diedit pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat diedit pada status ini',
+      );
     }
 
     const item = await this.purchaseOrderItemRepository.findOne({
@@ -758,9 +857,11 @@ export class PurchaseOrdersService {
     }
 
     updateItemDto.updatedBy = userId;
-    
+
     if (updateItemDto.expectedDeliveryDate) {
-      updateItemDto.expectedDeliveryDate = new Date(updateItemDto.expectedDeliveryDate) as any;
+      updateItemDto.expectedDeliveryDate = new Date(
+        updateItemDto.expectedDeliveryDate,
+      ) as any;
     }
 
     await this.purchaseOrderItemRepository.update(itemId, updateItemDto);
@@ -769,7 +870,7 @@ export class PurchaseOrdersService {
     const updatedItem = await this.purchaseOrderItemRepository.findOne({
       where: { id: itemId },
     });
-    
+
     if (updatedItem) {
       updatedItem.calculateTotals();
       await this.purchaseOrderItemRepository.save(updatedItem);
@@ -790,7 +891,9 @@ export class PurchaseOrdersService {
     const purchaseOrder = await this.findOne(tenantId, purchaseOrderId);
 
     if (!purchaseOrder.isEditable) {
-      throw new ForbiddenException('Purchase order tidak dapat diedit pada status ini');
+      throw new ForbiddenException(
+        'Purchase order tidak dapat diedit pada status ini',
+      );
     }
 
     const item = await this.purchaseOrderItemRepository.findOne({
@@ -807,7 +910,9 @@ export class PurchaseOrdersService {
     });
 
     if (itemCount <= 1) {
-      throw new BadRequestException('Purchase order harus memiliki minimal 1 item');
+      throw new BadRequestException(
+        'Purchase order harus memiliki minimal 1 item',
+      );
     }
 
     // Soft delete
@@ -829,7 +934,7 @@ export class PurchaseOrdersService {
     userId?: string,
   ): Promise<PurchaseOrderItem> {
     const purchaseOrder = await this.findOne(tenantId, purchaseOrderId);
-    
+
     const item = await this.purchaseOrderItemRepository.findOne({
       where: { id: itemId, purchaseOrderId, tenantId, isDeleted: false },
     });
@@ -841,12 +946,17 @@ export class PurchaseOrdersService {
     // Validate received quantity
     const maxReceivable = item.orderedQuantity - item.receivedQuantity;
     if (receiveDto.receivedQuantity > maxReceivable) {
-      throw new BadRequestException(`Quantity yang diterima tidak boleh melebihi ${maxReceivable}`);
+      throw new BadRequestException(
+        `Quantity yang diterima tidak boleh melebihi ${maxReceivable}`,
+      );
     }
 
     // Update item
-    item.receiveQuantity(receiveDto.receivedQuantity, receiveDto.rejectedQuantity || 0);
-    
+    item.receiveQuantity(
+      receiveDto.receivedQuantity,
+      receiveDto.rejectedQuantity || 0,
+    );
+
     if (receiveDto.notes) {
       item.notes = receiveDto.notes;
     }
@@ -876,7 +986,7 @@ export class PurchaseOrdersService {
 
     for (let i = 0; i < bulkCreateDto.purchaseOrders.length; i++) {
       const poDto = bulkCreateDto.purchaseOrders[i];
-      
+
       try {
         const po = await this.create(tenantId, poDto, userId);
         result.successful++;
@@ -917,16 +1027,26 @@ export class PurchaseOrdersService {
     for (const purchaseOrderId of bulkApprovalDto.purchaseOrderIds) {
       try {
         if (bulkApprovalDto.action === 'approve') {
-          await this.approve(tenantId, purchaseOrderId, { 
-            comments: bulkApprovalDto.comments 
-          }, userId);
+          await this.approve(
+            tenantId,
+            purchaseOrderId,
+            {
+              comments: bulkApprovalDto.comments,
+            },
+            userId,
+          );
         } else {
-          await this.reject(tenantId, purchaseOrderId, { 
-            reason: bulkApprovalDto.reason || 'Bulk rejection',
-            comments: bulkApprovalDto.comments 
-          }, userId);
+          await this.reject(
+            tenantId,
+            purchaseOrderId,
+            {
+              reason: bulkApprovalDto.reason || 'Bulk rejection',
+              comments: bulkApprovalDto.comments,
+            },
+            userId,
+          );
         }
-        
+
         result.successful++;
         result.successfulIds.push(purchaseOrderId);
       } catch (error) {
@@ -976,7 +1096,9 @@ export class PurchaseOrdersService {
   }
 
   // Helper methods
-  private async recalculatePurchaseOrderTotals(purchaseOrderId: string): Promise<void> {
+  private async recalculatePurchaseOrderTotals(
+    purchaseOrderId: string,
+  ): Promise<void> {
     const purchaseOrder = await this.purchaseOrderRepository.findOne({
       where: { id: purchaseOrderId },
       relations: ['items'],
@@ -988,7 +1110,9 @@ export class PurchaseOrdersService {
     }
   }
 
-  private async updatePurchaseOrderReceivingStatus(purchaseOrderId: string): Promise<void> {
+  private async updatePurchaseOrderReceivingStatus(
+    purchaseOrderId: string,
+  ): Promise<void> {
     const purchaseOrder = await this.purchaseOrderRepository.findOne({
       where: { id: purchaseOrderId },
       relations: ['items'],
@@ -1008,7 +1132,7 @@ export class PurchaseOrdersService {
 
     if (newStatus !== purchaseOrder.status) {
       purchaseOrder.updateStatus(newStatus);
-      
+
       await this.createStatusHistory(
         null,
         purchaseOrderId,
@@ -1056,57 +1180,115 @@ export class PurchaseOrdersService {
         where: { tenantId, isDeleted: false },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.DRAFT, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.DRAFT,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.PENDING_APPROVAL, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.PENDING_APPROVAL,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.APPROVED, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.APPROVED,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.SENT_TO_SUPPLIER, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.SENT_TO_SUPPLIER,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.ACKNOWLEDGED, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.ACKNOWLEDGED,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.PARTIALLY_RECEIVED, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.PARTIALLY_RECEIVED,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.RECEIVED, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.RECEIVED,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.CLOSED, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.CLOSED,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.CANCELLED, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.CANCELLED,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, status: PurchaseOrderStatus.REJECTED, isDeleted: false },
+        where: {
+          tenantId,
+          status: PurchaseOrderStatus.REJECTED,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, priority: PurchaseOrderPriority.LOW, isDeleted: false },
+        where: {
+          tenantId,
+          priority: PurchaseOrderPriority.LOW,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, priority: PurchaseOrderPriority.NORMAL, isDeleted: false },
+        where: {
+          tenantId,
+          priority: PurchaseOrderPriority.NORMAL,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, priority: PurchaseOrderPriority.HIGH, isDeleted: false },
+        where: {
+          tenantId,
+          priority: PurchaseOrderPriority.HIGH,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
-        where: { tenantId, priority: PurchaseOrderPriority.URGENT, isDeleted: false },
+        where: {
+          tenantId,
+          priority: PurchaseOrderPriority.URGENT,
+          isDeleted: false,
+        },
       }),
       this.purchaseOrderRepository.count({
         where: {
           tenantId,
           isDeleted: false,
           expectedDeliveryDate: Between(new Date(0), new Date()),
-          status: Not(In([
-            PurchaseOrderStatus.RECEIVED,
-            PurchaseOrderStatus.CLOSED,
-            PurchaseOrderStatus.CANCELLED
-          ])),
+          status: Not(
+            In([
+              PurchaseOrderStatus.RECEIVED,
+              PurchaseOrderStatus.CLOSED,
+              PurchaseOrderStatus.CANCELLED,
+            ]),
+          ),
         },
       }),
     ]);

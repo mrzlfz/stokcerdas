@@ -133,12 +133,12 @@ export class AccountingAccount {
     realmId?: string;
     discoveryDocument?: string;
     environment?: 'sandbox' | 'production';
-    
+
     // Accurate specific
     sessionId?: string;
     databaseId?: string;
     serverUrl?: string;
-    
+
     // Common settings
     enabledDataTypes?: AccountingDataType[];
     syncSettings?: {
@@ -187,14 +187,14 @@ export class AccountingAccount {
     taxPayableAccount?: string;
     discountAccount?: string;
     shippingAccount?: string;
-    
+
     // Default tax codes
     salesTaxCode?: string;
     purchaseTaxCode?: string;
-    
+
     // Default payment terms
     defaultPaymentTerms?: string;
-    
+
     // Custom mappings
     customMappings?: Record<string, string>;
   };
@@ -241,7 +241,7 @@ export class AccountingAccount {
     failedSyncs?: number;
     lastSyncDuration?: number; // in milliseconds
     averageSyncDuration?: number;
-    
+
     byDataType?: {
       [key in AccountingDataType]?: {
         totalRecords?: number;
@@ -252,7 +252,13 @@ export class AccountingAccount {
     };
   };
 
-  @Column({ name: 'connection_health_score', type: 'decimal', precision: 3, scale: 2, default: 100 })
+  @Column({
+    name: 'connection_health_score',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 100,
+  })
   connectionHealthScore: number; // 0-100
 
   @Column({ name: 'created_by' })
@@ -285,7 +291,10 @@ export class AccountingAccount {
   }
 
   // Update connection status
-  updateConnectionStatus(status: AccountingConnectionStatus, error?: string): void {
+  updateConnectionStatus(
+    status: AccountingConnectionStatus,
+    error?: string,
+  ): void {
     this.status = status;
     if (error) {
       this.lastSyncError = error;
@@ -298,7 +307,11 @@ export class AccountingAccount {
   }
 
   // Update tokens
-  updateTokens(accessToken: string, refreshToken?: string, expiresIn?: number): void {
+  updateTokens(
+    accessToken: string,
+    refreshToken?: string,
+    expiresIn?: number,
+  ): void {
     this.accessToken = accessToken;
     if (refreshToken) {
       this.refreshToken = refreshToken;
@@ -311,7 +324,11 @@ export class AccountingAccount {
   }
 
   // Update sync statistics
-  updateSyncStats(dataType: AccountingDataType, success: boolean, duration?: number): void {
+  updateSyncStats(
+    dataType: AccountingDataType,
+    success: boolean,
+    duration?: number,
+  ): void {
     if (!this.syncStatistics) {
       this.syncStatistics = {};
     }
@@ -319,16 +336,19 @@ export class AccountingAccount {
     // Update overall stats
     this.syncStatistics.totalSyncs = (this.syncStatistics.totalSyncs || 0) + 1;
     if (success) {
-      this.syncStatistics.successfulSyncs = (this.syncStatistics.successfulSyncs || 0) + 1;
+      this.syncStatistics.successfulSyncs =
+        (this.syncStatistics.successfulSyncs || 0) + 1;
     } else {
-      this.syncStatistics.failedSyncs = (this.syncStatistics.failedSyncs || 0) + 1;
+      this.syncStatistics.failedSyncs =
+        (this.syncStatistics.failedSyncs || 0) + 1;
     }
 
     if (duration) {
       this.syncStatistics.lastSyncDuration = duration;
       const avgDuration = this.syncStatistics.averageSyncDuration || 0;
-      this.syncStatistics.averageSyncDuration = 
-        (avgDuration * (this.syncStatistics.totalSyncs - 1) + duration) / this.syncStatistics.totalSyncs;
+      this.syncStatistics.averageSyncDuration =
+        (avgDuration * (this.syncStatistics.totalSyncs - 1) + duration) /
+        this.syncStatistics.totalSyncs;
     }
 
     // Update data type specific stats
@@ -369,7 +389,9 @@ export class AccountingAccount {
 
     // Consider sync success rate
     if (this.syncStatistics?.totalSyncs > 0) {
-      const successRate = (this.syncStatistics.successfulSyncs || 0) / this.syncStatistics.totalSyncs;
+      const successRate =
+        (this.syncStatistics.successfulSyncs || 0) /
+        this.syncStatistics.totalSyncs;
       score = score * successRate;
     }
 

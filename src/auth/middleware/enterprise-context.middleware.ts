@@ -1,4 +1,9 @@
-import { Injectable, NestMiddleware, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NestMiddleware,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -6,7 +11,10 @@ import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Department } from '../entities/department.entity';
 import { HierarchicalRole } from '../entities/hierarchical-role.entity';
-import { PermissionSet, PermissionSetStatus } from '../entities/permission-set.entity';
+import {
+  PermissionSet,
+  PermissionSetStatus,
+} from '../entities/permission-set.entity';
 
 export interface EnterpriseRequest extends Request {
   user?: User;
@@ -31,7 +39,7 @@ export interface EnterpriseRequest extends Request {
 @Injectable()
 export class EnterpriseContextMiddleware implements NestMiddleware {
   private readonly logger = new Logger(EnterpriseContextMiddleware.name);
-  
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -64,7 +72,10 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
 
       next();
     } catch (error) {
-      this.logger.error(`Enterprise context middleware error: ${error.message}`, error.stack);
+      this.logger.error(
+        `Enterprise context middleware error: ${error.message}`,
+        error.stack,
+      );
       next(error);
     }
   }
@@ -103,10 +114,12 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
     this.logger.debug(`Tenant context set: ${tenantId}`);
   }
 
-  private async extractDepartmentContext(req: EnterpriseRequest): Promise<void> {
+  private async extractDepartmentContext(
+    req: EnterpriseRequest,
+  ): Promise<void> {
     // Department context is optional but provides additional isolation
     const departmentId = req.headers['x-department-id'] as string;
-    
+
     if (departmentId && req.tenantId) {
       try {
         const department = await this.departmentRepository.findOne({
@@ -122,7 +135,9 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
         if (department) {
           req.departmentId = departmentId;
           req.departmentContext = department;
-          this.logger.debug(`Department context set: ${department.name} (${departmentId})`);
+          this.logger.debug(
+            `Department context set: ${department.name} (${departmentId})`,
+          );
         } else {
           this.logger.warn(`Invalid department ID provided: ${departmentId}`);
         }
@@ -133,8 +148,10 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
   }
 
   private setupAuditContext(req: EnterpriseRequest): void {
-    const sessionId = req.headers['x-session-id'] as string || this.generateSessionId();
-    const requestId = req.headers['x-request-id'] as string || this.generateRequestId();
+    const sessionId =
+      (req.headers['x-session-id'] as string) || this.generateSessionId();
+    const requestId =
+      (req.headers['x-request-id'] as string) || this.generateRequestId();
     const ipAddress = this.extractRealIpAddress(req);
     const userAgent = req.headers['user-agent'] || 'Unknown';
 
@@ -153,7 +170,9 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
     this.logger.debug(`Audit context set: ${requestId}`);
   }
 
-  private async preloadUserEnterpriseData(req: EnterpriseRequest): Promise<void> {
+  private async preloadUserEnterpriseData(
+    req: EnterpriseRequest,
+  ): Promise<void> {
     if (!req.user || !req.tenantId) {
       return;
     }
@@ -161,20 +180,31 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
     try {
       // Check if we already have cached data that's still fresh (5 minutes)
       if (req.userPermissionCache?.lastUpdated) {
-        const cacheAge = Date.now() - req.userPermissionCache.lastUpdated.getTime();
-        if (cacheAge < 5 * 60 * 1000) { // 5 minutes
+        const cacheAge =
+          Date.now() - req.userPermissionCache.lastUpdated.getTime();
+        if (cacheAge < 5 * 60 * 1000) {
+          // 5 minutes
           return;
         }
       }
 
       // Load user's hierarchical roles
-      const hierarchicalRoles = await this.getUserHierarchicalRoles(req.user.id, req.tenantId);
+      const hierarchicalRoles = await this.getUserHierarchicalRoles(
+        req.user.id,
+        req.tenantId,
+      );
 
       // Load user's permission sets
-      const permissionSets = await this.getUserPermissionSets(req.user.id, req.tenantId);
+      const permissionSets = await this.getUserPermissionSets(
+        req.user.id,
+        req.tenantId,
+      );
 
       // Load user's departments
-      const departments = await this.getUserDepartments(req.user.id, req.tenantId);
+      const departments = await this.getUserDepartments(
+        req.user.id,
+        req.tenantId,
+      );
 
       // Cache the data
       req.userPermissionCache = {
@@ -185,11 +215,12 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
       };
 
       this.logger.debug(
-        `User enterprise data preloaded: ${hierarchicalRoles.length} roles, ${permissionSets.length} permission sets, ${departments.length} departments`
+        `User enterprise data preloaded: ${hierarchicalRoles.length} roles, ${permissionSets.length} permission sets, ${departments.length} departments`,
       );
-
     } catch (error) {
-      this.logger.error(`Error preloading user enterprise data: ${error.message}`);
+      this.logger.error(
+        `Error preloading user enterprise data: ${error.message}`,
+      );
     }
   }
 
@@ -214,7 +245,10 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
     res.setHeader('Content-Security-Policy', csp);
   }
 
-  private async getUserHierarchicalRoles(userId: string, tenantId: string): Promise<HierarchicalRole[]> {
+  private async getUserHierarchicalRoles(
+    userId: string,
+    tenantId: string,
+  ): Promise<HierarchicalRole[]> {
     // In a real implementation, this would query user-role assignments
     // For now, return empty array as the assignment system isn't implemented yet
     try {
@@ -228,12 +262,17 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
         take: 50, // Limit for performance
       });
     } catch (error) {
-      this.logger.error(`Error loading user hierarchical roles: ${error.message}`);
+      this.logger.error(
+        `Error loading user hierarchical roles: ${error.message}`,
+      );
       return [];
     }
   }
 
-  private async getUserPermissionSets(userId: string, tenantId: string): Promise<PermissionSet[]> {
+  private async getUserPermissionSets(
+    userId: string,
+    tenantId: string,
+  ): Promise<PermissionSet[]> {
     // In a real implementation, this would query user-permission set assignments
     // For now, return empty array as the assignment system isn't implemented yet
     try {
@@ -252,7 +291,10 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
     }
   }
 
-  private async getUserDepartments(userId: string, tenantId: string): Promise<Department[]> {
+  private async getUserDepartments(
+    userId: string,
+    tenantId: string,
+  ): Promise<Department[]> {
     // In a real implementation, this would query user-department assignments
     // For now, return empty array as the assignment system isn't implemented yet
     try {
@@ -289,7 +331,9 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
       return forwarded.split(',')[0].trim();
     }
 
-    return req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+    return (
+      req.connection.remoteAddress || req.socket.remoteAddress || 'unknown'
+    );
   }
 
   private buildContentSecurityPolicy(req: EnterpriseRequest): string {
@@ -323,7 +367,11 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
 
 // Helper decorator for accessing enterprise context in controllers
 export const EnterpriseContext = () => {
-  return (target: any, propertyName: string, descriptor: PropertyDescriptor) => {
+  return (
+    target: any,
+    propertyName: string,
+    descriptor: PropertyDescriptor,
+  ) => {
     // This would be implemented as a parameter decorator
     // For now, it's a placeholder for future enhancement
   };
@@ -346,11 +394,15 @@ export class EnterpriseContextUtils {
     return req.departmentContext;
   }
 
-  static getAuditContext(req: EnterpriseRequest): EnterpriseRequest['auditContext'] {
+  static getAuditContext(
+    req: EnterpriseRequest,
+  ): EnterpriseRequest['auditContext'] {
     return req.auditContext;
   }
 
-  static getUserPermissionCache(req: EnterpriseRequest): EnterpriseRequest['userPermissionCache'] {
+  static getUserPermissionCache(
+    req: EnterpriseRequest,
+  ): EnterpriseRequest['userPermissionCache'] {
     return req.userPermissionCache;
   }
 
@@ -363,10 +415,21 @@ export class EnterpriseContextUtils {
   }
 
   static hasRoleInContext(req: EnterpriseRequest, roleName: string): boolean {
-    return req.userPermissionCache?.hierarchicalRoles.some(role => role.name === roleName) || false;
+    return (
+      req.userPermissionCache?.hierarchicalRoles.some(
+        role => role.name === roleName,
+      ) || false
+    );
   }
 
-  static hasPermissionSetInContext(req: EnterpriseRequest, permissionSetCode: string): boolean {
-    return req.userPermissionCache?.permissionSets.some(ps => ps.code === permissionSetCode) || false;
+  static hasPermissionSetInContext(
+    req: EnterpriseRequest,
+    permissionSetCode: string,
+  ): boolean {
+    return (
+      req.userPermissionCache?.permissionSets.some(
+        ps => ps.code === permissionSetCode,
+      ) || false
+    );
   }
 }

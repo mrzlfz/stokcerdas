@@ -13,7 +13,7 @@ import { AccountingAccount } from './entities/accounting-account.entity';
 // External entities
 import { Channel } from '../channels/entities/channel.entity';
 import { Product } from '../products/entities/product.entity';
-import { Order } from '../orders/entities/order.entity';
+import { Order, OrderItem } from '../orders/entities/order.entity';
 
 // Common services
 import { BaseApiService } from './common/services/base-api.service';
@@ -25,6 +25,7 @@ import { IntegrationLogService } from './common/services/integration-log.service
 import { ShopeeModule } from './shopee/shopee.module';
 import { LazadaModule } from './lazada/lazada.module';
 import { TokopediaModule } from './tokopedia/tokopedia.module';
+import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { MokaModule } from './moka/moka.module';
 
 // Accounting software modules
@@ -46,7 +47,7 @@ import { IntegrationProcessor } from './processors/integration.processor';
       maxRedirects: 3,
       // retries: 3, // Property doesn't exist in HttpModuleOptions
     }),
-    
+
     // Database entities
     TypeOrmModule.forFeature([
       // Integration entities
@@ -54,13 +55,14 @@ import { IntegrationProcessor } from './processors/integration.processor';
       SyncStatus,
       WebhookEvent,
       AccountingAccount,
-      
+
       // External entities
       Channel,
       Product,
       Order,
+      OrderItem,
     ]),
-    
+
     // Bull queue for async integration operations
     BullModule.registerQueue({
       name: 'integrations',
@@ -74,47 +76,46 @@ import { IntegrationProcessor } from './processors/integration.processor';
         },
       },
     }),
-    
+
     // Platform-specific modules
     ShopeeModule,
     LazadaModule,
     TokopediaModule,
+    WhatsAppModule,
     MokaModule,
-    
+
     // Accounting software modules
     QuickBooksModule,
     AccurateModule,
   ],
-  
-  controllers: [
-    WebhookController,
-    IntegrationController,
-  ],
-  
+
+  controllers: [WebhookController, IntegrationController],
+
   providers: [
     // Common services
     BaseApiService,
     WebhookHandlerService,
     RateLimiterService,
     IntegrationLogService,
-    
+
     // Queue processors
     IntegrationProcessor,
   ],
-  
+
   exports: [
     // Export common services for platform modules
     BaseApiService,
     WebhookHandlerService,
     RateLimiterService,
     IntegrationLogService,
-    
+
     // Platform modules
     ShopeeModule,
     LazadaModule,
     TokopediaModule,
+    WhatsAppModule,
     MokaModule,
-    
+
     // Accounting software modules
     QuickBooksModule,
     AccurateModule,

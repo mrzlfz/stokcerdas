@@ -224,7 +224,10 @@ export class OrderRoutingController {
 
   @Get('rules')
   @ApiOperation({ summary: 'Get all routing rules' })
-  @ApiResponse({ status: 200, description: 'Routing rules retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing rules retrieved successfully',
+  })
   @ApiQuery({ name: 'isActive', type: 'boolean', required: false })
   @ApiQuery({ name: 'priority', type: 'number', required: false })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
@@ -264,10 +267,14 @@ export class OrderRoutingController {
       // Apply filters
       let filteredRules = rules;
       if (query.isActive !== undefined) {
-        filteredRules = filteredRules.filter(rule => rule.isActive === query.isActive);
+        filteredRules = filteredRules.filter(
+          rule => rule.isActive === query.isActive,
+        );
       }
       if (query.priority !== undefined) {
-        filteredRules = filteredRules.filter(rule => rule.priority === query.priority);
+        filteredRules = filteredRules.filter(
+          rule => rule.priority === query.priority,
+        );
       }
 
       return {
@@ -276,7 +283,10 @@ export class OrderRoutingController {
         total: filteredRules.length,
       };
     } catch (error) {
-      this.logger.error(`Failed to get routing rules: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get routing rules: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -289,7 +299,10 @@ export class OrderRoutingController {
 
   @Get('rules/:ruleId')
   @ApiOperation({ summary: 'Get routing rule by ID' })
-  @ApiResponse({ status: 200, description: 'Routing rule retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing rule retrieved successfully',
+  })
   @ApiParam({ name: 'ruleId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getRoutingRuleById(
@@ -321,7 +334,10 @@ export class OrderRoutingController {
         data: rule,
       };
     } catch (error) {
-      this.logger.error(`Failed to get routing rule: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get routing rule: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -334,7 +350,10 @@ export class OrderRoutingController {
 
   @Post('rules')
   @ApiOperation({ summary: 'Create new routing rule' })
-  @ApiResponse({ status: 201, description: 'Routing rule created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Routing rule created successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createRoutingRule(
     @CurrentUser() user: any,
@@ -353,7 +372,9 @@ export class OrderRoutingController {
         successRate: 0,
       };
 
-      this.logger.log(`Created routing rule: ${rule.name} for tenant ${user.tenantId}`);
+      this.logger.log(
+        `Created routing rule: ${rule.name} for tenant ${user.tenantId}`,
+      );
 
       return {
         success: true,
@@ -361,7 +382,10 @@ export class OrderRoutingController {
         message: 'Routing rule created successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to create routing rule: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create routing rule: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -374,7 +398,10 @@ export class OrderRoutingController {
 
   @Put('rules/:ruleId')
   @ApiOperation({ summary: 'Update routing rule' })
-  @ApiResponse({ status: 200, description: 'Routing rule updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing rule updated successfully',
+  })
   @ApiParam({ name: 'ruleId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateRoutingRule(
@@ -391,7 +418,9 @@ export class OrderRoutingController {
         updatedAt: new Date(),
       };
 
-      this.logger.log(`Updated routing rule: ${ruleId} for tenant ${user.tenantId}`);
+      this.logger.log(
+        `Updated routing rule: ${ruleId} for tenant ${user.tenantId}`,
+      );
 
       return {
         success: true,
@@ -399,7 +428,10 @@ export class OrderRoutingController {
         message: 'Routing rule updated successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to update routing rule: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update routing rule: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -412,7 +444,10 @@ export class OrderRoutingController {
 
   @Patch('rules/:ruleId/toggle')
   @ApiOperation({ summary: 'Toggle routing rule active status' })
-  @ApiResponse({ status: 200, description: 'Routing rule toggled successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing rule toggled successfully',
+  })
   @ApiParam({ name: 'ruleId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async toggleRoutingRule(
@@ -423,15 +458,22 @@ export class OrderRoutingController {
       // Mock implementation
       const isActive = Math.random() > 0.5; // Random for demo
 
-      this.logger.log(`Toggled routing rule ${ruleId} to ${isActive ? 'active' : 'inactive'}`);
+      this.logger.log(
+        `Toggled routing rule ${ruleId} to ${isActive ? 'active' : 'inactive'}`,
+      );
 
       return {
         success: true,
         data: { id: ruleId, isActive },
-        message: `Routing rule ${isActive ? 'activated' : 'deactivated'} successfully`,
+        message: `Routing rule ${
+          isActive ? 'activated' : 'deactivated'
+        } successfully`,
       };
     } catch (error) {
-      this.logger.error(`Failed to toggle routing rule: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to toggle routing rule: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -446,12 +488,18 @@ export class OrderRoutingController {
 
   @Post('intelligent/analyze')
   @ApiOperation({ summary: 'Analyze optimal routing for orders' })
-  @ApiResponse({ status: 200, description: 'Routing analysis completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing analysis completed successfully',
+  })
   @ApiBody({
     schema: {
       properties: {
         orderIds: { type: 'array', items: { type: 'string' } },
-        analysisType: { type: 'string', enum: ['cost', 'speed', 'balanced', 'custom'] },
+        analysisType: {
+          type: 'string',
+          enum: ['cost', 'speed', 'balanced', 'custom'],
+        },
         constraints: { type: 'object' },
       },
     },
@@ -459,7 +507,8 @@ export class OrderRoutingController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async analyzeIntelligentRouting(
     @CurrentUser() user: any,
-    @Body() body: {
+    @Body()
+    body: {
       orderIds: string[];
       analysisType: 'cost' | 'speed' | 'balanced' | 'custom';
       constraints?: any;
@@ -473,18 +522,22 @@ export class OrderRoutingController {
         orderCount: body.orderIds.length,
         recommendations: body.orderIds.map((orderId, index) => ({
           orderId,
-          currentLocation: `location-${index % 3 + 1}`,
-          recommendedLocation: `location-${(index + 1) % 3 + 1}`,
+          currentLocation: `location-${(index % 3) + 1}`,
+          recommendedLocation: `location-${((index + 1) % 3) + 1}`,
           improvement: {
             cost: Math.round((Math.random() * 20 - 10) * 100) / 100, // -10% to +10%
             time: Math.round((Math.random() * 30 - 15) * 100) / 100, // -15% to +15%
             score: Math.round((50 + Math.random() * 50) * 100) / 100, // 50-100
           },
-          reasons: ['Better location proximity', 'Lower shipping cost', 'Faster processing'],
+          reasons: [
+            'Better location proximity',
+            'Lower shipping cost',
+            'Faster processing',
+          ],
         })),
         summary: {
           totalSavings: Math.round(Math.random() * 1000000), // Random IDR savings
-          averageTimeImprovement: Math.round((Math.random() * 10) * 100) / 100,
+          averageTimeImprovement: Math.round(Math.random() * 10 * 100) / 100,
           feasibilityScore: Math.round((70 + Math.random() * 30) * 100) / 100,
         },
         generatedAt: new Date(),
@@ -496,7 +549,10 @@ export class OrderRoutingController {
         message: 'Intelligent routing analysis completed',
       };
     } catch (error) {
-      this.logger.error(`Failed to analyze intelligent routing: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to analyze intelligent routing: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -509,11 +565,15 @@ export class OrderRoutingController {
 
   @Post('intelligent/optimize')
   @ApiOperation({ summary: 'Apply intelligent routing optimization' })
-  @ApiResponse({ status: 200, description: 'Routing optimization applied successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing optimization applied successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async applyIntelligentOptimization(
     @CurrentUser() user: any,
-    @Body() body: {
+    @Body()
+    body: {
       analysisId: string;
       applyRecommendations: string[]; // List of order IDs to apply recommendations to
       dryRun?: boolean;
@@ -526,10 +586,14 @@ export class OrderRoutingController {
         try {
           if (!body.dryRun) {
             // Apply actual routing optimization
-            const routing = await this.routingService.routeOrder(user.tenantId, orderId, {
-              forceReRoute: true,
-            });
-            
+            const routing = await this.routingService.routeOrder(
+              user.tenantId,
+              orderId,
+              {
+                forceReRoute: true,
+              },
+            );
+
             results.push({
               orderId,
               success: true,
@@ -573,12 +637,15 @@ export class OrderRoutingController {
             failedCount,
           },
         },
-        message: body.dryRun 
+        message: body.dryRun
           ? 'Optimization simulation completed'
           : `Optimization applied: ${successCount}/${body.applyRecommendations.length} successful`,
       };
     } catch (error) {
-      this.logger.error(`Failed to apply intelligent optimization: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to apply intelligent optimization: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -594,31 +661,48 @@ export class OrderRoutingController {
   @Get('conflicts')
   @ApiOperation({ summary: 'Get all cross-channel conflicts' })
   @ApiResponse({ status: 200, description: 'Conflicts retrieved successfully' })
-  @ApiQuery({ name: 'severity', enum: ['low', 'medium', 'high', 'critical'], required: false })
-  @ApiQuery({ name: 'type', enum: ['inventory', 'pricing', 'status', 'fulfillment'], required: false })
+  @ApiQuery({
+    name: 'severity',
+    enum: ['low', 'medium', 'high', 'critical'],
+    required: false,
+  })
+  @ApiQuery({
+    name: 'type',
+    enum: ['inventory', 'pricing', 'status', 'fulfillment'],
+    required: false,
+  })
   @ApiQuery({ name: 'autoResolvable', type: 'boolean', required: false })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getConflicts(
     @CurrentUser() user: any,
-    @Query() query: {
+    @Query()
+    query: {
       severity?: 'low' | 'medium' | 'high' | 'critical';
       type?: 'inventory' | 'pricing' | 'status' | 'fulfillment';
       autoResolvable?: boolean;
     },
   ) {
     try {
-      const conflicts = await this.routingService.detectCrossChannelConflicts(user.tenantId);
+      const conflicts = await this.routingService.detectCrossChannelConflicts(
+        user.tenantId,
+      );
 
       // Apply filters
       let filteredConflicts = conflicts;
       if (query.severity) {
-        filteredConflicts = filteredConflicts.filter(c => c.severity === query.severity);
+        filteredConflicts = filteredConflicts.filter(
+          c => c.severity === query.severity,
+        );
       }
       if (query.type) {
-        filteredConflicts = filteredConflicts.filter(c => c.type === query.type);
+        filteredConflicts = filteredConflicts.filter(
+          c => c.type === query.type,
+        );
       }
       if (query.autoResolvable !== undefined) {
-        filteredConflicts = filteredConflicts.filter(c => c.autoResolvable === query.autoResolvable);
+        filteredConflicts = filteredConflicts.filter(
+          c => c.autoResolvable === query.autoResolvable,
+        );
       }
 
       return {
@@ -626,12 +710,17 @@ export class OrderRoutingController {
         data: filteredConflicts,
         summary: {
           total: filteredConflicts.length,
-          critical: filteredConflicts.filter(c => c.severity === 'critical').length,
-          autoResolvable: filteredConflicts.filter(c => c.autoResolvable).length,
+          critical: filteredConflicts.filter(c => c.severity === 'critical')
+            .length,
+          autoResolvable: filteredConflicts.filter(c => c.autoResolvable)
+            .length,
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get conflicts: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get conflicts: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -653,10 +742,14 @@ export class OrderRoutingController {
     @Body() resolveDto: ResolveConflictDto,
   ) {
     try {
-      const resolution = await this.routingService.resolveConflict(user.tenantId, conflictId, {
-        ...resolveDto,
-        userId: user.id,
-      });
+      const resolution = await this.routingService.resolveConflict(
+        user.tenantId,
+        conflictId,
+        {
+          ...resolveDto,
+          userId: user.id,
+        },
+      );
 
       return {
         success: true,
@@ -664,7 +757,10 @@ export class OrderRoutingController {
         message: 'Conflict resolved successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to resolve conflict: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to resolve conflict: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -677,7 +773,10 @@ export class OrderRoutingController {
 
   @Post('conflicts/auto-resolve')
   @ApiOperation({ summary: 'Auto-resolve all resolvable conflicts' })
-  @ApiResponse({ status: 200, description: 'Auto-resolution completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Auto-resolution completed successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async autoResolveConflicts(
     @CurrentUser() user: any,
@@ -686,9 +785,25 @@ export class OrderRoutingController {
     try {
       // Mock auto-resolution
       const autoResolved = [
-        { conflictId: 'conflict-1', type: 'inventory', resolution: 'use_source', success: true },
-        { conflictId: 'conflict-2', type: 'status', resolution: 'use_target', success: true },
-        { conflictId: 'conflict-3', type: 'pricing', resolution: 'manual_override', success: false, error: 'Requires manual intervention' },
+        {
+          conflictId: 'conflict-1',
+          type: 'inventory',
+          resolution: 'use_source',
+          success: true,
+        },
+        {
+          conflictId: 'conflict-2',
+          type: 'status',
+          resolution: 'use_target',
+          success: true,
+        },
+        {
+          conflictId: 'conflict-3',
+          type: 'pricing',
+          resolution: 'manual_override',
+          success: false,
+          error: 'Requires manual intervention',
+        },
       ];
 
       const successCount = autoResolved.filter(r => r.success).length;
@@ -707,7 +822,10 @@ export class OrderRoutingController {
         message: `Auto-resolution completed: ${successCount}/${autoResolved.length} conflicts resolved`,
       };
     } catch (error) {
-      this.logger.error(`Failed to auto-resolve conflicts: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to auto-resolve conflicts: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -722,8 +840,15 @@ export class OrderRoutingController {
 
   @Get('analytics/performance')
   @ApiOperation({ summary: 'Get routing performance analytics' })
-  @ApiResponse({ status: 200, description: 'Performance analytics retrieved successfully' })
-  @ApiQuery({ name: 'period', enum: ['day', 'week', 'month', 'quarter'], required: false })
+  @ApiResponse({
+    status: 200,
+    description: 'Performance analytics retrieved successfully',
+  })
+  @ApiQuery({
+    name: 'period',
+    enum: ['day', 'week', 'month', 'quarter'],
+    required: false,
+  })
   @ApiQuery({ name: 'metrics', type: 'string', isArray: true, required: false })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getPerformanceAnalytics(
@@ -732,7 +857,11 @@ export class OrderRoutingController {
   ) {
     try {
       const period = query.period || 'week';
-      const metrics = query.metrics || ['routing_time', 'accuracy', 'cost_efficiency'];
+      const metrics = query.metrics || [
+        'routing_time',
+        'accuracy',
+        'cost_efficiency',
+      ];
 
       // Mock performance data
       const analytics = {
@@ -786,7 +915,10 @@ export class OrderRoutingController {
         data: analytics,
       };
     } catch (error) {
-      this.logger.error(`Failed to get performance analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get performance analytics: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -799,7 +931,10 @@ export class OrderRoutingController {
 
   @Get('analytics/locations/:locationId/performance')
   @ApiOperation({ summary: 'Get specific location performance' })
-  @ApiResponse({ status: 200, description: 'Location performance retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Location performance retrieved successfully',
+  })
   @ApiParam({ name: 'locationId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getLocationPerformance(
@@ -822,9 +957,24 @@ export class OrderRoutingController {
         },
         trends: {
           daily: [
-            { date: '2024-01-01', orders: 35, processingTime: 17.2, onTimeRate: 95.1 },
-            { date: '2024-01-02', orders: 42, processingTime: 19.1, onTimeRate: 93.8 },
-            { date: '2024-01-03', orders: 38, processingTime: 16.8, onTimeRate: 96.2 },
+            {
+              date: '2024-01-01',
+              orders: 35,
+              processingTime: 17.2,
+              onTimeRate: 95.1,
+            },
+            {
+              date: '2024-01-02',
+              orders: 42,
+              processingTime: 19.1,
+              onTimeRate: 93.8,
+            },
+            {
+              date: '2024-01-03',
+              orders: 38,
+              processingTime: 16.8,
+              onTimeRate: 96.2,
+            },
           ],
         },
         efficiency: {
@@ -858,7 +1008,10 @@ export class OrderRoutingController {
         data: performance,
       };
     } catch (error) {
-      this.logger.error(`Failed to get location performance: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get location performance: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -873,11 +1026,12 @@ export class OrderRoutingController {
 
   @Get('preferences')
   @ApiOperation({ summary: 'Get routing preferences' })
-  @ApiResponse({ status: 200, description: 'Routing preferences retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing preferences retrieved successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getRoutingPreferences(
-    @CurrentUser() user: any,
-  ) {
+  async getRoutingPreferences(@CurrentUser() user: any) {
     try {
       // Mock preferences - in real implementation, fetch from database
       const preferences = {
@@ -908,7 +1062,10 @@ export class OrderRoutingController {
         data: preferences,
       };
     } catch (error) {
-      this.logger.error(`Failed to get routing preferences: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get routing preferences: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -921,7 +1078,10 @@ export class OrderRoutingController {
 
   @Put('preferences')
   @ApiOperation({ summary: 'Update routing preferences' })
-  @ApiResponse({ status: 200, description: 'Routing preferences updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Routing preferences updated successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateRoutingPreferences(
     @CurrentUser() user: any,
@@ -935,7 +1095,9 @@ export class OrderRoutingController {
         updatedBy: user.id,
       };
 
-      this.logger.log(`Updated routing preferences for tenant ${user.tenantId}`);
+      this.logger.log(
+        `Updated routing preferences for tenant ${user.tenantId}`,
+      );
 
       return {
         success: true,
@@ -943,7 +1105,10 @@ export class OrderRoutingController {
         message: 'Routing preferences updated successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to update routing preferences: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update routing preferences: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -958,17 +1123,22 @@ export class OrderRoutingController {
 
   @Get('health')
   @ApiOperation({ summary: 'Get routing system health status' })
-  @ApiResponse({ status: 200, description: 'System health retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'System health retrieved successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getSystemHealth(
-    @CurrentUser() user: any,
-  ) {
+  async getSystemHealth(@CurrentUser() user: any) {
     try {
       const health = {
         overall: 'healthy', // healthy, degraded, critical
         components: {
           routingEngine: { status: 'healthy', responseTime: 95, uptime: 99.8 },
-          conflictDetection: { status: 'healthy', responseTime: 120, uptime: 99.5 },
+          conflictDetection: {
+            status: 'healthy',
+            responseTime: 120,
+            uptime: 99.5,
+          },
           ruleEngine: { status: 'healthy', responseTime: 85, uptime: 99.9 },
           analytics: { status: 'degraded', responseTime: 250, uptime: 98.2 },
         },
@@ -995,7 +1165,10 @@ export class OrderRoutingController {
         data: health,
       };
     } catch (error) {
-      this.logger.error(`Failed to get system health: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get system health: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1008,11 +1181,12 @@ export class OrderRoutingController {
 
   @Get('metrics/real-time')
   @ApiOperation({ summary: 'Get real-time routing metrics' })
-  @ApiResponse({ status: 200, description: 'Real-time metrics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Real-time metrics retrieved successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getRealTimeMetrics(
-    @CurrentUser() user: any,
-  ) {
+  async getRealTimeMetrics(@CurrentUser() user: any) {
     try {
       const metrics = {
         timestamp: new Date(),
@@ -1050,7 +1224,10 @@ export class OrderRoutingController {
         data: metrics,
       };
     } catch (error) {
-      this.logger.error(`Failed to get real-time metrics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get real-time metrics: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

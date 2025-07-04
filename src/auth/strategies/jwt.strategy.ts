@@ -49,7 +49,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Token tidak valid - pengguna tidak ditemukan');
+      throw new UnauthorizedException(
+        'Token tidak valid - pengguna tidak ditemukan',
+      );
     }
 
     // Check if user is active

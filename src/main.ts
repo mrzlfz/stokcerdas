@@ -93,8 +93,12 @@ async function bootstrap() {
   await app.listen(port);
 
   logger.log(`🚀 StokCerdas API is running on port ${port}`);
-  logger.log(`📖 API Documentation available at http://localhost:${port}/api/docs`);
-  logger.log(`🔗 WebSocket Real-time Gateway available at ws://localhost:${port}/realtime`);
+  logger.log(
+    `📖 API Documentation available at http://localhost:${port}/api/docs`,
+  );
+  logger.log(
+    `🔗 WebSocket Real-time Gateway available at ws://localhost:${port}/realtime`,
+  );
   logger.log(`🌍 Environment: ${environment}`);
 }
 

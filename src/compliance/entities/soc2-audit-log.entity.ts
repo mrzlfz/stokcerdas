@@ -16,7 +16,7 @@ export enum AuditEventType {
   PERMISSION_REVOKED = 'permission_revoked',
   ROLE_ASSIGNED = 'role_assigned',
   ROLE_REMOVED = 'role_removed',
-  
+
   // Data Access & Modification
   DATA_ACCESS = 'data_access',
   DATA_CREATE = 'data_create',
@@ -25,34 +25,34 @@ export enum AuditEventType {
   DATA_EXPORT = 'data_export',
   DATA_IMPORT = 'data_import',
   BULK_OPERATION = 'bulk_operation',
-  
+
   // System Administration
   USER_CREATED = 'user_created',
   USER_UPDATED = 'user_updated',
   USER_DELETED = 'user_deleted',
   SYSTEM_CONFIG_CHANGE = 'system_config_change',
   INTEGRATION_CONFIG_CHANGE = 'integration_config_change',
-  
+
   // Security Events
   SUSPICIOUS_ACTIVITY = 'suspicious_activity',
   BRUTE_FORCE_ATTEMPT = 'brute_force_attempt',
   UNAUTHORIZED_ACCESS_ATTEMPT = 'unauthorized_access_attempt',
   SECURITY_VIOLATION = 'security_violation',
-  
+
   // Compliance Events
   CONTROL_TEST = 'control_test',
   EXCEPTION_CREATED = 'exception_created',
   EXCEPTION_RESOLVED = 'exception_resolved',
   EVIDENCE_COLLECTED = 'evidence_collected',
   AUDIT_LOG_ACCESS = 'audit_log_access',
-  
+
   // Business Process Events
   INVENTORY_ADJUSTMENT = 'inventory_adjustment',
   ORDER_CREATED = 'order_created',
   ORDER_FULFILLED = 'order_fulfilled',
   PRODUCT_UPDATED = 'product_updated',
   PRICE_CHANGE = 'price_change',
-  
+
   // Integration Events
   API_CALL = 'api_call',
   WEBHOOK_RECEIVED = 'webhook_received',
@@ -247,10 +247,18 @@ export class SOC2AuditLog extends BaseEntity {
 
     // Base severity score
     switch (this.severity) {
-      case AuditEventSeverity.CRITICAL: score += 40; break;
-      case AuditEventSeverity.HIGH: score += 30; break;
-      case AuditEventSeverity.MEDIUM: score += 20; break;
-      case AuditEventSeverity.LOW: score += 10; break;
+      case AuditEventSeverity.CRITICAL:
+        score += 40;
+        break;
+      case AuditEventSeverity.HIGH:
+        score += 30;
+        break;
+      case AuditEventSeverity.MEDIUM:
+        score += 20;
+        break;
+      case AuditEventSeverity.LOW:
+        score += 10;
+        break;
     }
 
     // Event type multipliers
@@ -259,7 +267,8 @@ export class SOC2AuditLog extends BaseEntity {
     if (this.outcome === AuditEventOutcome.FAILURE) score *= 1.4;
 
     // Time-based factors (recent events are higher risk)
-    const hoursSinceEvent = (Date.now() - this.timestamp.getTime()) / (1000 * 60 * 60);
+    const hoursSinceEvent =
+      (Date.now() - this.timestamp.getTime()) / (1000 * 60 * 60);
     if (hoursSinceEvent < 1) score *= 1.2;
     else if (hoursSinceEvent < 24) score *= 1.1;
 

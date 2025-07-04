@@ -6,7 +6,11 @@ import * as nodemailer from 'nodemailer';
 import { createTransport } from 'nodemailer';
 
 import { AlertInstance, AlertStatus } from '../entities/alert-instance.entity';
-import { AlertConfiguration, AlertType, AlertSeverity } from '../entities/alert-configuration.entity';
+import {
+  AlertConfiguration,
+  AlertType,
+  AlertSeverity,
+} from '../entities/alert-configuration.entity';
 import { User, UserStatus } from '../../users/entities/user.entity';
 
 export interface EmailNotificationData {
@@ -72,7 +76,9 @@ export class EmailNotificationService {
       // Get alert configuration to check if email notifications are enabled
       const config = await this.getAlertConfiguration(data.alert);
       if (!config || !config.configuration?.enableEmailNotification) {
-        this.logger.debug(`Email notifications disabled for alert ${data.alert.id}`);
+        this.logger.debug(
+          `Email notifications disabled for alert ${data.alert.id}`,
+        );
         return true; // Not an error, just disabled
       }
 
@@ -84,22 +90,35 @@ export class EmailNotificationService {
       }
 
       // Generate email template
-      const template = await this.generateEmailTemplate(data.alert, data.customSubject, data.customMessage);
+      const template = await this.generateEmailTemplate(
+        data.alert,
+        data.customSubject,
+        data.customMessage,
+      );
 
       // Send email to each recipient
-      const emailPromises = recipients.map(email => 
-        this.sendSingleEmail(email, template, data.alert)
+      const emailPromises = recipients.map(email =>
+        this.sendSingleEmail(email, template, data.alert),
       );
 
       const results = await Promise.allSettled(emailPromises);
-      const successful = results.filter(result => result.status === 'fulfilled').length;
-      const failed = results.filter(result => result.status === 'rejected').length;
+      const successful = results.filter(
+        result => result.status === 'fulfilled',
+      ).length;
+      const failed = results.filter(
+        result => result.status === 'rejected',
+      ).length;
 
-      this.logger.log(`Alert email notification sent: ${successful} successful, ${failed} failed for alert ${data.alert.id}`);
+      this.logger.log(
+        `Alert email notification sent: ${successful} successful, ${failed} failed for alert ${data.alert.id}`,
+      );
 
       return successful > 0;
     } catch (error) {
-      this.logger.error(`Failed to send alert notification for alert ${data.alert.id}`, error.stack);
+      this.logger.error(
+        `Failed to send alert notification for alert ${data.alert.id}`,
+        error.stack,
+      );
       return false;
     }
   }
@@ -121,7 +140,7 @@ export class EmailNotificationService {
           tenantId: alert.tenantId,
           alert,
         });
-        
+
         if (sent) {
           successful++;
         } else {
@@ -129,7 +148,10 @@ export class EmailNotificationService {
         }
       } catch (error) {
         failed++;
-        this.logger.error(`Failed to send notification for alert ${alert.id}`, error.stack);
+        this.logger.error(
+          `Failed to send notification for alert ${alert.id}`,
+          error.stack,
+        );
       }
     }
 
@@ -156,16 +178,24 @@ export class EmailNotificationService {
         return false;
       }
 
-      const template = this.generateCustomEmailTemplate(subject, message, alertType);
+      const template = this.generateCustomEmailTemplate(
+        subject,
+        message,
+        alertType,
+      );
 
-      const emailPromises = recipients.map(email => 
-        this.sendSingleEmail(email, template)
+      const emailPromises = recipients.map(email =>
+        this.sendSingleEmail(email, template),
       );
 
       const results = await Promise.allSettled(emailPromises);
-      const successful = results.filter(result => result.status === 'fulfilled').length;
+      const successful = results.filter(
+        result => result.status === 'fulfilled',
+      ).length;
 
-      this.logger.log(`Custom notification sent to ${successful}/${recipients.length} recipients`);
+      this.logger.log(
+        `Custom notification sent to ${successful}/${recipients.length} recipients`,
+      );
 
       return successful > 0;
     } catch (error) {
@@ -185,20 +215,25 @@ export class EmailNotificationService {
       }
 
       const template = this.generateTestEmailTemplate();
-      
+
       await this.sendSingleEmail(testEmail, template);
-      
+
       this.logger.log(`Test email sent successfully to ${testEmail}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send test email to ${testEmail}`, error.stack);
+      this.logger.error(
+        `Failed to send test email to ${testEmail}`,
+        error.stack,
+      );
       return false;
     }
   }
 
   // Private helper methods
 
-  private async getAlertConfiguration(alert: AlertInstance): Promise<AlertConfiguration | null> {
+  private async getAlertConfiguration(
+    alert: AlertInstance,
+  ): Promise<AlertConfiguration | null> {
     if (alert.configurationId) {
       return await this.alertConfigRepository.findOne({
         where: { id: alert.configurationId, tenantId: alert.tenantId },
@@ -269,7 +304,7 @@ export class EmailNotificationService {
   ): Promise<EmailTemplate> {
     const severity = this.getSeverityDisplayName(alert.severity);
     const alertType = this.getAlertTypeDisplayName(alert.alertType);
-    
+
     // Generate subject
     let subject = customSubject;
     if (!subject) {
@@ -278,9 +313,19 @@ export class EmailNotificationService {
 
     // Generate content
     const message = customMessage || alert.message;
-    
-    const htmlContent = this.generateHtmlTemplate(alert, alertType, severity, message);
-    const textContent = this.generateTextTemplate(alert, alertType, severity, message);
+
+    const htmlContent = this.generateHtmlTemplate(
+      alert,
+      alertType,
+      severity,
+      message,
+    );
+    const textContent = this.generateTextTemplate(
+      alert,
+      alertType,
+      severity,
+      message,
+    );
 
     return {
       subject,
@@ -294,8 +339,10 @@ export class EmailNotificationService {
     message: string,
     alertType?: AlertType,
   ): EmailTemplate {
-    const typeDisplay = alertType ? this.getAlertTypeDisplayName(alertType) : 'Pemberitahuan';
-    
+    const typeDisplay = alertType
+      ? this.getAlertTypeDisplayName(alertType)
+      : 'Pemberitahuan';
+
     const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -326,7 +373,9 @@ export class EmailNotificationService {
         </div>
         <div class="footer">
             <p>Email ini dikirim secara otomatis oleh sistem StokCerdas.</p>
-            <p>Tanggal: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</p>
+            <p>Tanggal: ${new Date().toLocaleString('id-ID', {
+              timeZone: 'Asia/Jakarta',
+            })}</p>
         </div>
     </div>
 </body>
@@ -406,19 +455,33 @@ Tanggal: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
                     </tr>
                     <tr>
                         <th>Waktu Dibuat</th>
-                        <td>${alert.createdAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+                        <td>${alert.createdAt.toLocaleString('id-ID', {
+                          timeZone: 'Asia/Jakarta',
+                        })}</td>
                     </tr>
-                    ${alert.product ? `<tr><th>Produk</th><td>${alert.product.name}</td></tr>` : ''}
-                    ${alert.location ? `<tr><th>Lokasi</th><td>${alert.location.name}</td></tr>` : ''}
+                    ${
+                      alert.product
+                        ? `<tr><th>Produk</th><td>${alert.product.name}</td></tr>`
+                        : ''
+                    }
+                    ${
+                      alert.location
+                        ? `<tr><th>Lokasi</th><td>${alert.location.name}</td></tr>`
+                        : ''
+                    }
                 </table>
             </div>
             
-            ${alert.severity === AlertSeverity.CRITICAL ? `
+            ${
+              alert.severity === AlertSeverity.CRITICAL
+                ? `
             <div class="action-needed">
                 <strong>⚠️ Tindakan Segera Diperlukan</strong>
                 <p>Alert ini memerlukan perhatian segera. Silakan login ke sistem StokCerdas untuk menangani alert ini.</p>
             </div>
-            ` : ''}
+            `
+                : ''
+            }
         </div>
         <div class="footer">
             <p>Email ini dikirim secara otomatis oleh sistem StokCerdas.</p>
@@ -447,14 +510,20 @@ DETAIL ALERT:
 - Jenis Alert: ${alertType}
 - Tingkat Keparahan: ${severity}
 - Status: ${this.getStatusDisplayName(alert.status)}
-- Waktu Dibuat: ${alert.createdAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
+- Waktu Dibuat: ${alert.createdAt.toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+    })}
 ${alert.product ? `- Produk: ${alert.product.name}` : ''}
 ${alert.location ? `- Lokasi: ${alert.location.name}` : ''}
 
-${alert.severity === AlertSeverity.CRITICAL ? `
+${
+  alert.severity === AlertSeverity.CRITICAL
+    ? `
 ⚠️ TINDAKAN SEGERA DIPERLUKAN
 Alert ini memerlukan perhatian segera. Silakan login ke sistem StokCerdas untuk menangani alert ini.
-` : ''}
+`
+    : ''
+}
 
 ---
 Email ini dikirim secara otomatis oleh sistem StokCerdas.
@@ -465,7 +534,7 @@ Untuk mengelola alert ini, silakan login ke dashboard StokCerdas.
 
   private generateTestEmailTemplate(): EmailTemplate {
     const subject = 'Test Email - StokCerdas Notification System';
-    
+
     const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -501,7 +570,9 @@ Untuk mengelola alert ini, silakan login ke dashboard StokCerdas.
             </ul>
         </div>
         <div class="footer">
-            <p>Email test dikirim pada: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</p>
+            <p>Email test dikirim pada: ${new Date().toLocaleString('id-ID', {
+              timeZone: 'Asia/Jakarta',
+            })}</p>
         </div>
     </div>
 </body>
@@ -523,7 +594,9 @@ Anda akan menerima notifikasi email untuk:
 - Update status order
 
 ---
-Email test dikirim pada: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
+Email test dikirim pada: ${new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+    })}
 `;
 
     return {
@@ -539,7 +612,9 @@ Email test dikirim pada: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/
     alert?: AlertInstance,
   ): Promise<void> {
     const mailOptions = {
-      from: `"StokCerdas Alert System" <${this.configService.get('SMTP_USER')}>`,
+      from: `"StokCerdas Alert System" <${this.configService.get(
+        'SMTP_USER',
+      )}>`,
       to: email,
       subject: template.subject,
       text: template.textContent,
@@ -547,7 +622,7 @@ Email test dikirim pada: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/
     };
 
     await this.emailTransporter.sendMail(mailOptions);
-    
+
     if (alert) {
       this.logger.debug(`Alert email sent to ${email} for alert ${alert.id}`);
     } else {

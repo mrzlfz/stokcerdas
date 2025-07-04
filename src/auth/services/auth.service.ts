@@ -14,7 +14,11 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
 import { User, UserRole, UserStatus } from '../../users/entities/user.entity';
-import { Permission, PermissionResource, PermissionAction } from '../entities/permission.entity';
+import {
+  Permission,
+  PermissionResource,
+  PermissionAction,
+} from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { LoginDto } from '../dto/login.dto';
 import { RegisterDto } from '../dto/register.dto';
@@ -69,7 +73,11 @@ export class AuthService {
   /**
    * Validate user credentials
    */
-  async validateUser(email: string, password: string, tenantId: string): Promise<User | null> {
+  async validateUser(
+    email: string,
+    password: string,
+    tenantId: string,
+  ): Promise<User | null> {
     try {
       const user = await this.userRepository.findOne({
         where: {
@@ -85,7 +93,9 @@ export class AuthService {
 
       // Check if account is locked
       if (user.lockedUntil && user.lockedUntil > new Date()) {
-        throw new UnauthorizedException('Account is temporarily locked due to too many failed login attempts');
+        throw new UnauthorizedException(
+          'Account is temporarily locked due to too many failed login attempts',
+        );
       }
 
       // Check if user is active
@@ -95,7 +105,7 @@ export class AuthService {
 
       // Verify password
       const isPasswordValid = await bcrypt.compare(password, user.password);
-      
+
       if (!isPasswordValid) {
         await this.handleFailedLogin(user);
         return null;
@@ -116,8 +126,16 @@ export class AuthService {
   /**
    * Login user and return tokens
    */
-  async login(loginDto: LoginDto, tenantId: string, ipAddress?: string): Promise<LoginResponse> {
-    const user = await this.validateUser(loginDto.email, loginDto.password, tenantId);
+  async login(
+    loginDto: LoginDto,
+    tenantId: string,
+    ipAddress?: string,
+  ): Promise<LoginResponse> {
+    const user = await this.validateUser(
+      loginDto.email,
+      loginDto.password,
+      tenantId,
+    );
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -174,16 +192,79 @@ export class AuthService {
       lastName: registerDto.lastName,
       phoneNumber: registerDto.phoneNumber,
       role: registerDto.role || UserRole.STAFF,
-      status: UserStatus.PENDING,
+      status: process.env.NODE_ENV === 'development' || process.env.AUTO_ACTIVATE_USERS === 'true'
+        ? UserStatus.ACTIVE 
+        : UserStatus.PENDING,
+      emailVerified: process.env.NODE_ENV === 'development' || process.env.AUTO_ACTIVATE_USERS === 'true'
+        ? true 
+        : false,
       language: 'id',
       timezone: 'Asia/Jakarta',
       emailVerificationToken: randomBytes(32).toString('hex'),
     });
 
     const savedUser = await this.userRepository.save(user);
-    this.logger.log(`New user registered: ${savedUser.email} (${savedUser.id})`);
+    this.logger.log(
+      `New user registered: ${savedUser.email} (${savedUser.id}) with status: ${savedUser.status}`,
+    );
 
     return savedUser;
+  }
+
+  /**
+   * Activate user (for development/testing purposes)
+   */
+  async activateUser(email: string, tenantId: string): Promise<User | null> {
+    const user = await this.userRepository.findOne({
+      where: {
+        email: email.toLowerCase(),
+        tenantId,
+        isDeleted: false,
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    if (user.status === UserStatus.PENDING) {
+      user.status = UserStatus.ACTIVE;
+      user.emailVerified = true;
+      const updatedUser = await this.userRepository.save(user);
+      this.logger.log(
+        `User activated: ${updatedUser.email} (${updatedUser.id})`,
+      );
+      return updatedUser;
+    }
+
+    return user;
+  }
+
+  /**
+   * Activate all pending users for a tenant (development/testing only)
+   */
+  async activateAllPendingUsers(tenantId: string): Promise<number> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new UnauthorizedException('This operation is not allowed in production');
+    }
+
+    const result = await this.userRepository.update(
+      {
+        tenantId,
+        status: UserStatus.PENDING,
+        isDeleted: false,
+      },
+      {
+        status: UserStatus.ACTIVE,
+        emailVerified: true,
+      },
+    );
+
+    this.logger.log(
+      `Activated ${result.affected} pending users for tenant: ${tenantId}`,
+    );
+
+    return result.affected || 0;
   }
 
   /**
@@ -242,7 +323,11 @@ export class AuthService {
   /**
    * Check if user has specific permission
    */
-  async hasPermission(userId: string, resource: PermissionResource, action: PermissionAction): Promise<boolean> {
+  async hasPermission(
+    userId: string,
+    resource: PermissionResource,
+    action: PermissionAction,
+  ): Promise<boolean> {
     const user = await this.userRepository.findOne({
       where: { id: userId, isDeleted: false },
     });
@@ -341,7 +426,7 @@ export class AuthService {
    */
   async initializePermissions(): Promise<void> {
     const permissions = await this.getDefaultPermissions();
-    
+
     for (const permissionData of permissions) {
       const existing = await this.permissionRepository.findOne({
         where: {
@@ -371,20 +456,31 @@ export class AuthService {
     for (const resource of resources) {
       for (const action of actions) {
         // Skip system permissions for non-system resources
-        if (action === PermissionAction.VIEW_ALL || action === PermissionAction.MANAGE_SYSTEM) {
+        if (
+          action === PermissionAction.VIEW_ALL ||
+          action === PermissionAction.MANAGE_SYSTEM
+        ) {
           permissions.push({
             resource,
             action,
-            name: `${resource.charAt(0).toUpperCase() + resource.slice(1)} ${action.replace('_', ' ')}`,
-            description: `${action.replace('_', ' ').toUpperCase()} ${resource}`,
+            name: `${
+              resource.charAt(0).toUpperCase() + resource.slice(1)
+            } ${action.replace('_', ' ')}`,
+            description: `${action
+              .replace('_', ' ')
+              .toUpperCase()} ${resource}`,
             isSystemPermission: true,
           });
         } else {
           permissions.push({
             resource,
-            action,  
-            name: `${resource.charAt(0).toUpperCase() + resource.slice(1)} ${action.replace('_', ' ')}`,
-            description: `${action.replace('_', ' ').toUpperCase()} ${resource}`,
+            action,
+            name: `${
+              resource.charAt(0).toUpperCase() + resource.slice(1)
+            } ${action.replace('_', ' ')}`,
+            description: `${action
+              .replace('_', ' ')
+              .toUpperCase()} ${resource}`,
             isSystemPermission: false,
           });
         }
@@ -435,29 +531,97 @@ export class AuthService {
   private getDefaultRolePermissions() {
     return [
       // SUPER_ADMIN: All permissions (handled separately)
-      
+
       // ADMIN: Most permissions except system management
-      { resource: PermissionResource.USERS, action: PermissionAction.CREATE, roles: [UserRole.ADMIN] },
-      { resource: PermissionResource.USERS, action: PermissionAction.READ, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      { resource: PermissionResource.USERS, action: PermissionAction.UPDATE, roles: [UserRole.ADMIN] },
-      { resource: PermissionResource.USERS, action: PermissionAction.DELETE, roles: [UserRole.ADMIN] },
-      
-      { resource: PermissionResource.PRODUCTS, action: PermissionAction.CREATE, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      { resource: PermissionResource.PRODUCTS, action: PermissionAction.READ, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF] },
-      { resource: PermissionResource.PRODUCTS, action: PermissionAction.UPDATE, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      { resource: PermissionResource.PRODUCTS, action: PermissionAction.DELETE, roles: [UserRole.ADMIN] },
-      { resource: PermissionResource.PRODUCTS, action: PermissionAction.IMPORT, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      { resource: PermissionResource.PRODUCTS, action: PermissionAction.EXPORT, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      
-      { resource: PermissionResource.INVENTORY, action: PermissionAction.READ, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF] },
-      { resource: PermissionResource.INVENTORY, action: PermissionAction.ADJUST, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      { resource: PermissionResource.INVENTORY, action: PermissionAction.TRANSFER, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      
-      { resource: PermissionResource.REPORTS, action: PermissionAction.READ, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      { resource: PermissionResource.REPORTS, action: PermissionAction.EXPORT, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      
-      { resource: PermissionResource.SETTINGS, action: PermissionAction.READ, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-      { resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE, roles: [UserRole.ADMIN] },
+      {
+        resource: PermissionResource.USERS,
+        action: PermissionAction.CREATE,
+        roles: [UserRole.ADMIN],
+      },
+      {
+        resource: PermissionResource.USERS,
+        action: PermissionAction.READ,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        resource: PermissionResource.USERS,
+        action: PermissionAction.UPDATE,
+        roles: [UserRole.ADMIN],
+      },
+      {
+        resource: PermissionResource.USERS,
+        action: PermissionAction.DELETE,
+        roles: [UserRole.ADMIN],
+      },
+
+      {
+        resource: PermissionResource.PRODUCTS,
+        action: PermissionAction.CREATE,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        resource: PermissionResource.PRODUCTS,
+        action: PermissionAction.READ,
+        roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF],
+      },
+      {
+        resource: PermissionResource.PRODUCTS,
+        action: PermissionAction.UPDATE,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        resource: PermissionResource.PRODUCTS,
+        action: PermissionAction.DELETE,
+        roles: [UserRole.ADMIN],
+      },
+      {
+        resource: PermissionResource.PRODUCTS,
+        action: PermissionAction.IMPORT,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        resource: PermissionResource.PRODUCTS,
+        action: PermissionAction.EXPORT,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+
+      {
+        resource: PermissionResource.INVENTORY,
+        action: PermissionAction.READ,
+        roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF],
+      },
+      {
+        resource: PermissionResource.INVENTORY,
+        action: PermissionAction.ADJUST,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        resource: PermissionResource.INVENTORY,
+        action: PermissionAction.TRANSFER,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+
+      {
+        resource: PermissionResource.REPORTS,
+        action: PermissionAction.READ,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        resource: PermissionResource.REPORTS,
+        action: PermissionAction.EXPORT,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+
+      {
+        resource: PermissionResource.SETTINGS,
+        action: PermissionAction.READ,
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        resource: PermissionResource.SETTINGS,
+        action: PermissionAction.UPDATE,
+        roles: [UserRole.ADMIN],
+      },
     ];
   }
 }

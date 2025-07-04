@@ -25,9 +25,7 @@ import { NotificationSubscription } from './entities/notification-subscription.e
       NotificationSubscription,
     ]),
   ],
-  controllers: [
-    NotificationsController,
-  ],
+  controllers: [NotificationsController],
   providers: [
     NotificationsService,
     EmailService,

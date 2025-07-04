@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { Product, ProductStatus } from '../../../products/entities/product.entity';
+import {
+  Product,
+  ProductStatus,
+} from '../../../products/entities/product.entity';
 import { Channel } from '../../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
@@ -148,7 +151,10 @@ export class TokopediaProductService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -200,22 +206,19 @@ export class TokopediaProductService {
           total_pages: number;
           total_products: number;
         };
-      }>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'GET',
-          endpoint: '/v1/products',
-          params,
-          requiresAuth: true,
-        },
-      );
+      }>(tenantId, channelId, config, {
+        method: 'GET',
+        endpoint: '/v1/products',
+        params,
+        requiresAuth: true,
+      });
 
       if (!result.success || !result.data?.products) {
-        const errorMessage = typeof result.error === 'string' 
-          ? result.error 
-          : this.extractErrorMessage(result.error) || 'Failed to fetch products from Tokopedia';
+        const errorMessage =
+          typeof result.error === 'string'
+            ? result.error
+            : this.extractErrorMessage(result.error) ||
+              'Failed to fetch products from Tokopedia';
         throw new Error(errorMessage);
       }
 
@@ -230,11 +233,20 @@ export class TokopediaProductService {
       // Process each product
       for (const tokopediaProduct of products) {
         try {
-          await this.processInboundProduct(tenantId, channelId, tokopediaProduct);
+          await this.processInboundProduct(
+            tenantId,
+            channelId,
+            tokopediaProduct,
+          );
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to process product ${tokopediaProduct.product_id}: ${error.message}`, error.stack);
-          errors.push(`Product ${tokopediaProduct.product_id}: ${error.message}`);
+          this.logger.error(
+            `Failed to process product ${tokopediaProduct.product_id}: ${error.message}`,
+            error.stack,
+          );
+          errors.push(
+            `Product ${tokopediaProduct.product_id}: ${error.message}`,
+          );
           errorCount++;
         }
       }
@@ -279,11 +291,13 @@ export class TokopediaProductService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Tokopedia product sync failed: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Tokopedia product sync failed: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.logSync(
         tenantId,
@@ -333,7 +347,10 @@ export class TokopediaProductService {
       }
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -378,28 +395,27 @@ export class TokopediaProductService {
         );
       } else {
         // Create new product
-        result = await this.apiService.makeTokopediaRequest<{ product_id: number }>(
-          tenantId,
-          channelId,
-          config,
-          {
-            method: 'POST',
-            endpoint: '/v1/products',
-            data: tokopediaProductData,
-            requiresAuth: true,
-          },
-        );
+        result = await this.apiService.makeTokopediaRequest<{
+          product_id: number;
+        }>(tenantId, channelId, config, {
+          method: 'POST',
+          endpoint: '/v1/products',
+          data: tokopediaProductData,
+          requiresAuth: true,
+        });
       }
 
       if (!result.success) {
-        const errorMessage = typeof result.error === 'string' 
-          ? result.error 
-          : this.extractErrorMessage(result.error) || 'Failed to sync product to Tokopedia';
+        const errorMessage =
+          typeof result.error === 'string'
+            ? result.error
+            : this.extractErrorMessage(result.error) ||
+              'Failed to sync product to Tokopedia';
         throw new Error(errorMessage);
       }
 
-      const externalId = isUpdate 
-        ? existingMapping.externalId 
+      const externalId = isUpdate
+        ? existingMapping.externalId
         : result.data?.product_id?.toString();
 
       if (!isUpdate && externalId) {
@@ -442,9 +458,11 @@ export class TokopediaProductService {
         success: true,
         externalId,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to sync product to Tokopedia: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync product to Tokopedia: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.logSync(
         tenantId,
@@ -475,7 +493,10 @@ export class TokopediaProductService {
     error?: string;
   }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -489,16 +510,17 @@ export class TokopediaProductService {
         sandbox: channel.config.sandbox || false,
       };
 
-      const result = await this.apiService.makeTokopediaRequest<TokopediaProduct>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'GET',
-          endpoint: `/v1/products/${productId}`,
-          requiresAuth: true,
-        },
-      );
+      const result =
+        await this.apiService.makeTokopediaRequest<TokopediaProduct>(
+          tenantId,
+          channelId,
+          config,
+          {
+            method: 'GET',
+            endpoint: `/v1/products/${productId}`,
+            requiresAuth: true,
+          },
+        );
 
       if (result.success) {
         return {
@@ -508,15 +530,19 @@ export class TokopediaProductService {
       } else {
         return {
           success: false,
-          error: typeof result.error === 'string' 
-            ? result.error 
-            : this.extractErrorMessage(result.error) || 'Failed to get product details',
+          error:
+            typeof result.error === 'string'
+              ? result.error
+              : this.extractErrorMessage(result.error) ||
+                'Failed to get product details',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Tokopedia product details: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to get Tokopedia product details: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: false,
         error: error.message,
@@ -537,7 +563,10 @@ export class TokopediaProductService {
     error?: string;
   }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
       });
@@ -579,15 +608,19 @@ export class TokopediaProductService {
       } else {
         return {
           success: false,
-          error: typeof result.error === 'string' 
-            ? result.error 
-            : this.extractErrorMessage(result.error) || 'Failed to update product images',
+          error:
+            typeof result.error === 'string'
+              ? result.error
+              : this.extractErrorMessage(result.error) ||
+                'Failed to update product images',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to update product images: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to update product images: ${error.message}`,
+        error.stack,
+      );
+
       return {
         success: false,
         error: error.message,
@@ -603,7 +636,7 @@ export class TokopediaProductService {
     tokopediaProduct: TokopediaProduct,
   ): Promise<void> {
     // Check if we already have a mapping for this product
-    let mapping = await this.mappingRepository.findOne({
+    const mapping = await this.mappingRepository.findOne({
       where: {
         tenantId,
         channelId,
@@ -635,7 +668,10 @@ export class TokopediaProductService {
     product.sku = tokopediaProduct.sku;
     product.sellingPrice = tokopediaProduct.price;
     product.weight = tokopediaProduct.weight;
-    product.status = tokopediaProduct.status === 'active' ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
+    product.status =
+      tokopediaProduct.status === 'active'
+        ? ProductStatus.ACTIVE
+        : ProductStatus.INACTIVE;
     product.images = tokopediaProduct.images;
     // Store tokopedia-specific data in attributes
     product.attributes = {
@@ -680,7 +716,8 @@ export class TokopediaProductService {
       stock: 0, // Will be handled by inventory service
       weight: product.weight || 100, // Default 100g
       sku: product.sku,
-      condition: (product.attributes?.tokopedia?.condition as 'new' | 'used') || 'new',
+      condition:
+        (product.attributes?.tokopedia?.condition as 'new' | 'used') || 'new',
       minimum_order: product.attributes?.tokopedia?.minimumOrder || 1,
       images: product.images || [],
       preorder: false,

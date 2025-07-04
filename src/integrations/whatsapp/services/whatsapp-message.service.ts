@@ -4,9 +4,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { WhatsAppApiService, WhatsAppConfig, WhatsAppMessage, WhatsAppApiResponse } from './whatsapp-api.service';
+import {
+  WhatsAppApiService,
+  WhatsAppConfig,
+  WhatsAppMessage,
+  WhatsAppApiResponse,
+} from './whatsapp-api.service';
 import { WhatsAppAuthService } from './whatsapp-auth.service';
-import { IntegrationLog, IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLog,
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface WhatsAppTextMessage {
   to: string;
@@ -168,7 +177,10 @@ export interface WhatsAppMessageStatus {
 
 export interface BulkMessageRequest {
   recipients: string[];
-  message: WhatsAppTextMessage | WhatsAppTemplateMessage | WhatsAppInteractiveMessage;
+  message:
+    | WhatsAppTextMessage
+    | WhatsAppTemplateMessage
+    | WhatsAppInteractiveMessage;
   sendDelay?: number; // Delay between messages in milliseconds
 }
 
@@ -207,7 +219,10 @@ export class WhatsAppMessageService {
     messageData: WhatsAppTextMessage,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -232,7 +247,12 @@ export class WhatsAppMessageService {
         },
       };
 
-      const result = await this.apiService.sendMessage(tenantId, channelId, config, message);
+      const result = await this.apiService.sendMessage(
+        tenantId,
+        channelId,
+        config,
+        message,
+      );
 
       if (result.success && result.data?.messages?.[0]) {
         const messageId = result.data.messages[0].id;
@@ -262,12 +282,11 @@ export class WhatsAppMessageService {
 
         return { success: true, messageId };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to send message' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to send message',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to send text message: ${error.message}`, {
         tenantId,
@@ -289,7 +308,10 @@ export class WhatsAppMessageService {
     messageData: WhatsAppTemplateMessage,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -317,7 +339,12 @@ export class WhatsAppMessageService {
         },
       };
 
-      const result = await this.apiService.sendMessage(tenantId, channelId, config, message);
+      const result = await this.apiService.sendMessage(
+        tenantId,
+        channelId,
+        config,
+        message,
+      );
 
       if (result.success && result.data?.messages?.[0]) {
         const messageId = result.data.messages[0].id;
@@ -349,12 +376,11 @@ export class WhatsAppMessageService {
 
         return { success: true, messageId };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to send template message' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to send template message',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to send template message: ${error.message}`, {
         tenantId,
@@ -377,7 +403,10 @@ export class WhatsAppMessageService {
     messageData: WhatsAppInteractiveMessage,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -405,7 +434,12 @@ export class WhatsAppMessageService {
         },
       };
 
-      const result = await this.apiService.sendMessage(tenantId, channelId, config, message);
+      const result = await this.apiService.sendMessage(
+        tenantId,
+        channelId,
+        config,
+        message,
+      );
 
       if (result.success && result.data?.messages?.[0]) {
         const messageId = result.data.messages[0].id;
@@ -436,20 +470,22 @@ export class WhatsAppMessageService {
 
         return { success: true, messageId };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to send interactive message' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to send interactive message',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to send interactive message: ${error.message}`, {
-        tenantId,
-        channelId,
-        recipient: messageData.to,
-        interactiveType: messageData.type,
-        error: error.message,
-      });
+      this.logger.error(
+        `Failed to send interactive message: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          recipient: messageData.to,
+          interactiveType: messageData.type,
+          error: error.message,
+        },
+      );
 
       return { success: false, error: error.message };
     }
@@ -464,7 +500,10 @@ export class WhatsAppMessageService {
     messageData: WhatsAppMediaMessage,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -504,7 +543,12 @@ export class WhatsAppMessageService {
           break;
       }
 
-      const result = await this.apiService.sendMessage(tenantId, channelId, config, message);
+      const result = await this.apiService.sendMessage(
+        tenantId,
+        channelId,
+        config,
+        message,
+      );
 
       if (result.success && result.data?.messages?.[0]) {
         const messageId = result.data.messages[0].id;
@@ -537,12 +581,11 @@ export class WhatsAppMessageService {
 
         return { success: true, messageId };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to send media message' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to send media message',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to send media message: ${error.message}`, {
         tenantId,
@@ -565,7 +608,10 @@ export class WhatsAppMessageService {
     messageData: WhatsAppLocationMessage,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -592,7 +638,12 @@ export class WhatsAppMessageService {
         },
       };
 
-      const result = await this.apiService.sendMessage(tenantId, channelId, config, message);
+      const result = await this.apiService.sendMessage(
+        tenantId,
+        channelId,
+        config,
+        message,
+      );
 
       if (result.success && result.data?.messages?.[0]) {
         const messageId = result.data.messages[0].id;
@@ -623,12 +674,11 @@ export class WhatsAppMessageService {
 
         return { success: true, messageId };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to send location message' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to send location message',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to send location message: ${error.message}`, {
         tenantId,
@@ -650,7 +700,10 @@ export class WhatsAppMessageService {
     messageData: WhatsAppContactMessage,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -672,7 +725,12 @@ export class WhatsAppMessageService {
         contacts: messageData.contacts,
       };
 
-      const result = await this.apiService.sendMessage(tenantId, channelId, config, message);
+      const result = await this.apiService.sendMessage(
+        tenantId,
+        channelId,
+        config,
+        message,
+      );
 
       if (result.success && result.data?.messages?.[0]) {
         const messageId = result.data.messages[0].id;
@@ -702,12 +760,11 @@ export class WhatsAppMessageService {
 
         return { success: true, messageId };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to send contact message' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to send contact message',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to send contact message: ${error.message}`, {
         tenantId,
@@ -733,11 +790,14 @@ export class WhatsAppMessageService {
     let failureCount = 0;
 
     try {
-      this.logger.log(`Starting bulk message send to ${bulkRequest.recipients.length} recipients`, {
-        tenantId,
-        channelId,
-        recipientCount: bulkRequest.recipients.length,
-      });
+      this.logger.log(
+        `Starting bulk message send to ${bulkRequest.recipients.length} recipients`,
+        {
+          tenantId,
+          channelId,
+          recipientCount: bulkRequest.recipients.length,
+        },
+      );
 
       for (const recipient of bulkRequest.recipients) {
         try {
@@ -746,21 +806,24 @@ export class WhatsAppMessageService {
           // Determine message type and send accordingly
           if ('text' in bulkRequest.message) {
             result = await this.sendTextMessage(tenantId, channelId, {
-              ...bulkRequest.message as WhatsAppTextMessage,
+              ...(bulkRequest.message as WhatsAppTextMessage),
               to: recipient,
             });
           } else if ('templateName' in bulkRequest.message) {
             result = await this.sendTemplateMessage(tenantId, channelId, {
-              ...bulkRequest.message as WhatsAppTemplateMessage,
+              ...(bulkRequest.message as WhatsAppTemplateMessage),
               to: recipient,
             });
           } else if ('type' in bulkRequest.message) {
             result = await this.sendInteractiveMessage(tenantId, channelId, {
-              ...bulkRequest.message as WhatsAppInteractiveMessage,
+              ...(bulkRequest.message as WhatsAppInteractiveMessage),
               to: recipient,
             });
           } else {
-            result = { success: false, error: 'Unsupported message type for bulk sending' };
+            result = {
+              success: false,
+              error: 'Unsupported message type for bulk sending',
+            };
           }
 
           if (result.success) {
@@ -781,9 +844,10 @@ export class WhatsAppMessageService {
 
           // Add delay between messages if specified
           if (bulkRequest.sendDelay && bulkRequest.sendDelay > 0) {
-            await new Promise(resolve => setTimeout(resolve, bulkRequest.sendDelay));
+            await new Promise(resolve =>
+              setTimeout(resolve, bulkRequest.sendDelay),
+            );
           }
-
         } catch (error) {
           failureCount++;
           results.push({
@@ -792,7 +856,9 @@ export class WhatsAppMessageService {
             error: error.message,
           });
 
-          this.logger.error(`Bulk message failed for recipient ${recipient}: ${error.message}`);
+          this.logger.error(
+            `Bulk message failed for recipient ${recipient}: ${error.message}`,
+          );
         }
       }
 
@@ -818,7 +884,6 @@ export class WhatsAppMessageService {
         failureCount,
         results,
       };
-
     } catch (error) {
       this.logger.error(`Bulk message send failed: ${error.message}`, {
         tenantId,
@@ -845,7 +910,10 @@ export class WhatsAppMessageService {
     messageId: string,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -859,7 +927,12 @@ export class WhatsAppMessageService {
         verifyToken: credentials.verifyToken,
       };
 
-      const result = await this.apiService.markMessageAsRead(tenantId, channelId, config, messageId);
+      const result = await this.apiService.markMessageAsRead(
+        tenantId,
+        channelId,
+        config,
+        messageId,
+      );
 
       if (result.success) {
         // Log read status
@@ -874,12 +947,11 @@ export class WhatsAppMessageService {
 
         return { success: true };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to mark message as read' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to mark message as read',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to mark message as read: ${error.message}`, {
         tenantId,
@@ -900,7 +972,7 @@ export class WhatsAppMessageService {
   private formatPhoneNumber(phoneNumber: string): string {
     // Remove all non-digit characters
     let cleaned = phoneNumber.replace(/\D/g, '');
-    
+
     // Add country code if not present
     if (!cleaned.startsWith('62') && cleaned.length <= 12) {
       // Indonesian phone number
@@ -910,7 +982,7 @@ export class WhatsAppMessageService {
         cleaned = '62' + cleaned;
       }
     }
-    
+
     return cleaned;
   }
 }

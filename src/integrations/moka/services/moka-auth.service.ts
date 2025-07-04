@@ -5,7 +5,10 @@ import { Repository } from 'typeorm';
 import { MokaApiService, MokaCredentials } from './moka-api.service';
 import { Channel } from '../../../channels/entities/channel.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface MokaAuthConfig {
   apiKey: string;
@@ -48,7 +51,9 @@ export class MokaAuthService {
     error?: string;
   }> {
     try {
-      this.logger.debug(`Setting up Moka authentication for channel ${channelId}`);
+      this.logger.debug(
+        `Setting up Moka authentication for channel ${channelId}`,
+      );
 
       // Validate credentials by testing connection
       const credentials: MokaCredentials = {
@@ -63,7 +68,9 @@ export class MokaAuthService {
       );
 
       if (!testResult.success) {
-        throw new Error(`Authentication test failed: ${testResult.error?.message}`);
+        throw new Error(
+          `Authentication test failed: ${testResult.error?.message}`,
+        );
       }
 
       // Get store information
@@ -74,7 +81,9 @@ export class MokaAuthService {
       );
 
       if (!storeInfoResult.success) {
-        throw new Error(`Failed to get store info: ${storeInfoResult.error?.message}`);
+        throw new Error(
+          `Failed to get store info: ${storeInfoResult.error?.message}`,
+        );
       }
 
       const storeInfo = storeInfoResult.data;
@@ -92,7 +101,7 @@ export class MokaAuthService {
       channel.apiCredentials = credentials;
       // channel.isActive = true; // Read-only property
       channel.lastSyncAt = new Date();
-      
+
       // Update channel metadata with store info
       // TODO: Update metadata when Channel entity supports it
       // channel.metadata = {
@@ -128,15 +137,19 @@ export class MokaAuthService {
         },
       });
 
-      this.logger.log(`Moka authentication setup successful for channel ${channelId}`);
+      this.logger.log(
+        `Moka authentication setup successful for channel ${channelId}`,
+      );
 
       return {
         success: true,
         storeInfo,
       };
-
     } catch (error) {
-      this.logger.error(`Moka authentication setup failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Moka authentication setup failed: ${error.message}`,
+        error.stack,
+      );
 
       await this.logService.logError(tenantId, channelId, error, {
         metadata: {
@@ -155,7 +168,10 @@ export class MokaAuthService {
   /**
    * Get valid credentials for API calls
    */
-  async getValidCredentials(tenantId: string, channelId: string): Promise<MokaCredentials> {
+  async getValidCredentials(
+    tenantId: string,
+    channelId: string,
+  ): Promise<MokaCredentials> {
     try {
       const channel = await this.channelRepository.findOne({
         where: { id: channelId, tenantId },
@@ -170,7 +186,9 @@ export class MokaAuthService {
       }
 
       if (!channel.apiCredentials) {
-        throw new UnauthorizedException(`No credentials found for channel ${channelId}`);
+        throw new UnauthorizedException(
+          `No credentials found for channel ${channelId}`,
+        );
       }
 
       const credentials = channel.apiCredentials as MokaCredentials;
@@ -184,20 +202,29 @@ export class MokaAuthService {
 
       if (!testResult.success) {
         // Log authentication failure
-        await this.logService.logError(tenantId, channelId, new Error('Moka credentials invalid'), {
-          metadata: {
-            action: 'validate_credentials',
-            error: testResult.error?.message,
+        await this.logService.logError(
+          tenantId,
+          channelId,
+          new Error('Moka credentials invalid'),
+          {
+            metadata: {
+              action: 'validate_credentials',
+              error: testResult.error?.message,
+            },
           },
-        });
+        );
 
-        throw new UnauthorizedException(`Moka credentials are invalid: ${testResult.error?.message}`);
+        throw new UnauthorizedException(
+          `Moka credentials are invalid: ${testResult.error?.message}`,
+        );
       }
 
       return credentials;
-
     } catch (error) {
-      this.logger.error(`Failed to get valid credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get valid credentials: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -251,9 +278,11 @@ export class MokaAuthService {
           error: testResult.error?.message,
         };
       }
-
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -288,7 +317,7 @@ export class MokaAuthService {
       }
 
       const mokaMetadata = null; // channel.metadata?.moka;
-      
+
       if (!mokaMetadata) {
         return {
           isAuthenticated: false,
@@ -312,7 +341,6 @@ export class MokaAuthService {
           lastTestAt: new Date(),
           error: testResult.success ? undefined : testResult.error?.message,
         };
-
       } catch (error) {
         return {
           isAuthenticated: false,
@@ -321,9 +349,11 @@ export class MokaAuthService {
           error: error.message,
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get authentication status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get authentication status: ${error.message}`,
+        error.stack,
+      );
       return {
         isAuthenticated: false,
         error: error.message,
@@ -350,7 +380,7 @@ export class MokaAuthService {
       // Clear credentials and deactivate
       channel.apiCredentials = null;
       // channel.isActive = false; // Read-only property
-      
+
       // Clear Moka metadata
       // if (channel.metadata?.moka) {
       //   delete channel.metadata.moka;
@@ -369,9 +399,11 @@ export class MokaAuthService {
       });
 
       this.logger.log(`Moka authentication revoked for channel ${channelId}`);
-
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -396,8 +428,9 @@ export class MokaAuthService {
         throw new Error(`Channel ${channelId} not found`);
       }
 
-      const currentCredentials = channel.apiCredentials as MokaCredentials || {};
-      
+      const currentCredentials =
+        (channel.apiCredentials as MokaCredentials) || {};
+
       // Update credentials with new config
       const updatedCredentials: MokaCredentials = {
         ...currentCredentials,
@@ -412,7 +445,9 @@ export class MokaAuthService {
       );
 
       if (!testResult.success) {
-        throw new Error(`Updated credentials are invalid: ${testResult.error?.message}`);
+        throw new Error(
+          `Updated credentials are invalid: ${testResult.error?.message}`,
+        );
       }
 
       // Save updated credentials
@@ -433,9 +468,11 @@ export class MokaAuthService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to update store config: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update store config: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -464,7 +501,10 @@ export class MokaAuthService {
         sandbox: config.isSandbox || false,
       };
 
-      const authUrl = this.mokaApiService.generateAuthorizationUrl(credentials, state);
+      const authUrl = this.mokaApiService.generateAuthorizationUrl(
+        credentials,
+        state,
+      );
 
       await this.logService.log({
         tenantId,
@@ -482,9 +522,11 @@ export class MokaAuthService {
         success: true,
         authorizationUrl: authUrl,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate authorization URL: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate authorization URL: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -506,14 +548,18 @@ export class MokaAuthService {
   }> {
     try {
       if (!config.authorizationCode) {
-        throw new Error('Authorization code is required to complete OAuth flow');
+        throw new Error(
+          'Authorization code is required to complete OAuth flow',
+        );
       }
 
       // This will be handled by setupAuthentication method
       return await this.setupAuthentication(tenantId, channelId, config);
-
     } catch (error) {
-      this.logger.error(`Failed to complete OAuth flow: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to complete OAuth flow: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -559,9 +605,11 @@ export class MokaAuthService {
         success: testResult.success,
         error: testResult.success ? undefined : testResult.error?.message,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to refresh token: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to refresh token: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,

@@ -51,7 +51,9 @@ export class ReportExportService {
         },
       });
     } catch (error) {
-      this.logger.warn('Email configuration not available. Email export will be disabled.');
+      this.logger.warn(
+        'Email configuration not available. Email export will be disabled.',
+      );
     }
   }
 
@@ -63,7 +65,9 @@ export class ReportExportService {
     options: ExportOptions,
   ): Promise<Buffer | string> {
     const reportTitle = 'Laporan Valuasi Inventori';
-    const filename = options.filename || `inventory-valuation-${new Date().toISOString().split('T')[0]}`;
+    const filename =
+      options.filename ||
+      `inventory-valuation-${new Date().toISOString().split('T')[0]}`;
 
     switch (options.format) {
       case ReportFormat.CSV:
@@ -73,7 +77,9 @@ export class ReportExportService {
       case ReportFormat.PDF:
         return this.exportInventoryValuationToPdf(data, reportTitle, filename);
       default:
-        throw new BadRequestException(`Unsupported export format: ${options.format}`);
+        throw new BadRequestException(
+          `Unsupported export format: ${options.format}`,
+        );
     }
   }
 
@@ -85,7 +91,9 @@ export class ReportExportService {
     options: ExportOptions,
   ): Promise<Buffer | string> {
     const reportTitle = 'Laporan Pergerakan Stok';
-    const filename = options.filename || `stock-movement-${new Date().toISOString().split('T')[0]}`;
+    const filename =
+      options.filename ||
+      `stock-movement-${new Date().toISOString().split('T')[0]}`;
 
     switch (options.format) {
       case ReportFormat.CSV:
@@ -95,7 +103,9 @@ export class ReportExportService {
       case ReportFormat.PDF:
         return this.exportStockMovementToPdf(data, reportTitle, filename);
       default:
-        throw new BadRequestException(`Unsupported export format: ${options.format}`);
+        throw new BadRequestException(
+          `Unsupported export format: ${options.format}`,
+        );
     }
   }
 
@@ -107,7 +117,8 @@ export class ReportExportService {
     options: ExportOptions,
   ): Promise<Buffer | string> {
     const reportTitle = 'Laporan Stok Rendah';
-    const filename = options.filename || `low-stock-${new Date().toISOString().split('T')[0]}`;
+    const filename =
+      options.filename || `low-stock-${new Date().toISOString().split('T')[0]}`;
 
     switch (options.format) {
       case ReportFormat.CSV:
@@ -117,7 +128,9 @@ export class ReportExportService {
       case ReportFormat.PDF:
         return this.exportLowStockToPdf(data, reportTitle, filename);
       default:
-        throw new BadRequestException(`Unsupported export format: ${options.format}`);
+        throw new BadRequestException(
+          `Unsupported export format: ${options.format}`,
+        );
     }
   }
 
@@ -129,7 +142,9 @@ export class ReportExportService {
     options: ExportOptions,
   ): Promise<Buffer | string> {
     const reportTitle = 'Laporan Performa Produk';
-    const filename = options.filename || `product-performance-${new Date().toISOString().split('T')[0]}`;
+    const filename =
+      options.filename ||
+      `product-performance-${new Date().toISOString().split('T')[0]}`;
 
     switch (options.format) {
       case ReportFormat.CSV:
@@ -139,7 +154,9 @@ export class ReportExportService {
       case ReportFormat.PDF:
         return this.exportProductPerformanceToPdf(data, reportTitle, filename);
       default:
-        throw new BadRequestException(`Unsupported export format: ${options.format}`);
+        throw new BadRequestException(
+          `Unsupported export format: ${options.format}`,
+        );
     }
   }
 
@@ -161,12 +178,16 @@ export class ReportExportService {
 
     try {
       const fileExtension = this.getFileExtension(options.format);
-      const filename = `${options.filename || reportType}-${Date.now()}.${fileExtension}`;
-      
+      const filename = `${
+        options.filename || reportType
+      }-${Date.now()}.${fileExtension}`;
+
       const mailOptions = {
         from: this.configService.get('SMTP_FROM', 'noreply@stokcerdas.com'),
         to: options.email,
-        subject: options.subject || `Laporan ${reportType} - ${options.tenantName || 'StokCerdas'}`,
+        subject:
+          options.subject ||
+          `Laporan ${reportType} - ${options.tenantName || 'StokCerdas'}`,
         html: this.generateEmailTemplate(reportType, options.tenantName),
         attachments: [
           {
@@ -193,10 +214,10 @@ export class ReportExportService {
     filename: string,
   ): Promise<string> {
     const csvData = data.data.map(item => ({
-      'SKU': item.sku,
+      SKU: item.sku,
       'Nama Produk': item.productName,
-      'Kategori': item.category || '',
-      'Lokasi': item.locationName,
+      Kategori: item.category || '',
+      Lokasi: item.locationName,
       'Qty Tersedia': item.quantityOnHand,
       'Qty Available': item.quantityAvailable,
       'Harga Rata-rata': this.formatCurrency(item.averageCost),
@@ -204,7 +225,9 @@ export class ReportExportService {
       'Nilai Total (Cost)': this.formatCurrency(item.totalCostValue),
       'Nilai Total (Jual)': this.formatCurrency(item.totalSellingValue),
       'Potensi Profit': this.formatCurrency(item.potentialProfit),
-      'Terakhir Bergerak': item.lastMovementAt ? new Date(item.lastMovementAt).toLocaleDateString('id-ID') : '',
+      'Terakhir Bergerak': item.lastMovementAt
+        ? new Date(item.lastMovementAt).toLocaleDateString('id-ID')
+        : '',
       'Hari Sejak Bergerak': item.daysSinceLastMovement || '',
     }));
 
@@ -212,7 +235,7 @@ export class ReportExportService {
       const stream = csv.format({ headers: true });
       let csvString = '';
 
-      stream.on('data', chunk => csvString += chunk);
+      stream.on('data', chunk => (csvString += chunk));
       stream.on('end', () => resolve(csvString));
       stream.on('error', reject);
 
@@ -230,17 +253,27 @@ export class ReportExportService {
 
     // Headers
     const headers = [
-      'SKU', 'Nama Produk', 'Kategori', 'Lokasi', 'Qty Tersedia', 
-      'Qty Available', 'Harga Rata-rata', 'Harga Jual', 'Nilai Total (Cost)', 
-      'Nilai Total (Jual)', 'Potensi Profit', 'Terakhir Bergerak', 'Hari Sejak Bergerak'
+      'SKU',
+      'Nama Produk',
+      'Kategori',
+      'Lokasi',
+      'Qty Tersedia',
+      'Qty Available',
+      'Harga Rata-rata',
+      'Harga Jual',
+      'Nilai Total (Cost)',
+      'Nilai Total (Jual)',
+      'Potensi Profit',
+      'Terakhir Bergerak',
+      'Hari Sejak Bergerak',
     ];
-    
+
     worksheet.addRow(headers);
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFE6F3FF' }
+      fgColor: { argb: 'FFE6F3FF' },
     };
 
     // Data rows
@@ -257,18 +290,43 @@ export class ReportExportService {
         item.totalCostValue,
         item.totalSellingValue,
         item.potentialProfit,
-        item.lastMovementAt ? new Date(item.lastMovementAt).toLocaleDateString('id-ID') : '',
+        item.lastMovementAt
+          ? new Date(item.lastMovementAt).toLocaleDateString('id-ID')
+          : '',
         item.daysSinceLastMovement || '',
       ]);
     });
 
     // Summary section
     worksheet.addRow([]);
-    worksheet.addRow(['RINGKASAN:', '', '', '', '', '', '', '', '', '', '', '', '']);
+    worksheet.addRow([
+      'RINGKASAN:',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ]);
     worksheet.addRow(['Total Items:', data.summary.totalItems]);
-    worksheet.addRow(['Total Nilai Cost:', this.formatCurrency(data.summary.totalCostValue)]);
-    worksheet.addRow(['Total Nilai Jual:', this.formatCurrency(data.summary.totalSellingValue)]);
-    worksheet.addRow(['Total Potensi Profit:', this.formatCurrency(data.summary.totalPotentialProfit)]);
+    worksheet.addRow([
+      'Total Nilai Cost:',
+      this.formatCurrency(data.summary.totalCostValue),
+    ]);
+    worksheet.addRow([
+      'Total Nilai Jual:',
+      this.formatCurrency(data.summary.totalSellingValue),
+    ]);
+    worksheet.addRow([
+      'Total Potensi Profit:',
+      this.formatCurrency(data.summary.totalPotentialProfit),
+    ]);
 
     // Auto-fit columns
     worksheet.columns.forEach(column => {
@@ -292,18 +350,18 @@ export class ReportExportService {
     filename: string,
   ): Promise<string> {
     const csvData = data.data.map(item => ({
-      'Tanggal': new Date(item.transactionDate).toLocaleDateString('id-ID'),
-      'SKU': item.sku,
+      Tanggal: new Date(item.transactionDate).toLocaleDateString('id-ID'),
+      SKU: item.sku,
       'Nama Produk': item.productName,
-      'Lokasi': item.locationName,
+      Lokasi: item.locationName,
       'Jenis Transaksi': item.transactionType,
-      'Qty': item.quantity,
+      Qty: item.quantity,
       'Qty Sebelum': item.quantityBefore,
       'Qty Sesudah': item.quantityAfter,
       'Biaya Unit': item.unitCost ? this.formatCurrency(item.unitCost) : '',
       'Total Biaya': item.totalCost ? this.formatCurrency(item.totalCost) : '',
-      'Alasan': item.reason || '',
-      'Referensi': item.referenceNumber || '',
+      Alasan: item.reason || '',
+      Referensi: item.referenceNumber || '',
       'Dibuat Oleh': item.createdBy,
     }));
 
@@ -311,7 +369,7 @@ export class ReportExportService {
       const stream = csv.format({ headers: true });
       let csvString = '';
 
-      stream.on('data', chunk => csvString += chunk);
+      stream.on('data', chunk => (csvString += chunk));
       stream.on('end', () => resolve(csvString));
       stream.on('error', reject);
 
@@ -329,17 +387,27 @@ export class ReportExportService {
 
     // Headers
     const headers = [
-      'Tanggal', 'SKU', 'Nama Produk', 'Lokasi', 'Jenis Transaksi', 
-      'Qty', 'Qty Sebelum', 'Qty Sesudah', 'Biaya Unit', 'Total Biaya', 
-      'Alasan', 'Referensi', 'Dibuat Oleh'
+      'Tanggal',
+      'SKU',
+      'Nama Produk',
+      'Lokasi',
+      'Jenis Transaksi',
+      'Qty',
+      'Qty Sebelum',
+      'Qty Sesudah',
+      'Biaya Unit',
+      'Total Biaya',
+      'Alasan',
+      'Referensi',
+      'Dibuat Oleh',
     ];
-    
+
     worksheet.addRow(headers);
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFE6F3FF' }
+      fgColor: { argb: 'FFE6F3FF' },
     };
 
     // Data rows
@@ -363,10 +431,30 @@ export class ReportExportService {
 
     // Summary section
     worksheet.addRow([]);
-    worksheet.addRow(['RINGKASAN:', '', '', '', '', '', '', '', '', '', '', '', '']);
+    worksheet.addRow([
+      'RINGKASAN:',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ]);
     worksheet.addRow(['Total Pergerakan:', data.summary.totalMovements]);
-    worksheet.addRow(['Penerimaan:', `${data.summary.receipts.count} transaksi, ${data.summary.receipts.totalQuantity} qty`]);
-    worksheet.addRow(['Pengeluaran:', `${data.summary.issues.count} transaksi, ${data.summary.issues.totalQuantity} qty`]);
+    worksheet.addRow([
+      'Penerimaan:',
+      `${data.summary.receipts.count} transaksi, ${data.summary.receipts.totalQuantity} qty`,
+    ]);
+    worksheet.addRow([
+      'Pengeluaran:',
+      `${data.summary.issues.count} transaksi, ${data.summary.issues.totalQuantity} qty`,
+    ]);
 
     // Auto-fit columns
     worksheet.columns.forEach(column => {
@@ -390,19 +478,21 @@ export class ReportExportService {
     filename: string,
   ): Promise<string> {
     const csvData = data.data.map(item => ({
-      'SKU': item.sku,
+      SKU: item.sku,
       'Nama Produk': item.productName,
-      'Kategori': item.category || '',
-      'Lokasi': item.locationName,
+      Kategori: item.category || '',
+      Lokasi: item.locationName,
       'Qty Available': item.quantityAvailable,
       'Reorder Point': item.reorderPoint,
       'Reorder Qty': item.reorderQuantity,
       'Max Stock': item.maxStock || '',
       'Rata-rata Harian': item.averageDailySales || '',
       'Hari Tersisa': item.daysOfStockRemaining || '',
-      'Status': item.stockStatus,
+      Status: item.stockStatus,
       'Saran Reorder': item.suggestedReorderQuantity,
-      'Terakhir Terjual': item.lastSaleDate ? new Date(item.lastSaleDate).toLocaleDateString('id-ID') : '',
+      'Terakhir Terjual': item.lastSaleDate
+        ? new Date(item.lastSaleDate).toLocaleDateString('id-ID')
+        : '',
       'Hari Sejak Terjual': item.daysSinceLastSale || '',
     }));
 
@@ -410,7 +500,7 @@ export class ReportExportService {
       const stream = csv.format({ headers: true });
       let csvString = '';
 
-      stream.on('data', chunk => csvString += chunk);
+      stream.on('data', chunk => (csvString += chunk));
       stream.on('end', () => resolve(csvString));
       stream.on('error', reject);
 
@@ -428,17 +518,28 @@ export class ReportExportService {
 
     // Headers with colors based on status
     const headers = [
-      'SKU', 'Nama Produk', 'Kategori', 'Lokasi', 'Qty Available', 
-      'Reorder Point', 'Reorder Qty', 'Max Stock', 'Rata-rata Harian', 
-      'Hari Tersisa', 'Status', 'Saran Reorder', 'Terakhir Terjual', 'Hari Sejak Terjual'
+      'SKU',
+      'Nama Produk',
+      'Kategori',
+      'Lokasi',
+      'Qty Available',
+      'Reorder Point',
+      'Reorder Qty',
+      'Max Stock',
+      'Rata-rata Harian',
+      'Hari Tersisa',
+      'Status',
+      'Saran Reorder',
+      'Terakhir Terjual',
+      'Hari Sejak Terjual',
     ];
-    
+
     worksheet.addRow(headers);
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFE6F3FF' }
+      fgColor: { argb: 'FFE6F3FF' },
     };
 
     // Data rows with conditional formatting
@@ -457,7 +558,9 @@ export class ReportExportService {
         item.daysOfStockRemaining || '',
         item.stockStatus,
         item.suggestedReorderQuantity,
-        item.lastSaleDate ? new Date(item.lastSaleDate).toLocaleDateString('id-ID') : '',
+        item.lastSaleDate
+          ? new Date(item.lastSaleDate).toLocaleDateString('id-ID')
+          : '',
         item.daysSinceLastSale || '',
       ]);
 
@@ -467,20 +570,38 @@ export class ReportExportService {
         row.getCell(11).fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: statusColor }
+          fgColor: { argb: statusColor },
         };
       }
     });
 
     // Summary section
     worksheet.addRow([]);
-    worksheet.addRow(['RINGKASAN:', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    worksheet.addRow([
+      'RINGKASAN:',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ]);
     worksheet.addRow(['Total Items:', data.summary.totalItems]);
     worksheet.addRow(['Out of Stock:', data.summary.outOfStock]);
     worksheet.addRow(['Critical:', data.summary.critical]);
     worksheet.addRow(['Low:', data.summary.low]);
     worksheet.addRow(['Reorder Needed:', data.summary.reorderNeeded]);
-    worksheet.addRow(['Total Nilai Reorder:', this.formatCurrency(data.summary.totalReorderValue)]);
+    worksheet.addRow([
+      'Total Nilai Reorder:',
+      this.formatCurrency(data.summary.totalReorderValue),
+    ]);
 
     // Auto-fit columns
     worksheet.columns.forEach(column => {
@@ -504,10 +625,10 @@ export class ReportExportService {
     filename: string,
   ): Promise<string> {
     const csvData = data.data.map(item => ({
-      'Peringkat': item.performanceRank || '',
-      'SKU': item.sku,
+      Peringkat: item.performanceRank || '',
+      SKU: item.sku,
       'Nama Produk': item.productName,
-      'Kategori': item.category || '',
+      Kategori: item.category || '',
       'Total Terjual': item.totalQuantitySold,
       'Nilai Penjualan': this.formatCurrency(item.totalSalesValue),
       'Total Pembelian': item.totalQuantityReceived,
@@ -521,15 +642,19 @@ export class ReportExportService {
       'Harga Rata-rata': this.formatCurrency(item.averageSalePrice),
       'Qty Rata-rata': item.averageSaleQuantity.toFixed(2),
       'Kategori Performa': item.performanceCategory,
-      'Pertama Terjual': item.firstSaleDate ? new Date(item.firstSaleDate).toLocaleDateString('id-ID') : '',
-      'Terakhir Terjual': item.lastSaleDate ? new Date(item.lastSaleDate).toLocaleDateString('id-ID') : '',
+      'Pertama Terjual': item.firstSaleDate
+        ? new Date(item.firstSaleDate).toLocaleDateString('id-ID')
+        : '',
+      'Terakhir Terjual': item.lastSaleDate
+        ? new Date(item.lastSaleDate).toLocaleDateString('id-ID')
+        : '',
     }));
 
     return new Promise((resolve, reject) => {
       const stream = csv.format({ headers: true });
       let csvString = '';
 
-      stream.on('data', chunk => csvString += chunk);
+      stream.on('data', chunk => (csvString += chunk));
       stream.on('end', () => resolve(csvString));
       stream.on('error', reject);
 
@@ -547,18 +672,31 @@ export class ReportExportService {
 
     // Headers
     const headers = [
-      'Peringkat', 'SKU', 'Nama Produk', 'Kategori', 'Total Terjual', 
-      'Nilai Penjualan', 'Total Pembelian', 'Biaya Pembelian', 'Gross Profit', 
-      'Margin (%)', 'Jumlah Transaksi', 'Stok Saat Ini', 'Inventory Turnover', 
-      'Hari di Inventori', 'Harga Rata-rata', 'Qty Rata-rata', 'Kategori Performa'
+      'Peringkat',
+      'SKU',
+      'Nama Produk',
+      'Kategori',
+      'Total Terjual',
+      'Nilai Penjualan',
+      'Total Pembelian',
+      'Biaya Pembelian',
+      'Gross Profit',
+      'Margin (%)',
+      'Jumlah Transaksi',
+      'Stok Saat Ini',
+      'Inventory Turnover',
+      'Hari di Inventori',
+      'Harga Rata-rata',
+      'Qty Rata-rata',
+      'Kategori Performa',
     ];
-    
+
     worksheet.addRow(headers);
     worksheet.getRow(1).font = { bold: true };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FFE6F3FF' }
+      fgColor: { argb: 'FFE6F3FF' },
     };
 
     // Data rows
@@ -589,22 +727,49 @@ export class ReportExportService {
         row.getCell(17).fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: perfColor }
+          fgColor: { argb: perfColor },
         };
       }
     });
 
     // Summary section
     worksheet.addRow([]);
-    worksheet.addRow(['RINGKASAN:', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    worksheet.addRow([
+      'RINGKASAN:',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ]);
     worksheet.addRow(['Total Produk:', data.summary.totalProducts]);
     worksheet.addRow(['High Performers:', data.summary.highPerformers]);
     worksheet.addRow(['Medium Performers:', data.summary.mediumPerformers]);
     worksheet.addRow(['Low Performers:', data.summary.lowPerformers]);
     worksheet.addRow(['Slow Moving:', data.summary.slowMoving]);
-    worksheet.addRow(['Total Nilai Penjualan:', this.formatCurrency(data.summary.totalSalesValue)]);
-    worksheet.addRow(['Total Gross Profit:', this.formatCurrency(data.summary.totalGrossProfit)]);
-    worksheet.addRow(['Rata-rata Margin:', `${data.summary.averageGrossProfitMargin.toFixed(2)}%`]);
+    worksheet.addRow([
+      'Total Nilai Penjualan:',
+      this.formatCurrency(data.summary.totalSalesValue),
+    ]);
+    worksheet.addRow([
+      'Total Gross Profit:',
+      this.formatCurrency(data.summary.totalGrossProfit),
+    ]);
+    worksheet.addRow([
+      'Rata-rata Margin:',
+      `${data.summary.averageGrossProfitMargin.toFixed(2)}%`,
+    ]);
 
     // Auto-fit columns
     worksheet.columns.forEach(column => {
@@ -630,19 +795,19 @@ export class ReportExportService {
     try {
       browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
-      
+
       const page = await browser.newPage();
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-      
+
       const pdfBuffer = await page.pdf({
         format: 'A4',
         margin: {
           top: '20mm',
           right: '15mm',
           bottom: '20mm',
-          left: '15mm'
+          left: '15mm',
         },
         printBackground: true,
       });
@@ -658,8 +823,13 @@ export class ReportExportService {
     }
   }
 
-  private generateInventoryValuationHtml(data: InventoryValuationResponseDto, title: string): string {
-    const rows = data.data.map(item => `
+  private generateInventoryValuationHtml(
+    data: InventoryValuationResponseDto,
+    title: string,
+  ): string {
+    const rows = data.data
+      .map(
+        item => `
       <tr>
         <td>${item.sku}</td>
         <td>${item.productName}</td>
@@ -673,9 +843,13 @@ export class ReportExportService {
         <td class="currency">${this.formatCurrency(item.totalSellingValue)}</td>
         <td class="currency">${this.formatCurrency(item.potentialProfit)}</td>
       </tr>
-    `).join('');
+    `,
+      )
+      .join('');
 
-    return this.generatePdfTemplate(title, `
+    return this.generatePdfTemplate(
+      title,
+      `
       <table>
         <thead>
           <tr>
@@ -699,15 +873,28 @@ export class ReportExportService {
       <div class="summary">
         <h3>Ringkasan</h3>
         <p>Total Items: ${data.summary.totalItems}</p>
-        <p>Total Nilai Cost: ${this.formatCurrency(data.summary.totalCostValue)}</p>
-        <p>Total Nilai Jual: ${this.formatCurrency(data.summary.totalSellingValue)}</p>
-        <p>Total Potensi Profit: ${this.formatCurrency(data.summary.totalPotentialProfit)}</p>
+        <p>Total Nilai Cost: ${this.formatCurrency(
+          data.summary.totalCostValue,
+        )}</p>
+        <p>Total Nilai Jual: ${this.formatCurrency(
+          data.summary.totalSellingValue,
+        )}</p>
+        <p>Total Potensi Profit: ${this.formatCurrency(
+          data.summary.totalPotentialProfit,
+        )}</p>
       </div>
-    `);
+    `,
+    );
   }
 
-  private generateStockMovementHtml(data: StockMovementResponseDto, title: string): string {
-    const rows = data.data.slice(0, 50).map(item => `
+  private generateStockMovementHtml(
+    data: StockMovementResponseDto,
+    title: string,
+  ): string {
+    const rows = data.data
+      .slice(0, 50)
+      .map(
+        item => `
       <tr>
         <td>${new Date(item.transactionDate).toLocaleDateString('id-ID')}</td>
         <td>${item.sku}</td>
@@ -719,9 +906,13 @@ export class ReportExportService {
         <td class="number">${item.quantityAfter}</td>
         <td>${item.reason || ''}</td>
       </tr>
-    `).join('');
+    `,
+      )
+      .join('');
 
-    return this.generatePdfTemplate(title, `
+    return this.generatePdfTemplate(
+      title,
+      `
       <table>
         <thead>
           <tr>
@@ -740,18 +931,32 @@ export class ReportExportService {
           ${rows}
         </tbody>
       </table>
-      ${data.data.length > 50 ? '<p><em>Menampilkan 50 item pertama. Download Excel/CSV untuk data lengkap.</em></p>' : ''}
+      ${
+        data.data.length > 50
+          ? '<p><em>Menampilkan 50 item pertama. Download Excel/CSV untuk data lengkap.</em></p>'
+          : ''
+      }
       <div class="summary">
         <h3>Ringkasan</h3>
         <p>Total Pergerakan: ${data.summary.totalMovements}</p>
-        <p>Penerimaan: ${data.summary.receipts.count} transaksi, ${data.summary.receipts.totalQuantity} qty</p>
-        <p>Pengeluaran: ${data.summary.issues.count} transaksi, ${data.summary.issues.totalQuantity} qty</p>
+        <p>Penerimaan: ${data.summary.receipts.count} transaksi, ${
+        data.summary.receipts.totalQuantity
+      } qty</p>
+        <p>Pengeluaran: ${data.summary.issues.count} transaksi, ${
+        data.summary.issues.totalQuantity
+      } qty</p>
       </div>
-    `);
+    `,
+    );
   }
 
-  private generateLowStockHtml(data: LowStockResponseDto, title: string): string {
-    const rows = data.data.map(item => `
+  private generateLowStockHtml(
+    data: LowStockResponseDto,
+    title: string,
+  ): string {
+    const rows = data.data
+      .map(
+        item => `
       <tr class="${item.stockStatus}">
         <td>${item.sku}</td>
         <td>${item.productName}</td>
@@ -762,9 +967,13 @@ export class ReportExportService {
         <td class="number">${item.suggestedReorderQuantity}</td>
         <td>${item.daysOfStockRemaining || ''}</td>
       </tr>
-    `).join('');
+    `,
+      )
+      .join('');
 
-    return this.generatePdfTemplate(title, `
+    return this.generatePdfTemplate(
+      title,
+      `
       <table>
         <thead>
           <tr>
@@ -788,14 +997,25 @@ export class ReportExportService {
         <p class="out-of-stock">Out of Stock: ${data.summary.outOfStock}</p>
         <p class="critical">Critical: ${data.summary.critical}</p>
         <p class="low">Low: ${data.summary.low}</p>
-        <p class="reorder-needed">Reorder Needed: ${data.summary.reorderNeeded}</p>
-        <p>Total Nilai Reorder: ${this.formatCurrency(data.summary.totalReorderValue)}</p>
+        <p class="reorder-needed">Reorder Needed: ${
+          data.summary.reorderNeeded
+        }</p>
+        <p>Total Nilai Reorder: ${this.formatCurrency(
+          data.summary.totalReorderValue,
+        )}</p>
       </div>
-    `);
+    `,
+    );
   }
 
-  private generateProductPerformanceHtml(data: ProductPerformanceResponseDto, title: string): string {
-    const rows = data.data.slice(0, 30).map(item => `
+  private generateProductPerformanceHtml(
+    data: ProductPerformanceResponseDto,
+    title: string,
+  ): string {
+    const rows = data.data
+      .slice(0, 30)
+      .map(
+        item => `
       <tr class="${item.performanceCategory}">
         <td>${item.performanceRank || ''}</td>
         <td>${item.sku}</td>
@@ -807,9 +1027,13 @@ export class ReportExportService {
         <td class="number">${item.inventoryTurnover.toFixed(1)}</td>
         <td class="category">${item.performanceCategory}</td>
       </tr>
-    `).join('');
+    `,
+      )
+      .join('');
 
-    return this.generatePdfTemplate(title, `
+    return this.generatePdfTemplate(
+      title,
+      `
       <table>
         <thead>
           <tr>
@@ -828,17 +1052,26 @@ export class ReportExportService {
           ${rows}
         </tbody>
       </table>
-      ${data.data.length > 30 ? '<p><em>Menampilkan 30 produk teratas. Download Excel/CSV untuk data lengkap.</em></p>' : ''}
+      ${
+        data.data.length > 30
+          ? '<p><em>Menampilkan 30 produk teratas. Download Excel/CSV untuk data lengkap.</em></p>'
+          : ''
+      }
       <div class="summary">
         <h3>Ringkasan</h3>
         <p>Total Produk: ${data.summary.totalProducts}</p>
         <p class="high">High Performers: ${data.summary.highPerformers}</p>
-        <p class="medium">Medium Performers: ${data.summary.mediumPerformers}</p>
+        <p class="medium">Medium Performers: ${
+          data.summary.mediumPerformers
+        }</p>
         <p class="low">Low Performers: ${data.summary.lowPerformers}</p>
         <p class="slow_moving">Slow Moving: ${data.summary.slowMoving}</p>
-        <p>Rata-rata Margin: ${data.summary.averageGrossProfitMargin.toFixed(1)}%</p>
+        <p>Rata-rata Margin: ${data.summary.averageGrossProfitMargin.toFixed(
+          1,
+        )}%</p>
       </div>
-    `);
+    `,
+    );
   }
 
   private generatePdfTemplate(title: string, content: string): string {
@@ -934,7 +1167,10 @@ export class ReportExportService {
     `;
   }
 
-  private generateEmailTemplate(reportType: string, tenantName?: string): string {
+  private generateEmailTemplate(
+    reportType: string,
+    tenantName?: string,
+  ): string {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #0066cc; color: white; padding: 20px; text-align: center;">
@@ -944,7 +1180,9 @@ export class ReportExportService {
         <div style="padding: 20px; background-color: #f8f9fa;">
           <h2>Halo${tenantName ? ` ${tenantName}` : ''},</h2>
           <p>Laporan <strong>${reportType}</strong> telah berhasil dibuat dan dilampirkan dalam email ini.</p>
-          <p>Laporan ini dibuat pada: <strong>${new Date().toLocaleDateString('id-ID')}</strong></p>
+          <p>Laporan ini dibuat pada: <strong>${new Date().toLocaleDateString(
+            'id-ID',
+          )}</strong></p>
           <p>Silakan buka lampiran untuk melihat detail laporan Anda.</p>
           <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
           <p style="font-size: 12px; color: #666;">
@@ -967,39 +1205,57 @@ export class ReportExportService {
 
   private getFileExtension(format: ReportFormat): string {
     switch (format) {
-      case ReportFormat.CSV: return 'csv';
-      case ReportFormat.EXCEL: return 'xlsx';
-      case ReportFormat.PDF: return 'pdf';
-      default: return 'json';
+      case ReportFormat.CSV:
+        return 'csv';
+      case ReportFormat.EXCEL:
+        return 'xlsx';
+      case ReportFormat.PDF:
+        return 'pdf';
+      default:
+        return 'json';
     }
   }
 
   private getContentType(format: ReportFormat): string {
     switch (format) {
-      case ReportFormat.CSV: return 'text/csv';
-      case ReportFormat.EXCEL: return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      case ReportFormat.PDF: return 'application/pdf';
-      default: return 'application/json';
+      case ReportFormat.CSV:
+        return 'text/csv';
+      case ReportFormat.EXCEL:
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case ReportFormat.PDF:
+        return 'application/pdf';
+      default:
+        return 'application/json';
     }
   }
 
   private getStatusColor(status: string): string | null {
     switch (status) {
-      case 'out_of_stock': return 'FFCDD2';
-      case 'critical': return 'FFE0B2';
-      case 'low': return 'F3E5F5';
-      case 'reorder_needed': return 'C8E6C9';
-      default: return null;
+      case 'out_of_stock':
+        return 'FFCDD2';
+      case 'critical':
+        return 'FFE0B2';
+      case 'low':
+        return 'F3E5F5';
+      case 'reorder_needed':
+        return 'C8E6C9';
+      default:
+        return null;
     }
   }
 
   private getPerformanceColor(category: string): string | null {
     switch (category) {
-      case 'high': return 'C8E6C9';
-      case 'medium': return 'FFE0B2';
-      case 'low': return 'FFCDD2';
-      case 'slow_moving': return 'F5F5F5';
-      default: return null;
+      case 'high':
+        return 'C8E6C9';
+      case 'medium':
+        return 'FFE0B2';
+      case 'low':
+        return 'FFCDD2';
+      case 'slow_moving':
+        return 'F5F5F5';
+      default:
+        return null;
     }
   }
 }

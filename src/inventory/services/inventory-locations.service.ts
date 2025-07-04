@@ -1,8 +1,16 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, TreeRepository, IsNull, Not } from 'typeorm';
 
-import { InventoryLocation, LocationStatus } from '../entities/inventory-location.entity';
+import {
+  InventoryLocation,
+  LocationStatus,
+} from '../entities/inventory-location.entity';
 import { CreateInventoryLocationDto } from '../dto/create-inventory-location.dto';
 import { UpdateInventoryLocationDto } from '../dto/update-inventory-location.dto';
 import { InventoryRealtimeService } from './inventory-realtime.service';
@@ -80,7 +88,10 @@ export class InventoryLocationsService {
   /**
    * Dapatkan struktur hierarki lokasi
    */
-  async findHierarchy(tenantId: string, includeInactive: boolean = false): Promise<InventoryLocation[]> {
+  async findHierarchy(
+    tenantId: string,
+    includeInactive: boolean = false,
+  ): Promise<InventoryLocation[]> {
     const whereCondition: any = {
       tenantId,
       isDeleted: false,
@@ -93,7 +104,11 @@ export class InventoryLocationsService {
 
     const rootLocations = await this.locationRepository.find({
       where: whereCondition,
-      relations: ['children', 'children.children', 'children.children.children'], // 3 levels deep
+      relations: [
+        'children',
+        'children.children',
+        'children.children.children',
+      ], // 3 levels deep
       order: { name: 'ASC' },
     });
 
@@ -126,7 +141,9 @@ export class InventoryLocationsService {
     });
 
     if (!location) {
-      throw new NotFoundException('Lokasi dengan kode tersebut tidak ditemukan');
+      throw new NotFoundException(
+        'Lokasi dengan kode tersebut tidak ditemukan',
+      );
     }
 
     return location;
@@ -135,7 +152,10 @@ export class InventoryLocationsService {
   /**
    * Cari lokasi berdasarkan nama
    */
-  async findByName(tenantId: string, name: string): Promise<InventoryLocation[]> {
+  async findByName(
+    tenantId: string,
+    name: string,
+  ): Promise<InventoryLocation[]> {
     return await this.locationRepository.find({
       where: {
         tenantId,
@@ -166,16 +186,26 @@ export class InventoryLocationsService {
     // Validasi parent jika diubah
     if (updateLocationDto.parentId !== undefined) {
       if (updateLocationDto.parentId) {
-        await this.validateParentLocation(tenantId, updateLocationDto.parentId, id);
+        await this.validateParentLocation(
+          tenantId,
+          updateLocationDto.parentId,
+          id,
+        );
       }
       // Pastikan tidak membuat circular reference
-      await this.validateNoCircularReference(tenantId, id, updateLocationDto.parentId);
+      await this.validateNoCircularReference(
+        tenantId,
+        id,
+        updateLocationDto.parentId,
+      );
     }
 
     // Validasi business rules
     if (updateLocationDto.usableArea && updateLocationDto.totalArea) {
       if (updateLocationDto.usableArea > updateLocationDto.totalArea) {
-        throw new BadRequestException('Area yang bisa digunakan tidak boleh lebih besar dari total area');
+        throw new BadRequestException(
+          'Area yang bisa digunakan tidak boleh lebih besar dari total area',
+        );
       }
     }
 
@@ -197,17 +227,24 @@ export class InventoryLocationsService {
     const location = await this.findOne(tenantId, id);
 
     // Cek apakah masih ada inventory items
-    const inventoryCount = await this.locationRepository.manager.count('inventory_items', {
-      where: { locationId: id, tenantId }
-    });
-    
+    const inventoryCount = await this.locationRepository.manager.count(
+      'inventory_items',
+      {
+        where: { locationId: id, tenantId },
+      },
+    );
+
     if (inventoryCount > 0) {
-      throw new BadRequestException('Tidak dapat menghapus lokasi yang masih memiliki inventori');
+      throw new BadRequestException(
+        'Tidak dapat menghapus lokasi yang masih memiliki inventori',
+      );
     }
 
     // Cek apakah masih ada child locations
     if (location.children && location.children.length > 0) {
-      throw new BadRequestException('Tidak dapat menghapus lokasi yang masih memiliki sub-lokasi');
+      throw new BadRequestException(
+        'Tidak dapat menghapus lokasi yang masih memiliki sub-lokasi',
+      );
     }
 
     location.isDeleted = true;
@@ -235,7 +272,10 @@ export class InventoryLocationsService {
   /**
    * Dapatkan statistik lokasi
    */
-  async getLocationStats(tenantId: string, locationId?: string): Promise<{
+  async getLocationStats(
+    tenantId: string,
+    locationId?: string,
+  ): Promise<{
     totalLocations: number;
     activeLocations: number;
     warehouseCount: number;
@@ -257,16 +297,26 @@ export class InventoryLocationsService {
       locationsWithInventory,
     ] = await Promise.all([
       this.locationRepository.count({ where: whereCondition }),
-      this.locationRepository.count({ where: { ...whereCondition, status: LocationStatus.ACTIVE } }),
-      this.locationRepository.count({ where: { ...whereCondition, type: 'warehouse' } }),
-      this.locationRepository.count({ where: { ...whereCondition, type: 'store' } }),
-      this.locationRepository.count({ where: { ...whereCondition, type: 'virtual' } }),
+      this.locationRepository.count({
+        where: { ...whereCondition, status: LocationStatus.ACTIVE },
+      }),
+      this.locationRepository.count({
+        where: { ...whereCondition, type: 'warehouse' },
+      }),
+      this.locationRepository.count({
+        where: { ...whereCondition, type: 'store' },
+      }),
+      this.locationRepository.count({
+        where: { ...whereCondition, type: 'virtual' },
+      }),
       this.locationRepository
         .createQueryBuilder('location')
         .leftJoin('location.inventoryItems', 'item')
         .where('location.tenantId = :tenantId', { tenantId })
         .andWhere('location.isDeleted = false')
-        .andWhere(locationId ? 'location.id = :locationId' : '1=1', { locationId })
+        .andWhere(locationId ? 'location.id = :locationId' : '1=1', {
+          locationId,
+        })
         .groupBy('location.id')
         .having('COUNT(item.id) > 0')
         .getCount(),
@@ -294,7 +344,9 @@ export class InventoryLocationsService {
     for (const item of reorderData) {
       const location = await this.findOne(tenantId, item.id);
       if (location.parentId !== parentId) {
-        throw new BadRequestException(`Lokasi ${item.id} bukan child dari parent yang ditentukan`);
+        throw new BadRequestException(
+          `Lokasi ${item.id} bukan child dari parent yang ditentukan`,
+        );
       }
     }
 
@@ -326,19 +378,29 @@ export class InventoryLocationsService {
   }
 
   // Private helper methods
-  private async validateCodeUnique(tenantId: string, code: string, excludeId?: string): Promise<void> {
+  private async validateCodeUnique(
+    tenantId: string,
+    code: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, code, isDeleted: false };
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
 
-    const existingLocation = await this.locationRepository.findOne({ where: whereCondition });
+    const existingLocation = await this.locationRepository.findOne({
+      where: whereCondition,
+    });
     if (existingLocation) {
       throw new ConflictException(`Kode lokasi "${code}" sudah digunakan`);
     }
   }
 
-  private async validateParentLocation(tenantId: string, parentId: string, excludeId?: string): Promise<void> {
+  private async validateParentLocation(
+    tenantId: string,
+    parentId: string,
+    excludeId?: string,
+  ): Promise<void> {
     const parent = await this.locationRepository.findOne({
       where: { id: parentId, tenantId, isDeleted: false },
     });
@@ -348,7 +410,9 @@ export class InventoryLocationsService {
     }
 
     if (excludeId && parent.id === excludeId) {
-      throw new BadRequestException('Lokasi tidak bisa menjadi parent dari dirinya sendiri');
+      throw new BadRequestException(
+        'Lokasi tidak bisa menjadi parent dari dirinya sendiri',
+      );
     }
   }
 
@@ -364,11 +428,16 @@ export class InventoryLocationsService {
     const descendantIds = descendants.map(d => d.id);
 
     if (descendantIds.includes(newParentId)) {
-      throw new BadRequestException('Tidak dapat membuat circular reference dalam hierarki lokasi');
+      throw new BadRequestException(
+        'Tidak dapat membuat circular reference dalam hierarki lokasi',
+      );
     }
   }
 
-  private async getAllDescendants(tenantId: string, locationId: string): Promise<InventoryLocation[]> {
+  private async getAllDescendants(
+    tenantId: string,
+    locationId: string,
+  ): Promise<InventoryLocation[]> {
     const children = await this.locationRepository.find({
       where: { parentId: locationId, tenantId, isDeleted: false },
     });
@@ -383,20 +452,30 @@ export class InventoryLocationsService {
     return allDescendants;
   }
 
-  private validateBusinessRules(createLocationDto: CreateInventoryLocationDto): void {
+  private validateBusinessRules(
+    createLocationDto: CreateInventoryLocationDto,
+  ): void {
     // Validasi area
     if (createLocationDto.usableArea && createLocationDto.totalArea) {
       if (createLocationDto.usableArea > createLocationDto.totalArea) {
-        throw new BadRequestException('Area yang bisa digunakan tidak boleh lebih besar dari total area');
+        throw new BadRequestException(
+          'Area yang bisa digunakan tidak boleh lebih besar dari total area',
+        );
       }
     }
 
     // Validasi koordinat
-    if (createLocationDto.latitude !== undefined && (createLocationDto.latitude < -90 || createLocationDto.latitude > 90)) {
+    if (
+      createLocationDto.latitude !== undefined &&
+      (createLocationDto.latitude < -90 || createLocationDto.latitude > 90)
+    ) {
       throw new BadRequestException('Latitude harus antara -90 dan 90');
     }
 
-    if (createLocationDto.longitude !== undefined && (createLocationDto.longitude < -180 || createLocationDto.longitude > 180)) {
+    if (
+      createLocationDto.longitude !== undefined &&
+      (createLocationDto.longitude < -180 || createLocationDto.longitude > 180)
+    ) {
       throw new BadRequestException('Longitude harus antara -180 dan 180');
     }
   }

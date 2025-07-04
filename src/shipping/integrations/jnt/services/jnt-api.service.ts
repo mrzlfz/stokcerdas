@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../../../integrations/common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../../../integrations/common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 import * as crypto from 'crypto';
 
@@ -121,7 +126,6 @@ export interface JntTrackingResponse {
 
 @Injectable()
 export class JntApiService extends BaseApiService {
-  
   constructor(
     protected readonly httpService: HttpService,
     protected readonly configService: ConfigService,
@@ -133,7 +137,7 @@ export class JntApiService extends BaseApiService {
    * Get J&T API configuration
    */
   private getApiConfig(credentials: JntCredentials): ApiConfig {
-    const baseUrl = credentials.isSandbox 
+    const baseUrl = credentials.isSandbox
       ? 'https://openapi-uat.jtexpress.com.my'
       : 'https://openapi.jtexpress.com.my';
 
@@ -162,7 +166,7 @@ export class JntApiService extends BaseApiService {
     channelId: string,
   ): Promise<ApiResponse<T>> {
     const config = this.getApiConfig(credentials);
-    
+
     const timestamp = request.timestamp || Math.floor(Date.now() / 1000);
     const signature = this.generateJntSignature(
       credentials,
@@ -174,11 +178,11 @@ export class JntApiService extends BaseApiService {
       ...request,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'charset': 'utf-8',
-        'apiAccount': credentials.customerCode,
-        'timestamp': timestamp.toString(),
-        'signature': signature,
+        Accept: 'application/json',
+        charset: 'utf-8',
+        apiAccount: credentials.customerCode,
+        timestamp: timestamp.toString(),
+        signature: signature,
       },
     };
 
@@ -196,7 +200,7 @@ export class JntApiService extends BaseApiService {
     // J&T signature format: base64(HMAC-SHA256(apiAccount + timestamp + secretKey + requestBody))
     const requestBody = request.data ? JSON.stringify(request.data) : '';
     const stringToSign = `${credentials.customerCode}${timestamp}${credentials.secretKey}${requestBody}`;
-    
+
     return crypto
       .createHmac('sha256', credentials.secretKey)
       .update(stringToSign)
@@ -254,12 +258,16 @@ export class JntApiService extends BaseApiService {
     countryCode: string = 'ID',
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<Array<{
-    provinceName: string;
-    cityName: string;
-    areaName: string;
-    postCode: string;
-  }>>> {
+  ): Promise<
+    ApiResponse<
+      Array<{
+        provinceName: string;
+        cityName: string;
+        areaName: string;
+        postCode: string;
+      }>
+    >
+  > {
     const request: JntApiRequest = {
       method: 'POST',
       endpoint: '/area/getArea',
@@ -270,12 +278,7 @@ export class JntApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJntRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJntRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -294,12 +297,7 @@ export class JntApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJntRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJntRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -318,12 +316,7 @@ export class JntApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJntRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJntRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -344,12 +337,7 @@ export class JntApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJntRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJntRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -361,10 +349,12 @@ export class JntApiService extends BaseApiService {
     reason: string,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    success: boolean;
-    msg: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      success: boolean;
+      msg: string;
+    }>
+  > {
     const request: JntApiRequest = {
       method: 'POST',
       endpoint: '/order/cancelOrder',
@@ -375,12 +365,7 @@ export class JntApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJntRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJntRequest(credentials, request, tenantId, channelId);
   }
 
   /**
@@ -391,17 +376,19 @@ export class JntApiService extends BaseApiService {
     txLogisticId: string,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    txLogisticId: string;
-    awbNo: string;
-    orderStatus: string;
-    expressType: string;
-    deliveryType: string;
-    weight: number;
-    feeAmount: number;
-    createTime: string;
-    updateTime: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      txLogisticId: string;
+      awbNo: string;
+      orderStatus: string;
+      expressType: string;
+      deliveryType: string;
+      weight: number;
+      feeAmount: number;
+      createTime: string;
+      updateTime: string;
+    }>
+  > {
     const request: JntApiRequest = {
       method: 'POST',
       endpoint: '/order/getOrder',
@@ -411,39 +398,60 @@ export class JntApiService extends BaseApiService {
       requiresAuth: true,
     };
 
-    return this.makeJntRequest(
-      credentials,
-      request,
-      tenantId,
-      channelId,
-    );
+    return this.makeJntRequest(credentials, request, tenantId, channelId);
   }
 
   /**
    * Handle API errors specific to J&T
    */
-  handleJntError(error: any): { code: string; message: string; retryable: boolean } {
+  handleJntError(error: any): {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } {
     const errorCode = error.error_code || error.code;
-    const errorMessage = error.error_description || error.message || error.msg || 'Unknown J&T API error';
+    const errorMessage =
+      error.error_description ||
+      error.message ||
+      error.msg ||
+      'Unknown J&T API error';
 
     // Map common J&T error codes
     const errorMap: Record<string, { message: string; retryable: boolean }> = {
-      'AUTH_FAILED': { message: 'Authentication failed', retryable: false },
-      'INVALID_SIGNATURE': { message: 'Invalid signature', retryable: false },
-      'RATE_LIMIT_EXCEEDED': { message: 'Rate limit exceeded', retryable: true },
-      'INVALID_AREA': { message: 'Invalid pickup or delivery area', retryable: false },
-      'WEIGHT_EXCEEDED': { message: 'Weight exceeds limit', retryable: false },
-      'SERVICE_NOT_AVAILABLE': { message: 'Service not available for this route', retryable: false },
-      'INVALID_ORDER_DATA': { message: 'Invalid order data', retryable: false },
-      'ORDER_NOT_FOUND': { message: 'Order not found', retryable: false },
-      'ORDER_ALREADY_CANCELLED': { message: 'Order already cancelled', retryable: false },
-      'SYSTEM_ERROR': { message: 'System temporarily unavailable', retryable: true },
-      'INSUFFICIENT_BALANCE': { message: 'Insufficient account balance', retryable: false },
-      'DUPLICATE_ORDER': { message: 'Duplicate order reference', retryable: false },
+      AUTH_FAILED: { message: 'Authentication failed', retryable: false },
+      INVALID_SIGNATURE: { message: 'Invalid signature', retryable: false },
+      RATE_LIMIT_EXCEEDED: { message: 'Rate limit exceeded', retryable: true },
+      INVALID_AREA: {
+        message: 'Invalid pickup or delivery area',
+        retryable: false,
+      },
+      WEIGHT_EXCEEDED: { message: 'Weight exceeds limit', retryable: false },
+      SERVICE_NOT_AVAILABLE: {
+        message: 'Service not available for this route',
+        retryable: false,
+      },
+      INVALID_ORDER_DATA: { message: 'Invalid order data', retryable: false },
+      ORDER_NOT_FOUND: { message: 'Order not found', retryable: false },
+      ORDER_ALREADY_CANCELLED: {
+        message: 'Order already cancelled',
+        retryable: false,
+      },
+      SYSTEM_ERROR: {
+        message: 'System temporarily unavailable',
+        retryable: true,
+      },
+      INSUFFICIENT_BALANCE: {
+        message: 'Insufficient account balance',
+        retryable: false,
+      },
+      DUPLICATE_ORDER: {
+        message: 'Duplicate order reference',
+        retryable: false,
+      },
     };
 
     const mappedError = errorMap[errorCode];
-    
+
     return {
       code: errorCode || 'JNT_API_ERROR',
       message: mappedError?.message || errorMessage,
@@ -480,12 +488,12 @@ export class JntApiService extends BaseApiService {
       'In Transit': 'in_transit',
       'Arrived at Destination Hub': 'arrived_at_destination_hub',
       'Out for Delivery': 'out_for_delivery',
-      'Delivered': 'delivered',
+      Delivered: 'delivered',
       'Delivery Failed': 'delivery_attempted',
       'Returned to Hub': 'on_hold',
-      'Cancelled': 'cancelled',
-      'Exception': 'exception',
-      'Delayed': 'delayed',
+      Cancelled: 'cancelled',
+      Exception: 'exception',
+      Delayed: 'delayed',
     };
 
     return statusMap[scanType] || 'in_transit';
@@ -498,13 +506,14 @@ export class JntApiService extends BaseApiService {
     return {
       txLogisticId: jntTrackingData.txLogisticId,
       trackingNumber: jntTrackingData.awbNo,
-      events: jntTrackingData.details?.map((event: any) => ({
-        dateTime: event.scanTime,
-        description: event.desc,
-        location: event.city,
-        scanType: event.scanType,
-        status: this.mapJntScanTypeToTrackingStatus(event.scanType),
-      })) || [],
+      events:
+        jntTrackingData.details?.map((event: any) => ({
+          dateTime: event.scanTime,
+          description: event.desc,
+          location: event.city,
+          scanType: event.scanType,
+          status: this.mapJntScanTypeToTrackingStatus(event.scanType),
+        })) || [],
     };
   }
 
@@ -523,7 +532,7 @@ export class JntApiService extends BaseApiService {
   formatPhoneNumber(phone: string): string {
     // Remove all non-digits
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // J&T expects format without country code for mobile
     if (cleaned.startsWith('62')) {
       return `0${cleaned.substring(2)}`;
@@ -537,15 +546,28 @@ export class JntApiService extends BaseApiService {
   /**
    * Calculate volumetric weight for J&T (formula: L x W x H / 5000)
    */
-  calculateVolumetricWeight(length: number, width: number, height: number): number {
+  calculateVolumetricWeight(
+    length: number,
+    width: number,
+    height: number,
+  ): number {
     return (length * width * height) / 5000; // J&T formula
   }
 
   /**
    * Get chargeable weight (higher of actual or volumetric weight)
    */
-  getChargeableWeight(actualWeight: number, length: number, width: number, height: number): number {
-    const volumetricWeight = this.calculateVolumetricWeight(length, width, height);
+  getChargeableWeight(
+    actualWeight: number,
+    length: number,
+    width: number,
+    height: number,
+  ): number {
+    const volumetricWeight = this.calculateVolumetricWeight(
+      length,
+      width,
+      height,
+    );
     return Math.max(actualWeight, volumetricWeight);
   }
 
@@ -637,15 +659,15 @@ export class JntApiService extends BaseApiService {
   }): string {
     if (packageInfo.isFragile) return 'FRG';
     if (packageInfo.isLiquid) return 'LQD';
-    
+
     const weightKg = packageInfo.weight / 1000;
     const volume = packageInfo.length * packageInfo.width * packageInfo.height;
-    
+
     if (packageInfo.content?.toLowerCase().includes('document')) return 'DOC';
     if (weightKg <= 1 && volume <= 100000) return 'SPX'; // Small parcel
     if (weightKg <= 5 && volume <= 500000) return 'MPX'; // Medium parcel
     if (weightKg <= 30) return 'LPX'; // Large parcel
-    
+
     return 'BLK'; // Bulk
   }
 }

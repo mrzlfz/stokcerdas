@@ -51,7 +51,12 @@ export enum TradingTerms {
 }
 
 @Entity('company_relationships')
-@Unique('unique_relationship', ['tenantId', 'fromCompanyId', 'toCompanyId', 'relationshipType'])
+@Unique('unique_relationship', [
+  'tenantId',
+  'fromCompanyId',
+  'toCompanyId',
+  'relationshipType',
+])
 @Index(['tenantId', 'isDeleted'])
 @Index(['tenantId', 'fromCompanyId'])
 @Index(['tenantId', 'toCompanyId'])
@@ -104,10 +109,22 @@ export class CompanyRelationship extends AuditableEntity {
   description: string;
 
   // Ownership and control
-  @Column({ name: 'ownership_percentage', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({
+    name: 'ownership_percentage',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
   ownershipPercentage: number; // For parent-subsidiary relationships
 
-  @Column({ name: 'voting_rights_percentage', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({
+    name: 'voting_rights_percentage',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
   votingRightsPercentage: number;
 
   @Column({ name: 'is_controlling_interest', type: 'boolean', default: false })
@@ -120,7 +137,11 @@ export class CompanyRelationship extends AuditableEntity {
   @Column({ name: 'legal_structure', length: 100, nullable: true })
   legalStructure: string;
 
-  @Column({ name: 'regulatory_approval_required', type: 'boolean', default: false })
+  @Column({
+    name: 'regulatory_approval_required',
+    type: 'boolean',
+    default: false,
+  })
   regulatoryApprovalRequired: boolean;
 
   @Column({ name: 'regulatory_approval_status', length: 50, nullable: true })
@@ -144,7 +165,13 @@ export class CompanyRelationship extends AuditableEntity {
   })
   tradingTerms: TradingTerms;
 
-  @Column({ name: 'credit_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'credit_limit',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   creditLimit: number;
 
   @Column({ name: 'payment_terms_days', type: 'integer', nullable: true })
@@ -160,13 +187,27 @@ export class CompanyRelationship extends AuditableEntity {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
-  @Column({ name: 'allows_inter_company_transfers', type: 'boolean', default: true })
+  @Column({
+    name: 'allows_inter_company_transfers',
+    type: 'boolean',
+    default: true,
+  })
   allowsInterCompanyTransfers: boolean;
 
-  @Column({ name: 'requires_approval_for_transfers', type: 'boolean', default: true })
+  @Column({
+    name: 'requires_approval_for_transfers',
+    type: 'boolean',
+    default: true,
+  })
   requiresApprovalForTransfers: boolean;
 
-  @Column({ name: 'auto_approve_transfers_under', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'auto_approve_transfers_under',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   autoApproveTransfersUnder: number;
 
   @Column({ name: 'consolidated_reporting', type: 'boolean', default: false })
@@ -214,7 +255,13 @@ export class CompanyRelationship extends AuditableEntity {
   noticePeriodDays: number;
 
   // Performance tracking
-  @Column({ name: 'transaction_volume', type: 'decimal', precision: 20, scale: 2, default: 0 })
+  @Column({
+    name: 'transaction_volume',
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    default: 0,
+  })
   transactionVolume: number;
 
   @Column({ name: 'transaction_count', type: 'integer', default: 0 })
@@ -223,20 +270,46 @@ export class CompanyRelationship extends AuditableEntity {
   @Column({ name: 'last_transaction_date', type: 'timestamp', nullable: true })
   lastTransactionDate: Date;
 
-  @Column({ name: 'relationship_score', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  @Column({
+    name: 'relationship_score',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    nullable: true,
+  })
   relationshipScore: number; // 0.0 to 5.0
 
-  @Column({ name: 'performance_rating', type: 'varchar', length: 20, nullable: true })
-  performanceRating: 'excellent' | 'good' | 'satisfactory' | 'poor' | 'critical';
+  @Column({
+    name: 'performance_rating',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  performanceRating:
+    | 'excellent'
+    | 'good'
+    | 'satisfactory'
+    | 'poor'
+    | 'critical';
 
   // Risk management
-  @Column({ name: 'risk_level', type: 'varchar', length: 20, default: 'medium' })
+  @Column({
+    name: 'risk_level',
+    type: 'varchar',
+    length: 20,
+    default: 'medium',
+  })
   riskLevel: 'low' | 'medium' | 'high' | 'critical';
 
   @Column({ name: 'risk_factors', type: 'simple-array', nullable: true })
   riskFactors: string[];
 
-  @Column({ name: 'compliance_status', type: 'varchar', length: 50, default: 'compliant' })
+  @Column({
+    name: 'compliance_status',
+    type: 'varchar',
+    length: 50,
+    default: 'compliant',
+  })
   complianceStatus: string;
 
   @Column({ name: 'last_compliance_check', type: 'date', nullable: true })
@@ -328,7 +401,10 @@ export class CompanyRelationship extends AuditableEntity {
   }
 
   hasControllingInterest(): boolean {
-    return this.isControllingInterest || (this.ownershipPercentage && this.ownershipPercentage > 50);
+    return (
+      this.isControllingInterest ||
+      (this.ownershipPercentage && this.ownershipPercentage > 50)
+    );
   }
 
   isExpired(): boolean {
@@ -349,7 +425,11 @@ export class CompanyRelationship extends AuditableEntity {
 
   requiresTransferApproval(amount?: number): boolean {
     if (!this.requiresApprovalForTransfers) return false;
-    if (amount && this.autoApproveTransfersUnder && amount < this.autoApproveTransfersUnder) {
+    if (
+      amount &&
+      this.autoApproveTransfersUnder &&
+      amount < this.autoApproveTransfersUnder
+    ) {
       return false;
     }
     return true;
@@ -373,7 +453,8 @@ export class CompanyRelationship extends AuditableEntity {
     // Transaction activity factor
     if (this.lastTransactionDate) {
       const daysSinceLastTransaction = Math.floor(
-        (new Date().getTime() - this.lastTransactionDate.getTime()) / (1000 * 60 * 60 * 24)
+        (new Date().getTime() - this.lastTransactionDate.getTime()) /
+          (1000 * 60 * 60 * 24),
       );
       if (daysSinceLastTransaction <= 30) {
         score += 20;
@@ -514,7 +595,7 @@ export class CompanyRelationship extends AuditableEntity {
       this.effectiveUntil = new Date(
         this.effectiveUntil.getFullYear(),
         this.effectiveUntil.getMonth() + renewalMonths,
-        this.effectiveUntil.getDate()
+        this.effectiveUntil.getDate(),
       );
       this.addCustomField('last_renewal_date', new Date());
     }
@@ -522,12 +603,16 @@ export class CompanyRelationship extends AuditableEntity {
 
   validateBusinessTerms(): boolean {
     if (!this.businessTerms) return true;
-    
+
     const { minimumOrderValue, maximumOrderValue } = this.businessTerms;
-    if (minimumOrderValue && maximumOrderValue && minimumOrderValue > maximumOrderValue) {
+    if (
+      minimumOrderValue &&
+      maximumOrderValue &&
+      minimumOrderValue > maximumOrderValue
+    ) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -535,7 +620,7 @@ export class CompanyRelationship extends AuditableEntity {
     const fromName = this.fromCompany.name;
     const toName = this.toCompany.name;
     const type = this.relationshipType.replace('_', ' ').toLowerCase();
-    
+
     return `${fromName} has ${type} relationship with ${toName}`;
   }
 
@@ -556,7 +641,10 @@ export class CompanyRelationship extends AuditableEntity {
     this.lastComplianceCheck = checkDate || new Date();
   }
 
-  setRiskLevel(level: CompanyRelationship['riskLevel'], factors?: string[]): void {
+  setRiskLevel(
+    level: CompanyRelationship['riskLevel'],
+    factors?: string[],
+  ): void {
     this.riskLevel = level;
     if (factors) {
       this.riskFactors = factors;

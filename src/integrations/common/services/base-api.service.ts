@@ -51,7 +51,10 @@ export interface ApiResponse<T = any> {
 @Injectable()
 export class BaseApiService {
   protected readonly logger = new Logger(BaseApiService.name);
-  private requestCounts = new Map<string, { count: number; resetTime: number }>();
+  private requestCounts = new Map<
+    string,
+    { count: number; resetTime: number }
+  >();
 
   constructor(
     protected readonly httpService: HttpService,
@@ -75,7 +78,11 @@ export class BaseApiService {
       await this.checkRateLimit(channelId, config.rateLimit);
 
       // Prepare request configuration
-      const axiosConfig = await this.prepareRequestConfig(config, request, requestId);
+      const axiosConfig = await this.prepareRequestConfig(
+        config,
+        request,
+        requestId,
+      );
 
       // Log request
       this.logRequest(requestId, tenantId, channelId, request, axiosConfig);
@@ -102,10 +109,9 @@ export class BaseApiService {
           rateLimit,
         },
       };
-
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       // Log error
       this.logError(requestId, error, duration);
 
@@ -152,10 +158,17 @@ export class BaseApiService {
       },
     };
 
-    const response = await this.makeRequest(config, authRequest, 'system', 'auth');
+    const response = await this.makeRequest(
+      config,
+      authRequest,
+      'system',
+      'auth',
+    );
 
     if (!response.success) {
-      throw new Error(`OAuth authentication failed: ${response.error?.message}`);
+      throw new Error(
+        `OAuth authentication failed: ${response.error?.message}`,
+      );
     }
 
     return {
@@ -193,7 +206,12 @@ export class BaseApiService {
       },
     };
 
-    const response = await this.makeRequest(config, refreshRequest, 'system', 'auth');
+    const response = await this.makeRequest(
+      config,
+      refreshRequest,
+      'system',
+      'auth',
+    );
 
     if (!response.success) {
       throw new Error(`Token refresh failed: ${response.error?.message}`);
@@ -223,13 +241,15 @@ export class BaseApiService {
 
       // Handle different signature formats
       const receivedSignature = signature.replace(/^(sha256=|sha1=)/, '');
-      
+
       return crypto.timingSafeEqual(
         Buffer.from(expectedSignature, 'hex'),
         Buffer.from(receivedSignature, 'hex'),
       );
     } catch (error) {
-      this.logger.error(`Webhook signature verification failed: ${error.message}`);
+      this.logger.error(
+        `Webhook signature verification failed: ${error.message}`,
+      );
       return false;
     }
   }
@@ -245,7 +265,7 @@ export class BaseApiService {
     timestamp?: number,
   ): string {
     const ts = timestamp || Math.floor(Date.now() / 1000);
-    
+
     // Sort parameters
     const sortedParams = Object.keys(params)
       .sort()
@@ -279,7 +299,7 @@ export class BaseApiService {
     const rateLimitKey = channelId;
 
     const current = this.requestCounts.get(rateLimitKey);
-    
+
     if (!current || now >= current.resetTime) {
       // Reset window
       this.requestCounts.set(rateLimitKey, {
@@ -291,7 +311,9 @@ export class BaseApiService {
 
     if (current.count >= rateLimit.requestsPerMinute) {
       const waitTime = current.resetTime - now;
-      throw new Error(`Rate limit exceeded. Wait ${waitTime}ms before next request.`);
+      throw new Error(
+        `Rate limit exceeded. Wait ${waitTime}ms before next request.`,
+      );
     }
 
     // Increment count
@@ -304,7 +326,9 @@ export class BaseApiService {
     request: ApiRequest,
     requestId: string,
   ): Promise<AxiosRequestConfig> {
-    const url = `${config.baseUrl}${config.apiVersion ? `/${config.apiVersion}` : ''}${request.endpoint}`;
+    const url = `${config.baseUrl}${
+      config.apiVersion ? `/${config.apiVersion}` : ''
+    }${request.endpoint}`;
 
     const axiosConfig: AxiosRequestConfig = {
       method: request.method,
@@ -321,7 +345,7 @@ export class BaseApiService {
     if (config.authentication) {
       axiosConfig.headers = {
         ...axiosConfig.headers,
-        ...await this.getAuthHeaders(config.authentication),
+        ...(await this.getAuthHeaders(config.authentication)),
       };
     }
 
@@ -337,22 +361,25 @@ export class BaseApiService {
     return axiosConfig;
   }
 
-  private async getAuthHeaders(auth: ApiConfig['authentication']): Promise<Record<string, string>> {
+  private async getAuthHeaders(
+    auth: ApiConfig['authentication'],
+  ): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
 
     switch (auth.type) {
       case 'bearer':
         headers['Authorization'] = `Bearer ${auth.credentials.accessToken}`;
         break;
-      
+
       case 'apikey':
-        headers[auth.credentials.headerName || 'X-API-Key'] = auth.credentials.apiKey;
+        headers[auth.credentials.headerName || 'X-API-Key'] =
+          auth.credentials.apiKey;
         break;
-      
+
       case 'oauth':
         headers['Authorization'] = `Bearer ${auth.credentials.accessToken}`;
         break;
-      
+
       case 'signature':
         // Platform-specific signature implementation
         // Will be implemented in platform-specific services
@@ -362,7 +389,9 @@ export class BaseApiService {
     return headers;
   }
 
-  private async executeRequest<T>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  private async executeRequest<T>(
+    config: AxiosRequestConfig,
+  ): Promise<AxiosResponse<T>> {
     try {
       return await firstValueFrom(this.httpService.request<T>(config));
     } catch (error) {
@@ -371,12 +400,20 @@ export class BaseApiService {
     }
   }
 
-  private extractRateLimitInfo(response: AxiosResponse): ApiResponse['metadata']['rateLimit'] {
+  private extractRateLimitInfo(
+    response: AxiosResponse,
+  ): ApiResponse['metadata']['rateLimit'] {
     const headers = response.headers;
-    
-    const remaining = parseInt(headers['x-ratelimit-remaining'] || headers['x-rate-limit-remaining'] || '0');
-    const resetTimestamp = parseInt(headers['x-ratelimit-reset'] || headers['x-rate-limit-reset'] || '0');
-    
+
+    const remaining = parseInt(
+      headers['x-ratelimit-remaining'] ||
+        headers['x-rate-limit-remaining'] ||
+        '0',
+    );
+    const resetTimestamp = parseInt(
+      headers['x-ratelimit-reset'] || headers['x-rate-limit-reset'] || '0',
+    );
+
     if (remaining !== undefined && resetTimestamp) {
       return {
         remaining,
@@ -392,7 +429,10 @@ export class BaseApiService {
       // HTTP error response
       return {
         code: `HTTP_${error.response.status}`,
-        message: error.response.data?.message || error.response.statusText || 'HTTP request failed',
+        message:
+          error.response.data?.message ||
+          error.response.statusText ||
+          'HTTP request failed',
         details: {
           status: error.response.status,
           data: error.response.data,
@@ -442,19 +482,18 @@ export class BaseApiService {
     response: AxiosResponse,
     duration: number,
   ): void {
-    this.logger.debug(`[${requestId}] Response ${response.status} (${duration}ms)`, {
-      status: response.status,
-      duration,
-      dataSize: response.data ? JSON.stringify(response.data).length : 0,
-      headers: this.sanitizeHeaders(response.headers),
-    });
+    this.logger.debug(
+      `[${requestId}] Response ${response.status} (${duration}ms)`,
+      {
+        status: response.status,
+        duration,
+        dataSize: response.data ? JSON.stringify(response.data).length : 0,
+        headers: this.sanitizeHeaders(response.headers),
+      },
+    );
   }
 
-  private logError(
-    requestId: string,
-    error: any,
-    duration: number,
-  ): void {
+  private logError(requestId: string, error: any, duration: number): void {
     this.logger.error(`[${requestId}] Request failed (${duration}ms)`, {
       error: error.message,
       status: error.response?.status,
@@ -465,10 +504,15 @@ export class BaseApiService {
 
   protected sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
     const sanitized = { ...headers };
-    
+
     // Remove sensitive headers
-    const sensitiveHeaders = ['authorization', 'x-api-key', 'cookie', 'set-cookie'];
-    
+    const sensitiveHeaders = [
+      'authorization',
+      'x-api-key',
+      'cookie',
+      'set-cookie',
+    ];
+
     sensitiveHeaders.forEach(header => {
       if (sanitized[header]) {
         sanitized[header] = '[REDACTED]';
@@ -477,7 +521,7 @@ export class BaseApiService {
         sanitized[header.toLowerCase()] = '[REDACTED]';
       }
     });
-    
+
     return sanitized;
   }
 }

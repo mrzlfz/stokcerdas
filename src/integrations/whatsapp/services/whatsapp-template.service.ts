@@ -7,7 +7,10 @@ import { IntegrationLogService } from '../../common/services/integration-log.ser
 import { WhatsAppApiService, WhatsAppConfig } from './whatsapp-api.service';
 import { WhatsAppAuthService } from './whatsapp-auth.service';
 import { Channel } from '../../../channels/entities/channel.entity';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
 export interface WhatsAppTemplate {
   id: string;
@@ -124,9 +127,16 @@ export class WhatsAppTemplateService {
       language?: string;
       name?: string;
     },
-  ): Promise<{ success: boolean; templates?: WhatsAppTemplate[]; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    templates?: WhatsAppTemplate[];
+    error?: string;
+  }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -142,7 +152,8 @@ export class WhatsAppTemplateService {
 
       // Build query parameters
       const params: Record<string, any> = {
-        fields: 'id,name,status,category,language,components,created_time,updated_time,quality_score',
+        fields:
+          'id,name,status,category,language,components,created_time,updated_time,quality_score',
       };
 
       if (filters?.status) {
@@ -158,17 +169,14 @@ export class WhatsAppTemplateService {
         params.name = filters.name;
       }
 
-      const result = await this.apiService.makeWhatsAppRequest<{ data: WhatsAppTemplate[] }>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'GET',
-          endpoint: `/${credentials.businessAccountId}/message_templates`,
-          params,
-          requiresAuth: true,
-        },
-      );
+      const result = await this.apiService.makeWhatsAppRequest<{
+        data: WhatsAppTemplate[];
+      }>(tenantId, channelId, config, {
+        method: 'GET',
+        endpoint: `/${credentials.businessAccountId}/message_templates`,
+        params,
+        requiresAuth: true,
+      });
 
       if (result.success) {
         const templates = result.data?.data || [];
@@ -188,12 +196,11 @@ export class WhatsAppTemplateService {
 
         return { success: true, templates };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to retrieve templates' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to retrieve templates',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to get templates: ${error.message}`, {
         tenantId,
@@ -212,9 +219,16 @@ export class WhatsAppTemplateService {
     tenantId: string,
     channelId: string,
     templateId: string,
-  ): Promise<{ success: boolean; template?: WhatsAppTemplate; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    template?: WhatsAppTemplate;
+    error?: string;
+  }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -228,29 +242,30 @@ export class WhatsAppTemplateService {
         verifyToken: credentials.verifyToken,
       };
 
-      const result = await this.apiService.makeWhatsAppRequest<WhatsAppTemplate>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'GET',
-          endpoint: `/${templateId}`,
-          params: {
-            fields: 'id,name,status,category,language,components,created_time,updated_time,quality_score',
+      const result =
+        await this.apiService.makeWhatsAppRequest<WhatsAppTemplate>(
+          tenantId,
+          channelId,
+          config,
+          {
+            method: 'GET',
+            endpoint: `/${templateId}`,
+            params: {
+              fields:
+                'id,name,status,category,language,components,created_time,updated_time,quality_score',
+            },
+            requiresAuth: true,
           },
-          requiresAuth: true,
-        },
-      );
+        );
 
       if (result.success) {
         return { success: true, template: result.data };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to retrieve template' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to retrieve template',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to get template: ${error.message}`, {
         tenantId,
@@ -272,7 +287,10 @@ export class WhatsAppTemplateService {
     templateRequest: CreateTemplateRequest,
   ): Promise<{ success: boolean; templateId?: string; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -292,17 +310,15 @@ export class WhatsAppTemplateService {
         return { success: false, error: validation.errors?.join(', ') };
       }
 
-      const result = await this.apiService.makeWhatsAppRequest<{ id: string; status: string }>(
-        tenantId,
-        channelId,
-        config,
-        {
-          method: 'POST',
-          endpoint: `/${credentials.businessAccountId}/message_templates`,
-          data: templateRequest,
-          requiresAuth: true,
-        },
-      );
+      const result = await this.apiService.makeWhatsAppRequest<{
+        id: string;
+        status: string;
+      }>(tenantId, channelId, config, {
+        method: 'POST',
+        endpoint: `/${credentials.businessAccountId}/message_templates`,
+        data: templateRequest,
+        requiresAuth: true,
+      });
 
       if (result.success && result.data?.id) {
         const templateId = result.data.id;
@@ -335,12 +351,11 @@ export class WhatsAppTemplateService {
 
         return { success: true, templateId };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to create template' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to create template',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to create template: ${error.message}`, {
         tenantId,
@@ -363,7 +378,10 @@ export class WhatsAppTemplateService {
     templateName: string,
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
         return { success: false, error: 'No WhatsApp credentials found' };
       }
@@ -415,12 +433,11 @@ export class WhatsAppTemplateService {
 
         return { success: true };
       } else {
-        return { 
-          success: false, 
-          error: result.error?.message || 'Failed to delete template' 
+        return {
+          success: false,
+          error: result.error?.message || 'Failed to delete template',
         };
       }
-
     } catch (error) {
       this.logger.error(`Failed to delete template: ${error.message}`, {
         tenantId,
@@ -452,7 +469,9 @@ export class WhatsAppTemplateService {
             type: 'BODY',
             text: 'Halo {{1}}, pesanan Anda dengan nomor {{2}} telah dikonfirmasi. Total pembayaran: Rp {{3}}. Estimasi pengiriman: {{4}}. Terima kasih telah berbelanja dengan kami!',
             example: {
-              body_text: [['John Doe', 'ORD-12345', '250,000', '2-3 hari kerja']],
+              body_text: [
+                ['John Doe', 'ORD-12345', '250,000', '2-3 hari kerja'],
+              ],
             },
           },
           {
@@ -581,7 +600,9 @@ export class WhatsAppTemplateService {
             type: 'BODY',
             text: '🔥 PROMO SPESIAL! {{1}} diskon hingga {{2}} untuk semua produk {{3}}. Berlaku hingga {{4}}. Jangan sampai terlewat!',
             example: {
-              body_text: [['Flash Sale', '50%', 'elektronik', '31 Desember 2024']],
+              body_text: [
+                ['Flash Sale', '50%', 'elektronik', '31 Desember 2024'],
+              ],
             },
           },
           {
@@ -614,7 +635,9 @@ export class WhatsAppTemplateService {
             type: 'BODY',
             text: 'Halo {{1}}, ini pengingat untuk janji temu Anda besok pada {{2}} di {{3}}. Mohon datang 15 menit lebih awal. Jika ada perubahan, silakan hubungi kami.',
             example: {
-              body_text: [['John Doe', '14:00 WIB', 'StokCerdas Office Jakarta']],
+              body_text: [
+                ['John Doe', '14:00 WIB', 'StokCerdas Office Jakarta'],
+              ],
             },
           },
           {
@@ -654,7 +677,10 @@ export class WhatsAppTemplateService {
       const template = library[templateType];
 
       if (!template) {
-        return { success: false, error: `Template type '${templateType}' not found in library` };
+        return {
+          success: false,
+          error: `Template type '${templateType}' not found in library`,
+        };
       }
 
       const createRequest: CreateTemplateRequest = {
@@ -664,7 +690,11 @@ export class WhatsAppTemplateService {
         components: template.components,
       };
 
-      const result = await this.createTemplate(tenantId, channelId, createRequest);
+      const result = await this.createTemplate(
+        tenantId,
+        channelId,
+        createRequest,
+      );
 
       if (result.success) {
         // Log template creation from library
@@ -683,14 +713,16 @@ export class WhatsAppTemplateService {
       }
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Failed to create template from library: ${error.message}`, {
-        tenantId,
-        channelId,
-        templateType,
-        error: error.message,
-      });
+      this.logger.error(
+        `Failed to create template from library: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          templateType,
+          error: error.message,
+        },
+      );
 
       return { success: false, error: error.message };
     }
@@ -709,7 +741,7 @@ export class WhatsAppTemplateService {
     try {
       // This would typically integrate with analytics API
       // For now, we'll return mock data structure
-      
+
       const stats: TemplateUsageStats = {
         templateName,
         totalSent: 0,
@@ -728,14 +760,16 @@ export class WhatsAppTemplateService {
       // This could involve querying webhook events, integration logs, etc.
 
       return { success: true, stats };
-
     } catch (error) {
-      this.logger.error(`Failed to get template usage stats: ${error.message}`, {
-        tenantId,
-        channelId,
-        templateName,
-        error: error.message,
-      });
+      this.logger.error(
+        `Failed to get template usage stats: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          templateName,
+          error: error.message,
+        },
+      );
 
       return { success: false, error: error.message };
     }
@@ -746,9 +780,10 @@ export class WhatsAppTemplateService {
   /**
    * Validate template request
    */
-  private validateTemplateRequest(
-    templateRequest: CreateTemplateRequest,
-  ): { isValid: boolean; errors?: string[] } {
+  private validateTemplateRequest(templateRequest: CreateTemplateRequest): {
+    isValid: boolean;
+    errors?: string[];
+  } {
     const errors: string[] = [];
 
     // Validate name
@@ -756,11 +791,17 @@ export class WhatsAppTemplateService {
       errors.push('Template name is required');
     }
     if (templateRequest.name && !/^[a-z0-9_]+$/.test(templateRequest.name)) {
-      errors.push('Template name can only contain lowercase letters, numbers, and underscores');
+      errors.push(
+        'Template name can only contain lowercase letters, numbers, and underscores',
+      );
     }
 
     // Validate category
-    if (!['AUTHENTICATION', 'MARKETING', 'UTILITY'].includes(templateRequest.category)) {
+    if (
+      !['AUTHENTICATION', 'MARKETING', 'UTILITY'].includes(
+        templateRequest.category,
+      )
+    ) {
       errors.push('Invalid template category');
     }
 
@@ -770,7 +811,10 @@ export class WhatsAppTemplateService {
     }
 
     // Validate components
-    if (!templateRequest.components || templateRequest.components.length === 0) {
+    if (
+      !templateRequest.components ||
+      templateRequest.components.length === 0
+    ) {
       errors.push('At least one component is required');
     }
 
@@ -786,7 +830,9 @@ export class WhatsAppTemplateService {
 
       if (component.type === 'HEADER' && component.format && !component.text) {
         if (component.format === 'TEXT' && !component.text) {
-          errors.push(`Header component with TEXT format must have text content`);
+          errors.push(
+            `Header component with TEXT format must have text content`,
+          );
         }
       }
 
@@ -794,7 +840,7 @@ export class WhatsAppTemplateService {
         if (component.buttons.length > 3) {
           errors.push(`Maximum 3 buttons allowed per template`);
         }
-        
+
         component.buttons.forEach((button, buttonIndex) => {
           if (!button.text) {
             errors.push(`Button ${buttonIndex + 1} must have text`);

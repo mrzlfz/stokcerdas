@@ -1,6 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AnalyticsMetaDto } from './analytics-response.dto';
-import { PredictiveAnalysisType, RiskLevel, MovementCategory } from './predictive-analytics-query.dto';
+import {
+  PredictiveAnalysisType,
+  RiskLevel,
+  MovementCategory,
+} from './predictive-analytics-query.dto';
 
 export class StockoutRiskDto {
   @ApiProperty({ description: 'Product ID' })
@@ -508,7 +512,10 @@ export class OptimalReorderResponseDto {
 }
 
 export class PriceOptimizationResponseDto {
-  @ApiProperty({ description: 'Analysis results', type: [PriceOptimizationDto] })
+  @ApiProperty({
+    description: 'Analysis results',
+    type: [PriceOptimizationDto],
+  })
   data: PriceOptimizationDto[];
 
   @ApiProperty({ description: 'Response metadata' })
@@ -583,11 +590,20 @@ export class SeasonalAnalysisResponseDto {
 }
 
 export class PredictiveAnalyticsResponseDto {
-  @ApiProperty({ description: 'Analysis type performed', enum: PredictiveAnalysisType })
+  @ApiProperty({
+    description: 'Analysis type performed',
+    enum: PredictiveAnalysisType,
+  })
   analysisType: PredictiveAnalysisType;
 
   @ApiProperty({ description: 'Analysis results' })
-  data: StockoutRiskDto[] | SlowMovingItemDto[] | OptimalReorderDto[] | PriceOptimizationDto[] | DemandAnomalyDto[] | SeasonalAnalysisDto[];
+  data:
+    | StockoutRiskDto[]
+    | SlowMovingItemDto[]
+    | OptimalReorderDto[]
+    | PriceOptimizationDto[]
+    | DemandAnomalyDto[]
+    | SeasonalAnalysisDto[];
 
   @ApiProperty({ description: 'Response metadata' })
   meta: AnalyticsMetaDto;

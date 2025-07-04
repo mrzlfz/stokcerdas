@@ -1,14 +1,36 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, IsNull, Not, In, QueryRunner } from 'typeorm';
+import {
+  Repository,
+  Like,
+  Between,
+  IsNull,
+  Not,
+  In,
+  QueryRunner,
+} from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
-import { Product, ProductStatus, ProductType } from '../entities/product.entity';
+import {
+  Product,
+  ProductStatus,
+  ProductType,
+} from '../entities/product.entity';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { ProductQueryDto } from '../dto/product-query.dto';
-import { BulkCreateProductDto, BulkUpdateProductDto, BulkDeleteProductDto, BulkProductResponseDto } from '../dto/bulk-product.dto';
+import {
+  BulkCreateProductDto,
+  BulkUpdateProductDto,
+  BulkDeleteProductDto,
+  BulkProductResponseDto,
+} from '../dto/bulk-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -19,7 +41,11 @@ export class ProductsService {
     private readonly productQueue: Queue,
   ) {}
 
-  async create(tenantId: string, createProductDto: CreateProductDto, userId?: string): Promise<Product> {
+  async create(
+    tenantId: string,
+    createProductDto: CreateProductDto,
+    userId?: string,
+  ): Promise<Product> {
     // Validasi SKU unik per tenant
     await this.validateSkuUnique(tenantId, createProductDto.sku);
 
@@ -29,7 +55,11 @@ export class ProductsService {
     }
 
     // Validasi harga
-    this.validatePricing(createProductDto.costPrice, createProductDto.sellingPrice, createProductDto.wholesalePrice);
+    this.validatePricing(
+      createProductDto.costPrice,
+      createProductDto.sellingPrice,
+      createProductDto.wholesalePrice,
+    );
 
     const product = this.productRepository.create({
       ...createProductDto,
@@ -57,7 +87,10 @@ export class ProductsService {
     return savedProduct;
   }
 
-  async findAll(tenantId: string, query: ProductQueryDto): Promise<{
+  async findAll(
+    tenantId: string,
+    query: ProductQueryDto,
+  ): Promise<{
     data: Product[];
     meta: {
       total: number;
@@ -66,9 +99,24 @@ export class ProductsService {
       totalPages: number;
     };
   }> {
-    const { page, limit, search, status, type, categoryId, brand, supplier, 
-            minPrice, maxPrice, lowStock, outOfStock, expiringSoon, 
-            sortBy, sortOrder, includeDeleted } = query;
+    const {
+      page,
+      limit,
+      search,
+      status,
+      type,
+      categoryId,
+      brand,
+      supplier,
+      minPrice,
+      maxPrice,
+      lowStock,
+      outOfStock,
+      expiringSoon,
+      sortBy,
+      sortOrder,
+      includeDeleted,
+    } = query;
 
     const queryBuilder = this.productRepository
       .createQueryBuilder('product')
@@ -79,14 +127,16 @@ export class ProductsService {
 
     // Filter soft delete
     if (!includeDeleted) {
-      queryBuilder.andWhere('product.isDeleted = :isDeleted', { isDeleted: false });
+      queryBuilder.andWhere('product.isDeleted = :isDeleted', {
+        isDeleted: false,
+      });
     }
 
     // Search
     if (search) {
       queryBuilder.andWhere(
         '(product.name ILIKE :search OR product.sku ILIKE :search OR product.barcode ILIKE :search OR product.description ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -107,12 +157,17 @@ export class ProductsService {
 
     // Brand filter
     if (brand) {
-      queryBuilder.andWhere('product.brand ILIKE :brand', { brand: `%${brand}%` });
+      queryBuilder.andWhere('product.brand ILIKE :brand', {
+        brand: `%${brand}%`,
+      });
     }
 
     // Supplier filter
     if (supplier) {
-      queryBuilder.andWhere('supplier.name ILIKE :supplier OR supplier.code ILIKE :supplier', { supplier: `%${supplier}%` });
+      queryBuilder.andWhere(
+        'supplier.name ILIKE :supplier OR supplier.code ILIKE :supplier',
+        { supplier: `%${supplier}%` },
+      );
     }
 
     // Price range filter
@@ -130,21 +185,33 @@ export class ProductsService {
     }
     if (outOfStock) {
       // This would need inventory integration
-      queryBuilder.andWhere('product.trackStock = :trackStock', { trackStock: true }); // Placeholder
+      queryBuilder.andWhere('product.trackStock = :trackStock', {
+        trackStock: true,
+      }); // Placeholder
     }
 
     // Expiring soon filter
     if (expiringSoon) {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      
-      queryBuilder.andWhere('product.expiryDate IS NOT NULL')
-                  .andWhere('product.expiryDate <= :thirtyDaysFromNow', { thirtyDaysFromNow })
-                  .andWhere('product.expiryDate > :now', { now: new Date() });
+
+      queryBuilder
+        .andWhere('product.expiryDate IS NOT NULL')
+        .andWhere('product.expiryDate <= :thirtyDaysFromNow', {
+          thirtyDaysFromNow,
+        })
+        .andWhere('product.expiryDate > :now', { now: new Date() });
     }
 
     // Sorting
-    const validSortFields = ['name', 'sku', 'sellingPrice', 'costPrice', 'createdAt', 'salesCount'];
+    const validSortFields = [
+      'name',
+      'sku',
+      'sellingPrice',
+      'costPrice',
+      'createdAt',
+      'salesCount',
+    ];
     const sortField = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
     queryBuilder.orderBy(`product.${sortField}`, sortOrder);
 
@@ -176,7 +243,7 @@ export class ProductsService {
     }
 
     // Increment view count
-    await this.productRepository.update(id, { 
+    await this.productRepository.update(id, {
       viewCount: () => 'viewCount + 1',
     });
 
@@ -203,13 +270,20 @@ export class ProductsService {
     });
 
     if (!product) {
-      throw new NotFoundException(`Produk dengan barcode "${barcode}" tidak ditemukan`);
+      throw new NotFoundException(
+        `Produk dengan barcode "${barcode}" tidak ditemukan`,
+      );
     }
 
     return product;
   }
 
-  async update(tenantId: string, id: string, updateProductDto: UpdateProductDto, userId?: string): Promise<Product> {
+  async update(
+    tenantId: string,
+    id: string,
+    updateProductDto: UpdateProductDto,
+    userId?: string,
+  ): Promise<Product> {
     const product = await this.findOne(tenantId, id);
 
     // Validasi SKU jika berubah
@@ -218,16 +292,25 @@ export class ProductsService {
     }
 
     // Validasi barcode jika berubah
-    if (updateProductDto.barcode && updateProductDto.barcode !== product.barcode) {
+    if (
+      updateProductDto.barcode &&
+      updateProductDto.barcode !== product.barcode
+    ) {
       await this.validateBarcodeUnique(tenantId, updateProductDto.barcode, id);
     }
 
     // Validasi harga jika berubah
-    if (updateProductDto.costPrice !== undefined || updateProductDto.sellingPrice !== undefined || updateProductDto.wholesalePrice !== undefined) {
+    if (
+      updateProductDto.costPrice !== undefined ||
+      updateProductDto.sellingPrice !== undefined ||
+      updateProductDto.wholesalePrice !== undefined
+    ) {
       const costPrice = updateProductDto.costPrice ?? product.costPrice;
-      const sellingPrice = updateProductDto.sellingPrice ?? product.sellingPrice;
-      const wholesalePrice = updateProductDto.wholesalePrice ?? product.wholesalePrice;
-      
+      const sellingPrice =
+        updateProductDto.sellingPrice ?? product.sellingPrice;
+      const wholesalePrice =
+        updateProductDto.wholesalePrice ?? product.wholesalePrice;
+
       this.validatePricing(costPrice, sellingPrice, wholesalePrice);
     }
 
@@ -245,7 +328,12 @@ export class ProductsService {
     return this.findOne(tenantId, id);
   }
 
-  async remove(tenantId: string, id: string, hardDelete: boolean = false, userId?: string): Promise<void> {
+  async remove(
+    tenantId: string,
+    id: string,
+    hardDelete: boolean = false,
+    userId?: string,
+  ): Promise<void> {
     const product = await this.findOne(tenantId, id);
 
     if (hardDelete) {
@@ -267,7 +355,11 @@ export class ProductsService {
     });
   }
 
-  async bulkCreate(tenantId: string, bulkCreateDto: BulkCreateProductDto, userId?: string): Promise<BulkProductResponseDto> {
+  async bulkCreate(
+    tenantId: string,
+    bulkCreateDto: BulkCreateProductDto,
+    userId?: string,
+  ): Promise<BulkProductResponseDto> {
     const result: BulkProductResponseDto = {
       successful: 0,
       failed: 0,
@@ -275,19 +367,20 @@ export class ProductsService {
       successfulIds: [],
     };
 
-    const queryRunner = this.productRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.productRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
 
     for (let i = 0; i < bulkCreateDto.products.length; i++) {
       const productDto = bulkCreateDto.products[i];
-      
+
       try {
         await queryRunner.startTransaction();
-        
+
         const product = await this.create(tenantId, productDto, userId);
         result.successful++;
         result.successfulIds.push(product.id);
-        
+
         await queryRunner.commitTransaction();
       } catch (error) {
         await queryRunner.rollbackTransaction();
@@ -304,7 +397,11 @@ export class ProductsService {
     return result;
   }
 
-  async bulkUpdate(tenantId: string, bulkUpdateDto: BulkUpdateProductDto, userId?: string): Promise<BulkProductResponseDto> {
+  async bulkUpdate(
+    tenantId: string,
+    bulkUpdateDto: BulkUpdateProductDto,
+    userId?: string,
+  ): Promise<BulkProductResponseDto> {
     const result: BulkProductResponseDto = {
       successful: 0,
       failed: 0,
@@ -314,7 +411,12 @@ export class ProductsService {
 
     for (const productId of bulkUpdateDto.productIds) {
       try {
-        await this.update(tenantId, productId, bulkUpdateDto.updateData, userId);
+        await this.update(
+          tenantId,
+          productId,
+          bulkUpdateDto.updateData,
+          userId,
+        );
         result.successful++;
         result.successfulIds.push(productId);
       } catch (error) {
@@ -329,7 +431,11 @@ export class ProductsService {
     return result;
   }
 
-  async bulkDelete(tenantId: string, bulkDeleteDto: BulkDeleteProductDto, userId?: string): Promise<BulkProductResponseDto> {
+  async bulkDelete(
+    tenantId: string,
+    bulkDeleteDto: BulkDeleteProductDto,
+    userId?: string,
+  ): Promise<BulkProductResponseDto> {
     const result: BulkProductResponseDto = {
       successful: 0,
       failed: 0,
@@ -339,7 +445,12 @@ export class ProductsService {
 
     for (const productId of bulkDeleteDto.productIds) {
       try {
-        await this.remove(tenantId, productId, bulkDeleteDto.hardDelete, userId);
+        await this.remove(
+          tenantId,
+          productId,
+          bulkDeleteDto.hardDelete,
+          userId,
+        );
         result.successful++;
         result.successfulIds.push(productId);
       } catch (error) {
@@ -382,7 +493,7 @@ export class ProductsService {
     // Expiring soon calculation
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    
+
     const expiringSoon = await this.productRepository.count({
       where: {
         tenantId,
@@ -402,9 +513,13 @@ export class ProductsService {
   }
 
   // Private helper methods
-  private async validateSkuUnique(tenantId: string, sku: string, excludeId?: string): Promise<void> {
+  private async validateSkuUnique(
+    tenantId: string,
+    sku: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, sku, isDeleted: false };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -418,9 +533,13 @@ export class ProductsService {
     }
   }
 
-  private async validateBarcodeUnique(tenantId: string, barcode: string, excludeId?: string): Promise<void> {
+  private async validateBarcodeUnique(
+    tenantId: string,
+    barcode: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, barcode, isDeleted: false };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -434,17 +553,27 @@ export class ProductsService {
     }
   }
 
-  private validatePricing(costPrice: number, sellingPrice: number, wholesalePrice?: number): void {
+  private validatePricing(
+    costPrice: number,
+    sellingPrice: number,
+    wholesalePrice?: number,
+  ): void {
     if (sellingPrice < costPrice) {
-      throw new BadRequestException('Harga jual tidak boleh lebih rendah dari harga modal');
+      throw new BadRequestException(
+        'Harga jual tidak boleh lebih rendah dari harga modal',
+      );
     }
 
     if (wholesalePrice !== undefined && wholesalePrice < costPrice) {
-      throw new BadRequestException('Harga grosir tidak boleh lebih rendah dari harga modal');
+      throw new BadRequestException(
+        'Harga grosir tidak boleh lebih rendah dari harga modal',
+      );
     }
 
     if (wholesalePrice !== undefined && wholesalePrice > sellingPrice) {
-      throw new BadRequestException('Harga grosir tidak boleh lebih tinggi dari harga jual');
+      throw new BadRequestException(
+        'Harga grosir tidak boleh lebih tinggi dari harga jual',
+      );
     }
   }
 }

@@ -4,14 +4,27 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { ShippingLabel, ShippingLabelStatus } from '../../../entities/shipping-label.entity';
-import { ShippingTracking, TrackingStatus } from '../../../entities/shipping-tracking.entity';
+import {
+  ShippingLabel,
+  ShippingLabelStatus,
+} from '../../../entities/shipping-label.entity';
+import {
+  ShippingTracking,
+  TrackingStatus,
+} from '../../../entities/shipping-tracking.entity';
 import { ShippingRate } from '../../../entities/shipping-rate.entity';
 
 // Services
-import { JntApiService, JntCredentials, JntBookingRequest } from './jnt-api.service';
+import {
+  JntApiService,
+  JntCredentials,
+  JntBookingRequest,
+} from './jnt-api.service';
 import { IntegrationLogService } from '../../../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../../../integrations/entities/integration-log.entity';
 
 // Interfaces
 export interface JntShipmentRequest {
@@ -51,7 +64,10 @@ export class JntShippingService {
   /**
    * Create shipment with J&T Express
    */
-  async createShipment(tenantId: string, request: JntShipmentRequest): Promise<{
+  async createShipment(
+    tenantId: string,
+    request: JntShipmentRequest,
+  ): Promise<{
     success: boolean;
     trackingNumber?: string;
     txLogisticId?: string;
@@ -60,7 +76,9 @@ export class JntShippingService {
     error?: string;
   }> {
     try {
-      this.logger.debug(`Creating J&T shipment for label ${request.shippingLabelId}`);
+      this.logger.debug(
+        `Creating J&T shipment for label ${request.shippingLabelId}`,
+      );
 
       // Get shipping label
       const shippingLabel = await this.shippingLabelRepository.findOne({
@@ -103,7 +121,9 @@ export class JntShippingService {
         payType: request.deliveryType === 'PREPAID' ? 'PP_PM' : 'CC_CASH',
         sender: {
           name: shippingLabel.senderAddress.name,
-          mobile: this.jntApiService.formatPhoneNumber(shippingLabel.senderAddress.phone),
+          mobile: this.jntApiService.formatPhoneNumber(
+            shippingLabel.senderAddress.phone,
+          ),
           company: shippingLabel.senderAddress.company || '',
           countryCode: 'ID',
           province: shippingLabel.senderAddress.state,
@@ -114,7 +134,9 @@ export class JntShippingService {
         },
         receiver: {
           name: shippingLabel.recipientAddress.name,
-          mobile: this.jntApiService.formatPhoneNumber(shippingLabel.recipientAddress.phone),
+          mobile: this.jntApiService.formatPhoneNumber(
+            shippingLabel.recipientAddress.phone,
+          ),
           company: shippingLabel.recipientAddress.company || '',
           countryCode: 'ID',
           province: shippingLabel.recipientAddress.state,
@@ -123,17 +145,19 @@ export class JntShippingService {
           address: shippingLabel.recipientAddress.address,
           postCode: shippingLabel.recipientAddress.postalCode,
         },
-        items: [{
-          itemName: shippingLabel.packageInfo.content,
-          itemType: itemType,
-          weight: shippingLabel.packageInfo.weight / 1000, // Convert to kg
-          length: shippingLabel.packageInfo.length,
-          width: shippingLabel.packageInfo.width,
-          height: shippingLabel.packageInfo.height,
-          quantity: shippingLabel.packageInfo.pieces,
-          itemValue: shippingLabel.insuredValue || 0,
-          currency: 'IDR',
-        }],
+        items: [
+          {
+            itemName: shippingLabel.packageInfo.content,
+            itemType: itemType,
+            weight: shippingLabel.packageInfo.weight / 1000, // Convert to kg
+            length: shippingLabel.packageInfo.length,
+            width: shippingLabel.packageInfo.width,
+            height: shippingLabel.packageInfo.height,
+            quantity: shippingLabel.packageInfo.pieces,
+            itemValue: shippingLabel.insuredValue || 0,
+            currency: 'IDR',
+          },
+        ],
         totalWeight: shippingLabel.packageInfo.weight / 1000, // Convert to kg
         totalQuantity: shippingLabel.packageInfo.pieces,
         goodsValue: shippingLabel.insuredValue || 0,
@@ -150,20 +174,25 @@ export class JntShippingService {
         request.credentials,
         bookingData,
         tenantId,
-        'jnt-shipping'
+        'jnt-shipping',
       );
 
       if (!response.success) {
         const errorInfo = this.jntApiService.handleJntError(response.error);
-        
-        await this.logService.logError(tenantId, 'jnt-shipping', new Error(errorInfo.message), {
-          metadata: {
-            action: 'create_booking',
-            shippingLabelId: request.shippingLabelId,
-            errorCode: errorInfo.code,
-            retryable: errorInfo.retryable,
+
+        await this.logService.logError(
+          tenantId,
+          'jnt-shipping',
+          new Error(errorInfo.message),
+          {
+            metadata: {
+              action: 'create_booking',
+              shippingLabelId: request.shippingLabelId,
+              errorCode: errorInfo.code,
+              retryable: errorInfo.retryable,
+            },
           },
-        });
+        );
 
         return {
           success: false,
@@ -247,10 +276,12 @@ export class JntShippingService {
         labelUrl: response.data.data.pdfUrl,
         totalCost: response.data.data.feeAmount,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to create J&T booking: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to create J&T booking: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logError(tenantId, 'jnt-shipping', error, {
         metadata: {
           action: 'create_booking',
@@ -268,20 +299,26 @@ export class JntShippingService {
   /**
    * Track shipment with J&T Express
    */
-  async trackShipment(tenantId: string, trackingNumbers: string[], credentials: JntCredentials): Promise<{
+  async trackShipment(
+    tenantId: string,
+    trackingNumbers: string[],
+    credentials: JntCredentials,
+  ): Promise<{
     success: boolean;
     trackingData?: any[];
     error?: string;
   }> {
     try {
-      this.logger.debug(`Tracking J&T shipments: ${trackingNumbers.join(', ')}`);
+      this.logger.debug(
+        `Tracking J&T shipments: ${trackingNumbers.join(', ')}`,
+      );
 
       // Call J&T tracking API
       const response = await this.jntApiService.trackShipment(
         credentials,
         trackingNumbers,
         tenantId,
-        'jnt-shipping'
+        'jnt-shipping',
       );
 
       if (!response.success) {
@@ -293,17 +330,19 @@ export class JntShippingService {
       }
 
       // Format tracking data
-      const trackingData = response.data.data.map((item: any) => 
-        this.jntApiService.formatTrackingData(item)
+      const trackingData = response.data.data.map((item: any) =>
+        this.jntApiService.formatTrackingData(item),
       );
 
       return {
         success: true,
         trackingData,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to track J&T shipments: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to track J&T shipments: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -314,9 +353,14 @@ export class JntShippingService {
   /**
    * Update tracking information from J&T webhook or polling
    */
-  async updateTracking(tenantId: string, trackingUpdates: JntTrackingUpdate[]): Promise<void> {
+  async updateTracking(
+    tenantId: string,
+    trackingUpdates: JntTrackingUpdate[],
+  ): Promise<void> {
     try {
-      this.logger.debug(`Updating J&T tracking for ${trackingUpdates.length} packages`);
+      this.logger.debug(
+        `Updating J&T tracking for ${trackingUpdates.length} packages`,
+      );
 
       for (const update of trackingUpdates) {
         // Find shipping label
@@ -330,7 +374,8 @@ export class JntShippingService {
         }
 
         // Convert J&T scan type to our tracking status
-        const trackingStatus = this.jntApiService.mapJntScanTypeToTrackingStatus(update.scanType);
+        const trackingStatus =
+          this.jntApiService.mapJntScanTypeToTrackingStatus(update.scanType);
 
         // Create tracking entry
         await this.createTrackingEntry(tenantId, {
@@ -347,7 +392,12 @@ export class JntShippingService {
         });
 
         // Update shipping label status if needed
-        await this.updateShippingLabelFromTracking(tenantId, shippingLabel, trackingStatus, update);
+        await this.updateShippingLabelFromTracking(
+          tenantId,
+          shippingLabel,
+          trackingStatus,
+          update,
+        );
 
         // Log tracking update
         await this.logService.log({
@@ -363,9 +413,11 @@ export class JntShippingService {
           },
         });
       }
-
     } catch (error) {
-      this.logger.error(`Failed to update J&T tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update J&T tracking: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -373,7 +425,12 @@ export class JntShippingService {
   /**
    * Cancel booking with J&T Express
    */
-  async cancelBooking(tenantId: string, trackingNumber: string, reason: string, credentials: JntCredentials): Promise<{
+  async cancelBooking(
+    tenantId: string,
+    trackingNumber: string,
+    reason: string,
+    credentials: JntCredentials,
+  ): Promise<{
     success: boolean;
     message?: string;
     error?: string;
@@ -391,7 +448,9 @@ export class JntShippingService {
       }
 
       if (!shippingLabel.canBeCancelled) {
-        throw new BadRequestException('Booking cannot be cancelled in current status');
+        throw new BadRequestException(
+          'Booking cannot be cancelled in current status',
+        );
       }
 
       // Get txLogisticId from carrier data
@@ -406,7 +465,7 @@ export class JntShippingService {
         txLogisticId,
         reason,
         tenantId,
-        'jnt-shipping'
+        'jnt-shipping',
       );
 
       if (!response.success) {
@@ -418,7 +477,11 @@ export class JntShippingService {
       }
 
       // Update shipping label status
-      shippingLabel.updateStatus(ShippingLabelStatus.CANCELLED, undefined, reason);
+      shippingLabel.updateStatus(
+        ShippingLabelStatus.CANCELLED,
+        undefined,
+        reason,
+      );
       await this.shippingLabelRepository.save(shippingLabel);
 
       // Create tracking entry for cancellation
@@ -460,9 +523,11 @@ export class JntShippingService {
         success: true,
         message: response.data.msg,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to cancel J&T booking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel J&T booking: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -473,20 +538,26 @@ export class JntShippingService {
   /**
    * Sync shipping rates from J&T Express
    */
-  async syncShippingRates(tenantId: string, credentials: JntCredentials, routes: Array<{
-    senderProvince: string;
-    senderCity: string;
-    senderArea: string;
-    receiverProvince: string;
-    receiverCity: string;
-    receiverArea: string;
-  }>): Promise<{
+  async syncShippingRates(
+    tenantId: string,
+    credentials: JntCredentials,
+    routes: Array<{
+      senderProvince: string;
+      senderCity: string;
+      senderArea: string;
+      receiverProvince: string;
+      receiverCity: string;
+      receiverArea: string;
+    }>,
+  ): Promise<{
     success: boolean;
     synced: number;
     errors: string[];
   }> {
     try {
-      this.logger.debug(`Syncing J&T shipping rates for ${routes.length} routes`);
+      this.logger.debug(
+        `Syncing J&T shipping rates for ${routes.length} routes`,
+      );
 
       let synced = 0;
       const errors: string[] = [];
@@ -521,11 +592,13 @@ export class JntShippingService {
                 credentials,
                 rateRequest,
                 tenantId,
-                'jnt-shipping'
+                'jnt-shipping',
               );
 
               if (!ratesResponse.success) {
-                errors.push(`Failed to get rates for ${route.senderCity} -> ${route.receiverCity}, weight: ${weight}kg, type: ${itemType}`);
+                errors.push(
+                  `Failed to get rates for ${route.senderCity} -> ${route.receiverCity}, weight: ${weight}kg, type: ${itemType}`,
+                );
                 continue;
               }
 
@@ -549,7 +622,10 @@ export class JntShippingService {
                 shippingRate.carrierName = 'J&T Express';
                 shippingRate.serviceCode = serviceType.code;
                 shippingRate.serviceName = serviceType.name;
-                shippingRate.rateType = this.jntApiService.mapJntExpressTypeToServiceType(serviceType.name) as any;
+                shippingRate.rateType =
+                  this.jntApiService.mapJntExpressTypeToServiceType(
+                    serviceType.name,
+                  ) as any;
 
                 // Geographic info
                 shippingRate.originCity = route.senderCity;
@@ -562,22 +638,28 @@ export class JntShippingService {
                 shippingRate.maxWeight = serviceType.maxWeight * 1000; // Convert to grams
 
                 // Pricing (adjust based on actual rate from API)
-                const baseMultiplier = {
-                  'STANDARD': 1.0,
-                  'SPECIAL': 1.3,
-                  'ECONOMY': 0.8,
-                }[serviceType.code] || 1.0;
+                const baseMultiplier =
+                  {
+                    STANDARD: 1.0,
+                    SPECIAL: 1.3,
+                    ECONOMY: 0.8,
+                  }[serviceType.code] || 1.0;
 
-                shippingRate.baseCost = Math.round(rateData.data.fee * baseMultiplier);
+                shippingRate.baseCost = Math.round(
+                  rateData.data.fee * baseMultiplier,
+                );
                 shippingRate.currency = 'IDR';
 
                 // Service info
                 const etdMatch = rateData.data.timeLimit.match(/(\d+)/);
-                shippingRate.estimatedDays = etdMatch ? parseInt(etdMatch[1]) : 3;
+                shippingRate.estimatedDays = etdMatch
+                  ? parseInt(etdMatch[1])
+                  : 3;
 
                 // Features
                 shippingRate.isCodAvailable = serviceType.features.cod;
-                shippingRate.isInsuranceAvailable = serviceType.features.insurance;
+                shippingRate.isInsuranceAvailable =
+                  serviceType.features.insurance;
 
                 // Rate metadata
                 shippingRate.rateDate = new Date();
@@ -608,22 +690,27 @@ export class JntShippingService {
               }
             }
           }
-
         } catch (error) {
-          errors.push(`Failed to sync rates for ${route.senderCity} -> ${route.receiverCity}: ${error.message}`);
+          errors.push(
+            `Failed to sync rates for ${route.senderCity} -> ${route.receiverCity}: ${error.message}`,
+          );
         }
       }
 
-      this.logger.debug(`J&T rate sync completed: ${synced} rates synced, ${errors.length} errors`);
+      this.logger.debug(
+        `J&T rate sync completed: ${synced} rates synced, ${errors.length} errors`,
+      );
 
       return {
         success: errors.length < routes.length,
         synced,
         errors,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to sync J&T shipping rates: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync J&T shipping rates: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         synced: 0,
@@ -634,15 +721,18 @@ export class JntShippingService {
 
   // Private helper methods
 
-  private async createTrackingEntry(tenantId: string, data: {
-    shippingLabelId: string;
-    trackingNumber: string;
-    status: TrackingStatus;
-    description: string;
-    location?: string;
-    eventTime: Date;
-    carrierData?: any;
-  }): Promise<ShippingTracking> {
+  private async createTrackingEntry(
+    tenantId: string,
+    data: {
+      shippingLabelId: string;
+      trackingNumber: string;
+      status: TrackingStatus;
+      description: string;
+      location?: string;
+      eventTime: Date;
+      carrierData?: any;
+    },
+  ): Promise<ShippingTracking> {
     // Get sequence number
     const lastTracking = await this.shippingTrackingRepository.findOne({
       where: { tenantId, trackingNumber: data.trackingNumber },
@@ -676,7 +766,7 @@ export class JntShippingService {
     tenantId: string,
     shippingLabel: ShippingLabel,
     trackingStatus: string,
-    update: JntTrackingUpdate
+    update: JntTrackingUpdate,
   ): Promise<void> {
     let statusChanged = false;
 

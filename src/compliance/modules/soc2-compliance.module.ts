@@ -5,15 +5,15 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 
 // Entities
-import { 
-  SOC2Control, 
-  SOC2ControlEvidence, 
-  SOC2ControlTest 
+import {
+  SOC2Control,
+  SOC2ControlEvidence,
+  SOC2ControlTest,
 } from '../entities/soc2-control.entity';
-import { 
-  SOC2AuditLog, 
-  SOC2AuditLogRetentionRule, 
-  SOC2AuditLogAlert 
+import {
+  SOC2AuditLog,
+  SOC2AuditLogRetentionRule,
+  SOC2AuditLogAlert,
 } from '../entities/soc2-audit-log.entity';
 
 // Services
@@ -37,27 +37,19 @@ import { UsersModule } from '../../users/users.module';
       SOC2Control,
       SOC2ControlEvidence,
       SOC2ControlTest,
-      
+
       // SOC 2 Audit Log entities
       SOC2AuditLog,
       SOC2AuditLogRetentionRule,
       SOC2AuditLogAlert,
     ]),
-    
+
     // Import auth modules for dependencies
     forwardRef(() => AuthModule),
     forwardRef(() => UsersModule),
   ],
-  controllers: [
-    SOC2ComplianceController,
-  ],
-  providers: [
-    SOC2ControlService,
-    SOC2AuditLogService,
-  ],
-  exports: [
-    SOC2ControlService,
-    SOC2AuditLogService,
-  ],
+  controllers: [SOC2ComplianceController],
+  providers: [SOC2ControlService, SOC2AuditLogService],
+  exports: [SOC2ControlService, SOC2AuditLogService],
 })
 export class SOC2ComplianceModule {}

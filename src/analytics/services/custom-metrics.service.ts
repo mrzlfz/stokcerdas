@@ -50,9 +50,11 @@ export class CustomMetricsService {
     query: CustomMetricQueryDto,
   ): Promise<CustomMetricResponseDto> {
     const startTime = Date.now();
-    
+
     try {
-      this.logger.debug(`Calculating custom metric '${query.metricName}' for tenant ${tenantId}`);
+      this.logger.debug(
+        `Calculating custom metric '${query.metricName}' for tenant ${tenantId}`,
+      );
 
       // Validate metric type and formula
       this.validateMetricQuery(query);
@@ -80,11 +82,17 @@ export class CustomMetricsService {
           result = await this.calculateGrowthMetric(tenantId, query);
           break;
         default:
-          throw new BadRequestException(`Unsupported metric type: ${query.metricType}`);
+          throw new BadRequestException(
+            `Unsupported metric type: ${query.metricType}`,
+          );
       }
 
       // Generate insights if possible
-      const insights = await this.generateMetricInsights(tenantId, query, result);
+      const insights = await this.generateMetricInsights(
+        tenantId,
+        query,
+        result,
+      );
 
       const meta: AnalyticsMetaDto = {
         total: 1,
@@ -102,10 +110,14 @@ export class CustomMetricsService {
         meta,
         insights,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to calculate custom metric: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to calculate custom metric: ${error.message}`);
+      this.logger.error(
+        `Failed to calculate custom metric: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to calculate custom metric: ${error.message}`,
+      );
     }
   }
 
@@ -117,7 +129,9 @@ export class CustomMetricsService {
     query: CustomMetricQueryDto,
   ): Promise<CustomMetricResultDto> {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     let queryBuilder = this.transactionRepository
       .createQueryBuilder('transaction')
@@ -133,7 +147,10 @@ export class CustomMetricsService {
 
     // Apply custom filters
     if (query.additionalFilters) {
-      queryBuilder = this.applyCustomFilters(queryBuilder, query.additionalFilters);
+      queryBuilder = this.applyCustomFilters(
+        queryBuilder,
+        query.additionalFilters,
+      );
     }
 
     // Use custom formula or default calculation
@@ -151,10 +168,20 @@ export class CustomMetricsService {
     const value = Number(result?.metricValue) || 0;
 
     // Calculate breakdown by dimensions
-    const breakdown = await this.calculateRevenueBreakdown(tenantId, query, startDate, endDate);
+    const breakdown = await this.calculateRevenueBreakdown(
+      tenantId,
+      query,
+      startDate,
+      endDate,
+    );
 
     // Get historical data
-    const historical = await this.getHistoricalRevenueData(tenantId, query, startDate, endDate);
+    const historical = await this.getHistoricalRevenueData(
+      tenantId,
+      query,
+      startDate,
+      endDate,
+    );
 
     return {
       metricName: query.metricName,
@@ -174,7 +201,9 @@ export class CustomMetricsService {
     query: CustomMetricQueryDto,
   ): Promise<CustomMetricResultDto> {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     let queryBuilder = this.transactionRepository
       .createQueryBuilder('transaction')
@@ -190,7 +219,10 @@ export class CustomMetricsService {
 
     // Apply custom filters
     if (query.additionalFilters) {
-      queryBuilder = this.applyCustomFilters(queryBuilder, query.additionalFilters);
+      queryBuilder = this.applyCustomFilters(
+        queryBuilder,
+        query.additionalFilters,
+      );
     }
 
     // Calculate profit (Revenue - COGS)
@@ -198,7 +230,8 @@ export class CustomMetricsService {
     if (query.customFormula) {
       selectClause = this.parseCustomFormula(query.customFormula, 'profit');
     } else {
-      selectClause = 'SUM(transaction.quantity * (transaction.unitCost - product.costPrice))';
+      selectClause =
+        'SUM(transaction.quantity * (transaction.unitCost - product.costPrice))';
     }
 
     const result = await queryBuilder
@@ -208,8 +241,18 @@ export class CustomMetricsService {
     const value = Number(result?.metricValue) || 0;
 
     // Calculate breakdown and historical data
-    const breakdown = await this.calculateProfitBreakdown(tenantId, query, startDate, endDate);
-    const historical = await this.getHistoricalProfitData(tenantId, query, startDate, endDate);
+    const breakdown = await this.calculateProfitBreakdown(
+      tenantId,
+      query,
+      startDate,
+      endDate,
+    );
+    const historical = await this.getHistoricalProfitData(
+      tenantId,
+      query,
+      startDate,
+      endDate,
+    );
 
     return {
       metricName: query.metricName,
@@ -229,7 +272,9 @@ export class CustomMetricsService {
     query: CustomMetricQueryDto,
   ): Promise<CustomMetricResultDto> {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     let queryBuilder = this.transactionRepository
       .createQueryBuilder('transaction')
@@ -245,7 +290,10 @@ export class CustomMetricsService {
 
     // Apply custom filters
     if (query.additionalFilters) {
-      queryBuilder = this.applyCustomFilters(queryBuilder, query.additionalFilters);
+      queryBuilder = this.applyCustomFilters(
+        queryBuilder,
+        query.additionalFilters,
+      );
     }
 
     // Calculate volume
@@ -263,8 +311,18 @@ export class CustomMetricsService {
     const value = Number(result?.metricValue) || 0;
 
     // Calculate breakdown and historical data
-    const breakdown = await this.calculateVolumeBreakdown(tenantId, query, startDate, endDate);
-    const historical = await this.getHistoricalVolumeData(tenantId, query, startDate, endDate);
+    const breakdown = await this.calculateVolumeBreakdown(
+      tenantId,
+      query,
+      startDate,
+      endDate,
+    );
+    const historical = await this.getHistoricalVolumeData(
+      tenantId,
+      query,
+      startDate,
+      endDate,
+    );
 
     return {
       metricName: query.metricName,
@@ -285,7 +343,9 @@ export class CustomMetricsService {
   ): Promise<CustomMetricResultDto> {
     // Inventory turnover = COGS / Average Inventory Value
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 365 * 24 * 60 * 60 * 1000);
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 365 * 24 * 60 * 60 * 1000);
 
     // Calculate COGS
     const cogsResult = await this.transactionRepository
@@ -310,7 +370,7 @@ export class CustomMetricsService {
 
     const cogs = Number(cogsResult?.totalCogs) || 0;
     const avgInventory = Number(avgInventoryResult?.avgInventoryValue) || 0;
-    
+
     const value = avgInventory > 0 ? cogs / avgInventory : 0;
 
     return {
@@ -329,7 +389,9 @@ export class CustomMetricsService {
     query: CustomMetricQueryDto,
   ): Promise<CustomMetricResultDto> {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Calculate both revenue and profit to get margin
     const result = await this.transactionRepository
@@ -349,7 +411,7 @@ export class CustomMetricsService {
 
     const revenue = Number(result?.totalRevenue) || 0;
     const profit = Number(result?.totalProfit) || 0;
-    
+
     // Margin = (Profit / Revenue) * 100
     const value = revenue > 0 ? (profit / revenue) * 100 : 0;
 
@@ -369,8 +431,10 @@ export class CustomMetricsService {
     query: CustomMetricQueryDto,
   ): Promise<CustomMetricResultDto> {
     const endDate = query.endDate ? new Date(query.endDate) : new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(endDate.getTime() - 60 * 24 * 60 * 60 * 1000);
-    
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(endDate.getTime() - 60 * 24 * 60 * 60 * 1000);
+
     // Calculate current period and previous period
     const periodLength = endDate.getTime() - startDate.getTime();
     const previousStartDate = new Date(startDate.getTime() - periodLength);
@@ -385,7 +449,10 @@ export class CustomMetricsService {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
       })
-      .select('SUM(transaction.quantity * transaction.unitCost)', 'totalRevenue')
+      .select(
+        'SUM(transaction.quantity * transaction.unitCost)',
+        'totalRevenue',
+      )
       .getRawOne();
 
     // Previous period revenue
@@ -397,14 +464,20 @@ export class CustomMetricsService {
         startDate: previousStartDate.toISOString(),
         endDate: previousEndDate.toISOString(),
       })
-      .select('SUM(transaction.quantity * transaction.unitCost)', 'totalRevenue')
+      .select(
+        'SUM(transaction.quantity * transaction.unitCost)',
+        'totalRevenue',
+      )
       .getRawOne();
 
     const currentRevenue = Number(currentResult?.totalRevenue) || 0;
     const previousRevenue = Number(previousResult?.totalRevenue) || 0;
-    
+
     // Growth = ((Current - Previous) / Previous) * 100
-    const value = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : 0;
+    const value =
+      previousRevenue > 0
+        ? ((currentRevenue - previousRevenue) / previousRevenue) * 100
+        : 0;
 
     return {
       metricName: query.metricName,
@@ -444,20 +517,33 @@ export class CustomMetricsService {
     // Generate recommendations based on metric type and value
     switch (query.metricType) {
       case MetricType.REVENUE:
-        if (result.value < 1000000) { // Less than 1M IDR
-          insights.recommendations.push('Consider implementing promotional campaigns to boost revenue');
+        if (result.value < 1000000) {
+          // Less than 1M IDR
+          insights.recommendations.push(
+            'Consider implementing promotional campaigns to boost revenue',
+          );
         }
         break;
       case MetricType.MARGIN:
-        if (result.value < 20) { // Less than 20% margin
-          insights.recommendations.push('Review pricing strategy to improve profit margins');
-          insights.recommendations.push('Analyze cost structure for optimization opportunities');
+        if (result.value < 20) {
+          // Less than 20% margin
+          insights.recommendations.push(
+            'Review pricing strategy to improve profit margins',
+          );
+          insights.recommendations.push(
+            'Analyze cost structure for optimization opportunities',
+          );
         }
         break;
       case MetricType.TURNOVER:
-        if (result.value < 2) { // Less than 2x turnover per year
-          insights.recommendations.push('Improve inventory management to increase turnover');
-          insights.recommendations.push('Consider reducing slow-moving inventory');
+        if (result.value < 2) {
+          // Less than 2x turnover per year
+          insights.recommendations.push(
+            'Improve inventory management to increase turnover',
+          );
+          insights.recommendations.push(
+            'Consider reducing slow-moving inventory',
+          );
         }
         break;
     }
@@ -484,12 +570,21 @@ export class CustomMetricsService {
 
   private validateCustomFormula(formula: string): void {
     // Basic validation for SQL injection prevention
-    const forbiddenKeywords = ['DELETE', 'DROP', 'INSERT', 'UPDATE', 'CREATE', 'ALTER'];
+    const forbiddenKeywords = [
+      'DELETE',
+      'DROP',
+      'INSERT',
+      'UPDATE',
+      'CREATE',
+      'ALTER',
+    ];
     const upperFormula = formula.toUpperCase();
-    
+
     for (const keyword of forbiddenKeywords) {
       if (upperFormula.includes(keyword)) {
-        throw new BadRequestException(`Formula contains forbidden keyword: ${keyword}`);
+        throw new BadRequestException(
+          `Formula contains forbidden keyword: ${keyword}`,
+        );
       }
     }
 
@@ -499,7 +594,7 @@ export class CustomMetricsService {
   private parseCustomFormula(formula: string, metricType: string): string {
     // Simple formula parser - in production, use a proper SQL parser
     // Replace placeholders with actual column names
-    let parsedFormula = formula
+    const parsedFormula = formula
       .replace(/\{revenue\}/g, 'transaction.quantity * transaction.unitCost')
       .replace(/\{quantity\}/g, 'transaction.quantity')
       .replace(/\{price\}/g, 'transaction.unitCost')
@@ -515,14 +610,20 @@ export class CustomMetricsService {
     for (const [key, value] of Object.entries(filters)) {
       switch (key) {
         case 'categoryId':
-          queryBuilder.andWhere('category.id = :categoryId', { categoryId: value });
+          queryBuilder.andWhere('category.id = :categoryId', {
+            categoryId: value,
+          });
           break;
         case 'locationId':
-          queryBuilder.andWhere('location.id = :locationId', { locationId: value });
+          queryBuilder.andWhere('location.id = :locationId', {
+            locationId: value,
+          });
           break;
         case 'productIds':
           if (Array.isArray(value) && value.length > 0) {
-            queryBuilder.andWhere('product.id IN (:...productIds)', { productIds: value });
+            queryBuilder.andWhere('product.id IN (:...productIds)', {
+              productIds: value,
+            });
           }
           break;
         // Add more filter types as needed
@@ -591,17 +692,21 @@ export class CustomMetricsService {
     return [];
   }
 
-  private analyzeTrend(values: number[]): 'increasing' | 'decreasing' | 'stable' {
+  private analyzeTrend(
+    values: number[],
+  ): 'increasing' | 'decreasing' | 'stable' {
     if (values.length < 2) return 'stable';
-    
+
     const firstHalf = values.slice(0, Math.floor(values.length / 2));
     const secondHalf = values.slice(Math.floor(values.length / 2));
-    
-    const firstAvg = firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
-    const secondAvg = secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
-    
+
+    const firstAvg =
+      firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
+    const secondAvg =
+      secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
+
     const changePercent = Math.abs((secondAvg - firstAvg) / firstAvg) * 100;
-    
+
     if (changePercent < 5) return 'stable';
     return secondAvg > firstAvg ? 'increasing' : 'decreasing';
   }

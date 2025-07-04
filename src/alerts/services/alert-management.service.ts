@@ -1,21 +1,34 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { AlertInstance, AlertStatus, AlertPriority } from '../entities/alert-instance.entity';
-import { AlertConfiguration, AlertType, AlertSeverity } from '../entities/alert-configuration.entity';
+import {
+  AlertInstance,
+  AlertStatus,
+  AlertPriority,
+} from '../entities/alert-instance.entity';
+import {
+  AlertConfiguration,
+  AlertType,
+  AlertSeverity,
+} from '../entities/alert-configuration.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
-import { 
-  AcknowledgeAlertDto, 
-  ResolveAlertDto, 
-  DismissAlertDto, 
-  SnoozeAlertDto, 
+import {
+  AcknowledgeAlertDto,
+  ResolveAlertDto,
+  DismissAlertDto,
+  SnoozeAlertDto,
   EscalateAlertDto,
   UpdateAlertPriorityDto,
   BulkAlertActionDto,
   AlertQueryDto,
-  CreateSystemMaintenanceAlertDto 
+  CreateSystemMaintenanceAlertDto,
 } from '../dto/alert-management.dto';
 
 @Injectable()
@@ -74,7 +87,9 @@ export class AlertManagementService {
       alert: savedAlert,
     });
 
-    this.logger.log(`Alert created: ${alertType} for tenant ${tenantId} - ${title}`);
+    this.logger.log(
+      `Alert created: ${alertType} for tenant ${tenantId} - ${title}`,
+    );
 
     return savedAlert;
   }
@@ -157,14 +172,14 @@ export class AlertManagementService {
     }
 
     if (createdFrom) {
-      queryBuilder.andWhere('alert.createdAt >= :createdFrom', { 
-        createdFrom: new Date(createdFrom) 
+      queryBuilder.andWhere('alert.createdAt >= :createdFrom', {
+        createdFrom: new Date(createdFrom),
       });
     }
 
     if (createdTo) {
-      queryBuilder.andWhere('alert.createdAt <= :createdTo', { 
-        createdTo: new Date(createdTo) 
+      queryBuilder.andWhere('alert.createdAt <= :createdTo', {
+        createdTo: new Date(createdTo),
       });
     }
 
@@ -181,8 +196,8 @@ export class AlertManagementService {
     }
 
     if (activeOnly) {
-      queryBuilder.andWhere('alert.status = :activeStatus', { 
-        activeStatus: AlertStatus.ACTIVE 
+      queryBuilder.andWhere('alert.status = :activeStatus', {
+        activeStatus: AlertStatus.ACTIVE,
       });
     }
 
@@ -193,7 +208,7 @@ export class AlertManagementService {
     if (search) {
       queryBuilder.andWhere(
         '(alert.title ILIKE :search OR alert.message ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -233,7 +248,10 @@ export class AlertManagementService {
       'location.name',
     ];
 
-    if (validSortFields.includes(`alert.${sortBy}`) || validSortFields.includes(sortBy)) {
+    if (
+      validSortFields.includes(`alert.${sortBy}`) ||
+      validSortFields.includes(sortBy)
+    ) {
       const sortField = sortBy.includes('.') ? sortBy : `alert.${sortBy}`;
       queryBuilder.orderBy(sortField, sortOrder);
     } else {
@@ -265,9 +283,9 @@ export class AlertManagementService {
     const alert = await this.alertInstanceRepository.findOne({
       where: { id, tenantId },
       relations: [
-        'product', 
-        'location', 
-        'inventoryItem', 
+        'product',
+        'location',
+        'inventoryItem',
         'configuration',
         'acknowledger',
         'resolver',
@@ -288,9 +306,13 @@ export class AlertManagementService {
   /**
    * Mark alert as viewed by user
    */
-  async markAsViewed(tenantId: string, id: string, userId: string): Promise<AlertInstance> {
+  async markAsViewed(
+    tenantId: string,
+    id: string,
+    userId: string,
+  ): Promise<AlertInstance> {
     const alert = await this.findOne(tenantId, id);
-    
+
     alert.markAsViewed(userId);
     await this.alertInstanceRepository.save(alert);
 
@@ -309,7 +331,9 @@ export class AlertManagementService {
     const alert = await this.findOne(tenantId, id);
 
     if (!alert.canBeAcknowledged()) {
-      throw new BadRequestException('Alert tidak dapat di-acknowledge dalam status ini');
+      throw new BadRequestException(
+        'Alert tidak dapat di-acknowledge dalam status ini',
+      );
     }
 
     alert.status = AlertStatus.ACKNOWLEDGED;
@@ -343,7 +367,9 @@ export class AlertManagementService {
     const alert = await this.findOne(tenantId, id);
 
     if (!alert.canBeResolved()) {
-      throw new BadRequestException('Alert tidak dapat di-resolve dalam status ini');
+      throw new BadRequestException(
+        'Alert tidak dapat di-resolve dalam status ini',
+      );
     }
 
     alert.status = AlertStatus.RESOLVED;
@@ -411,18 +437,24 @@ export class AlertManagementService {
     const alert = await this.findOne(tenantId, id);
 
     if (!alert.canBeSnoozed()) {
-      throw new BadRequestException('Alert tidak dapat di-snooze dalam status ini');
+      throw new BadRequestException(
+        'Alert tidak dapat di-snooze dalam status ini',
+      );
     }
 
     // Check if alert configuration allows snoozing
     if (alert.configuration && !alert.configuration.canSnooze()) {
-      throw new BadRequestException('Alert ini tidak dapat di-snooze berdasarkan konfigurasi');
+      throw new BadRequestException(
+        'Alert ini tidak dapat di-snooze berdasarkan konfigurasi',
+      );
     }
 
     // Check snooze duration limits
     const maxSnoozeHours = alert.configuration?.getMaxSnoozeHours() || 24;
     if (snoozeDto.snoozeHours > maxSnoozeHours) {
-      throw new BadRequestException(`Maksimum snooze adalah ${maxSnoozeHours} jam`);
+      throw new BadRequestException(
+        `Maksimum snooze adalah ${maxSnoozeHours} jam`,
+      );
     }
 
     const snoozeUntil = new Date();
@@ -445,7 +477,9 @@ export class AlertManagementService {
       snoozeUntil,
     });
 
-    this.logger.log(`Alert snoozed: ${id} by user ${userId} until ${snoozeUntil}`);
+    this.logger.log(
+      `Alert snoozed: ${id} by user ${userId} until ${snoozeUntil}`,
+    );
 
     return savedAlert;
   }
@@ -471,7 +505,8 @@ export class AlertManagementService {
     if (alert.priority !== AlertPriority.CRITICAL) {
       const priorities = Object.values(AlertPriority);
       const currentIndex = priorities.indexOf(alert.priority);
-      alert.priority = priorities[Math.min(currentIndex + 1, priorities.length - 1)];
+      alert.priority =
+        priorities[Math.min(currentIndex + 1, priorities.length - 1)];
     }
 
     const savedAlert = await this.alertInstanceRepository.save(alert);
@@ -484,7 +519,9 @@ export class AlertManagementService {
       escalatedTo: escalateDto.escalateTo,
     });
 
-    this.logger.log(`Alert escalated: ${id} by user ${userId} to user ${escalateDto.escalateTo}`);
+    this.logger.log(
+      `Alert escalated: ${id} by user ${userId} to user ${escalateDto.escalateTo}`,
+    );
 
     return savedAlert;
   }
@@ -502,9 +539,9 @@ export class AlertManagementService {
 
     const oldPriority = alert.priority;
     alert.priority = updateDto.priority;
-    
+
     if (updateDto.reason) {
-      alert.notes = alert.notes 
+      alert.notes = alert.notes
         ? `${alert.notes}
 
 Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reason}`
@@ -528,7 +565,11 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
   /**
    * Add tag to alert
    */
-  async addTag(tenantId: string, id: string, tag: string): Promise<AlertInstance> {
+  async addTag(
+    tenantId: string,
+    id: string,
+    tag: string,
+  ): Promise<AlertInstance> {
     const alert = await this.findOne(tenantId, id);
     alert.addTag(tag);
     return await this.alertInstanceRepository.save(alert);
@@ -537,7 +578,11 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
   /**
    * Remove tag from alert
    */
-  async removeTag(tenantId: string, id: string, tag: string): Promise<AlertInstance> {
+  async removeTag(
+    tenantId: string,
+    id: string,
+    tag: string,
+  ): Promise<AlertInstance> {
     const alert = await this.findOne(tenantId, id);
     alert.removeTag(tag);
     return await this.alertInstanceRepository.save(alert);
@@ -565,31 +610,53 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
       try {
         switch (bulkActionDto.action) {
           case 'acknowledge':
-            await this.acknowledgeAlert(tenantId, alertId, { 
-              notes: bulkActionDto.actionData?.notes 
-            }, userId);
+            await this.acknowledgeAlert(
+              tenantId,
+              alertId,
+              {
+                notes: bulkActionDto.actionData?.notes,
+              },
+              userId,
+            );
             break;
-          
+
           case 'resolve':
-            await this.resolveAlert(tenantId, alertId, { 
-              resolutionNotes: bulkActionDto.actionData?.resolutionNotes || 'Bulk resolved' 
-            }, userId);
+            await this.resolveAlert(
+              tenantId,
+              alertId,
+              {
+                resolutionNotes:
+                  bulkActionDto.actionData?.resolutionNotes || 'Bulk resolved',
+              },
+              userId,
+            );
             break;
-          
+
           case 'dismiss':
-            await this.dismissAlert(tenantId, alertId, { 
-              dismissalReason: bulkActionDto.actionData?.dismissalReason || 'Bulk dismissed' 
-            }, userId);
+            await this.dismissAlert(
+              tenantId,
+              alertId,
+              {
+                dismissalReason:
+                  bulkActionDto.actionData?.dismissalReason || 'Bulk dismissed',
+              },
+              userId,
+            );
             break;
-          
+
           case 'snooze':
-            await this.snoozeAlert(tenantId, alertId, { 
-              snoozeHours: bulkActionDto.actionData?.snoozeHours || 1,
-              reason: bulkActionDto.actionData?.reason 
-            }, userId);
+            await this.snoozeAlert(
+              tenantId,
+              alertId,
+              {
+                snoozeHours: bulkActionDto.actionData?.snoozeHours || 1,
+                reason: bulkActionDto.actionData?.reason,
+              },
+              userId,
+            );
             break;
         }
-        
+
         result.successful++;
       } catch (error) {
         result.failed++;
@@ -614,7 +681,7 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
     const alert = await this.createAlert(
       tenantId,
       AlertType.SYSTEM_MAINTENANCE,
-      maintenanceDto.severity as AlertSeverity || AlertSeverity.WARNING,
+      (maintenanceDto.severity as AlertSeverity) || AlertSeverity.WARNING,
       maintenanceDto.title,
       maintenanceDto.message,
       {
@@ -640,7 +707,10 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
   /**
    * Get alert statistics
    */
-  async getStatistics(tenantId: string, days: number = 30): Promise<{
+  async getStatistics(
+    tenantId: string,
+    days: number = 30,
+  ): Promise<{
     totalAlerts: number;
     activeAlerts: number;
     resolvedAlerts: number;
@@ -666,8 +736,14 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
       resolutionTimes,
     ] = await Promise.all([
       queryBuilder.getCount(),
-      queryBuilder.clone().andWhere('alert.status = :status', { status: AlertStatus.ACTIVE }).getCount(),
-      queryBuilder.clone().andWhere('alert.status = :status', { status: AlertStatus.RESOLVED }).getCount(),
+      queryBuilder
+        .clone()
+        .andWhere('alert.status = :status', { status: AlertStatus.ACTIVE })
+        .getCount(),
+      queryBuilder
+        .clone()
+        .andWhere('alert.status = :status', { status: AlertStatus.RESOLVED })
+        .getCount(),
       queryBuilder
         .clone()
         .select('alert.alertType', 'type')
@@ -682,15 +758,22 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
         .getRawMany(),
       queryBuilder
         .clone()
-        .select('EXTRACT(EPOCH FROM (alert.resolvedAt - alert.createdAt))/3600', 'hours')
+        .select(
+          'EXTRACT(EPOCH FROM (alert.resolvedAt - alert.createdAt))/3600',
+          'hours',
+        )
         .where('alert.resolvedAt IS NOT NULL')
         .getRawMany(),
     ]);
 
     // Calculate average resolution time
-    const avgResolutionTime = resolutionTimes.length > 0
-      ? resolutionTimes.reduce((sum, item) => sum + parseFloat(item.hours), 0) / resolutionTimes.length
-      : 0;
+    const avgResolutionTime =
+      resolutionTimes.length > 0
+        ? resolutionTimes.reduce(
+            (sum, item) => sum + parseFloat(item.hours),
+            0,
+          ) / resolutionTimes.length
+        : 0;
 
     // Format data
     const alertsByTypeFormatted = alertsByType.reduce((acc, item) => {
@@ -709,7 +792,7 @@ Priority changed from ${oldPriority} to ${updateDto.priority}: ${updateDto.reaso
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
-      
+
       const dayStart = new Date(date);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(date);

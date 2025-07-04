@@ -1,28 +1,28 @@
-import { 
-  IsString, 
-  IsOptional, 
-  IsEnum, 
-  IsNumber, 
-  IsBoolean, 
-  IsUUID, 
-  IsArray, 
-  IsObject, 
-  ValidateNested, 
-  Min, 
-  Max, 
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsUUID,
+  IsArray,
+  IsObject,
+  ValidateNested,
+  Min,
+  Max,
   IsDateString,
   IsEmail,
   ArrayMinSize,
-  ArrayMaxSize
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
-import { 
-  ReorderRuleType, 
-  ReorderTrigger, 
-  ReorderStatus, 
-  SupplierSelectionMethod 
+import {
+  ReorderRuleType,
+  ReorderTrigger,
+  ReorderStatus,
+  SupplierSelectionMethod,
 } from '../entities/reorder-rule.entity';
 
 export class SupplierWeightsDto {
@@ -84,7 +84,10 @@ export class SeasonalFactorsDto {
 
   @ApiPropertyOptional({ description: 'Faktor seasonal untuk bulan Februari' })
   @IsOptional()
-  @IsNumber({}, { message: 'Seasonal factor untuk Februari harus berupa angka' })
+  @IsNumber(
+    {},
+    { message: 'Seasonal factor untuk Februari harus berupa angka' },
+  )
   @Min(0.1, { message: 'Seasonal factor tidak boleh kurang dari 0.1' })
   @Max(5, { message: 'Seasonal factor tidak boleh lebih dari 5' })
   '2'?: number;
@@ -133,7 +136,10 @@ export class SeasonalFactorsDto {
 
   @ApiPropertyOptional({ description: 'Faktor seasonal untuk bulan September' })
   @IsOptional()
-  @IsNumber({}, { message: 'Seasonal factor untuk September harus berupa angka' })
+  @IsNumber(
+    {},
+    { message: 'Seasonal factor untuk September harus berupa angka' },
+  )
   @Min(0.1, { message: 'Seasonal factor tidak boleh kurang dari 0.1' })
   @Max(5, { message: 'Seasonal factor tidak boleh lebih dari 5' })
   '9'?: number;
@@ -147,14 +153,20 @@ export class SeasonalFactorsDto {
 
   @ApiPropertyOptional({ description: 'Faktor seasonal untuk bulan November' })
   @IsOptional()
-  @IsNumber({}, { message: 'Seasonal factor untuk November harus berupa angka' })
+  @IsNumber(
+    {},
+    { message: 'Seasonal factor untuk November harus berupa angka' },
+  )
   @Min(0.1, { message: 'Seasonal factor tidak boleh kurang dari 0.1' })
   @Max(5, { message: 'Seasonal factor tidak boleh lebih dari 5' })
   '11'?: number;
 
   @ApiPropertyOptional({ description: 'Faktor seasonal untuk bulan Desember' })
   @IsOptional()
-  @IsNumber({}, { message: 'Seasonal factor untuk Desember harus berupa angka' })
+  @IsNumber(
+    {},
+    { message: 'Seasonal factor untuk Desember harus berupa angka' },
+  )
   @Min(0.1, { message: 'Seasonal factor tidak boleh kurang dari 0.1' })
   @Max(5, { message: 'Seasonal factor tidak boleh lebih dari 5' })
   '12'?: number;
@@ -207,7 +219,9 @@ export class CreateReorderRuleDto {
     enum: ReorderRuleType,
     example: ReorderRuleType.FIXED_QUANTITY,
   })
-  @IsEnum(ReorderRuleType, { message: 'Rule type harus berupa nilai yang valid' })
+  @IsEnum(ReorderRuleType, {
+    message: 'Rule type harus berupa nilai yang valid',
+  })
   ruleType: ReorderRuleType;
 
   @ApiProperty({
@@ -400,7 +414,9 @@ export class CreateReorderRuleDto {
     enum: SupplierSelectionMethod,
     example: SupplierSelectionMethod.BALANCED,
   })
-  @IsEnum(SupplierSelectionMethod, { message: 'Supplier selection method harus berupa nilai yang valid' })
+  @IsEnum(SupplierSelectionMethod, {
+    message: 'Supplier selection method harus berupa nilai yang valid',
+  })
   supplierSelectionMethod: SupplierSelectionMethod;
 
   @ApiPropertyOptional({
@@ -419,7 +435,10 @@ export class CreateReorderRuleDto {
   })
   @IsOptional()
   @IsArray({ message: 'Allowed supplier IDs harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap allowed supplier ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap allowed supplier ID harus berupa UUID yang valid',
+  })
   @ArrayMaxSize(20, { message: 'Maksimal 20 supplier yang diizinkan' })
   allowedSupplierIds?: string[];
 
@@ -490,7 +509,10 @@ export class CreateReorderRuleDto {
   })
   @IsOptional()
   @IsArray({ message: 'Approver user IDs harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap approver user ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap approver user ID harus berupa UUID yang valid',
+  })
   @ArrayMaxSize(10, { message: 'Maksimal 10 approver' })
   approverUserIds?: string[];
 
@@ -527,7 +549,13 @@ export class CreateReorderRuleDto {
   })
   @IsOptional()
   @IsArray({ message: 'Notification emails harus berupa array' })
-  @IsEmail({}, { each: true, message: 'Setiap notification email harus berupa email yang valid' })
+  @IsEmail(
+    {},
+    {
+      each: true,
+      message: 'Setiap notification email harus berupa email yang valid',
+    },
+  )
   @ArrayMaxSize(10, { message: 'Maksimal 10 email notifikasi' })
   notificationEmails?: string[];
 
@@ -636,7 +664,9 @@ export class ReorderRuleQueryDto {
     example: ReorderRuleType.EOQ,
   })
   @IsOptional()
-  @IsEnum(ReorderRuleType, { message: 'Rule type harus berupa nilai yang valid' })
+  @IsEnum(ReorderRuleType, {
+    message: 'Rule type harus berupa nilai yang valid',
+  })
   ruleType?: ReorderRuleType;
 
   @ApiPropertyOptional({
@@ -823,7 +853,10 @@ export class BulkActionReorderRuleDto {
   @IsArray({ message: 'Rule IDs harus berupa array' })
   @ArrayMinSize(1, { message: 'Minimal 1 rule ID diperlukan' })
   @ArrayMaxSize(50, { message: 'Maksimal 50 rule IDs per batch' })
-  @IsUUID(4, { each: true, message: 'Setiap rule ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap rule ID harus berupa UUID yang valid',
+  })
   ruleIds: string[];
 
   @ApiProperty({

@@ -13,7 +13,11 @@ import {
   LegalBasisUUPDP,
 } from '../entities/privacy-management.entity';
 import { SOC2AuditLogService } from './soc2-audit-log.service';
-import { AuditEventType, AuditEventOutcome, AuditEventSeverity } from '../entities/soc2-audit-log.entity';
+import {
+  AuditEventType,
+  AuditEventOutcome,
+  AuditEventSeverity,
+} from '../entities/soc2-audit-log.entity';
 
 export interface RetentionPolicyDto {
   policyName: string;
@@ -150,7 +154,9 @@ export class DataRetentionService {
         createdBy,
       });
 
-      const savedPolicy = await this.retentionPolicyRepository.save(retentionPolicy);
+      const savedPolicy = await this.retentionPolicyRepository.save(
+        retentionPolicy,
+      );
 
       // Emit policy created event
       this.eventEmitter.emit('privacy.retention_policy.created', {
@@ -184,9 +190,11 @@ export class DataRetentionService {
 
       this.logger.log(`Data retention policy created: ${savedPolicy.id}`);
       return savedPolicy;
-
     } catch (error) {
-      this.logger.error(`Error creating retention policy: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating retention policy: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to create retention policy');
     }
   }
@@ -231,9 +239,11 @@ export class DataRetentionService {
         where,
         order: { createdAt: 'DESC' },
       });
-
     } catch (error) {
-      this.logger.error(`Error getting retention policies: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting retention policies: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve retention policies');
     }
   }
@@ -248,36 +258,45 @@ export class DataRetentionService {
 
       try {
         // Get all active data classifications
-        const dataClassifications = await this.dataClassificationRepository.find({
-          where: { tenantId, isActive: true, isDeleted: false },
-        });
+        const dataClassifications =
+          await this.dataClassificationRepository.find({
+            where: { tenantId, isActive: true, isDeleted: false },
+          });
 
         // Get applicable retention policies
-        const retentionPolicies = await this.getRetentionPolicies(tenantId, { isActive: true });
+        const retentionPolicies = await this.getRetentionPolicies(tenantId, {
+          isActive: true,
+        });
 
         for (const classification of dataClassifications) {
           // Find applicable retention policy
-          const applicablePolicy = retentionPolicies.find(policy =>
-            policy.dataCategory === classification.category &&
-            policy.processingPurpose === classification.processingPurposes[0] // Using first purpose
+          const applicablePolicy = retentionPolicies.find(
+            policy =>
+              policy.dataCategory === classification.category &&
+              policy.processingPurpose === classification.processingPurposes[0], // Using first purpose
           );
 
           if (!applicablePolicy) continue;
 
           // Query records for this classification
-          const records = await queryRunner.query(`
+          const records = await queryRunner.query(
+            `
             SELECT id, created_at, updated_at 
             FROM ${classification.entityName} 
             WHERE tenant_id = $1 AND is_deleted = false
-          `, [tenantId]);
+          `,
+            [tenantId],
+          );
 
           for (const record of records) {
             const createdAt = new Date(record.created_at);
             const expiryDate = new Date(createdAt);
-            expiryDate.setDate(expiryDate.getDate() + applicablePolicy.retentionDays);
+            expiryDate.setDate(
+              expiryDate.getDate() + applicablePolicy.retentionDays,
+            );
 
             const daysToExpiry = Math.ceil(
-              (expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+              (expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
             );
 
             let status: DataLifecycleStatus['status'] = 'active';
@@ -296,23 +315,30 @@ export class DataRetentionService {
               daysToExpiry,
               status,
               actions: {
-                archiveEligible: applicablePolicy.archivalDays ? daysToExpiry <= 0 : false,
-                deleteEligible: applicablePolicy.automaticDeletion && daysToExpiry <= 0,
-                anonymizeEligible: applicablePolicy.anonymizationAllowed && daysToExpiry <= 0,
-                requiresApproval: applicablePolicy.policyDetails?.auditRequirements.approvalRequired || false,
+                archiveEligible: applicablePolicy.archivalDays
+                  ? daysToExpiry <= 0
+                  : false,
+                deleteEligible:
+                  applicablePolicy.automaticDeletion && daysToExpiry <= 0,
+                anonymizeEligible:
+                  applicablePolicy.anonymizationAllowed && daysToExpiry <= 0,
+                requiresApproval:
+                  applicablePolicy.policyDetails?.auditRequirements
+                    .approvalRequired || false,
               },
             });
           }
         }
 
         return lifecycleStatuses;
-
       } finally {
         await queryRunner.release();
       }
-
     } catch (error) {
-      this.logger.error(`Error analyzing data lifecycle: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error analyzing data lifecycle: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to analyze data lifecycle');
     }
   }
@@ -326,7 +352,9 @@ export class DataRetentionService {
   ): Promise<RetentionReport> {
     try {
       const lifecycleStatuses = await this.analyzeDataLifecycle(tenantId);
-      const retentionPolicies = await this.getRetentionPolicies(tenantId, { isActive: true });
+      const retentionPolicies = await this.getRetentionPolicies(tenantId, {
+        isActive: true,
+      });
 
       // Calculate summary statistics
       const totalRecords = lifecycleStatuses.length;
@@ -339,47 +367,72 @@ export class DataRetentionService {
 
       lifecycleStatuses.forEach(status => {
         // Count by status
-        recordsByStatus[status.status] = (recordsByStatus[status.status] || 0) + 1;
+        recordsByStatus[status.status] =
+          (recordsByStatus[status.status] || 0) + 1;
       });
 
       // Categorize expiring records
       const expiringRecords = {
-        in7Days: lifecycleStatuses.filter(s => s.daysToExpiry >= 0 && s.daysToExpiry <= 7),
-        in30Days: lifecycleStatuses.filter(s => s.daysToExpiry >= 8 && s.daysToExpiry <= 30),
+        in7Days: lifecycleStatuses.filter(
+          s => s.daysToExpiry >= 0 && s.daysToExpiry <= 7,
+        ),
+        in30Days: lifecycleStatuses.filter(
+          s => s.daysToExpiry >= 8 && s.daysToExpiry <= 30,
+        ),
         overdue: lifecycleStatuses.filter(s => s.daysToExpiry < 0),
       };
 
       // Calculate metrics
-      const automatedActions = lifecycleStatuses.filter(s => s.actions.deleteEligible).length;
-      const manualReviewRequired = lifecycleStatuses.filter(s => s.actions.requiresApproval).length;
+      const automatedActions = lifecycleStatuses.filter(
+        s => s.actions.deleteEligible,
+      ).length;
+      const manualReviewRequired = lifecycleStatuses.filter(
+        s => s.actions.requiresApproval,
+      ).length;
 
       const retentionDays = lifecycleStatuses.map(s => s.daysToExpiry);
-      const averageRetentionDays = retentionDays.length > 0 
-        ? retentionDays.reduce((sum, days) => sum + days, 0) / retentionDays.length 
-        : 0;
+      const averageRetentionDays =
+        retentionDays.length > 0
+          ? retentionDays.reduce((sum, days) => sum + days, 0) /
+            retentionDays.length
+          : 0;
 
-      const expiredRecords = lifecycleStatuses.filter(s => s.status === 'expired').length;
-      const complianceRate = totalRecords > 0 ? ((totalRecords - expiredRecords) / totalRecords) * 100 : 100;
+      const expiredRecords = lifecycleStatuses.filter(
+        s => s.status === 'expired',
+      ).length;
+      const complianceRate =
+        totalRecords > 0
+          ? ((totalRecords - expiredRecords) / totalRecords) * 100
+          : 100;
 
-      const automationRate = totalRecords > 0 ? (automatedActions / totalRecords) * 100 : 0;
+      const automationRate =
+        totalRecords > 0 ? (automatedActions / totalRecords) * 100 : 0;
 
       // Generate recommendations
       const recommendations: string[] = [];
-      
+
       if (complianceRate < 95) {
-        recommendations.push('Consider implementing automated retention enforcement to improve compliance rate');
+        recommendations.push(
+          'Consider implementing automated retention enforcement to improve compliance rate',
+        );
       }
-      
+
       if (expiringRecords.overdue.length > 0) {
-        recommendations.push(`${expiringRecords.overdue.length} records are overdue for retention action`);
+        recommendations.push(
+          `${expiringRecords.overdue.length} records are overdue for retention action`,
+        );
       }
-      
+
       if (automationRate < 50) {
-        recommendations.push('Consider increasing automation in retention policies to reduce manual overhead');
+        recommendations.push(
+          'Consider increasing automation in retention policies to reduce manual overhead',
+        );
       }
-      
+
       if (retentionPolicies.length === 0) {
-        recommendations.push('No active retention policies found - consider implementing data lifecycle management');
+        recommendations.push(
+          'No active retention policies found - consider implementing data lifecycle management',
+        );
       }
 
       return {
@@ -402,9 +455,11 @@ export class DataRetentionService {
         },
         recommendations,
       };
-
     } catch (error) {
-      this.logger.error(`Error generating retention report: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error generating retention report: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to generate retention report');
     }
   }
@@ -424,29 +479,34 @@ export class DataRetentionService {
       const tablesAffected: string[] = [];
 
       const queryRunner = this.dataSource.createQueryRunner();
-      
+
       if (!dryRun) {
         await queryRunner.startTransaction();
       }
 
       try {
         // Get retention policies to apply
-        const policies = policyId 
-          ? [await this.retentionPolicyRepository.findOne({ where: { id: policyId, tenantId } })]
+        const policies = policyId
+          ? [
+              await this.retentionPolicyRepository.findOne({
+                where: { id: policyId, tenantId },
+              }),
+            ]
           : await this.getRetentionPolicies(tenantId, { isActive: true });
 
         for (const policy of policies.filter(Boolean)) {
           if (!policy!.archivalDays) continue;
 
           // Find records eligible for archival
-          const dataClassifications = await this.dataClassificationRepository.find({
-            where: {
-              tenantId,
-              category: policy!.dataCategory,
-              isActive: true,
-              isDeleted: false,
-            },
-          });
+          const dataClassifications =
+            await this.dataClassificationRepository.find({
+              where: {
+                tenantId,
+                category: policy!.dataCategory,
+                isActive: true,
+                isDeleted: false,
+              },
+            });
 
           for (const classification of dataClassifications) {
             const cutoffDate = new Date();
@@ -454,21 +514,27 @@ export class DataRetentionService {
 
             if (!dryRun) {
               // Move data to archive table (simplified - real implementation would be more sophisticated)
-              const archiveResult = await queryRunner.query(`
+              const archiveResult = await queryRunner.query(
+                `
                 INSERT INTO ${classification.entityName}_archive 
                 SELECT *, $1 as archived_at, $2 as archival_id
                 FROM ${classification.entityName}
                 WHERE tenant_id = $3 AND created_at < $4 AND is_deleted = false
-              `, [archivalDate, archivalId, tenantId, cutoffDate]);
+              `,
+                [archivalDate, archivalId, tenantId, cutoffDate],
+              );
 
               recordsArchived += archiveResult.affectedRows || 0;
 
               // Mark original records as archived
-              await queryRunner.query(`
+              await queryRunner.query(
+                `
                 UPDATE ${classification.entityName}
                 SET is_deleted = true, deleted_at = $1, deleted_by = 'system_archival'
                 WHERE tenant_id = $2 AND created_at < $3 AND is_deleted = false
-              `, [archivalDate, tenantId, cutoffDate]);
+              `,
+                [archivalDate, tenantId, cutoffDate],
+              );
 
               if (!tablesAffected.includes(classification.entityName)) {
                 tablesAffected.push(classification.entityName);
@@ -534,7 +600,6 @@ export class DataRetentionService {
         }
 
         return result;
-
       } catch (error) {
         if (!dryRun) {
           await queryRunner.rollbackTransaction();
@@ -543,7 +608,6 @@ export class DataRetentionService {
       } finally {
         await queryRunner.release();
       }
-
     } catch (error) {
       this.logger.error(`Error archiving data: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to archive expired data');
@@ -562,7 +626,9 @@ export class DataRetentionService {
     try {
       // Verify confirmation token for security
       if (!dryRun && !confirmationToken) {
-        throw new BadRequestException('Confirmation token required for data purging');
+        throw new BadRequestException(
+          'Confirmation token required for data purging',
+        );
       }
 
       const purgeId = crypto.randomUUID();
@@ -573,29 +639,34 @@ export class DataRetentionService {
       const retentionExceptions: PurgeResult['retentionExceptions'] = [];
 
       const queryRunner = this.dataSource.createQueryRunner();
-      
+
       if (!dryRun) {
         await queryRunner.startTransaction();
       }
 
       try {
         // Get retention policies to apply
-        const policies = policyId 
-          ? [await this.retentionPolicyRepository.findOne({ where: { id: policyId, tenantId } })]
+        const policies = policyId
+          ? [
+              await this.retentionPolicyRepository.findOne({
+                where: { id: policyId, tenantId },
+              }),
+            ]
           : await this.getRetentionPolicies(tenantId, { isActive: true });
 
         for (const policy of policies.filter(Boolean)) {
           if (!policy!.automaticDeletion) continue;
 
           // Find records eligible for purging
-          const dataClassifications = await this.dataClassificationRepository.find({
-            where: {
-              tenantId,
-              category: policy!.dataCategory,
-              isActive: true,
-              isDeleted: false,
-            },
-          });
+          const dataClassifications =
+            await this.dataClassificationRepository.find({
+              where: {
+                tenantId,
+                category: policy!.dataCategory,
+                isActive: true,
+                isDeleted: false,
+              },
+            });
 
           for (const classification of dataClassifications) {
             const cutoffDate = new Date();
@@ -626,11 +697,16 @@ export class DataRetentionService {
                 recordsAnonymized += anonymizeResult;
               } else {
                 // Permanently delete records
-                const deleteResult = await queryRunner.query(`
+                const deleteResult = await queryRunner.query(
+                  `
                   DELETE FROM ${classification.entityName}
                   WHERE tenant_id = $1 AND created_at < $2 
-                    AND id NOT IN (${exceptions.map((_, i) => `$${i + 3}`).join(',') || 'NULL'})
-                `, [tenantId, cutoffDate, ...exceptions.map(e => e.recordId)]);
+                    AND id NOT IN (${
+                      exceptions.map((_, i) => `$${i + 3}`).join(',') || 'NULL'
+                    })
+                `,
+                  [tenantId, cutoffDate, ...exceptions.map(e => e.recordId)],
+                );
 
                 recordsPurged += deleteResult.affectedRows || 0;
               }
@@ -687,7 +763,6 @@ export class DataRetentionService {
         }
 
         return result;
-
       } catch (error) {
         if (!dryRun) {
           await queryRunner.rollbackTransaction();
@@ -696,7 +771,6 @@ export class DataRetentionService {
       } finally {
         await queryRunner.release();
       }
-
     } catch (error) {
       this.logger.error(`Error purging data: ${error.message}`, error.stack);
       throw new BadRequestException('Failed to purge expired data');
@@ -742,10 +816,13 @@ export class DataRetentionService {
           }
 
           // Auto-archive eligible data
-          const archivePolicies = await this.getRetentionPolicies(tenantId, { isActive: true });
-          const autoArchivePolicies = archivePolicies.filter(p => 
-            p.archivalDays && 
-            p.policyDetails?.auditRequirements.approvalRequired === false
+          const archivePolicies = await this.getRetentionPolicies(tenantId, {
+            isActive: true,
+          });
+          const autoArchivePolicies = archivePolicies.filter(
+            p =>
+              p.archivalDays &&
+              p.policyDetails?.auditRequirements.approvalRequired === false,
           );
 
           for (const policy of autoArchivePolicies) {
@@ -753,25 +830,34 @@ export class DataRetentionService {
           }
 
           // Auto-delete eligible data
-          const autoPurgePolicies = archivePolicies.filter(p => 
-            p.automaticDeletion && 
-            p.policyDetails?.auditRequirements.approvalRequired === false
+          const autoPurgePolicies = archivePolicies.filter(
+            p =>
+              p.automaticDeletion &&
+              p.policyDetails?.auditRequirements.approvalRequired === false,
           );
 
           for (const policy of autoPurgePolicies) {
             const confirmationToken = crypto.randomUUID(); // Generate for automated process
-            await this.purgeExpiredData(tenantId, policy.id, confirmationToken, false);
+            await this.purgeExpiredData(
+              tenantId,
+              policy.id,
+              confirmationToken,
+              false,
+            );
           }
-
         } catch (error) {
-          this.logger.error(`Error in daily retention check for tenant ${tenantId}: ${error.message}`);
+          this.logger.error(
+            `Error in daily retention check for tenant ${tenantId}: ${error.message}`,
+          );
         }
       }
 
       this.logger.log('Daily data retention check completed');
-
     } catch (error) {
-      this.logger.error(`Error during daily retention check: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error during daily retention check: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -796,7 +882,7 @@ export class DataRetentionService {
 
       for (const policy of expiringPolicies) {
         const daysToExpiry = Math.ceil(
-          (policy.expiryDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          (policy.expiryDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
         );
 
         if ([30, 14, 7, 1].includes(daysToExpiry)) {
@@ -812,10 +898,14 @@ export class DataRetentionService {
         }
       }
 
-      this.logger.log(`Sent expiry reminders for ${expiringPolicies.length} retention policies`);
-
+      this.logger.log(
+        `Sent expiry reminders for ${expiringPolicies.length} retention policies`,
+      );
     } catch (error) {
-      this.logger.error(`Error sending retention policy reminders: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error sending retention policy reminders: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -859,12 +949,21 @@ export class DataRetentionService {
       ...Object.values(anonymizedData),
     ];
 
-    const result = await queryRunner.query(`
+    const result = await queryRunner.query(
+      `
       UPDATE ${tableName} 
       SET ${setClause}, updated_at = $1, updated_by = $2
       WHERE tenant_id = $3 AND created_at < $4 
-        ${exceptions.length > 0 ? `AND id NOT IN (${exceptions.map((_, i) => `$${i + 5}`).join(',')})` : ''}
-    `, [...values, ...exceptions]);
+        ${
+          exceptions.length > 0
+            ? `AND id NOT IN (${exceptions
+                .map((_, i) => `$${i + 5}`)
+                .join(',')})`
+            : ''
+        }
+    `,
+      [...values, ...exceptions],
+    );
 
     return result.affectedRows || 0;
   }

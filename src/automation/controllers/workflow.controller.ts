@@ -55,10 +55,10 @@ import {
 } from '../dto/workflow.dto';
 
 // Entities
-import { 
-  Workflow, 
-  WorkflowStatus, 
-  WorkflowTriggerType 
+import {
+  Workflow,
+  WorkflowStatus,
+  WorkflowTriggerType,
 } from '../entities/workflow.entity';
 import { WorkflowExecution } from '../entities/workflow-execution.entity';
 
@@ -90,12 +90,13 @@ export class WorkflowController {
   // =============================================
 
   @Get()
-  @ApiOperation({ 
-    summary: 'Get workflows', 
-    description: 'Retrieve paginated list of workflows with filtering and search' 
+  @ApiOperation({
+    summary: 'Get workflows',
+    description:
+      'Retrieve paginated list of workflows with filtering and search',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflows retrieved successfully',
     schema: {
       type: 'object',
@@ -123,10 +124,7 @@ export class WorkflowController {
     },
   })
   @RequirePermissions('workflow:read')
-  async getWorkflows(
-    @Request() req: any,
-    @Query() query: WorkflowQueryDto,
-  ) {
+  async getWorkflows(@Request() req: any, @Query() query: WorkflowQueryDto) {
     try {
       const tenantId = req.user.tenantId;
       const page = query.page || 1;
@@ -160,15 +158,16 @@ export class WorkflowController {
       }
 
       // Execute query with pagination
-      const [workflows, total] = await this.workflowBuilderService.findWorkflows({
-        where: whereConditions,
-        relations: ['owner', 'steps'],
-        order: {
-          [query.sortBy || 'createdAt']: query.sortOrder || 'DESC',
-        },
-        take: limit,
-        skip: offset,
-      });
+      const [workflows, total] =
+        await this.workflowBuilderService.findWorkflows({
+          where: whereConditions,
+          relations: ['owner', 'steps'],
+          order: {
+            [query.sortBy || 'createdAt']: query.sortOrder || 'DESC',
+          },
+          take: limit,
+          skip: offset,
+        });
 
       return {
         success: true,
@@ -182,21 +181,23 @@ export class WorkflowController {
           },
         },
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get workflows: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get workflows: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get(':id')
-  @ApiOperation({ 
-    summary: 'Get workflow by ID', 
-    description: 'Retrieve detailed workflow information including steps' 
+  @ApiOperation({
+    summary: 'Get workflow by ID',
+    description: 'Retrieve detailed workflow information including steps',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow retrieved successfully',
     schema: {
       type: 'object',
@@ -214,27 +215,32 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const workflow = await this.workflowBuilderService.getWorkflowWithSteps(tenantId, workflowId);
+      const workflow = await this.workflowBuilderService.getWorkflowWithSteps(
+        tenantId,
+        workflowId,
+      );
 
       return {
         success: true,
         data: this.transformWorkflowResponse(workflow),
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Post()
-  @ApiOperation({ 
-    summary: 'Create workflow', 
-    description: 'Create a new workflow with optional steps' 
+  @ApiOperation({
+    summary: 'Create workflow',
+    description: 'Create a new workflow with optional steps',
   })
   @ApiBody({ type: CreateWorkflowDto })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Workflow created successfully',
     schema: {
       type: 'object',
@@ -246,7 +252,10 @@ export class WorkflowController {
     },
   })
   @ApiResponse({ status: 400, description: 'Invalid workflow data' })
-  @ApiResponse({ status: 409, description: 'Workflow with same name already exists' })
+  @ApiResponse({
+    status: 409,
+    description: 'Workflow with same name already exists',
+  })
   @HttpCode(HttpStatus.CREATED)
   @RequirePermissions('workflow:create')
   async createWorkflow(
@@ -256,7 +265,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const workflow = await this.workflowBuilderService.createWorkflow(
         tenantId,
         createWorkflowDto,
@@ -268,22 +277,24 @@ export class WorkflowController {
         data: this.transformWorkflowResponse(workflow),
         message: 'Workflow berhasil dibuat',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to create workflow: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create workflow: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Put(':id')
-  @ApiOperation({ 
-    summary: 'Update workflow', 
-    description: 'Update workflow configuration and metadata' 
+  @ApiOperation({
+    summary: 'Update workflow',
+    description: 'Update workflow configuration and metadata',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiBody({ type: UpdateWorkflowDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow updated successfully',
     schema: {
       type: 'object',
@@ -305,7 +316,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const workflow = await this.workflowBuilderService.updateWorkflow(
         tenantId,
         workflowId,
@@ -318,21 +329,23 @@ export class WorkflowController {
         data: this.transformWorkflowResponse(workflow),
         message: 'Workflow berhasil diperbarui',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to update workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Delete(':id')
-  @ApiOperation({ 
-    summary: 'Delete workflow', 
-    description: 'Soft delete workflow and mark as inactive' 
+  @ApiOperation({
+    summary: 'Delete workflow',
+    description: 'Soft delete workflow and mark as inactive',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow deleted successfully',
     schema: {
       type: 'object',
@@ -352,29 +365,36 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
-      await this.workflowBuilderService.deleteWorkflow(tenantId, workflowId, user.id);
+
+      await this.workflowBuilderService.deleteWorkflow(
+        tenantId,
+        workflowId,
+        user.id,
+      );
 
       return {
         success: true,
         message: 'Workflow berhasil dihapus',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to delete workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Post(':id/clone')
-  @ApiOperation({ 
-    summary: 'Clone workflow', 
-    description: 'Create a copy of existing workflow with optional customizations' 
+  @ApiOperation({
+    summary: 'Clone workflow',
+    description:
+      'Create a copy of existing workflow with optional customizations',
   })
   @ApiParam({ name: 'id', description: 'Source workflow ID', type: 'string' })
   @ApiBody({ type: CloneWorkflowDto })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Workflow cloned successfully',
     schema: {
       type: 'object',
@@ -395,7 +415,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const workflow = await this.workflowBuilderService.cloneWorkflow(
         tenantId,
         sourceWorkflowId,
@@ -408,21 +428,23 @@ export class WorkflowController {
         data: this.transformWorkflowResponse(workflow),
         message: 'Workflow berhasil di-clone',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to clone workflow ${sourceWorkflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to clone workflow ${sourceWorkflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Post(':id/version')
-  @ApiOperation({ 
-    summary: 'Create workflow version', 
-    description: 'Create a new version of existing workflow' 
+  @ApiOperation({
+    summary: 'Create workflow version',
+    description: 'Create a new version of existing workflow',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Workflow version created successfully',
     schema: {
       type: 'object',
@@ -442,7 +464,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const workflow = await this.workflowBuilderService.createWorkflowVersion(
         tenantId,
         workflowId,
@@ -454,9 +476,11 @@ export class WorkflowController {
         data: this.transformWorkflowResponse(workflow),
         message: 'Versi workflow berhasil dibuat',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to create workflow version ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create workflow version ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -466,13 +490,13 @@ export class WorkflowController {
   // =============================================
 
   @Get(':id/steps')
-  @ApiOperation({ 
-    summary: 'Get workflow steps', 
-    description: 'Retrieve all steps for a workflow in execution order' 
+  @ApiOperation({
+    summary: 'Get workflow steps',
+    description: 'Retrieve all steps for a workflow in execution order',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow steps retrieved successfully',
     schema: {
       type: 'object',
@@ -492,28 +516,35 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const workflow = await this.workflowBuilderService.getWorkflowWithSteps(tenantId, workflowId);
+      const workflow = await this.workflowBuilderService.getWorkflowWithSteps(
+        tenantId,
+        workflowId,
+      );
 
       return {
         success: true,
-        data: workflow.steps?.sort((a, b) => a.executionOrder - b.executionOrder) || [],
+        data:
+          workflow.steps?.sort((a, b) => a.executionOrder - b.executionOrder) ||
+          [],
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get workflow steps ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get workflow steps ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Post(':id/steps')
-  @ApiOperation({ 
-    summary: 'Add workflow step', 
-    description: 'Add a new step to the workflow' 
+  @ApiOperation({
+    summary: 'Add workflow step',
+    description: 'Add a new step to the workflow',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiBody({ type: CreateWorkflowStepDto })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Workflow step added successfully',
     schema: {
       type: 'object',
@@ -534,7 +565,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const step = await this.workflowBuilderService.addWorkflowStep(
         tenantId,
         workflowId,
@@ -547,23 +578,25 @@ export class WorkflowController {
         data: step,
         message: 'Step berhasil ditambahkan',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to add workflow step: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to add workflow step: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Put(':id/steps/:stepId')
-  @ApiOperation({ 
-    summary: 'Update workflow step', 
-    description: 'Update step configuration and settings' 
+  @ApiOperation({
+    summary: 'Update workflow step',
+    description: 'Update step configuration and settings',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiParam({ name: 'stepId', description: 'Step ID', type: 'string' })
   @ApiBody({ type: UpdateWorkflowStepDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow step updated successfully',
     schema: {
       type: 'object',
@@ -584,7 +617,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const step = await this.workflowBuilderService.updateWorkflowStep(
         tenantId,
         workflowId,
@@ -598,22 +631,24 @@ export class WorkflowController {
         data: step,
         message: 'Step berhasil diperbarui',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to update workflow step: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update workflow step: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Delete(':id/steps/:stepId')
-  @ApiOperation({ 
-    summary: 'Delete workflow step', 
-    description: 'Remove step from workflow' 
+  @ApiOperation({
+    summary: 'Delete workflow step',
+    description: 'Remove step from workflow',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiParam({ name: 'stepId', description: 'Step ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow step deleted successfully',
     schema: {
       type: 'object',
@@ -632,7 +667,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       await this.workflowBuilderService.deleteWorkflowStep(
         tenantId,
         workflowId,
@@ -644,22 +679,24 @@ export class WorkflowController {
         success: true,
         message: 'Step berhasil dihapus',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to delete workflow step: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete workflow step: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Patch(':id/steps/reorder')
-  @ApiOperation({ 
-    summary: 'Reorder workflow steps', 
-    description: 'Update execution order of workflow steps' 
+  @ApiOperation({
+    summary: 'Reorder workflow steps',
+    description: 'Update execution order of workflow steps',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiBody({ type: ReorderStepsDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow steps reordered successfully',
     schema: {
       type: 'object',
@@ -678,7 +715,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       await this.workflowBuilderService.reorderWorkflowSteps(
         tenantId,
         workflowId,
@@ -690,9 +727,11 @@ export class WorkflowController {
         success: true,
         message: 'Urutan step berhasil diubah',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to reorder workflow steps: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to reorder workflow steps: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -702,14 +741,14 @@ export class WorkflowController {
   // =============================================
 
   @Post(':id/trigger')
-  @ApiOperation({ 
-    summary: 'Trigger workflow execution', 
-    description: 'Manually trigger workflow execution with optional input data' 
+  @ApiOperation({
+    summary: 'Trigger workflow execution',
+    description: 'Manually trigger workflow execution with optional input data',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiBody({ type: TriggerWorkflowDto })
-  @ApiResponse({ 
-    status: 202, 
+  @ApiResponse({
+    status: 202,
     description: 'Workflow execution triggered successfully',
     schema: {
       type: 'object',
@@ -737,14 +776,15 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
-      const executionId = await this.triggerConfigurationService.triggerWorkflow(
-        tenantId,
-        workflowId,
-        triggerDto.inputData,
-        user.id,
-        triggerDto.triggerSource || 'manual_api',
-      );
+
+      const executionId =
+        await this.triggerConfigurationService.triggerWorkflow(
+          tenantId,
+          workflowId,
+          triggerDto.inputData,
+          user.id,
+          triggerDto.triggerSource || 'manual_api',
+        );
 
       return {
         success: true,
@@ -755,24 +795,40 @@ export class WorkflowController {
         },
         message: 'Workflow execution dimulai',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to trigger workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to trigger workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get(':id/executions')
-  @ApiOperation({ 
-    summary: 'Get workflow executions', 
-    description: 'Retrieve execution history for workflow' 
+  @ApiOperation({
+    summary: 'Get workflow executions',
+    description: 'Retrieve execution history for workflow',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'running', 'completed', 'failed', 'cancelled'] })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['pending', 'running', 'completed', 'failed', 'cancelled'],
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Workflow executions retrieved successfully',
     schema: {
       type: 'object',
@@ -808,36 +864,43 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
-      const executions = await this.workflowExecutionService.getWorkflowExecutions(
-        tenantId,
-        workflowId,
-        {
-          page,
-          limit: Math.min(limit, 100),
-          status,
-        }
-      );
+
+      const executions =
+        await this.workflowExecutionService.getWorkflowExecutions(
+          tenantId,
+          workflowId,
+          {
+            page,
+            limit: Math.min(limit, 100),
+            status,
+          },
+        );
 
       return {
         success: true,
         data: executions,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get workflow executions: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get workflow executions: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get('executions/:executionId')
-  @ApiOperation({ 
-    summary: 'Get execution details', 
-    description: 'Retrieve detailed execution information and step results' 
+  @ApiOperation({
+    summary: 'Get execution details',
+    description: 'Retrieve detailed execution information and step results',
   })
-  @ApiParam({ name: 'executionId', description: 'Execution ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiParam({
+    name: 'executionId',
+    description: 'Execution ID',
+    type: 'string',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Execution details retrieved successfully',
     schema: {
       type: 'object',
@@ -855,7 +918,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const execution = await this.workflowExecutionService.getExecutionDetails(
         tenantId,
         workflowId,
@@ -866,19 +929,25 @@ export class WorkflowController {
         success: true,
         data: execution,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get execution details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get execution details: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Patch('executions/:executionId/pause')
-  @ApiOperation({ 
-    summary: 'Pause workflow execution', 
-    description: 'Pause a running workflow execution' 
+  @ApiOperation({
+    summary: 'Pause workflow execution',
+    description: 'Pause a running workflow execution',
   })
-  @ApiParam({ name: 'executionId', description: 'Execution ID', type: 'string' })
+  @ApiParam({
+    name: 'executionId',
+    description: 'Execution ID',
+    type: 'string',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -887,8 +956,8 @@ export class WorkflowController {
       },
     },
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Execution paused successfully',
     schema: {
       type: 'object',
@@ -906,7 +975,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       await this.workflowExecutionService.pauseWorkflowExecution(
         tenantId,
         executionId,
@@ -917,21 +986,27 @@ export class WorkflowController {
         success: true,
         message: 'Execution berhasil di-pause',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to pause execution: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to pause execution: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Patch('executions/:executionId/resume')
-  @ApiOperation({ 
-    summary: 'Resume workflow execution', 
-    description: 'Resume a paused workflow execution' 
+  @ApiOperation({
+    summary: 'Resume workflow execution',
+    description: 'Resume a paused workflow execution',
   })
-  @ApiParam({ name: 'executionId', description: 'Execution ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiParam({
+    name: 'executionId',
+    description: 'Execution ID',
+    type: 'string',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Execution resumed successfully',
     schema: {
       type: 'object',
@@ -948,7 +1023,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       await this.workflowExecutionService.resumeWorkflowExecution(
         tenantId,
         executionId,
@@ -958,19 +1033,25 @@ export class WorkflowController {
         success: true,
         message: 'Execution berhasil di-resume',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to resume execution: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to resume execution: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Patch('executions/:executionId/cancel')
-  @ApiOperation({ 
-    summary: 'Cancel workflow execution', 
-    description: 'Cancel a running or paused workflow execution' 
+  @ApiOperation({
+    summary: 'Cancel workflow execution',
+    description: 'Cancel a running or paused workflow execution',
   })
-  @ApiParam({ name: 'executionId', description: 'Execution ID', type: 'string' })
+  @ApiParam({
+    name: 'executionId',
+    description: 'Execution ID',
+    type: 'string',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -979,8 +1060,8 @@ export class WorkflowController {
       },
     },
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Execution cancelled successfully',
     schema: {
       type: 'object',
@@ -998,7 +1079,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       await this.workflowExecutionService.cancelWorkflowExecution(
         tenantId,
         executionId,
@@ -1009,9 +1090,11 @@ export class WorkflowController {
         success: true,
         message: 'Execution berhasil dibatalkan',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to cancel execution: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel execution: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -1021,13 +1104,13 @@ export class WorkflowController {
   // =============================================
 
   @Post(':id/validate')
-  @ApiOperation({ 
-    summary: 'Validate workflow', 
-    description: 'Validate workflow configuration and steps' 
+  @ApiOperation({
+    summary: 'Validate workflow',
+    description: 'Validate workflow configuration and steps',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow validation completed',
     schema: {
       type: 'object',
@@ -1044,34 +1127,37 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
-      const validationResult = await this.workflowBuilderService.validateWorkflow(
-        tenantId,
-        workflowId,
-      );
+
+      const validationResult =
+        await this.workflowBuilderService.validateWorkflow(
+          tenantId,
+          workflowId,
+        );
 
       return {
         success: true,
         data: validationResult,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to validate workflow: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to validate workflow: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Post(':id/test')
-  @ApiOperation({ 
-    summary: 'Test workflow', 
-    description: 'Run workflow validation and generate test scenarios' 
+  @ApiOperation({
+    summary: 'Test workflow',
+    description: 'Run workflow validation and generate test scenarios',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        testData: { 
+        testData: {
           type: 'object',
           description: 'Test input data for workflow',
           example: { productId: 'test-123', quantity: 10 },
@@ -1079,8 +1165,8 @@ export class WorkflowController {
       },
     },
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow test completed',
     schema: {
       type: 'object',
@@ -1089,7 +1175,9 @@ export class WorkflowController {
         data: {
           type: 'object',
           properties: {
-            validationResult: { $ref: '#/components/schemas/WorkflowValidationResultDto' },
+            validationResult: {
+              $ref: '#/components/schemas/WorkflowValidationResultDto',
+            },
             testScenarios: {
               type: 'array',
               items: {
@@ -1101,7 +1189,10 @@ export class WorkflowController {
                 },
               },
             },
-            estimatedExecutionTime: { type: 'number', description: 'Estimated time in milliseconds' },
+            estimatedExecutionTime: {
+              type: 'number',
+              description: 'Estimated time in milliseconds',
+            },
             resourceRequirements: { type: 'object' },
           },
         },
@@ -1116,7 +1207,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       const testResult = await this.workflowBuilderService.testWorkflow(
         tenantId,
         workflowId,
@@ -1127,9 +1218,11 @@ export class WorkflowController {
         success: true,
         data: testResult,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to test workflow: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to test workflow: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -1139,21 +1232,24 @@ export class WorkflowController {
   // =============================================
 
   @Put(':id/trigger-config')
-  @ApiOperation({ 
-    summary: 'Configure workflow trigger', 
-    description: 'Update workflow trigger configuration' 
+  @ApiOperation({
+    summary: 'Configure workflow trigger',
+    description: 'Update workflow trigger configuration',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
   @ApiBody({ type: TriggerConfigDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Trigger configuration updated successfully',
     schema: {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: true },
         data: { $ref: '#/components/schemas/Workflow' },
-        message: { type: 'string', example: 'Trigger configuration berhasil diperbarui' },
+        message: {
+          type: 'string',
+          example: 'Trigger configuration berhasil diperbarui',
+        },
       },
     },
   })
@@ -1166,34 +1262,37 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
-      const workflow = await this.triggerConfigurationService.updateTriggerConfiguration(
-        tenantId,
-        workflowId,
-        triggerConfigDto,
-        user.id,
-      );
+
+      const workflow =
+        await this.triggerConfigurationService.updateTriggerConfiguration(
+          tenantId,
+          workflowId,
+          triggerConfigDto,
+          user.id,
+        );
 
       return {
         success: true,
         data: this.transformWorkflowResponse(workflow),
         message: 'Trigger configuration berhasil diperbarui',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to configure trigger: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to configure trigger: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Patch(':id/enable')
-  @ApiOperation({ 
-    summary: 'Enable workflow', 
-    description: 'Activate workflow and enable triggers' 
+  @ApiOperation({
+    summary: 'Enable workflow',
+    description: 'Activate workflow and enable triggers',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow enabled successfully',
     schema: {
       type: 'object',
@@ -1211,7 +1310,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       await this.workflowBuilderService.updateWorkflow(
         tenantId,
         workflowId,
@@ -1223,21 +1322,23 @@ export class WorkflowController {
         success: true,
         message: 'Workflow berhasil diaktifkan',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to enable workflow: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to enable workflow: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Patch(':id/disable')
-  @ApiOperation({ 
-    summary: 'Disable workflow', 
-    description: 'Deactivate workflow and disable triggers' 
+  @ApiOperation({
+    summary: 'Disable workflow',
+    description: 'Deactivate workflow and disable triggers',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Workflow disabled successfully',
     schema: {
       type: 'object',
@@ -1255,7 +1356,7 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
+
       await this.triggerConfigurationService.disableTrigger(
         tenantId,
         workflowId,
@@ -1266,9 +1367,11 @@ export class WorkflowController {
         success: true,
         message: 'Workflow berhasil dinonaktifkan',
       };
-
     } catch (error) {
-      this.logger.error(`Failed to disable workflow: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to disable workflow: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -1278,14 +1381,23 @@ export class WorkflowController {
   // =============================================
 
   @Get('/templates/actions')
-  @ApiOperation({ 
-    summary: 'Get action templates', 
-    description: 'Retrieve available action templates for workflow steps' 
+  @ApiOperation({
+    summary: 'Get action templates',
+    description: 'Retrieve available action templates for workflow steps',
   })
-  @ApiQuery({ name: 'category', required: false, type: String, description: 'Filter by category' })
-  @ApiQuery({ name: 'difficulty', required: false, enum: ['beginner', 'intermediate', 'advanced'] })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    type: String,
+    description: 'Filter by category',
+  })
+  @ApiQuery({
+    name: 'difficulty',
+    required: false,
+    enum: ['beginner', 'intermediate', 'advanced'],
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Action templates retrieved successfully',
     schema: {
       type: 'object',
@@ -1304,27 +1416,45 @@ export class WorkflowController {
     @Query('difficulty') difficulty?: string,
   ) {
     try {
-      const templates = await this.actionTemplateService.getActionTemplates(category, difficulty);
+      const templates = await this.actionTemplateService.getActionTemplates(
+        category,
+        difficulty,
+      );
 
       return {
         success: true,
         data: templates,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get action templates: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get action templates: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get('/templates/workflows')
-  @ApiOperation({ 
-    summary: 'Get workflow templates', 
-    description: 'Retrieve available workflow templates' 
+  @ApiOperation({
+    summary: 'Get workflow templates',
+    description: 'Retrieve available workflow templates',
   })
-  @ApiQuery({ name: 'category', required: false, enum: ['inventory_management', 'purchase_order', 'supplier_management', 'alert_notification', 'reporting', 'data_sync', 'maintenance', 'custom'] })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    enum: [
+      'inventory_management',
+      'purchase_order',
+      'supplier_management',
+      'alert_notification',
+      'reporting',
+      'data_sync',
+      'maintenance',
+      'custom',
+    ],
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Workflow templates retrieved successfully',
     schema: {
       type: 'object',
@@ -1338,32 +1468,44 @@ export class WorkflowController {
     },
   })
   @RequirePermissions('workflow:read')
-  async getWorkflowTemplates(
-    @Query('category') category?: string,
-  ) {
+  async getWorkflowTemplates(@Query('category') category?: string) {
     try {
-      const templates = await this.actionTemplateService.getWorkflowTemplates(category as any);
+      const templates = await this.actionTemplateService.getWorkflowTemplates(
+        category as any,
+      );
 
       return {
         success: true,
         data: templates,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get workflow templates: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get workflow templates: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get('/templates/search')
-  @ApiOperation({ 
-    summary: 'Search templates', 
-    description: 'Search both action and workflow templates' 
+  @ApiOperation({
+    summary: 'Search templates',
+    description: 'Search both action and workflow templates',
   })
-  @ApiQuery({ name: 'query', required: true, type: String, description: 'Search query' })
-  @ApiQuery({ name: 'type', required: false, enum: ['action', 'workflow', 'both'], description: 'Template type to search' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'query',
+    required: true,
+    type: String,
+    description: 'Search query',
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['action', 'workflow', 'both'],
+    description: 'Template type to search',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Templates search completed',
     schema: {
       type: 'object',
@@ -1391,15 +1533,20 @@ export class WorkflowController {
     @Query('type') type: 'action' | 'workflow' | 'both' = 'both',
   ) {
     try {
-      const searchResults = await this.actionTemplateService.searchTemplates(query, type);
+      const searchResults = await this.actionTemplateService.searchTemplates(
+        query,
+        type,
+      );
 
       return {
         success: true,
         data: searchResults,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to search templates: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to search templates: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -1409,14 +1556,19 @@ export class WorkflowController {
   // =============================================
 
   @Get(':id/analytics')
-  @ApiOperation({ 
-    summary: 'Get workflow analytics', 
-    description: 'Retrieve workflow performance analytics and metrics' 
+  @ApiOperation({
+    summary: 'Get workflow analytics',
+    description: 'Retrieve workflow performance analytics and metrics',
   })
   @ApiParam({ name: 'id', description: 'Workflow ID', type: 'string' })
-  @ApiQuery({ name: 'period', required: false, enum: ['7d', '30d', '90d'], description: 'Analytics period' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['7d', '30d', '90d'],
+    description: 'Analytics period',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Workflow analytics retrieved successfully',
     schema: {
       type: 'object',
@@ -1442,31 +1594,34 @@ export class WorkflowController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      
-      const analytics = await this.workflowExecutionService.getWorkflowAnalytics(
-        tenantId,
-        workflowId,
-        period,
-      );
+
+      const analytics =
+        await this.workflowExecutionService.getWorkflowAnalytics(
+          tenantId,
+          workflowId,
+          period,
+        );
 
       return {
         success: true,
         data: analytics,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get workflow analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get workflow analytics: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get('/dashboard/summary')
-  @ApiOperation({ 
-    summary: 'Get workflow dashboard summary', 
-    description: 'Retrieve overall workflow metrics and status summary' 
+  @ApiOperation({
+    summary: 'Get workflow dashboard summary',
+    description: 'Retrieve overall workflow metrics and status summary',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Dashboard summary retrieved successfully',
     schema: {
       type: 'object',
@@ -1487,21 +1642,23 @@ export class WorkflowController {
     },
   })
   @RequirePermissions('workflow:read')
-  async getDashboardSummary(
-    @Request() req: any,
-  ) {
+  async getDashboardSummary(@Request() req: any) {
     try {
       const tenantId = req.user.tenantId;
-      
-      const summary = await this.workflowExecutionService.getDashboardSummary(tenantId);
+
+      const summary = await this.workflowExecutionService.getDashboardSummary(
+        tenantId,
+      );
 
       return {
         success: true,
         data: summary,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get dashboard summary: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get dashboard summary: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -1529,11 +1686,13 @@ export class WorkflowController {
       lastExecutionAt: workflow.lastExecutionAt,
       createdAt: workflow.createdAt,
       updatedAt: workflow.updatedAt,
-      owner: workflow.owner ? {
-        id: workflow.owner.id,
-        name: `${workflow.owner.firstName} ${workflow.owner.lastName}`,
-        email: workflow.owner.email,
-      } : null,
+      owner: workflow.owner
+        ? {
+            id: workflow.owner.id,
+            name: `${workflow.owner.firstName} ${workflow.owner.lastName}`,
+            email: workflow.owner.email,
+          }
+        : null,
       steps: workflow.steps?.length || 0,
       triggerConfig: workflow.triggerConfig,
       workflowConfig: workflow.workflowConfig,

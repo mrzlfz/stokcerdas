@@ -15,7 +15,11 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { PermissionSetType, PermissionSetStatus, PermissionSetScope } from '../entities/permission-set.entity';
+import {
+  PermissionSetType,
+  PermissionSetStatus,
+  PermissionSetScope,
+} from '../entities/permission-set.entity';
 
 // Base permission set DTO
 export class BasePermissionSetDto {
@@ -44,7 +48,8 @@ export class BasePermissionSetDto {
 
   @ApiPropertyOptional({
     description: 'Deskripsi permission set',
-    example: 'Set permission untuk manager penjualan dengan akses lengkap ke modul sales',
+    example:
+      'Set permission untuk manager penjualan dengan akses lengkap ke modul sales',
   })
   @IsOptional()
   @IsString({ message: 'Deskripsi harus berupa teks' })
@@ -144,11 +149,17 @@ export class BasePermissionSetDto {
 export class CreatePermissionSetDto extends BasePermissionSetDto {
   @ApiPropertyOptional({
     description: 'Array ID permission yang akan disertakan',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d1-9f4e-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d1-9f4e-123456789abc',
+    ],
   })
   @IsOptional()
   @IsArray({ message: 'Permission IDs harus berupa array' })
-  @IsUUID('4', { each: true, message: 'Setiap permission ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Setiap permission ID harus berupa UUID yang valid',
+  })
   permissionIds?: string[];
 
   @ApiPropertyOptional({
@@ -185,13 +196,13 @@ export class CreatePermissionSetDto extends BasePermissionSetDto {
         validFrom: '2024-01-01',
         validUntil: '2024-12-31',
         allowedHours: {
-          monday: { start: '08:00', end: '17:00' }
-        }
+          monday: { start: '08:00', end: '17:00' },
+        },
       },
       ipRestriction: {
         allowedIps: ['192.168.1.0/24'],
-        blockedIps: ['10.0.0.100']
-      }
+        blockedIps: ['10.0.0.100'],
+      },
     },
   })
   @IsOptional()
@@ -200,7 +211,7 @@ export class CreatePermissionSetDto extends BasePermissionSetDto {
     timeRestriction?: {
       validFrom?: string;
       validUntil?: string;
-      allowedHours?: Record<string, { start: string; end: string; }>;
+      allowedHours?: Record<string, { start: string; end: string }>;
     };
     ipRestriction?: {
       allowedIps?: string[];
@@ -231,7 +242,9 @@ export class CreatePermissionSetDto extends BasePermissionSetDto {
 }
 
 // Update permission set DTO
-export class UpdatePermissionSetDto extends PartialType(CreatePermissionSetDto) {
+export class UpdatePermissionSetDto extends PartialType(
+  CreatePermissionSetDto,
+) {
   @ApiPropertyOptional({
     description: 'Status permission set',
     enum: PermissionSetStatus,
@@ -424,7 +437,10 @@ export class ApplyTemplateDto {
   })
   @IsOptional()
   @IsArray({ message: 'Add permissions harus berupa array' })
-  @IsUUID('4', { each: true, message: 'Setiap permission ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Setiap permission ID harus berupa UUID yang valid',
+  })
   addPermissions?: string[];
 
   @ApiPropertyOptional({
@@ -433,7 +449,10 @@ export class ApplyTemplateDto {
   })
   @IsOptional()
   @IsArray({ message: 'Remove permissions harus berupa array' })
-  @IsUUID('4', { each: true, message: 'Setiap permission ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Setiap permission ID harus berupa UUID yang valid',
+  })
   removePermissions?: string[];
 
   @ApiPropertyOptional({
@@ -467,10 +486,16 @@ export class ManagePermissionDto {
 export class BulkUpdatePermissionSetStatusDto {
   @ApiProperty({
     description: 'Array ID permission set',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d1-9f4e-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d1-9f4e-123456789abc',
+    ],
   })
   @IsArray({ message: 'Permission set IDs harus berupa array' })
-  @IsUUID('4', { each: true, message: 'Setiap ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Setiap ID harus berupa UUID yang valid',
+  })
   permissionSetIds: string[];
 
   @ApiProperty({
@@ -504,7 +529,7 @@ export class CheckPermissionDto {
     description: 'Context untuk pemeriksaan permission',
     example: {
       departmentId: '123e4567-e89b-12d3-a456-426614174000',
-      ipAddress: '192.168.1.100'
+      ipAddress: '192.168.1.100',
     },
   })
   @IsOptional()
@@ -523,14 +548,18 @@ export class ComparePermissionSetsDto {
     description: 'ID permission set pertama',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsUUID('4', { message: 'First permission set ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    message: 'First permission set ID harus berupa UUID yang valid',
+  })
   firstPermissionSetId: string;
 
   @ApiProperty({
     description: 'ID permission set kedua',
     example: '987fcdeb-51a2-43d1-9f4e-123456789abc',
   })
-  @IsUUID('4', { message: 'Second permission set ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    message: 'Second permission set ID harus berupa UUID yang valid',
+  })
   secondPermissionSetId: string;
 }
 
@@ -543,7 +572,7 @@ export class ImportPermissionSetDto {
       code: 'IMPORTED_PERMS',
       type: 'custom',
       scope: 'tenant',
-      permissions: ['products:read', 'inventory:update']
+      permissions: ['products:read', 'inventory:update'],
     },
   })
   @IsObject({ message: 'Import data harus berupa objek' })
@@ -575,10 +604,16 @@ export class PermissionSetResponseDto {
   @ApiProperty({ description: 'Jenis permission set', enum: PermissionSetType })
   type: PermissionSetType;
 
-  @ApiProperty({ description: 'Status permission set', enum: PermissionSetStatus })
+  @ApiProperty({
+    description: 'Status permission set',
+    enum: PermissionSetStatus,
+  })
   status: PermissionSetStatus;
 
-  @ApiProperty({ description: 'Scope permission set', enum: PermissionSetScope })
+  @ApiProperty({
+    description: 'Scope permission set',
+    enum: PermissionSetScope,
+  })
   scope: PermissionSetScope;
 
   @ApiPropertyOptional({ description: 'Kategori' })

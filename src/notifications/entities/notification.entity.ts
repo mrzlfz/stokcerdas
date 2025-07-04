@@ -37,10 +37,18 @@ export class Notification extends BaseEntity {
   @Column({ type: 'enum', enum: NotificationType })
   type: NotificationType;
 
-  @Column({ type: 'enum', enum: NotificationStatus, default: NotificationStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: NotificationStatus,
+    default: NotificationStatus.PENDING,
+  })
   status: NotificationStatus;
 
-  @Column({ type: 'enum', enum: NotificationPriority, default: NotificationPriority.NORMAL })
+  @Column({
+    type: 'enum',
+    enum: NotificationPriority,
+    default: NotificationPriority.NORMAL,
+  })
   priority: NotificationPriority;
 
   @Column({ type: 'uuid' })
@@ -91,11 +99,18 @@ export class Notification extends BaseEntity {
   }
 
   get isSent(): boolean {
-    return [NotificationStatus.SENT, NotificationStatus.DELIVERED, NotificationStatus.READ].includes(this.status);
+    return [
+      NotificationStatus.SENT,
+      NotificationStatus.DELIVERED,
+      NotificationStatus.READ,
+    ].includes(this.status);
   }
 
   get canRetry(): boolean {
-    return this.retryCount < this.maxRetries && this.status === NotificationStatus.FAILED;
+    return (
+      this.retryCount < this.maxRetries &&
+      this.status === NotificationStatus.FAILED
+    );
   }
 
   markAsSent(): void {

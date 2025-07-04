@@ -133,7 +133,14 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     description: 'Urutkan berdasarkan field',
-    enum: ['name', 'sku', 'sellingPrice', 'costPrice', 'createdAt', 'salesCount'],
+    enum: [
+      'name',
+      'sku',
+      'sellingPrice',
+      'costPrice',
+      'createdAt',
+      'salesCount',
+    ],
     default: 'createdAt',
   })
   @IsOptional()

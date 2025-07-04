@@ -28,9 +28,24 @@ import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
 import { UserRole } from '../../../users/entities/user.entity';
 
-import { WhatsAppAuthService, WhatsAppAuthConfig } from '../services/whatsapp-auth.service';
-import { WhatsAppMessageService, WhatsAppTextMessage, WhatsAppTemplateMessage, WhatsAppInteractiveMessage, WhatsAppMediaMessage, WhatsAppLocationMessage, WhatsAppContactMessage, BulkMessageRequest } from '../services/whatsapp-message.service';
-import { WhatsAppTemplateService, CreateTemplateRequest } from '../services/whatsapp-template.service';
+import {
+  WhatsAppAuthService,
+  WhatsAppAuthConfig,
+} from '../services/whatsapp-auth.service';
+import {
+  WhatsAppMessageService,
+  WhatsAppTextMessage,
+  WhatsAppTemplateMessage,
+  WhatsAppInteractiveMessage,
+  WhatsAppMediaMessage,
+  WhatsAppLocationMessage,
+  WhatsAppContactMessage,
+  BulkMessageRequest,
+} from '../services/whatsapp-message.service';
+import {
+  WhatsAppTemplateService,
+  CreateTemplateRequest,
+} from '../services/whatsapp-template.service';
 
 // DTOs for API validation
 export class WhatsAppAuthConfigDto {
@@ -103,7 +118,10 @@ export class WhatsAppContactMessageDto {
 
 export class BulkMessageRequestDto {
   recipients: string[];
-  message: WhatsAppTextMessageDto | WhatsAppTemplateMessageDto | WhatsAppInteractiveMessageDto;
+  message:
+    | WhatsAppTextMessageDto
+    | WhatsAppTemplateMessageDto
+    | WhatsAppInteractiveMessageDto;
   sendDelay?: number;
 }
 
@@ -140,7 +158,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Setup WhatsApp Business API credentials' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'WhatsApp credentials configured successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'WhatsApp credentials configured successfully',
+  })
   async setupCredentials(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -158,7 +179,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to setup WhatsApp credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to setup WhatsApp credentials: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -173,7 +197,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get WhatsApp authentication status' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authentication status retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication status retrieved successfully',
+  })
   async getAuthStatus(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -189,7 +216,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get auth status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get auth status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -204,7 +234,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Test WhatsApp authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Authentication tested successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Authentication tested successfully',
+  })
   async testAuthentication(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -220,7 +253,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -235,7 +271,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke WhatsApp authentication' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication revoked successfully',
+  })
   async revokeAuthentication(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -251,7 +290,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -275,7 +317,10 @@ export class WhatsAppController {
       },
     },
   })
-  @ApiResponse({ status: 200, description: 'Webhook configuration updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook configuration updated successfully',
+  })
   async updateWebhook(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -294,7 +339,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to update webhook: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update webhook: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -329,7 +377,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to send text message: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send text message: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -344,7 +395,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send template message' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Template message sent successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Template message sent successfully',
+  })
   async sendTemplateMessage(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -362,7 +416,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to send template message: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send template message: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -377,7 +434,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send interactive message (buttons, lists, etc.)' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Interactive message sent successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Interactive message sent successfully',
+  })
   async sendInteractiveMessage(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -395,7 +455,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to send interactive message: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send interactive message: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -408,7 +471,9 @@ export class WhatsAppController {
 
   @Post('messages/media/:channelId')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  @ApiOperation({ summary: 'Send media message (image, video, document, etc.)' })
+  @ApiOperation({
+    summary: 'Send media message (image, video, document, etc.)',
+  })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiResponse({ status: 201, description: 'Media message sent successfully' })
   async sendMediaMessage(
@@ -428,7 +493,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to send media message: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send media message: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -443,7 +511,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send location message' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Location message sent successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Location message sent successfully',
+  })
   async sendLocationMessage(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -461,7 +532,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to send location message: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send location message: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -476,7 +550,10 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Send contact message' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiResponse({ status: 201, description: 'Contact message sent successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Contact message sent successfully',
+  })
   async sendContactMessage(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -494,7 +571,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to send contact message: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send contact message: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -527,7 +607,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to send bulk messages: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send bulk messages: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -543,7 +626,10 @@ export class WhatsAppController {
   @ApiOperation({ summary: 'Mark message as read' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'messageId', description: 'Message ID' })
-  @ApiResponse({ status: 201, description: 'Message marked as read successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Message marked as read successfully',
+  })
   async markMessageAsRead(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -561,7 +647,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to mark message as read: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to mark message as read: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -578,9 +667,21 @@ export class WhatsAppController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get message templates' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
-  @ApiQuery({ name: 'category', required: false, description: 'Filter by category' })
-  @ApiQuery({ name: 'language', required: false, description: 'Filter by language' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by status',
+  })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Filter by category',
+  })
+  @ApiQuery({
+    name: 'language',
+    required: false,
+    description: 'Filter by language',
+  })
   @ApiQuery({ name: 'name', required: false, description: 'Filter by name' })
   @ApiResponse({ status: 200, description: 'Templates retrieved successfully' })
   async getTemplates(
@@ -600,7 +701,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get templates: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get templates: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -634,7 +738,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get template: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get template: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -667,7 +774,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to create template: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create template: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -704,7 +814,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to delete template: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete template: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -718,7 +831,10 @@ export class WhatsAppController {
   @Get('templates/library/list')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get template library with pre-defined templates' })
-  @ApiResponse({ status: 200, description: 'Template library retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Template library retrieved successfully',
+  })
   async getTemplateLibrary() {
     try {
       const library = this.templateService.getTemplateLibrary();
@@ -728,7 +844,10 @@ export class WhatsAppController {
         data: library,
       };
     } catch (error) {
-      this.logger.error(`Failed to get template library: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get template library: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -744,8 +863,15 @@ export class WhatsAppController {
   @ApiOperation({ summary: 'Create template from library' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiParam({ name: 'templateType', description: 'Template type from library' })
-  @ApiQuery({ name: 'language', required: false, description: 'Language code (default: id)' })
-  @ApiResponse({ status: 201, description: 'Template created from library successfully' })
+  @ApiQuery({
+    name: 'language',
+    required: false,
+    description: 'Language code (default: id)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Template created from library successfully',
+  })
   async createTemplateFromLibrary(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -765,7 +891,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to create template from library: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create template from library: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -783,7 +912,10 @@ export class WhatsAppController {
   @ApiParam({ name: 'templateName', description: 'Template name' })
   @ApiQuery({ name: 'startDate', description: 'Start date (ISO string)' })
   @ApiQuery({ name: 'endDate', description: 'End date (ISO string)' })
-  @ApiResponse({ status: 200, description: 'Template statistics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Template statistics retrieved successfully',
+  })
   async getTemplateStats(
     @CurrentUser() user: any,
     @Param('channelId') channelId: string,
@@ -805,7 +937,10 @@ export class WhatsAppController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get template stats: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get template stats: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

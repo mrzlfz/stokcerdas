@@ -24,9 +24,8 @@ import { PredictiveAnalyticsService } from './services/predictive-analytics.serv
 import { PriceOptimizationService } from './services/price-optimization.service';
 import { DemandAnomalyService } from './services/demand-anomaly.service';
 
-// Import ML Forecasting services for integration
-import { ForecastingService } from '../ml-forecasting/services/forecasting.service';
-import { ModelServingService } from '../ml-forecasting/services/model-serving.service';
+// Import ML Forecasting module for service integration
+import { MLForecastingModule } from '../ml-forecasting/ml-forecasting.module';
 
 // Import controllers
 import { AnalyticsController } from './controllers/analytics.controller';
@@ -43,7 +42,7 @@ import { AnalyticsProcessor } from './processors/analytics.processor';
       timeout: 30000,
       maxRedirects: 3,
     }),
-    
+
     // Database entities for analytics
     TypeOrmModule.forFeature([
       // Core inventory and product entities
@@ -52,12 +51,12 @@ import { AnalyticsProcessor } from './processors/analytics.processor';
       InventoryLocation,
       Product,
       ProductCategory,
-      
+
       // ML entities for advanced analytics
       Prediction,
       MLModel,
     ]),
-    
+
     // Bull queue for async analytics processing
     BullModule.registerQueue({
       name: 'analytics',
@@ -71,32 +70,30 @@ import { AnalyticsProcessor } from './processors/analytics.processor';
         },
       },
     }),
+
+    // Import ML Forecasting module for service integration
+    MLForecastingModule,
   ],
-  
-  controllers: [
-    AnalyticsController,
-    PredictiveAnalyticsController,
-  ],
-  
+
+  controllers: [AnalyticsController, PredictiveAnalyticsController],
+
   providers: [
     // Core analytics services
     BusinessIntelligenceService,
     CustomMetricsService,
     BenchmarkingService,
-    
+
     // Predictive analytics services
     PredictiveAnalyticsService,
     PriceOptimizationService,
     DemandAnomalyService,
-    
-    // ML Forecasting services (imported for integration)
-    ForecastingService,
-    ModelServingService,
-    
+
+    // Note: ML Forecasting services are now provided by MLForecastingModule
+
     // Queue processors
     AnalyticsProcessor,
   ],
-  
+
   exports: [
     // Export analytics services for use in other modules
     BusinessIntelligenceService,

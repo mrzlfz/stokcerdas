@@ -115,7 +115,11 @@ export class ApprovalAction extends AuditableEntity {
   })
   status: ActionStatus;
 
-  @Column({ name: 'action_date', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    name: 'action_date',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   actionDate: Date;
 
   @Column({ name: 'comments', type: 'text', nullable: true })
@@ -227,7 +231,11 @@ export class ApprovalAction extends AuditableEntity {
   @Column({ name: 'attachments', type: 'simple-array', nullable: true })
   attachments: string[];
 
-  @Column({ name: 'supporting_documents', type: 'simple-array', nullable: true })
+  @Column({
+    name: 'supporting_documents',
+    type: 'simple-array',
+    nullable: true,
+  })
   supportingDocuments: string[];
 
   @Column({ name: 'digital_signature', type: 'text', nullable: true })
@@ -240,7 +248,13 @@ export class ApprovalAction extends AuditableEntity {
   @Column({ name: 'approval_authority_level', type: 'integer', nullable: true })
   approvalAuthorityLevel: number;
 
-  @Column({ name: 'approval_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'approval_limit',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   approvalLimit: number;
 
   @Column({ name: 'exceeds_authority', type: 'boolean', default: false })
@@ -266,10 +280,22 @@ export class ApprovalAction extends AuditableEntity {
   acknowledgmentDate: Date;
 
   // Quality and feedback
-  @Column({ name: 'confidence_level', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  @Column({
+    name: 'confidence_level',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    nullable: true,
+  })
   confidenceLevel: number; // 0.0 to 1.0
 
-  @Column({ name: 'quality_score', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  @Column({
+    name: 'quality_score',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    nullable: true,
+  })
   qualityScore: number; // 0.0 to 1.0
 
   @Column({ name: 'reviewer_feedback', type: 'text', nullable: true })
@@ -342,7 +368,9 @@ export class ApprovalAction extends AuditableEntity {
   }
 
   isApprovalAction(): boolean {
-    return [ApprovalActionType.APPROVE, ApprovalActionType.REJECT].includes(this.actionType);
+    return [ApprovalActionType.APPROVE, ApprovalActionType.REJECT].includes(
+      this.actionType,
+    );
   }
 
   isDelegationAction(): boolean {
@@ -374,7 +402,9 @@ export class ApprovalAction extends AuditableEntity {
   }
 
   hasAttachments(): boolean {
-    return Boolean(this.attachments?.length || this.supportingDocuments?.length);
+    return Boolean(
+      this.attachments?.length || this.supportingDocuments?.length,
+    );
   }
 
   isDigitallySigned(): boolean {
@@ -519,13 +549,19 @@ export class ApprovalAction extends AuditableEntity {
   getActionSummary(): string {
     switch (this.actionType) {
       case ApprovalActionType.APPROVE:
-        return `Approved${this.decision === ApprovalDecision.CONDITIONAL ? ' with conditions' : ''}`;
+        return `Approved${
+          this.decision === ApprovalDecision.CONDITIONAL
+            ? ' with conditions'
+            : ''
+        }`;
       case ApprovalActionType.REJECT:
         return 'Rejected';
       case ApprovalActionType.DELEGATE:
         return `Delegated to ${this.delegatedTo?.fullName || 'another user'}`;
       case ApprovalActionType.ESCALATE:
-        return `Escalated to ${this.escalatedTo?.fullName || 'higher authority'}`;
+        return `Escalated to ${
+          this.escalatedTo?.fullName || 'higher authority'
+        }`;
       case ApprovalActionType.REQUEST_INFO:
         return 'Requested additional information';
       case ApprovalActionType.PROVIDE_INFO:

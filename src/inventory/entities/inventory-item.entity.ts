@@ -1,4 +1,11 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryLocation } from './inventory-location.entity';
@@ -90,7 +97,10 @@ export class InventoryItem extends BaseEntity {
   }
 
   get quantityAvailable(): number {
-    return Math.max(0, this.quantityOnHand - this.quantityReserved - this.quantityAllocated);
+    return Math.max(
+      0,
+      this.quantityOnHand - this.quantityReserved - this.quantityAllocated,
+    );
   }
 
   get totalQuantity(): number {
@@ -124,7 +134,8 @@ export class InventoryItem extends BaseEntity {
   get isExpiringSoon(): boolean {
     if (!this.expiryDate) return false;
     const daysUntilExpiry = Math.ceil(
-      (this.expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      (this.expiryDate.getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24),
     );
     return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
   }
@@ -140,7 +151,7 @@ export class InventoryItem extends BaseEntity {
     this.quantityOnHand += adjustment;
     this.lastMovementAt = new Date();
     this.updatedBy = userId;
-    
+
     // Recalculate total value
     this.totalValue = this.quantityOnHand * this.averageCost;
   }
@@ -173,11 +184,12 @@ export class InventoryItem extends BaseEntity {
     if (this.quantityOnHand === 0) {
       this.averageCost = newCost;
     } else {
-      const totalCost = (this.averageCost * this.quantityOnHand) + (newCost * quantity);
+      const totalCost =
+        this.averageCost * this.quantityOnHand + newCost * quantity;
       const totalQuantity = this.quantityOnHand + quantity;
       this.averageCost = totalCost / totalQuantity;
     }
-    
+
     this.totalValue = this.quantityOnHand * this.averageCost;
   }
 
@@ -186,10 +198,10 @@ export class InventoryItem extends BaseEntity {
     this.quantityOnHand = countedQuantity;
     this.lastCountAt = new Date();
     this.updatedBy = userId;
-    
+
     // Recalculate total value
     this.totalValue = this.quantityOnHand * this.averageCost;
-    
+
     return variance;
   }
 }

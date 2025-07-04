@@ -9,7 +9,11 @@ import {
   Index,
 } from 'typeorm';
 
-import { AlertConfiguration, AlertType, AlertSeverity } from './alert-configuration.entity';
+import {
+  AlertConfiguration,
+  AlertType,
+  AlertSeverity,
+} from './alert-configuration.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryLocation } from '../../inventory/entities/inventory-location.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
@@ -114,22 +118,22 @@ export class AlertInstance {
     threshold?: number;
     reorderPoint?: number;
     availableQuantity?: number;
-    
+
     // For expiry alerts
     expiryDate?: string;
     daysUntilExpiry?: number;
-    
+
     // For system alerts
     maintenanceWindow?: {
       start: string;
       end: string;
     };
     affectedServices?: string[];
-    
+
     // Reference data
     referenceType?: string; // 'order', 'transfer', 'adjustment', etc.
     referenceId?: string;
-    
+
     // Previous values for tracking changes
     previousValues?: {
       quantity?: number;
@@ -258,9 +262,11 @@ export class AlertInstance {
   }
 
   isSnoozed(): boolean {
-    return this.status === AlertStatus.SNOOZED && 
-           this.snoozeUntil && 
-           this.snoozeUntil > new Date();
+    return (
+      this.status === AlertStatus.SNOOZED &&
+      this.snoozeUntil &&
+      this.snoozeUntil > new Date()
+    );
   }
 
   isResolved(): boolean {
@@ -284,7 +290,11 @@ export class AlertInstance {
   }
 
   canBeResolved(): boolean {
-    return [AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED, AlertStatus.SNOOZED].includes(this.status);
+    return [
+      AlertStatus.ACTIVE,
+      AlertStatus.ACKNOWLEDGED,
+      AlertStatus.SNOOZED,
+    ].includes(this.status);
   }
 
   canBeDismissed(): boolean {
@@ -309,7 +319,7 @@ export class AlertInstance {
 
   getTimeToResolve(): string | null {
     if (!this.resolvedAt) return null;
-    
+
     const diffMs = this.resolvedAt.getTime() - this.createdAt.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
@@ -326,8 +336,9 @@ export class AlertInstance {
 
   shouldEscalate(configuredHours: number = 24): boolean {
     if (this.status !== AlertStatus.ACTIVE) return false;
-    
-    const hoursAge = (new Date().getTime() - this.createdAt.getTime()) / (1000 * 60 * 60);
+
+    const hoursAge =
+      (new Date().getTime() - this.createdAt.getTime()) / (1000 * 60 * 60);
     return hoursAge >= configuredHours;
   }
 

@@ -6,24 +6,24 @@ import { InventoryItem } from './inventory-item.entity';
 import { User } from '../../users/entities/user.entity';
 
 export enum TransactionType {
-  RECEIPT = 'receipt',                    // Incoming stock
-  ISSUE = 'issue',                        // Outgoing stock
-  TRANSFER_OUT = 'transfer_out',          // Transfer to another location
-  TRANSFER_IN = 'transfer_in',            // Transfer from another location
+  RECEIPT = 'receipt', // Incoming stock
+  ISSUE = 'issue', // Outgoing stock
+  TRANSFER_OUT = 'transfer_out', // Transfer to another location
+  TRANSFER_IN = 'transfer_in', // Transfer from another location
   ADJUSTMENT_POSITIVE = 'adjustment_positive', // Stock count increase
   ADJUSTMENT_NEGATIVE = 'adjustment_negative', // Stock count decrease
-  SALE = 'sale',                         // Sale transaction
-  RETURN = 'return',                     // Return from customer
-  PRODUCTION_INPUT = 'production_input',  // Used in production
+  SALE = 'sale', // Sale transaction
+  RETURN = 'return', // Return from customer
+  PRODUCTION_INPUT = 'production_input', // Used in production
   PRODUCTION_OUTPUT = 'production_output', // Created from production
-  DAMAGED = 'damaged',                   // Stock marked as damaged
-  EXPIRED = 'expired',                   // Stock marked as expired
-  LOST = 'lost',                         // Stock marked as lost
-  FOUND = 'found',                       // Stock found during audit
-  RESERVATION = 'reservation',           // Stock reserved
+  DAMAGED = 'damaged', // Stock marked as damaged
+  EXPIRED = 'expired', // Stock marked as expired
+  LOST = 'lost', // Stock marked as lost
+  FOUND = 'found', // Stock found during audit
+  RESERVATION = 'reservation', // Stock reserved
   RESERVATION_RELEASE = 'reservation_release', // Reservation released
-  ALLOCATION = 'allocation',             // Stock allocated
-  ALLOCATION_RELEASE = 'allocation_release',   // Allocation released
+  ALLOCATION = 'allocation', // Stock allocated
+  ALLOCATION_RELEASE = 'allocation_release', // Allocation released
 }
 
 export enum TransactionStatus {
@@ -204,7 +204,9 @@ export class InventoryTransaction extends BaseEntity {
   }
 
   get isTransfer(): boolean {
-    return [TransactionType.TRANSFER_IN, TransactionType.TRANSFER_OUT].includes(this.type);
+    return [TransactionType.TRANSFER_IN, TransactionType.TRANSFER_OUT].includes(
+      this.type,
+    );
   }
 
   get isAdjustment(): boolean {
@@ -256,8 +258,10 @@ export class InventoryTransaction extends BaseEntity {
 
   fail(reason?: string): void {
     this.status = TransactionStatus.FAILED;
-    this.notes = reason ? `${this.notes || ''}
-Failure reason: ${reason}`.trim() : this.notes;
+    this.notes = reason
+      ? `${this.notes || ''}
+Failure reason: ${reason}`.trim()
+      : this.notes;
   }
 
   addMetadata(key: string, value: any): void {
@@ -277,7 +281,7 @@ Failure reason: ${reason}`.trim() : this.notes;
     createdBy?: string,
     reason?: string,
     referenceType?: string,
-    referenceId?: string
+    referenceId?: string,
   ): [InventoryTransaction, InventoryTransaction] {
     const outTransaction = new InventoryTransaction();
     outTransaction.productId = productId;

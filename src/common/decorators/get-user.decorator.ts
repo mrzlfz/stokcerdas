@@ -3,14 +3,14 @@ import { User } from '../../users/entities/user.entity';
 
 /**
  * Decorator to extract the authenticated user from the request
- * 
+ *
  * @example
  * ```typescript
  * @Get('profile')
  * getProfile(@GetUser() user: User) {
  *   return user;
  * }
- * 
+ *
  * // Get specific user property
  * @Get('user-id')
  * getUserId(@GetUser('id') userId: string) {

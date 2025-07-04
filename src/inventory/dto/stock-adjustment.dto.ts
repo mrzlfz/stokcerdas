@@ -57,7 +57,8 @@ export class StockAdjustmentDto {
   adjustmentType: AdjustmentType;
 
   @ApiProperty({
-    description: 'Jumlah penyesuaian (untuk positive/negative) atau jumlah hasil hitung (untuk count)',
+    description:
+      'Jumlah penyesuaian (untuk positive/negative) atau jumlah hasil hitung (untuk count)',
     example: 10,
   })
   @IsNumber({}, { message: 'Quantity harus berupa angka' })
@@ -110,7 +111,7 @@ export class StockAdjustmentDto {
 
   @ApiPropertyOptional({
     description: 'Cost per unit untuk adjustment (jika ada)',
-    example: 15000.50,
+    example: 15000.5,
   })
   @IsOptional()
   @IsNumber({}, { message: 'Unit cost harus berupa angka' })

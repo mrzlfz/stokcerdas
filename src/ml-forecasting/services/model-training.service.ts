@@ -14,7 +14,11 @@ import * as stats from 'simple-statistics';
 import { Matrix } from 'ml-matrix';
 
 import { MLModel, ModelType, ModelStatus } from '../entities/ml-model.entity';
-import { TrainingJob, TrainingJobStatus, TrainingJobType } from '../entities/training-job.entity';
+import {
+  TrainingJob,
+  TrainingJobStatus,
+  TrainingJobType,
+} from '../entities/training-job.entity';
 import { DataPipelineService } from './data-pipeline.service';
 
 export interface TrainingRequest {
@@ -64,17 +68,20 @@ export class ModelTrainingService {
   constructor(
     @InjectRepository(MLModel)
     private mlModelRepo: Repository<MLModel>,
-    
+
     @InjectRepository(TrainingJob)
     private trainingJobRepo: Repository<TrainingJob>,
-    
+
     @InjectQueue('ml-training')
     private trainingQueue: Queue,
-    
+
     private dataPipelineService: DataPipelineService,
     private configService: ConfigService,
   ) {
-    this.modelStoragePath = this.configService.get('ML_MODEL_STORAGE_PATH', '/tmp/ml-models');
+    this.modelStoragePath = this.configService.get(
+      'ML_MODEL_STORAGE_PATH',
+      '/tmp/ml-models',
+    );
     this.ensureStorageDirectory();
   }
 
@@ -83,24 +90,24 @@ export class ModelTrainingService {
    */
   async startTraining(
     tenantId: string,
-    request: TrainingRequest
+    request: TrainingRequest,
   ): Promise<TrainingResult> {
     this.logger.log(`Starting training for model type: ${request.modelType}`);
 
     try {
       // Create or update ML model record
       let model: MLModel;
-      
+
       if (request.modelId) {
         // Retraining existing model
         model = await this.mlModelRepo.findOne({
-          where: { id: request.modelId, tenantId }
+          where: { id: request.modelId, tenantId },
         });
-        
+
         if (!model) {
           throw new Error(`Model ${request.modelId} not found`);
         }
-        
+
         model.status = ModelStatus.TRAINING;
         model.hyperparameters = request.trainingConfig.hyperparameters;
         model.trainingConfig = {
@@ -137,7 +144,9 @@ export class ModelTrainingService {
       const trainingJob = new TrainingJob();
       trainingJob.tenantId = tenantId;
       trainingJob.modelId = model.id;
-      trainingJob.jobType = request.modelId ? TrainingJobType.RETRAINING : TrainingJobType.INITIAL_TRAINING;
+      trainingJob.jobType = request.modelId
+        ? TrainingJobType.RETRAINING
+        : TrainingJobType.INITIAL_TRAINING;
       trainingJob.status = TrainingJobStatus.QUEUED;
       trainingJob.trainingConfig = {
         dataSource: request.trainingConfig.dataSource,
@@ -151,20 +160,24 @@ export class ModelTrainingService {
       const savedJob = await this.trainingJobRepo.save(trainingJob);
 
       // Queue the training job
-      const job = await this.trainingQueue.add('train-model', {
-        tenantId,
-        modelId: model.id,
-        jobId: savedJob.id,
-        trainingConfig: request.trainingConfig,
-      }, {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
+      const job = await this.trainingQueue.add(
+        'train-model',
+        {
+          tenantId,
+          modelId: model.id,
+          jobId: savedJob.id,
+          trainingConfig: request.trainingConfig,
         },
-        removeOnComplete: 10,
-        removeOnFail: 5,
-      });
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+          removeOnComplete: 10,
+          removeOnFail: 5,
+        },
+      );
 
       // Update job with queue job ID
       savedJob.jobId = job.id.toString();
@@ -175,9 +188,11 @@ export class ModelTrainingService {
         modelId: model.id,
         jobId: savedJob.id,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to start training: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to start training: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         modelId: '',
@@ -194,10 +209,10 @@ export class ModelTrainingService {
     tenantId: string,
     modelId: string,
     jobId: string,
-    trainingConfig: any
+    trainingConfig: any,
   ): Promise<void> {
     const job = await this.trainingJobRepo.findOne({
-      where: { id: jobId, tenantId }
+      where: { id: jobId, tenantId },
     });
 
     if (!job) {
@@ -205,7 +220,7 @@ export class ModelTrainingService {
     }
 
     const model = await this.mlModelRepo.findOne({
-      where: { id: modelId, tenantId }
+      where: { id: modelId, tenantId },
     });
 
     if (!model) {
@@ -220,15 +235,18 @@ export class ModelTrainingService {
       job.updateProgress(10, 'Extracting training data');
       await this.trainingJobRepo.save(job);
 
-      const timeSeries = await this.dataPipelineService.extractSalesData(tenantId, {
-        dateRange: trainingConfig.dataSource,
-        aggregation: 'daily',
-        productIds: trainingConfig.dataSource.productIds,
-        categoryIds: trainingConfig.dataSource.categoryIds,
-        locationIds: trainingConfig.dataSource.locationIds,
-        features: trainingConfig.features,
-        target: trainingConfig.target,
-      });
+      const timeSeries = await this.dataPipelineService.extractSalesData(
+        tenantId,
+        {
+          dateRange: trainingConfig.dataSource,
+          aggregation: 'daily',
+          productIds: trainingConfig.dataSource.productIds,
+          categoryIds: trainingConfig.dataSource.categoryIds,
+          locationIds: trainingConfig.dataSource.locationIds,
+          features: trainingConfig.features,
+          target: trainingConfig.target,
+        },
+      );
 
       if (timeSeries.length === 0) {
         throw new Error('No training data found for the specified criteria');
@@ -237,12 +255,13 @@ export class ModelTrainingService {
       job.updateProgress(30, 'Extracting features');
       await this.trainingJobRepo.save(job);
 
-      const productIds = trainingConfig.dataSource.productIds || 
-        [...new Set(timeSeries.map(ts => ts.productId))];
+      const productIds = trainingConfig.dataSource.productIds || [
+        ...new Set(timeSeries.map(ts => ts.productId)),
+      ];
 
       const features = await this.dataPipelineService.extractProductFeatures(
-        tenantId, 
-        productIds
+        tenantId,
+        productIds,
       );
 
       job.updateProgress(50, 'Preprocessing data');
@@ -256,17 +275,18 @@ export class ModelTrainingService {
           aggregation: 'daily',
           features: trainingConfig.features,
           target: trainingConfig.target,
-        }
+        },
       );
 
       // Step 2: Train/validation split
-      const { train, validation } = this.dataPipelineService.createTrainValidationSplit(
-        preprocessedData.features,
-        preprocessedData.target,
-        preprocessedData.dates,
-        trainingConfig.validation.splitRatio,
-        trainingConfig.validation.method
-      );
+      const { train, validation } =
+        this.dataPipelineService.createTrainValidationSplit(
+          preprocessedData.features,
+          preprocessedData.target,
+          preprocessedData.dates,
+          trainingConfig.validation.splitRatio,
+          trainingConfig.validation.method,
+        );
 
       job.updateProgress(60, 'Training model');
       await this.trainingJobRepo.save(job);
@@ -277,26 +297,28 @@ export class ModelTrainingService {
 
       switch (model.modelType) {
         case ModelType.LINEAR_REGRESSION:
-          ({ model: trainedModel, performance } = await this.trainLinearRegression(
-            train,
-            validation,
-            trainingConfig.hyperparameters
-          ));
+          ({ model: trainedModel, performance } =
+            await this.trainLinearRegression(
+              train,
+              validation,
+              trainingConfig.hyperparameters,
+            ));
           break;
 
         case ModelType.EXPONENTIAL_SMOOTHING:
-          ({ model: trainedModel, performance } = await this.trainExponentialSmoothing(
-            train,
-            validation,
-            trainingConfig.hyperparameters
-          ));
+          ({ model: trainedModel, performance } =
+            await this.trainExponentialSmoothing(
+              train,
+              validation,
+              trainingConfig.hyperparameters,
+            ));
           break;
 
         case ModelType.ARIMA:
           ({ model: trainedModel, performance } = await this.trainARIMA(
             train,
             validation,
-            trainingConfig.hyperparameters
+            trainingConfig.hyperparameters,
           ));
           break;
 
@@ -304,7 +326,7 @@ export class ModelTrainingService {
           ({ model: trainedModel, performance } = await this.trainProphet(
             train,
             validation,
-            trainingConfig.hyperparameters
+            trainingConfig.hyperparameters,
           ));
           break;
 
@@ -312,7 +334,7 @@ export class ModelTrainingService {
           ({ model: trainedModel, performance } = await this.trainXGBoost(
             train,
             validation,
-            trainingConfig.hyperparameters
+            trainingConfig.hyperparameters,
           ));
           break;
 
@@ -368,16 +390,21 @@ export class ModelTrainingService {
       await this.trainingJobRepo.save(job);
 
       this.logger.log(`Model training completed successfully: ${model.id}`);
-
     } catch (error) {
-      this.logger.error(`Training failed for model ${modelId}: ${error.message}`, error.stack);
-      
-      job.fail(error.message, { type: error.constructor.name, stack: error.stack });
+      this.logger.error(
+        `Training failed for model ${modelId}: ${error.message}`,
+        error.stack,
+      );
+
+      job.fail(error.message, {
+        type: error.constructor.name,
+        stack: error.stack,
+      });
       await this.trainingJobRepo.save(job);
-      
+
       model.status = ModelStatus.FAILED;
       await this.mlModelRepo.save(model);
-      
+
       throw error;
     }
   }
@@ -388,19 +415,22 @@ export class ModelTrainingService {
   private async trainLinearRegression(
     train: any,
     validation: any,
-    hyperparameters: any
+    hyperparameters: any,
   ): Promise<{ model: any; performance: any }> {
     this.logger.debug('Training Linear Regression model');
 
     // Use ml-regression library for linear regression
     const mlr = new regression.MLR(train.features, train.target);
-    
+
     // Make predictions on validation set
-    const predictions = validation.features.map((features: number[]) => 
-      mlr.predict(features)
+    const predictions = validation.features.map((features: number[]) =>
+      mlr.predict(features),
     );
 
-    const performance = this.calculatePerformanceMetrics(validation.target, predictions);
+    const performance = this.calculatePerformanceMetrics(
+      validation.target,
+      predictions,
+    );
 
     return {
       model: {
@@ -419,7 +449,7 @@ export class ModelTrainingService {
   private async trainExponentialSmoothing(
     train: any,
     validation: any,
-    hyperparameters: any
+    hyperparameters: any,
   ): Promise<{ model: any; performance: any }> {
     this.logger.debug('Training Exponential Smoothing model');
 
@@ -433,10 +463,13 @@ export class ModelTrainingService {
       validation.target.length,
       alpha,
       beta,
-      gamma
+      gamma,
     );
 
-    const performance = this.calculatePerformanceMetrics(validation.target, predictions);
+    const performance = this.calculatePerformanceMetrics(
+      validation.target,
+      predictions,
+    );
 
     return {
       model: {
@@ -456,7 +489,7 @@ export class ModelTrainingService {
   private async trainARIMA(
     train: any,
     validation: any,
-    hyperparameters: any
+    hyperparameters: any,
   ): Promise<{ model: any; performance: any }> {
     this.logger.debug('Training ARIMA model');
 
@@ -465,17 +498,29 @@ export class ModelTrainingService {
     const q = hyperparameters.q || 1;
 
     // Create Python script for ARIMA training
-    const pythonScript = this.createARIMAPythonScript(train.target, validation.target, p, d, q);
-    const scriptPath = path.join(this.modelStoragePath, `arima_${Date.now()}.py`);
-    
+    const pythonScript = this.createARIMAPythonScript(
+      train.target,
+      validation.target,
+      p,
+      d,
+      q,
+    );
+    const scriptPath = path.join(
+      this.modelStoragePath,
+      `arima_${Date.now()}.py`,
+    );
+
     fs.writeFileSync(scriptPath, pythonScript);
 
     try {
       const resultStr = await this.executePythonScript(scriptPath);
       const result = JSON.parse(resultStr);
       const predictions = result.predictions;
-      
-      const performance = this.calculatePerformanceMetrics(validation.target, predictions);
+
+      const performance = this.calculatePerformanceMetrics(
+        validation.target,
+        predictions,
+      );
 
       return {
         model: {
@@ -500,7 +545,7 @@ export class ModelTrainingService {
   private async trainProphet(
     train: any,
     validation: any,
-    hyperparameters: any
+    hyperparameters: any,
   ): Promise<{ model: any; performance: any }> {
     this.logger.debug('Training Prophet model');
 
@@ -510,24 +555,32 @@ export class ModelTrainingService {
       train.dates,
       validation.target,
       validation.dates,
-      hyperparameters
+      hyperparameters,
     );
-    
-    const scriptPath = path.join(this.modelStoragePath, `prophet_${Date.now()}.py`);
+
+    const scriptPath = path.join(
+      this.modelStoragePath,
+      `prophet_${Date.now()}.py`,
+    );
     fs.writeFileSync(scriptPath, pythonScript);
 
     try {
       const resultStr = await this.executePythonScript(scriptPath);
       const result = JSON.parse(resultStr);
       const predictions = result.predictions;
-      
-      const performance = this.calculatePerformanceMetrics(validation.target, predictions);
+
+      const performance = this.calculatePerformanceMetrics(
+        validation.target,
+        predictions,
+      );
 
       return {
         model: {
           type: 'prophet',
-          changepoint_prior_scale: hyperparameters.changepoint_prior_scale || 0.05,
-          seasonality_prior_scale: hyperparameters.seasonality_prior_scale || 10,
+          changepoint_prior_scale:
+            hyperparameters.changepoint_prior_scale || 0.05,
+          seasonality_prior_scale:
+            hyperparameters.seasonality_prior_scale || 10,
           holidays_prior_scale: hyperparameters.holidays_prior_scale || 10,
           seasonality: hyperparameters.seasonality || 'auto',
         },
@@ -547,7 +600,7 @@ export class ModelTrainingService {
   private async trainXGBoost(
     train: any,
     validation: any,
-    hyperparameters: any
+    hyperparameters: any,
   ): Promise<{ model: any; performance: any }> {
     this.logger.debug('Training XGBoost model');
 
@@ -557,18 +610,24 @@ export class ModelTrainingService {
       train.target,
       validation.features,
       validation.target,
-      hyperparameters
+      hyperparameters,
     );
-    
-    const scriptPath = path.join(this.modelStoragePath, `xgboost_${Date.now()}.py`);
+
+    const scriptPath = path.join(
+      this.modelStoragePath,
+      `xgboost_${Date.now()}.py`,
+    );
     fs.writeFileSync(scriptPath, pythonScript);
 
     try {
       const resultStr = await this.executePythonScript(scriptPath);
       const result = JSON.parse(resultStr);
       const predictions = result.predictions;
-      
-      const performance = this.calculatePerformanceMetrics(validation.target, predictions);
+
+      const performance = this.calculatePerformanceMetrics(
+        validation.target,
+        predictions,
+      );
 
       return {
         model: {
@@ -590,32 +649,46 @@ export class ModelTrainingService {
 
   // Helper methods
 
-  private calculatePerformanceMetrics(actual: number[], predicted: number[]): any {
+  private calculatePerformanceMetrics(
+    actual: number[],
+    predicted: number[],
+  ): any {
     const n = actual.length;
-    
+
     if (n === 0 || n !== predicted.length) {
       throw new Error('Invalid input for performance calculation');
     }
 
     // Mean Absolute Error
-    const mae = actual.reduce((sum, a, i) => sum + Math.abs(a - predicted[i]), 0) / n;
-    
+    const mae =
+      actual.reduce((sum, a, i) => sum + Math.abs(a - predicted[i]), 0) / n;
+
     // Root Mean Square Error
     const rmse = Math.sqrt(
-      actual.reduce((sum, a, i) => sum + Math.pow(a - predicted[i], 2), 0) / n
+      actual.reduce((sum, a, i) => sum + Math.pow(a - predicted[i], 2), 0) / n,
     );
-    
+
     // Mean Absolute Percentage Error
-    const mape = actual.reduce((sum, a, i) => {
-      if (a === 0) return sum;
-      return sum + Math.abs((a - predicted[i]) / a);
-    }, 0) / n * 100;
-    
+    const mape =
+      (actual.reduce((sum, a, i) => {
+        if (a === 0) return sum;
+        return sum + Math.abs((a - predicted[i]) / a);
+      }, 0) /
+        n) *
+      100;
+
     // R-squared
     const actualMean = stats.mean(actual);
-    const totalSumSquares = actual.reduce((sum, a) => sum + Math.pow(a - actualMean, 2), 0);
-    const residualSumSquares = actual.reduce((sum, a, i) => sum + Math.pow(a - predicted[i], 2), 0);
-    const r2Score = totalSumSquares === 0 ? 0 : 1 - (residualSumSquares / totalSumSquares);
+    const totalSumSquares = actual.reduce(
+      (sum, a) => sum + Math.pow(a - actualMean, 2),
+      0,
+    );
+    const residualSumSquares = actual.reduce(
+      (sum, a, i) => sum + Math.pow(a - predicted[i], 2),
+      0,
+    );
+    const r2Score =
+      totalSumSquares === 0 ? 0 : 1 - residualSumSquares / totalSumSquares;
 
     return { mae, rmse, mape, r2Score };
   }
@@ -625,11 +698,11 @@ export class ModelTrainingService {
     forecastPeriods: number,
     alpha: number,
     beta: number,
-    gamma: number
+    gamma: number,
   ): number[] {
     const seasonLength = 12; // Assuming monthly seasonality
     const n = data.length;
-    
+
     if (n < seasonLength * 2) {
       // Fallback to simple exponential smoothing if not enough data
       return this.simpleExponentialSmoothing(data, forecastPeriods, alpha);
@@ -637,39 +710,49 @@ export class ModelTrainingService {
 
     // Initialize level, trend, and seasonal components
     let level = stats.mean(data.slice(0, seasonLength));
-    let trend = (stats.mean(data.slice(seasonLength, seasonLength * 2)) - level) / seasonLength;
+    let trend =
+      (stats.mean(data.slice(seasonLength, seasonLength * 2)) - level) /
+      seasonLength;
     const seasonal = new Array(seasonLength);
-    
+
     for (let i = 0; i < seasonLength; i++) {
       seasonal[i] = data[i] / level;
     }
 
     const predictions = [];
-    
+
     // Apply Holt-Winters method
     for (let t = seasonLength; t < n; t++) {
       const prevLevel = level;
       const prevTrend = trend;
-      
-      level = alpha * (data[t] / seasonal[t % seasonLength]) + (1 - alpha) * (prevLevel + prevTrend);
+
+      level =
+        alpha * (data[t] / seasonal[t % seasonLength]) +
+        (1 - alpha) * (prevLevel + prevTrend);
       trend = beta * (level - prevLevel) + (1 - beta) * prevTrend;
-      seasonal[t % seasonLength] = gamma * (data[t] / level) + (1 - gamma) * seasonal[t % seasonLength];
+      seasonal[t % seasonLength] =
+        gamma * (data[t] / level) + (1 - gamma) * seasonal[t % seasonLength];
     }
 
     // Generate forecasts
     for (let i = 0; i < forecastPeriods; i++) {
-      const forecast = (level + (i + 1) * trend) * seasonal[(n + i) % seasonLength];
+      const forecast =
+        (level + (i + 1) * trend) * seasonal[(n + i) % seasonLength];
       predictions.push(Math.max(0, forecast)); // Ensure non-negative predictions
     }
 
     return predictions;
   }
 
-  private simpleExponentialSmoothing(data: number[], forecastPeriods: number, alpha: number): number[] {
+  private simpleExponentialSmoothing(
+    data: number[],
+    forecastPeriods: number,
+    alpha: number,
+  ): number[] {
     if (data.length === 0) return [];
-    
+
     let level = data[0];
-    
+
     for (let i = 1; i < data.length; i++) {
       level = alpha * data[i] + (1 - alpha) * level;
     }
@@ -689,7 +772,13 @@ export class ModelTrainingService {
     }
   }
 
-  private createARIMAPythonScript(trainData: number[], testData: number[], p: number, d: number, q: number): string {
+  private createARIMAPythonScript(
+    trainData: number[],
+    testData: number[],
+    p: number,
+    d: number,
+    q: number,
+  ): string {
     return `
 import json
 import numpy as np
@@ -729,7 +818,7 @@ except Exception as e:
     trainDates: string[],
     testData: number[],
     testDates: string[],
-    hyperparameters: any
+    hyperparameters: any,
   ): string {
     return `
 import json
@@ -750,8 +839,12 @@ test_dates = pd.to_datetime(${JSON.stringify(testDates)})
 try:
     # Initialize Prophet model
     model = Prophet(
-        changepoint_prior_scale=${hyperparameters.changepoint_prior_scale || 0.05},
-        seasonality_prior_scale=${hyperparameters.seasonality_prior_scale || 10},
+        changepoint_prior_scale=${
+          hyperparameters.changepoint_prior_scale || 0.05
+        },
+        seasonality_prior_scale=${
+          hyperparameters.seasonality_prior_scale || 10
+        },
         holidays_prior_scale=${hyperparameters.holidays_prior_scale || 10}
     )
     
@@ -785,7 +878,7 @@ except Exception as e:
     trainTarget: number[],
     testFeatures: number[][],
     testTarget: number[],
-    hyperparameters: any
+    hyperparameters: any,
   ): string {
     return `
 import json
@@ -842,15 +935,15 @@ except Exception as e:
       let output = '';
       let error = '';
 
-      python.stdout.on('data', (data) => {
+      python.stdout.on('data', data => {
         output += data.toString();
       });
 
-      python.stderr.on('data', (data) => {
+      python.stderr.on('data', data => {
         error += data.toString();
       });
 
-      python.on('close', (code) => {
+      python.on('close', code => {
         if (code === 0) {
           resolve(output.trim());
         } else {

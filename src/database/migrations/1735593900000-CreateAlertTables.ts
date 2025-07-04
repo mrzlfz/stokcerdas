@@ -176,7 +176,14 @@ export class CreateAlertTables1735593900000 implements MigrationInterface {
           {
             name: 'status',
             type: 'enum',
-            enum: ['active', 'acknowledged', 'resolved', 'snoozed', 'dismissed', 'escalated'],
+            enum: [
+              'active',
+              'acknowledged',
+              'resolved',
+              'snoozed',
+              'dismissed',
+              'escalated',
+            ],
             default: "'active'",
             isNullable: false,
           },
@@ -461,31 +468,73 @@ export class CreateAlertTables1735593900000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign keys first
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_escalated_to"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_escalated_by"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_snoozed_by"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_dismissed_by"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_resolved_by"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_acknowledged_by"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_configuration_id"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_inventory_item_id"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_location_id"`);
-    await queryRunner.query(`ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_product_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_escalated_to"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_escalated_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_snoozed_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_dismissed_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_resolved_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_acknowledged_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_configuration_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_inventory_item_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_location_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_instances" DROP CONSTRAINT IF EXISTS "FK_alert_instances_product_id"`,
+    );
 
-    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_updated_by"`);
-    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_created_by"`);
-    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_location_id"`);
-    await queryRunner.query(`ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_product_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_updated_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_created_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_location_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "alert_configurations" DROP CONSTRAINT IF EXISTS "FK_alert_configurations_product_id"`,
+    );
 
     // Drop indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_resolved_at"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_created_at"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_tenant_severity_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_tenant_type_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_instances_tenant_status"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_alert_instances_resolved_at"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_alert_instances_created_at"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_alert_instances_tenant_severity_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_alert_instances_tenant_type_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_alert_instances_tenant_status"`,
+    );
 
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_configurations_tenant_product_location"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_alert_configurations_tenant_type"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_alert_configurations_tenant_product_location"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_alert_configurations_tenant_type"`,
+    );
 
     // Drop tables
     await queryRunner.dropTable('alert_instances');

@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -8,7 +13,10 @@ import { Queue } from 'bull';
 // Entities
 import { Channel, ChannelStatus } from '../entities/channel.entity';
 import { ChannelInventory } from '../entities/channel-inventory.entity';
-import { ChannelMapping, MappingType } from '../entities/channel-mapping.entity';
+import {
+  ChannelMapping,
+  MappingType,
+} from '../entities/channel-mapping.entity';
 
 // Services
 import { ChannelsService } from './channels.service';
@@ -28,7 +36,10 @@ import { TokopediaInventoryService } from '../../integrations/tokopedia/services
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../integrations/entities/integration-log.entity';
 
 export interface SyncRequest {
   channelIds?: string[];
@@ -186,11 +197,16 @@ export class ChannelSyncService {
   async startSync(tenantId: string, request: SyncRequest): Promise<string> {
     try {
       const syncId = this.generateSyncId();
-      
-      this.logger.debug(`Starting sync ${syncId} for tenant ${tenantId}`, { request });
+
+      this.logger.debug(`Starting sync ${syncId} for tenant ${tenantId}`, {
+        request,
+      });
 
       // Get channels to sync
-      const channels = await this.getChannelsForSync(tenantId, request.channelIds);
+      const channels = await this.getChannelsForSync(
+        tenantId,
+        request.channelIds,
+      );
       if (channels.length === 0) {
         throw new BadRequestException('No active channels found for sync');
       }
@@ -247,7 +263,6 @@ export class ChannelSyncService {
       });
 
       return syncId;
-
     } catch (error) {
       this.logger.error(`Failed to start sync: ${error.message}`, error.stack);
       await this.logService.logError(tenantId, null, error, {
@@ -275,7 +290,9 @@ export class ChannelSyncService {
       }
 
       if (syncStatus.status === 'completed' || syncStatus.status === 'failed') {
-        throw new BadRequestException(`Sync ${syncId} cannot be cancelled (status: ${syncStatus.status})`);
+        throw new BadRequestException(
+          `Sync ${syncId} cannot be cancelled (status: ${syncStatus.status})`,
+        );
       }
 
       // Update status
@@ -284,9 +301,13 @@ export class ChannelSyncService {
       this.activeSyncs.set(syncId, syncStatus);
 
       // Cancel queue jobs
-      const jobs = await this.syncQueue.getJobs(['waiting', 'active', 'delayed']);
+      const jobs = await this.syncQueue.getJobs([
+        'waiting',
+        'active',
+        'delayed',
+      ]);
       const syncJobs = jobs.filter(job => job.data.syncId === syncId);
-      
+
       for (const job of syncJobs) {
         await job.remove();
       }
@@ -305,7 +326,6 @@ export class ChannelSyncService {
         tenantId,
         syncId,
       });
-
     } catch (error) {
       this.logger.error(`Failed to cancel sync: ${error.message}`, error.stack);
       throw error;
@@ -321,12 +341,15 @@ export class ChannelSyncService {
   ): Promise<string> {
     try {
       const syncId = this.generateSyncId();
-      
+
       this.logger.debug(`Starting cross-channel sync ${syncId}`, { request });
 
       // Get source and target channels
       const sourceChannel = request.sourceChannelId
-        ? await this.channelsService.getChannelById(tenantId, request.sourceChannelId)
+        ? await this.channelsService.getChannelById(
+            tenantId,
+            request.sourceChannelId,
+          )
         : null;
 
       const targetChannels = request.targetChannelIds
@@ -334,24 +357,30 @@ export class ChannelSyncService {
         : await this.channelsService.getActiveChannels(tenantId);
 
       if (targetChannels.length === 0) {
-        throw new BadRequestException('No target channels found for cross-channel sync');
+        throw new BadRequestException(
+          'No target channels found for cross-channel sync',
+        );
       }
 
       // Create cross-channel sync job
-      await this.syncQueue.add('cross-channel-sync', {
-        syncId,
-        tenantId,
-        sourceChannel,
-        targetChannels,
-        request,
-      }, {
-        priority: request.syncRules?.priorityOrder ? 10 : 5,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
+      await this.syncQueue.add(
+        'cross-channel-sync',
+        {
+          syncId,
+          tenantId,
+          sourceChannel,
+          targetChannels,
+          request,
         },
-      });
+        {
+          priority: request.syncRules?.priorityOrder ? 10 : 5,
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        },
+      );
 
       // Log start
       await this.logService.log({
@@ -368,9 +397,11 @@ export class ChannelSyncService {
       });
 
       return syncId;
-
     } catch (error) {
-      this.logger.error(`Failed to start cross-channel sync: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to start cross-channel sync: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -386,10 +417,16 @@ export class ChannelSyncService {
     options: any = {},
   ): Promise<SyncResult> {
     try {
-      const channel = await this.channelsService.getChannelById(tenantId, channelId);
+      const channel = await this.channelsService.getChannelById(
+        tenantId,
+        channelId,
+      );
       const syncId = this.generateSyncId();
 
-      this.logger.debug(`Syncing channel ${channelId} (${syncType})`, { direction, options });
+      this.logger.debug(`Syncing channel ${channelId} (${syncType})`, {
+        direction,
+        options,
+      });
 
       const result: SyncResult = {
         success: true,
@@ -416,14 +453,26 @@ export class ChannelSyncService {
 
       // Perform sync based on platform and type
       const platformId = channel.platformId.toLowerCase();
-      
+
       switch (syncType) {
         case SyncType.PRODUCTS:
-          await this.syncProducts(tenantId, channel, direction, result, options);
+          await this.syncProducts(
+            tenantId,
+            channel,
+            direction,
+            result,
+            options,
+          );
           break;
 
         case SyncType.INVENTORY:
-          await this.syncInventory(tenantId, channel, direction, result, options);
+          await this.syncInventory(
+            tenantId,
+            channel,
+            direction,
+            result,
+            options,
+          );
           break;
 
         case SyncType.ORDERS:
@@ -431,17 +480,37 @@ export class ChannelSyncService {
           break;
 
         case SyncType.CATEGORIES:
-          await this.syncCategories(tenantId, channel, direction, result, options);
+          await this.syncCategories(
+            tenantId,
+            channel,
+            direction,
+            result,
+            options,
+          );
           break;
 
         case SyncType.ALL:
-          await this.syncProducts(tenantId, channel, direction, result, options);
-          await this.syncInventory(tenantId, channel, direction, result, options);
+          await this.syncProducts(
+            tenantId,
+            channel,
+            direction,
+            result,
+            options,
+          );
+          await this.syncInventory(
+            tenantId,
+            channel,
+            direction,
+            result,
+            options,
+          );
           await this.syncOrders(tenantId, channel, direction, result, options);
           break;
 
         default:
-          throw new BadRequestException(`Sync type ${syncType} is not supported`);
+          throw new BadRequestException(
+            `Sync type ${syncType} is not supported`,
+          );
       }
 
       // Finalize result
@@ -457,7 +526,9 @@ export class ChannelSyncService {
         tenantId,
         channelId,
         type: IntegrationLogType.SYNC,
-        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
+        level: result.success
+          ? IntegrationLogLevel.INFO
+          : IntegrationLogLevel.WARN,
         message: `Channel sync completed: ${result.itemsSucceeded}/${result.itemsProcessed} successful`,
         metadata: {
           syncId,
@@ -480,9 +551,11 @@ export class ChannelSyncService {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Failed to sync channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync channel: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, channelId, error, {
         metadata: { action: 'sync_channel', syncType, direction },
       });
@@ -511,22 +584,25 @@ export class ChannelSyncService {
       };
 
       const { logs } = await this.logService.queryLogs(query);
-      
+
       return logs.map(log => ({
         syncId: log.metadata?.syncId || 'unknown',
         channelId: log.channelId,
         syncType: log.metadata?.syncType,
         direction: log.metadata?.direction,
-        status: log.level === IntegrationLogLevel.ERROR ? 'failed' : 'completed',
+        status:
+          log.level === IntegrationLogLevel.ERROR ? 'failed' : 'completed',
         startTime: log.createdAt,
         duration: log.metadata?.result?.duration,
         itemsProcessed: log.metadata?.result?.itemsProcessed || 0,
         summary: log.metadata?.result?.summary || {},
         message: log.message,
       }));
-
     } catch (error) {
-      this.logger.error(`Failed to get sync history: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get sync history: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -537,7 +613,10 @@ export class ChannelSyncService {
     return `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private async getChannelsForSync(tenantId: string, channelIds?: string[]): Promise<Channel[]> {
+  private async getChannelsForSync(
+    tenantId: string,
+    channelIds?: string[],
+  ): Promise<Channel[]> {
     if (channelIds && channelIds.length > 0) {
       return this.channelRepository.find({
         where: {
@@ -561,7 +640,10 @@ export class ChannelSyncService {
     });
   }
 
-  private async getChannelsByIds(tenantId: string, channelIds: string[]): Promise<Channel[]> {
+  private async getChannelsByIds(
+    tenantId: string,
+    channelIds: string[],
+  ): Promise<Channel[]> {
     return this.channelRepository.find({
       where: {
         tenantId,
@@ -583,22 +665,31 @@ export class ChannelSyncService {
 
     for (const channel of channels) {
       for (const syncType of request.syncTypes) {
-        await this.syncQueue.add('channel-sync', {
-          syncId,
-          tenantId,
-          channelId: channel.id,
-          syncType,
-          direction: request.direction,
-          options: request.options,
-        }, {
-          delay,
-          priority: request.priority === 'high' ? 10 : request.priority === 'low' ? 1 : 5,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
+        await this.syncQueue.add(
+          'channel-sync',
+          {
+            syncId,
+            tenantId,
+            channelId: channel.id,
+            syncType,
+            direction: request.direction,
+            options: request.options,
           },
-        });
+          {
+            delay,
+            priority:
+              request.priority === 'high'
+                ? 10
+                : request.priority === 'low'
+                ? 1
+                : 5,
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+          },
+        );
       }
     }
   }
@@ -611,21 +702,30 @@ export class ChannelSyncService {
   ): Promise<void> {
     for (const channel of channels) {
       for (const syncType of request.syncTypes) {
-        await this.syncQueue.add('channel-sync', {
-          syncId,
-          tenantId,
-          channelId: channel.id,
-          syncType,
-          direction: request.direction,
-          options: request.options,
-        }, {
-          priority: request.priority === 'high' ? 10 : request.priority === 'low' ? 1 : 5,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
+        await this.syncQueue.add(
+          'channel-sync',
+          {
+            syncId,
+            tenantId,
+            channelId: channel.id,
+            syncType,
+            direction: request.direction,
+            options: request.options,
           },
-        });
+          {
+            priority:
+              request.priority === 'high'
+                ? 10
+                : request.priority === 'low'
+                ? 1
+                : 5,
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+          },
+        );
       }
     }
   }
@@ -668,11 +768,12 @@ export class ChannelSyncService {
 
         case 'tokopedia':
           if (direction === 'inbound' || direction === 'bidirectional') {
-            syncResult = await this.tokopediaProductService.syncProductsFromTokopedia(
-              tenantId,
-              channel.id,
-              options,
-            );
+            syncResult =
+              await this.tokopediaProductService.syncProductsFromTokopedia(
+                tenantId,
+                channel.id,
+                options,
+              );
           }
           break;
 
@@ -683,7 +784,6 @@ export class ChannelSyncService {
       if (syncResult) {
         this.updateSyncResult(result, syncResult);
       }
-
     } catch (error) {
       result.errors?.push(`Product sync failed: ${error.message}`);
       result.summary.errors++;
@@ -698,11 +798,14 @@ export class ChannelSyncService {
     options: any,
   ): Promise<void> {
     try {
-      const syncResult = await this.inventoryService.syncChannelInventory(tenantId, {
-        channelId: channel.id,
-        syncType: 'both',
-        direction: direction as any,
-      });
+      const syncResult = await this.inventoryService.syncChannelInventory(
+        tenantId,
+        {
+          channelId: channel.id,
+          syncType: 'both',
+          direction: direction as any,
+        },
+      );
 
       if (syncResult) {
         result.itemsProcessed += syncResult.processedItems;
@@ -711,7 +814,6 @@ export class ChannelSyncService {
         result.summary.updated += syncResult.successCount;
         result.summary.errors += syncResult.errorCount;
       }
-
     } catch (error) {
       result.errors?.push(`Inventory sync failed: ${error.message}`);
       result.summary.errors++;
@@ -753,11 +855,12 @@ export class ChannelSyncService {
 
         case 'tokopedia':
           if (direction === 'inbound' || direction === 'bidirectional') {
-            syncResult = await this.tokopediaOrderService.syncOrdersFromTokopedia(
-              tenantId,
-              channel.id,
-              options,
-            );
+            syncResult =
+              await this.tokopediaOrderService.syncOrdersFromTokopedia(
+                tenantId,
+                channel.id,
+                options,
+              );
           }
           break;
 
@@ -768,7 +871,6 @@ export class ChannelSyncService {
       if (syncResult) {
         this.updateSyncResult(result, syncResult);
       }
-
     } catch (error) {
       result.errors?.push(`Order sync failed: ${error.message}`);
       result.summary.errors++;
@@ -784,16 +886,18 @@ export class ChannelSyncService {
   ): Promise<void> {
     try {
       // Get category mappings
-      const { mappings } = await this.mappingService.getChannelMappings(tenantId, {
-        channelId: channel.id,
-        mappingType: MappingType.CATEGORY,
-        isActive: true,
-      });
+      const { mappings } = await this.mappingService.getChannelMappings(
+        tenantId,
+        {
+          channelId: channel.id,
+          mappingType: MappingType.CATEGORY,
+          isActive: true,
+        },
+      );
 
       result.itemsProcessed += mappings.length;
       result.itemsSucceeded += mappings.length;
       result.summary.updated += mappings.length;
-
     } catch (error) {
       result.errors?.push(`Category sync failed: ${error.message}`);
       result.summary.errors++;

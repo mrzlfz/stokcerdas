@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BaseApiService, ApiConfig, ApiRequest, ApiResponse } from '../../../../integrations/common/services/base-api.service';
+import {
+  BaseApiService,
+  ApiConfig,
+  ApiRequest,
+  ApiResponse,
+} from '../../../../integrations/common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 import * as crypto from 'crypto';
 
@@ -164,7 +169,6 @@ export interface GrabQuoteResponse {
 
 @Injectable()
 export class GrabApiService extends BaseApiService {
-  
   constructor(
     protected readonly httpService: HttpService,
     protected readonly configService: ConfigService,
@@ -176,7 +180,7 @@ export class GrabApiService extends BaseApiService {
    * Get Grab API configuration
    */
   private getApiConfig(credentials: GrabCredentials): ApiConfig {
-    const baseUrl = credentials.isSandbox 
+    const baseUrl = credentials.isSandbox
       ? 'https://partner-api.stg-myteksi.com'
       : 'https://partner-api.grab.com';
 
@@ -208,16 +212,16 @@ export class GrabApiService extends BaseApiService {
     channelId: string,
   ): Promise<ApiResponse<T>> {
     const config = this.getApiConfig(credentials);
-    
+
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const nonce = crypto.randomBytes(16).toString('hex');
-    
+
     const grabRequest: ApiRequest = {
       ...request,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Date': new Date().toUTCString(),
+        Accept: 'application/json',
+        Date: new Date().toUTCString(),
         'X-Grab-Merchant-ID': credentials.merchantId,
       },
     };
@@ -232,10 +236,10 @@ export class GrabApiService extends BaseApiService {
         timestamp,
         nonce,
       );
-      
+
       grabRequest.headers = {
         ...grabRequest.headers,
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'X-Grab-Signature': authSignature,
         'X-Grab-Timestamp': timestamp,
         'X-Grab-Nonce': nonce,
@@ -264,12 +268,10 @@ export class GrabApiService extends BaseApiService {
     };
 
     const config = this.getApiConfig(credentials);
-    const response = await this.makeRequest<{ access_token: string; expires_in: number }>(
-      config, 
-      tokenRequest, 
-      'system', 
-      'oauth'
-    );
+    const response = await this.makeRequest<{
+      access_token: string;
+      expires_in: number;
+    }>(config, tokenRequest, 'system', 'oauth');
 
     if (response.success && response.data?.access_token) {
       return response.data.access_token;
@@ -291,14 +293,14 @@ export class GrabApiService extends BaseApiService {
     const method = request.method.toUpperCase();
     const url = request.endpoint;
     const body = request.data ? JSON.stringify(request.data) : '';
-    
+
     const stringToSign = `${method}
 ${url}
 ${body}
 ${accessToken}
 ${timestamp}
 ${nonce}`;
-    
+
     return crypto
       .createHmac('sha256', credentials.clientSecret)
       .update(stringToSign)
@@ -327,14 +329,16 @@ ${nonce}`;
             longitude: 106.8229,
           },
           serviceType: 'instant',
-          packages: [{
-            weight: 1000,
-            dimensions: {
-              length: 10,
-              width: 10,
-              height: 10,
+          packages: [
+            {
+              weight: 1000,
+              dimensions: {
+                length: 10,
+                width: 10,
+                height: 10,
+              },
             },
-          }],
+          ],
         },
         requiresAuth: true,
       };
@@ -383,12 +387,7 @@ ${nonce}`;
       requiresAuth: true,
     };
 
-    return this.makeGrabRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGrabRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -404,7 +403,9 @@ ${nonce}`;
       method: 'POST',
       endpoint: '/grabexpress/v1/deliveries',
       data: {
-        merchantOrderID: `ORDER_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        merchantOrderID: `ORDER_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(7)}`,
         serviceType: deliveryData.serviceType,
         origin: {
           address: deliveryData.origin.address,
@@ -412,7 +413,9 @@ ${nonce}`;
           coordinates: deliveryData.origin.coordinates,
           contactPerson: {
             name: deliveryData.origin.contactPerson.name,
-            phoneNumber: this.formatPhoneNumber(deliveryData.origin.contactPerson.phoneNumber),
+            phoneNumber: this.formatPhoneNumber(
+              deliveryData.origin.contactPerson.phoneNumber,
+            ),
           },
           note: deliveryData.origin.note,
         },
@@ -422,7 +425,9 @@ ${nonce}`;
           coordinates: deliveryData.destination.coordinates,
           contactPerson: {
             name: deliveryData.destination.contactPerson.name,
-            phoneNumber: this.formatPhoneNumber(deliveryData.destination.contactPerson.phoneNumber),
+            phoneNumber: this.formatPhoneNumber(
+              deliveryData.destination.contactPerson.phoneNumber,
+            ),
           },
           note: deliveryData.destination.note,
         },
@@ -439,23 +444,20 @@ ${nonce}`;
           },
         })),
         paymentMethod: deliveryData.paymentMethod,
-        cashOnDelivery: deliveryData.cashOnDelivery ? {
-          amount: deliveryData.cashOnDelivery.amount,
-          currency: 'IDR',
-          currencyExponent: 2,
-        } : undefined,
+        cashOnDelivery: deliveryData.cashOnDelivery
+          ? {
+              amount: deliveryData.cashOnDelivery.amount,
+              currency: 'IDR',
+              currencyExponent: 2,
+            }
+          : undefined,
         scheduledAt: deliveryData.scheduledAt,
         specialRequests: deliveryData.specialRequests,
       },
       requiresAuth: true,
     };
 
-    return this.makeGrabRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGrabRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -473,12 +475,7 @@ ${nonce}`;
       requiresAuth: true,
     };
 
-    return this.makeGrabRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGrabRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -490,16 +487,18 @@ ${nonce}`;
     reason: string,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    deliveryID: string;
-    status: string;
-    cancellationReason: string;
-    cancellationFee?: {
-      amount: number;
-      currency: string;
-      currencyExponent: number;
-    };
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      deliveryID: string;
+      status: string;
+      cancellationReason: string;
+      cancellationFee?: {
+        amount: number;
+        currency: string;
+        currencyExponent: number;
+      };
+    }>
+  > {
     const apiRequest: GrabApiRequest = {
       method: 'PUT',
       endpoint: `/grabexpress/v1/deliveries/${deliveryId}/cancel`,
@@ -509,12 +508,7 @@ ${nonce}`;
       requiresAuth: true,
     };
 
-    return this.makeGrabRequest(
-      credentials,
-      apiRequest,
-      tenantId,
-      channelId,
-    );
+    return this.makeGrabRequest(credentials, apiRequest, tenantId, channelId);
   }
 
   /**
@@ -524,24 +518,28 @@ ${nonce}`;
     credentials: GrabCredentials,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<Array<{
-    serviceType: string;
-    serviceName: string;
-    description: string;
-    isInstant: boolean;
-    maxWeight: number;
-    maxDimensions: {
-      length: number;
-      width: number;
-      height: number;
-    };
-    features: {
-      cod: boolean;
-      insurance: boolean;
-      tracking: boolean;
-      scheduledDelivery: boolean;
-    };
-  }>>> {
+  ): Promise<
+    ApiResponse<
+      Array<{
+        serviceType: string;
+        serviceName: string;
+        description: string;
+        isInstant: boolean;
+        maxWeight: number;
+        maxDimensions: {
+          length: number;
+          width: number;
+          height: number;
+        };
+        features: {
+          cod: boolean;
+          insurance: boolean;
+          tracking: boolean;
+          scheduledDelivery: boolean;
+        };
+      }>
+    >
+  > {
     // Grab doesn't have a specific endpoint for service types
     // Return static configuration based on known Grab services
     return {
@@ -613,30 +611,77 @@ ${nonce}`;
   /**
    * Handle API errors specific to Grab
    */
-  handleGrabError(error: any): { code: string; message: string; retryable: boolean } {
+  handleGrabError(error: any): {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } {
     const errorCode = error.code || error.errorCode || error.status;
-    const errorMessage = error.message || error.errorMessage || 'Unknown Grab API error';
+    const errorMessage =
+      error.message || error.errorMessage || 'Unknown Grab API error';
 
     // Map common Grab error codes
     const errorMap: Record<string, { message: string; retryable: boolean }> = {
-      'UNAUTHORIZED': { message: 'Invalid or expired access token', retryable: true },
-      'FORBIDDEN': { message: 'Access forbidden - check permissions', retryable: false },
-      'INVALID_LOCATION': { message: 'Invalid pickup or delivery location', retryable: false },
-      'SERVICE_UNAVAILABLE': { message: 'Delivery service not available in this area', retryable: false },
-      'NO_DRIVER_AVAILABLE': { message: 'No driver available at this time', retryable: true },
-      'ORDER_NOT_FOUND': { message: 'Delivery order not found', retryable: false },
-      'ORDER_ALREADY_CANCELLED': { message: 'Order already cancelled', retryable: false },
-      'INVALID_PACKAGE_SIZE': { message: 'Package size exceeds service limits', retryable: false },
-      'RATE_LIMIT_EXCEEDED': { message: 'API rate limit exceeded', retryable: true },
-      'MERCHANT_SUSPENDED': { message: 'Merchant account suspended', retryable: false },
-      'PAYMENT_FAILED': { message: 'Payment processing failed', retryable: false },
-      'INVALID_COD_AMOUNT': { message: 'Invalid cash on delivery amount', retryable: false },
-      'INSUFFICIENT_BALANCE': { message: 'Insufficient merchant balance', retryable: false },
-      'DUPLICATE_ORDER': { message: 'Duplicate merchant order ID', retryable: false },
+      UNAUTHORIZED: {
+        message: 'Invalid or expired access token',
+        retryable: true,
+      },
+      FORBIDDEN: {
+        message: 'Access forbidden - check permissions',
+        retryable: false,
+      },
+      INVALID_LOCATION: {
+        message: 'Invalid pickup or delivery location',
+        retryable: false,
+      },
+      SERVICE_UNAVAILABLE: {
+        message: 'Delivery service not available in this area',
+        retryable: false,
+      },
+      NO_DRIVER_AVAILABLE: {
+        message: 'No driver available at this time',
+        retryable: true,
+      },
+      ORDER_NOT_FOUND: {
+        message: 'Delivery order not found',
+        retryable: false,
+      },
+      ORDER_ALREADY_CANCELLED: {
+        message: 'Order already cancelled',
+        retryable: false,
+      },
+      INVALID_PACKAGE_SIZE: {
+        message: 'Package size exceeds service limits',
+        retryable: false,
+      },
+      RATE_LIMIT_EXCEEDED: {
+        message: 'API rate limit exceeded',
+        retryable: true,
+      },
+      MERCHANT_SUSPENDED: {
+        message: 'Merchant account suspended',
+        retryable: false,
+      },
+      PAYMENT_FAILED: {
+        message: 'Payment processing failed',
+        retryable: false,
+      },
+      INVALID_COD_AMOUNT: {
+        message: 'Invalid cash on delivery amount',
+        retryable: false,
+      },
+      INSUFFICIENT_BALANCE: {
+        message: 'Insufficient merchant balance',
+        retryable: false,
+      },
+      DUPLICATE_ORDER: {
+        message: 'Duplicate merchant order ID',
+        retryable: false,
+      },
     };
 
     const mappedError = errorMap[errorCode];
-    
+
     return {
       code: errorCode || 'GRAB_API_ERROR',
       message: mappedError?.message || errorMessage,
@@ -649,18 +694,18 @@ ${nonce}`;
    */
   mapGrabStatusToTrackingStatus(grabStatus: string): string {
     const statusMap: Record<string, string> = {
-      'ALLOCATING': 'order_confirmed',
-      'FINDING_DRIVER': 'searching_driver',
-      'DRIVER_ASSIGNED': 'assigned_to_driver',
-      'DRIVER_EN_ROUTE_TO_PICKUP': 'driver_heading_to_pickup',
-      'DRIVER_ARRIVED_PICKUP': 'driver_arrived_pickup',
-      'PICKED_UP': 'picked_up',
-      'DRIVER_EN_ROUTE_TO_DROPOFF': 'in_transit',
-      'DRIVER_ARRIVED_DROPOFF': 'driver_arrived_dropoff',
-      'DELIVERED': 'delivered',
-      'CANCELLED': 'cancelled',
-      'FAILED': 'delivery_failed',
-      'RETURNED': 'returned_to_sender',
+      ALLOCATING: 'order_confirmed',
+      FINDING_DRIVER: 'searching_driver',
+      DRIVER_ASSIGNED: 'assigned_to_driver',
+      DRIVER_EN_ROUTE_TO_PICKUP: 'driver_heading_to_pickup',
+      DRIVER_ARRIVED_PICKUP: 'driver_arrived_pickup',
+      PICKED_UP: 'picked_up',
+      DRIVER_EN_ROUTE_TO_DROPOFF: 'in_transit',
+      DRIVER_ARRIVED_DROPOFF: 'driver_arrived_dropoff',
+      DELIVERED: 'delivered',
+      CANCELLED: 'cancelled',
+      FAILED: 'delivery_failed',
+      RETURNED: 'returned_to_sender',
     };
 
     return statusMap[grabStatus.toUpperCase()] || 'in_transit';
@@ -674,21 +719,24 @@ ${nonce}`;
       deliveryId: grabTrackingData.deliveryID,
       trackingNumber: grabTrackingData.deliveryID,
       status: this.mapGrabStatusToTrackingStatus(grabTrackingData.status),
-      driverInfo: grabTrackingData.driverDetails ? {
-        name: grabTrackingData.driverDetails.name,
-        phone: grabTrackingData.driverDetails.phoneNumber,
-        photo: grabTrackingData.driverDetails.photoURL,
-        plateNumber: grabTrackingData.driverDetails.plateNumber,
-        currentLocation: grabTrackingData.driverDetails.location,
-      } : null,
+      driverInfo: grabTrackingData.driverDetails
+        ? {
+            name: grabTrackingData.driverDetails.name,
+            phone: grabTrackingData.driverDetails.phoneNumber,
+            photo: grabTrackingData.driverDetails.photoURL,
+            plateNumber: grabTrackingData.driverDetails.plateNumber,
+            currentLocation: grabTrackingData.driverDetails.location,
+          }
+        : null,
       schedule: grabTrackingData.schedule,
       waypoints: grabTrackingData.waypoints,
-      timeline: grabTrackingData.trackingHistory?.map((event: any) => ({
-        timestamp: event.timestamp,
-        status: this.mapGrabStatusToTrackingStatus(event.status),
-        description: event.description,
-        location: event.location,
-      })) || [],
+      timeline:
+        grabTrackingData.trackingHistory?.map((event: any) => ({
+          timestamp: event.timestamp,
+          status: this.mapGrabStatusToTrackingStatus(event.status),
+          description: event.description,
+          location: event.location,
+        })) || [],
     };
   }
 
@@ -698,7 +746,7 @@ ${nonce}`;
   formatPhoneNumber(phone: string): string {
     // Remove all non-digits
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // Add +62 country code if not present
     if (cleaned.startsWith('62')) {
       return `+${cleaned}`;
@@ -722,19 +770,22 @@ ${nonce}`;
    * Calculate distance between two coordinates
    */
   calculateDistance(
-    lat1: number, 
-    lon1: number, 
-    lat2: number, 
-    lon2: number
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
   ): number {
     const R = 6371; // Earth's radius in kilometers
     const dLat = this.toRadians(lat2 - lat1);
     const dLon = this.toRadians(lon2 - lon1);
-    
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(lat1)) *
+        Math.cos(this.toRadians(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
@@ -752,11 +803,13 @@ ${nonce}`;
     longitude: number,
     tenantId: string,
     channelId: string,
-  ): Promise<ApiResponse<{
-    isServiceable: boolean;
-    availableServices: string[];
-    estimatedPickupTime?: string;
-  }>> {
+  ): Promise<
+    ApiResponse<{
+      isServiceable: boolean;
+      availableServices: string[];
+      estimatedPickupTime?: string;
+    }>
+  > {
     // Grab doesn't have a specific coverage endpoint
     // We'll determine coverage based on major Indonesian cities
     const majorCities = [
@@ -774,7 +827,12 @@ ${nonce}`;
     let minDistance = Infinity;
 
     for (const city of majorCities) {
-      const distance = this.calculateDistance(latitude, longitude, city.lat, city.lng);
+      const distance = this.calculateDistance(
+        latitude,
+        longitude,
+        city.lat,
+        city.lng,
+      );
       if (distance <= city.radius) {
         isServiceable = true;
       }
@@ -784,7 +842,7 @@ ${nonce}`;
       }
     }
 
-    const availableServices = isServiceable 
+    const availableServices = isServiceable
       ? ['instant', 'same_day', 'express']
       : [];
 

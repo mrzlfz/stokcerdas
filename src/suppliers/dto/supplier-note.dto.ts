@@ -13,7 +13,8 @@ import { ApiProperty } from '@nestjs/swagger';
 export class AddSupplierNoteDto {
   @ApiProperty({
     description: 'Catatan untuk supplier',
-    example: 'Supplier ini selalu mengirim barang tepat waktu dan kualitas bagus',
+    example:
+      'Supplier ini selalu mengirim barang tepat waktu dan kualitas bagus',
     minLength: 10,
     maxLength: 1000,
   })

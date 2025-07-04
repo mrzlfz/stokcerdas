@@ -162,8 +162,10 @@ export class WebhookEvent {
 
   // Helper methods
   get canRetry(): boolean {
-    return this.processingAttempts < this.maxAttempts &&
-           this.processingStatus === WebhookProcessingStatus.FAILED;
+    return (
+      this.processingAttempts < this.maxAttempts &&
+      this.processingStatus === WebhookProcessingStatus.FAILED
+    );
   }
 
   get isProcessed(): boolean {

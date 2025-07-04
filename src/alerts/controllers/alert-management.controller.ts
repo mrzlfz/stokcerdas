@@ -61,9 +61,9 @@ export class AlertManagementController {
 
   @Get()
   @RequirePermissions('inventory:read')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get alerts',
-    description: 'Dapatkan daftar alert dengan filter dan pagination' 
+    description: 'Dapatkan daftar alert dengan filter dan pagination',
   })
   @ApiResponse({
     status: 200,
@@ -89,11 +89,16 @@ export class AlertManagementController {
 
   @Get('statistics')
   @RequirePermissions('inventory:read')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get alert statistics',
-    description: 'Dapatkan statistik alert untuk tenant' 
+    description: 'Dapatkan statistik alert untuk tenant',
   })
-  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Jumlah hari untuk statistik (default: 30)' })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    type: Number,
+    description: 'Jumlah hari untuk statistik (default: 30)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Statistik alert berhasil diambil',
@@ -103,7 +108,10 @@ export class AlertManagementController {
     @GetTenant() tenantId: string,
     @Req() req: Request,
   ) {
-    const statistics = await this.alertManagementService.getStatistics(tenantId, days);
+    const statistics = await this.alertManagementService.getStatistics(
+      tenantId,
+      days,
+    );
 
     return {
       success: true,
@@ -117,9 +125,9 @@ export class AlertManagementController {
 
   @Get(':id')
   @RequirePermissions('inventory:read')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get alert by ID',
-    description: 'Dapatkan detail alert berdasarkan ID' 
+    description: 'Dapatkan detail alert berdasarkan ID',
   })
   @ApiResponse({
     status: 200,
@@ -136,7 +144,11 @@ export class AlertManagementController {
     @Req() req: Request,
   ) {
     // Mark as viewed when user accesses alert detail
-    const alert = await this.alertManagementService.markAsViewed(tenantId, id, user.id);
+    const alert = await this.alertManagementService.markAsViewed(
+      tenantId,
+      id,
+      user.id,
+    );
 
     return {
       success: true,
@@ -151,9 +163,10 @@ export class AlertManagementController {
   @Patch(':id/acknowledge')
   @RequirePermissions('inventory:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Acknowledge alert',
-    description: 'Acknowledge alert untuk menandai bahwa alert sudah dilihat dan akan ditangani' 
+    description:
+      'Acknowledge alert untuk menandai bahwa alert sudah dilihat dan akan ditangani',
   })
   @ApiResponse({
     status: 200,
@@ -190,9 +203,9 @@ export class AlertManagementController {
   @Patch(':id/resolve')
   @RequirePermissions('inventory:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Resolve alert',
-    description: 'Resolve alert setelah masalah selesai ditangani' 
+    description: 'Resolve alert setelah masalah selesai ditangani',
   })
   @ApiResponse({
     status: 200,
@@ -229,9 +242,10 @@ export class AlertManagementController {
   @Patch(':id/dismiss')
   @RequirePermissions('inventory:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Dismiss alert',
-    description: 'Dismiss alert jika alert tidak relevan atau tidak memerlukan tindakan' 
+    description:
+      'Dismiss alert jika alert tidak relevan atau tidak memerlukan tindakan',
   })
   @ApiResponse({
     status: 200,
@@ -264,9 +278,10 @@ export class AlertManagementController {
   @Patch(':id/snooze')
   @RequirePermissions('inventory:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Snooze alert',
-    description: 'Snooze alert untuk menyembunyikan sementara dan muncul lagi setelah durasi tertentu' 
+    description:
+      'Snooze alert untuk menyembunyikan sementara dan muncul lagi setelah durasi tertentu',
   })
   @ApiResponse({
     status: 200,
@@ -303,9 +318,9 @@ export class AlertManagementController {
   @Patch(':id/escalate')
   @RequirePermissions('inventory:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Escalate alert',
-    description: 'Escalate alert ke user lain atau manager' 
+    description: 'Escalate alert ke user lain atau manager',
   })
   @ApiResponse({
     status: 200,
@@ -338,9 +353,9 @@ export class AlertManagementController {
   @Patch(':id/priority')
   @RequirePermissions('inventory:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update alert priority',
-    description: 'Update prioritas alert' 
+    description: 'Update prioritas alert',
   })
   @ApiResponse({
     status: 200,
@@ -372,9 +387,9 @@ export class AlertManagementController {
 
   @Post(':id/tags')
   @RequirePermissions('inventory:update')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Add tag to alert',
-    description: 'Tambahkan tag ke alert untuk kategorisasi' 
+    description: 'Tambahkan tag ke alert untuk kategorisasi',
   })
   @ApiResponse({
     status: 200,
@@ -386,7 +401,11 @@ export class AlertManagementController {
     @GetTenant() tenantId: string,
     @Req() req: Request,
   ) {
-    const alert = await this.alertManagementService.addTag(tenantId, id, addTagDto.tag);
+    const alert = await this.alertManagementService.addTag(
+      tenantId,
+      id,
+      addTagDto.tag,
+    );
 
     return {
       success: true,
@@ -401,9 +420,9 @@ export class AlertManagementController {
   @Delete(':id/tags')
   @RequirePermissions('inventory:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Remove tag from alert',
-    description: 'Hapus tag dari alert' 
+    description: 'Hapus tag dari alert',
   })
   @ApiResponse({
     status: 200,
@@ -415,7 +434,11 @@ export class AlertManagementController {
     @GetTenant() tenantId: string,
     @Req() req: Request,
   ) {
-    const alert = await this.alertManagementService.removeTag(tenantId, id, removeTagDto.tag);
+    const alert = await this.alertManagementService.removeTag(
+      tenantId,
+      id,
+      removeTagDto.tag,
+    );
 
     return {
       success: true,
@@ -429,9 +452,9 @@ export class AlertManagementController {
 
   @Post('bulk-actions')
   @RequirePermissions('inventory:update')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Bulk actions on alerts',
-    description: 'Lakukan action secara bulk pada multiple alerts' 
+    description: 'Lakukan action secara bulk pada multiple alerts',
   })
   @ApiResponse({
     status: 200,
@@ -461,9 +484,9 @@ export class AlertManagementController {
 
   @Post('system-maintenance')
   @RequirePermissions('settings:update')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create system maintenance alert',
-    description: 'Buat alert untuk system maintenance' 
+    description: 'Buat alert untuk system maintenance',
   })
   @ApiResponse({
     status: 201,
@@ -475,11 +498,12 @@ export class AlertManagementController {
     @GetUser() user: User,
     @Req() req: Request,
   ) {
-    const alert = await this.alertManagementService.createSystemMaintenanceAlert(
-      tenantId,
-      maintenanceDto,
-      user.id,
-    );
+    const alert =
+      await this.alertManagementService.createSystemMaintenanceAlert(
+        tenantId,
+        maintenanceDto,
+        user.id,
+      );
 
     return {
       success: true,
@@ -494,9 +518,10 @@ export class AlertManagementController {
   @Post('reactivate-snoozed')
   @RequirePermissions('settings:update')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Reactivate snoozed alerts',
-    description: 'Reaktivasi alert yang sudah melewati waktu snooze (biasanya dijalankan oleh cron job)' 
+    description:
+      'Reaktivasi alert yang sudah melewati waktu snooze (biasanya dijalankan oleh cron job)',
   })
   @ApiResponse({
     status: 200,

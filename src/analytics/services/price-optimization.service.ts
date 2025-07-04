@@ -7,9 +7,7 @@ import { InventoryTransaction } from '../../inventory/entities/inventory-transac
 import { Product } from '../../products/entities/product.entity';
 import { ProductCategory } from '../../products/entities/product-category.entity';
 
-import {
-  PriceOptimizationQueryDto,
-} from '../dto/predictive-analytics-query.dto';
+import { PriceOptimizationQueryDto } from '../dto/predictive-analytics-query.dto';
 
 import {
   PriceOptimizationResponseDto,
@@ -75,7 +73,7 @@ export class PriceOptimizationService {
       name: 'Christmas/New Year',
       period: 'December-January',
       effect: 'increase',
-      multiplier: 1.20,
+      multiplier: 1.2,
       categories: ['gifts', 'food', 'electronics'],
       reasoning: 'Holiday season dan bonus tahun akhir',
     },
@@ -83,7 +81,7 @@ export class PriceOptimizationService {
       name: 'Back to School',
       period: 'June-July',
       effect: 'increase',
-      multiplier: 1.10,
+      multiplier: 1.1,
       categories: ['stationery', 'electronics', 'clothing'],
       reasoning: 'Persiapan tahun ajaran baru',
     },
@@ -116,12 +114,17 @@ export class PriceOptimizationService {
     query: PriceOptimizationQueryDto,
   ): Promise<PriceOptimizationResponseDto> {
     const startTime = Date.now();
-    
+
     try {
-      this.logger.debug(`Generating price optimization recommendations for tenant ${tenantId}`);
+      this.logger.debug(
+        `Generating price optimization recommendations for tenant ${tenantId}`,
+      );
 
       // Get products to analyze
-      const products = await this.getProductsForPriceOptimization(tenantId, query);
+      const products = await this.getProductsForPriceOptimization(
+        tenantId,
+        query,
+      );
 
       const priceOptimizations: PriceOptimizationDto[] = [];
       let totalRevenueImpact = 0;
@@ -130,17 +133,25 @@ export class PriceOptimizationService {
 
       for (const product of products) {
         try {
-          const optimization = await this.optimizeProductPrice(tenantId, product, query);
+          const optimization = await this.optimizeProductPrice(
+            tenantId,
+            product,
+            query,
+          );
           priceOptimizations.push(optimization);
 
           totalRevenueImpact += optimization.revenueImpact.revenueChange;
-          averageMarginImprovement += (optimization.recommendedMargin - optimization.currentMargin);
-          
-          if (Math.abs(optimization.revenueImpact.revenueChange) > 100000) { // 100K IDR impact
+          averageMarginImprovement +=
+            optimization.recommendedMargin - optimization.currentMargin;
+
+          if (Math.abs(optimization.revenueImpact.revenueChange) > 100000) {
+            // 100K IDR impact
             highImpactProducts++;
           }
         } catch (error) {
-          this.logger.warn(`Failed to optimize price for product ${product.id}: ${error.message}`);
+          this.logger.warn(
+            `Failed to optimize price for product ${product.id}: ${error.message}`,
+          );
         }
       }
 
@@ -150,18 +161,24 @@ export class PriceOptimizationService {
       });
 
       // Sort by revenue impact (highest impact first)
-      filteredOptimizations.sort((a, b) => 
-        Math.abs(b.revenueImpact.revenueChange) - Math.abs(a.revenueImpact.revenueChange)
+      filteredOptimizations.sort(
+        (a, b) =>
+          Math.abs(b.revenueImpact.revenueChange) -
+          Math.abs(a.revenueImpact.revenueChange),
       );
 
       // Apply pagination
       const startIndex = ((query.page || 1) - 1) * (query.limit || 50);
-      const paginatedData = filteredOptimizations.slice(startIndex, startIndex + (query.limit || 50));
+      const paginatedData = filteredOptimizations.slice(
+        startIndex,
+        startIndex + (query.limit || 50),
+      );
 
       // Calculate summary statistics
-      averageMarginImprovement = priceOptimizations.length > 0 
-        ? averageMarginImprovement / priceOptimizations.length 
-        : 0;
+      averageMarginImprovement =
+        priceOptimizations.length > 0
+          ? averageMarginImprovement / priceOptimizations.length
+          : 0;
 
       const riskLevel = this.assessOverallPricingRisk(priceOptimizations);
 
@@ -174,13 +191,18 @@ export class PriceOptimizationService {
       };
 
       // Generate strategic insights
-      const insights = this.generatePricingInsights(priceOptimizations, summary);
+      const insights = this.generatePricingInsights(
+        priceOptimizations,
+        summary,
+      );
 
       const meta: AnalyticsMetaDto = {
         total: filteredOptimizations.length,
         page: query.page || 1,
         limit: query.limit || 50,
-        totalPages: Math.ceil(filteredOptimizations.length / (query.limit || 50)),
+        totalPages: Math.ceil(
+          filteredOptimizations.length / (query.limit || 50),
+        ),
         generatedAt: new Date().toISOString(),
         executionTime: Date.now() - startTime,
         parameters: query,
@@ -193,10 +215,14 @@ export class PriceOptimizationService {
         summary,
         insights,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to generate price optimizations: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to generate price optimizations: ${error.message}`);
+      this.logger.error(
+        `Failed to generate price optimizations: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to generate price optimizations: ${error.message}`,
+      );
     }
   }
 
@@ -217,35 +243,42 @@ export class PriceOptimizationService {
       .andWhere('product.costPrice > 0');
 
     if (query.productId) {
-      queryBuilder.andWhere('product.id = :productId', { productId: query.productId });
+      queryBuilder.andWhere('product.id = :productId', {
+        productId: query.productId,
+      });
     }
 
     if (query.categoryId) {
-      queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId: query.categoryId });
+      queryBuilder.andWhere('product.categoryId = :categoryId', {
+        categoryId: query.categoryId,
+      });
     }
 
     // Filter by margin threshold
     if (query.currentMarginThreshold) {
       queryBuilder.andWhere(
         '((product.sellingPrice - product.costPrice) / product.sellingPrice * 100) >= :marginThreshold',
-        { marginThreshold: query.currentMarginThreshold }
+        { marginThreshold: query.currentMarginThreshold },
       );
     }
 
     // Filter by minimum volume if specified
     if (query.minVolumeThreshold) {
-      queryBuilder.andWhere(`
+      queryBuilder.andWhere(
+        `
         (SELECT COALESCE(SUM(t.quantity), 0) 
          FROM inventory_transactions t 
          WHERE t.productId = product.id 
          AND t.tenantId = :tenantId 
          AND t.type = 'sale' 
          AND t.transactionDate >= :thirtyDaysAgo) >= :minVolume
-      `, {
-        tenantId,
-        thirtyDaysAgo: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-        minVolume: query.minVolumeThreshold,
-      });
+      `,
+        {
+          tenantId,
+          thirtyDaysAgo: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          minVolume: query.minVolumeThreshold,
+        },
+      );
     }
 
     return queryBuilder.getMany();
@@ -264,7 +297,10 @@ export class PriceOptimizationService {
     const currentMargin = ((currentPrice - costPrice) / currentPrice) * 100;
 
     // Analyze demand elasticity
-    const elasticityAnalysis = await this.analyzeDemandElasticity(tenantId, product);
+    const elasticityAnalysis = await this.analyzeDemandElasticity(
+      tenantId,
+      product,
+    );
 
     // Get competitive analysis (simulated for now)
     const competitiveAnalysis = await this.analyzeCompetitivePricing(product);
@@ -277,8 +313,10 @@ export class PriceOptimizationService {
       query,
     );
 
-    const recommendedMargin = ((recommendedPrice - costPrice) / recommendedPrice) * 100;
-    const priceChangePercent = ((recommendedPrice - currentPrice) / currentPrice) * 100;
+    const recommendedMargin =
+      ((recommendedPrice - costPrice) / recommendedPrice) * 100;
+    const priceChangePercent =
+      ((recommendedPrice - currentPrice) / currentPrice) * 100;
 
     // Calculate revenue impact
     const revenueImpact = await this.calculateRevenueImpact(
@@ -298,25 +336,37 @@ export class PriceOptimizationService {
     );
 
     // Generate seasonal pricing recommendations
-    const seasonalPricingData = query.includeSeasonalPricing 
+    const seasonalPricingData = query.includeSeasonalPricing
       ? this.generateSeasonalPricing(product, recommendedPrice)
       : undefined;
-    
-    const seasonalPricing = seasonalPricingData ? {
-      peakSeasonAdjustment: (seasonalPricingData.peakSeasonMultiplier - 1) * 100,
-      lowSeasonAdjustment: (seasonalPricingData.lowSeasonMultiplier - 1) * 100,
-      holidayPricing: seasonalPricingData.holidayAdjustments.map(holiday => ({
-        period: holiday.period,
-        adjustment: (holiday.multiplier - 1) * 100,
-        reasoning: holiday.reasoning,
-      })),
-    } : undefined;
+
+    const seasonalPricing = seasonalPricingData
+      ? {
+          peakSeasonAdjustment:
+            (seasonalPricingData.peakSeasonMultiplier - 1) * 100,
+          lowSeasonAdjustment:
+            (seasonalPricingData.lowSeasonMultiplier - 1) * 100,
+          holidayPricing: seasonalPricingData.holidayAdjustments.map(
+            holiday => ({
+              period: holiday.period,
+              adjustment: (holiday.multiplier - 1) * 100,
+              reasoning: holiday.reasoning,
+            }),
+          ),
+        }
+      : undefined;
 
     // Create implementation plan
-    const implementation = this.createImplementationPlan(recommendedPrice, currentPrice);
+    const implementation = this.createImplementationPlan(
+      recommendedPrice,
+      currentPrice,
+    );
 
     // Assess risks and create mitigation plan
-    const riskMitigation = this.createRiskMitigation(priceChangePercent, elasticityAnalysis);
+    const riskMitigation = this.createRiskMitigation(
+      priceChangePercent,
+      elasticityAnalysis,
+    );
 
     return {
       productId: product.id,
@@ -331,7 +381,10 @@ export class PriceOptimizationService {
       demandElasticity: {
         elasticityCoefficient: elasticityAnalysis.elasticityCoefficient,
         isElastic: elasticityAnalysis.isElastic,
-        expectedVolumeChange: this.calculateVolumeChange(priceChangePercent, elasticityAnalysis.elasticityCoefficient),
+        expectedVolumeChange: this.calculateVolumeChange(
+          priceChangePercent,
+          elasticityAnalysis.elasticityCoefficient,
+        ),
       },
       revenueImpact,
       competitiveAnalysis,
@@ -350,19 +403,23 @@ export class PriceOptimizationService {
     product: Product,
   ): Promise<PriceElasticityAnalysis> {
     // Get historical sales and price data
-    const salesHistory = await this.getProductSalesHistory(tenantId, product.id);
-    
+    const salesHistory = await this.getProductSalesHistory(
+      tenantId,
+      product.id,
+    );
+
     // Calculate elasticity using simplified method
     let elasticityCoefficient = -1.2; // Default moderate elasticity
-    
+
     if (salesHistory.length >= 2) {
       // Simple elasticity calculation using two periods
       const recent = salesHistory[0];
       const previous = salesHistory[1];
-      
+
       const volumeChange = (recent.volume - previous.volume) / previous.volume;
-      const priceChange = (recent.averagePrice - previous.averagePrice) / previous.averagePrice;
-      
+      const priceChange =
+        (recent.averagePrice - previous.averagePrice) / previous.averagePrice;
+
       if (priceChange !== 0) {
         elasticityCoefficient = volumeChange / priceChange;
       }
@@ -374,12 +431,12 @@ export class PriceOptimizationService {
     // Generate price sensitivity scenarios
     const currentPrice = product.sellingPrice || 0;
     const pricePoints = [];
-    
+
     for (let adjustment = -0.2; adjustment <= 0.2; adjustment += 0.05) {
       const newPrice = currentPrice * (1 + adjustment);
       const volumeMultiplier = Math.pow(1 + adjustment, elasticityCoefficient);
       const baseVolume = salesHistory[0]?.volume || 100; // Default if no history
-      
+
       pricePoints.push({
         price: Math.round(newPrice),
         expectedVolume: Math.round(baseVolume * volumeMultiplier),
@@ -406,14 +463,16 @@ export class PriceOptimizationService {
     // Simulated competitive analysis - in a real implementation, this would
     // integrate with market data APIs or manual competitive intelligence
     const currentPrice = product.sellingPrice || 0;
-    
+
     // Simulate market pricing based on product category and characteristics
-    const categoryMultiplier = this.getCategoryPricingMultiplier(product.category?.name || '');
+    const categoryMultiplier = this.getCategoryPricingMultiplier(
+      product.category?.name || '',
+    );
     const marketPrice = currentPrice * (0.9 + Math.random() * 0.2); // ±10% variation
-    
+
     const competitorAveragePrice = Math.round(marketPrice * categoryMultiplier);
     const priceGap = currentPrice - competitorAveragePrice;
-    
+
     let marketPosition: 'below' | 'at' | 'above' | 'premium';
     if (currentPrice < competitorAveragePrice * 0.9) {
       marketPosition = 'below';
@@ -425,7 +484,10 @@ export class PriceOptimizationService {
       marketPosition = 'at';
     }
 
-    const competitiveAdvantage = this.determineCompetitiveAdvantage(marketPosition, priceGap);
+    const competitiveAdvantage = this.determineCompetitiveAdvantage(
+      marketPosition,
+      priceGap,
+    );
 
     return {
       marketPosition,
@@ -471,7 +533,7 @@ export class PriceOptimizationService {
       competitive: 0.25,
     };
 
-    let optimalPrice = 
+    let optimalPrice =
       marginBasedPrice * weights.margin +
       elasticityOptimalPrice * weights.elasticity +
       competitiveOptimalPrice * weights.competitive;
@@ -502,11 +564,17 @@ export class PriceOptimizationService {
     paybackPeriod: number;
   }> {
     // Get current daily sales volume
-    const currentDailyVolume = await this.getCurrentDailyVolume(tenantId, product.id);
-    
+    const currentDailyVolume = await this.getCurrentDailyVolume(
+      tenantId,
+      product.id,
+    );
+
     // Calculate projected volume with new price
     const priceChange = (recommendedPrice - currentPrice) / currentPrice;
-    const volumeChange = Math.pow(1 + priceChange, elasticityAnalysis.elasticityCoefficient);
+    const volumeChange = Math.pow(
+      1 + priceChange,
+      elasticityAnalysis.elasticityCoefficient,
+    );
     const projectedDailyVolume = currentDailyVolume * volumeChange;
 
     const currentDailyRevenue = currentDailyVolume * currentPrice;
@@ -515,7 +583,8 @@ export class PriceOptimizationService {
 
     // Calculate payback period (simplified)
     const implementationCost = 10000; // Cost of price change implementation
-    const paybackPeriod = revenueChange > 0 ? implementationCost / revenueChange : 365;
+    const paybackPeriod =
+      revenueChange > 0 ? implementationCost / revenueChange : 365;
 
     return {
       currentDailyRevenue: Math.round(currentDailyRevenue),
@@ -531,12 +600,14 @@ export class PriceOptimizationService {
   private async getProductSalesHistory(
     tenantId: string,
     productId: string,
-  ): Promise<Array<{
-    period: string;
-    volume: number;
-    averagePrice: number;
-    revenue: number;
-  }>> {
+  ): Promise<
+    Array<{
+      period: string;
+      volume: number;
+      averagePrice: number;
+      revenue: number;
+    }>
+  > {
     // Get sales data for the last 6 months, grouped by month
     const salesData = await this.transactionRepository
       .createQueryBuilder('transaction')
@@ -567,15 +638,20 @@ export class PriceOptimizationService {
   /**
    * Get current daily sales volume
    */
-  private async getCurrentDailyVolume(tenantId: string, productId: string): Promise<number> {
+  private async getCurrentDailyVolume(
+    tenantId: string,
+    productId: string,
+  ): Promise<number> {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
+
     const result = await this.transactionRepository
       .createQueryBuilder('transaction')
       .where('transaction.tenantId = :tenantId', { tenantId })
       .andWhere('transaction.productId = :productId', { productId })
       .andWhere('transaction.type = :type', { type: 'sale' })
-      .andWhere('transaction.transactionDate >= :startDate', { startDate: thirtyDaysAgo })
+      .andWhere('transaction.transactionDate >= :startDate', {
+        startDate: thirtyDaysAgo,
+      })
       .select('SUM(transaction.quantity)', 'totalQuantity')
       .getRawOne();
 
@@ -585,14 +661,14 @@ export class PriceOptimizationService {
   // Helper methods for pricing calculations
   private getCategoryPricingMultiplier(categoryName: string): number {
     const multipliers: Record<string, number> = {
-      'electronics': 0.95,
-      'fashion': 1.1,
-      'food': 0.9,
-      'books': 0.85,
-      'toys': 1.05,
-      'home': 1.0,
+      electronics: 0.95,
+      fashion: 1.1,
+      food: 0.9,
+      books: 0.85,
+      toys: 1.05,
+      home: 1.0,
     };
-    
+
     const category = categoryName.toLowerCase();
     return multipliers[category] || 1.0;
   }
@@ -617,10 +693,10 @@ export class PriceOptimizationService {
     elasticityAnalysis: PriceElasticityAnalysis,
   ): number {
     // Find the price point that maximizes revenue
-    const optimalPoint = elasticityAnalysis.pricePoints.reduce((max, point) => 
-      point.expectedRevenue > max.expectedRevenue ? point : max
+    const optimalPoint = elasticityAnalysis.pricePoints.reduce((max, point) =>
+      point.expectedRevenue > max.expectedRevenue ? point : max,
     );
-    
+
     return optimalPoint.price;
   }
 
@@ -635,7 +711,7 @@ export class PriceOptimizationService {
 
     // Adjust price based on competitive position
     const competitorPrice = competitiveAnalysis.competitorAveragePrice;
-    
+
     if (competitiveAnalysis.marketPosition === 'below') {
       // Can increase price towards market average
       return Math.min(currentPrice * 1.1, competitorPrice * 0.95);
@@ -648,7 +724,10 @@ export class PriceOptimizationService {
     }
   }
 
-  private calculateVolumeChange(priceChangePercent: number, elasticityCoefficient: number): number {
+  private calculateVolumeChange(
+    priceChangePercent: number,
+    elasticityCoefficient: number,
+  ): number {
     const volumeChangePercent = priceChangePercent * elasticityCoefficient;
     return Math.round(volumeChangePercent * 100) / 100;
   }
@@ -664,7 +743,11 @@ export class PriceOptimizationService {
     riskLevel: 'low' | 'medium' | 'high';
     successProbability: number;
   } {
-    let strategyType: 'penetration' | 'skimming' | 'competitive' | 'value_based';
+    let strategyType:
+      | 'penetration'
+      | 'skimming'
+      | 'competitive'
+      | 'value_based';
     let reasoning: string;
     let riskLevel: 'low' | 'medium' | 'high';
     let successProbability: number;
@@ -699,12 +782,15 @@ export class PriceOptimizationService {
     };
   }
 
-  private generateSeasonalPricing(product: Product, basePrice: number): SeasonalPricing {
+  private generateSeasonalPricing(
+    product: Product,
+    basePrice: number,
+  ): SeasonalPricing {
     const categoryName = product.category?.name?.toLowerCase() || '';
-    
+
     // Get relevant holidays for this product category
     const relevantHolidays = this.indonesianHolidays.filter(holiday =>
-      holiday.categories.some(cat => categoryName.includes(cat))
+      holiday.categories.some(cat => categoryName.includes(cat)),
     );
 
     return {
@@ -719,20 +805,25 @@ export class PriceOptimizationService {
     };
   }
 
-  private createImplementationPlan(recommendedPrice: number, currentPrice: number): {
+  private createImplementationPlan(
+    recommendedPrice: number,
+    currentPrice: number,
+  ): {
     recommendedStart: string;
     testPeriod: number;
     fullRollout: string;
     monitoringMetrics: string[];
   } {
-    const priceChange = Math.abs((recommendedPrice - currentPrice) / currentPrice);
-    
+    const priceChange = Math.abs(
+      (recommendedPrice - currentPrice) / currentPrice,
+    );
+
     // Larger price changes need longer test periods
     const testPeriod = priceChange > 0.1 ? 14 : 7; // 14 days for >10% change, 7 days otherwise
-    
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() + 3); // Start in 3 days
-    
+
     const rolloutDate = new Date(startDate);
     rolloutDate.setDate(rolloutDate.getDate() + testPeriod);
 
@@ -751,7 +842,10 @@ export class PriceOptimizationService {
     };
   }
 
-  private createRiskMitigation(priceChangePercent: number, elasticityAnalysis: PriceElasticityAnalysis): {
+  private createRiskMitigation(
+    priceChangePercent: number,
+    elasticityAnalysis: PriceElasticityAnalysis,
+  ): {
     identifiedRisks: string[];
     mitigationStrategies: string[];
     rollbackPlan: string;
@@ -760,7 +854,9 @@ export class PriceOptimizationService {
     const mitigations = [];
 
     if (Math.abs(priceChangePercent) > 10) {
-      risks.push('Significant price change dapat menyebabkan customer resistance');
+      risks.push(
+        'Significant price change dapat menyebabkan customer resistance',
+      );
       mitigations.push('Implement gradual price adjustment over 2-3 stages');
     }
 
@@ -771,13 +867,16 @@ export class PriceOptimizationService {
 
     if (priceChangePercent > 0) {
       risks.push('Competitor dapat respond dengan price cuts');
-      mitigations.push('Monitor competitor pricing weekly dan prepare counter-strategy');
+      mitigations.push(
+        'Monitor competitor pricing weekly dan prepare counter-strategy',
+      );
     }
 
     risks.push('Customer churn risk dari price-sensitive segments');
     mitigations.push('Prepare retention offers untuk key customers');
 
-    const rollbackPlan = 'Automatic rollback jika volume turun >20% dalam 1 minggu atau complaints increase >50%';
+    const rollbackPlan =
+      'Automatic rollback jika volume turun >20% dalam 1 minggu atau complaints increase >50%';
 
     return {
       identifiedRisks: risks,
@@ -786,9 +885,13 @@ export class PriceOptimizationService {
     };
   }
 
-  private assessOverallPricingRisk(optimizations: PriceOptimizationDto[]): 'low' | 'medium' | 'high' {
-    const highRiskCount = optimizations.filter(opt => 
-      opt.strategy.riskLevel === 'high' || Math.abs(opt.priceChangePercent) > 15
+  private assessOverallPricingRisk(
+    optimizations: PriceOptimizationDto[],
+  ): 'low' | 'medium' | 'high' {
+    const highRiskCount = optimizations.filter(
+      opt =>
+        opt.strategy.riskLevel === 'high' ||
+        Math.abs(opt.priceChangePercent) > 15,
     ).length;
 
     const totalCount = optimizations.length;
@@ -799,7 +902,10 @@ export class PriceOptimizationService {
     return 'low';
   }
 
-  private generatePricingInsights(optimizations: PriceOptimizationDto[], summary: any): any {
+  private generatePricingInsights(
+    optimizations: PriceOptimizationDto[],
+    summary: any,
+  ): any {
     const pricingStrategy = [];
     const competitivePosition = [];
     const marketOpportunities = [];
@@ -807,22 +913,33 @@ export class PriceOptimizationService {
 
     // Pricing strategy insights
     const strategyTypes = optimizations.reduce((acc, opt) => {
-      acc[opt.strategy.strategyType] = (acc[opt.strategy.strategyType] || 0) + 1;
+      acc[opt.strategy.strategyType] =
+        (acc[opt.strategy.strategyType] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    const dominantStrategy = Object.entries(strategyTypes).reduce((max, [strategy, count]) => 
-      count > max.count ? { strategy, count } : max, { strategy: '', count: 0 });
+    const dominantStrategy = Object.entries(strategyTypes).reduce(
+      (max, [strategy, count]) =>
+        count > max.count ? { strategy, count } : max,
+      { strategy: '', count: 0 },
+    );
 
-    pricingStrategy.push(`Dominant strategy: ${dominantStrategy.strategy} untuk ${dominantStrategy.count} produk`);
-    
+    pricingStrategy.push(
+      `Dominant strategy: ${dominantStrategy.strategy} untuk ${dominantStrategy.count} produk`,
+    );
+
     if (summary.averageMarginImprovement > 3) {
-      pricingStrategy.push(`Opportunity untuk improve margin rata-rata ${summary.averageMarginImprovement.toFixed(1)}%`);
+      pricingStrategy.push(
+        `Opportunity untuk improve margin rata-rata ${summary.averageMarginImprovement.toFixed(
+          1,
+        )}%`,
+      );
     }
 
     // Competitive position insights
     const positions = optimizations.reduce((acc, opt) => {
-      acc[opt.competitiveAnalysis.marketPosition] = (acc[opt.competitiveAnalysis.marketPosition] || 0) + 1;
+      acc[opt.competitiveAnalysis.marketPosition] =
+        (acc[opt.competitiveAnalysis.marketPosition] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -833,17 +950,33 @@ export class PriceOptimizationService {
 
     // Market opportunities
     if (summary.totalRevenueImpact > 1000000) {
-      marketOpportunities.push(`Total revenue opportunity: Rp ${(summary.totalRevenueImpact / 1000000).toFixed(1)}M`);
+      marketOpportunities.push(
+        `Total revenue opportunity: Rp ${(
+          summary.totalRevenueImpact / 1000000
+        ).toFixed(1)}M`,
+      );
     }
-    
-    marketOpportunities.push('Focus on high-impact products untuk maximize ROI');
-    marketOpportunities.push('Consider bundling strategies untuk less elastic products');
+
+    marketOpportunities.push(
+      'Focus on high-impact products untuk maximize ROI',
+    );
+    marketOpportunities.push(
+      'Consider bundling strategies untuk less elastic products',
+    );
 
     // Implementation guide
-    implementationGuide.push('Start dengan products yang memiliki lowest risk dan highest impact');
-    implementationGuide.push('Implement A/B testing untuk validate price elasticity assumptions');
-    implementationGuide.push('Setup monitoring dashboard untuk track key metrics');
-    implementationGuide.push('Prepare customer communication strategy untuk significant price changes');
+    implementationGuide.push(
+      'Start dengan products yang memiliki lowest risk dan highest impact',
+    );
+    implementationGuide.push(
+      'Implement A/B testing untuk validate price elasticity assumptions',
+    );
+    implementationGuide.push(
+      'Setup monitoring dashboard untuk track key metrics',
+    );
+    implementationGuide.push(
+      'Prepare customer communication strategy untuk significant price changes',
+    );
 
     return {
       pricingStrategy,

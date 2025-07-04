@@ -47,7 +47,7 @@ export class CreateInventoryItemDto {
 
   @ApiPropertyOptional({
     description: 'Harga rata-rata pembelian',
-    example: 15000.50,
+    example: 15000.5,
   })
   @IsOptional()
   @IsNumber({}, { message: 'Average cost harus berupa angka' })

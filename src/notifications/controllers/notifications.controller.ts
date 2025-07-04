@@ -22,7 +22,10 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
 
-import { NotificationsService, CreateNotificationDto } from '../services/notifications.service';
+import {
+  NotificationsService,
+  CreateNotificationDto,
+} from '../services/notifications.service';
 import { Notification } from '../entities/notification.entity';
 
 @ApiTags('Notifications')
@@ -56,7 +59,11 @@ export class NotificationsController {
     summary: 'Get user notifications',
     description: 'Gets notifications for the current user',
   })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of notifications to return' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of notifications to return',
+  })
   @ApiResponse({
     status: 200,
     description: 'Notifications retrieved successfully',
@@ -82,7 +89,10 @@ export class NotificationsController {
     @CurrentUser('id') userId: string,
     @CurrentTenant() tenantId: string,
   ): Promise<{ count: number }> {
-    const count = await this.notificationsService.getUnreadCount(userId, tenantId);
+    const count = await this.notificationsService.getUnreadCount(
+      userId,
+      tenantId,
+    );
     return { count };
   }
 

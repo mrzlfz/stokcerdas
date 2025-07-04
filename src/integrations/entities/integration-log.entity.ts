@@ -30,6 +30,10 @@ export enum IntegrationLogType {
   INSTANT_DELIVERY = 'instant_delivery',
   INSTANT_DELIVERY_PROCESSOR = 'instant_delivery_processor',
   INVENTORY = 'inventory',
+  ORDER = 'order',
+  FULFILLMENT = 'fulfillment',
+  ROUTING = 'routing',
+  CONFLICT = 'conflict',
 }
 
 @Entity('integration_logs')

@@ -1,4 +1,11 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { AuditableEntity } from '../../common/entities/base.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryLocation } from '../../inventory/entities/inventory-location.entity';
@@ -295,7 +302,7 @@ export class ReorderRule extends AuditableEntity {
   get hasRecentErrors(): boolean {
     if (this.consecutiveErrors >= this.maxRetryAttempts) return true;
     if (!this.lastErrorAt) return false;
-    
+
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     return this.lastErrorAt > oneHourAgo;
   }
@@ -303,28 +310,37 @@ export class ReorderRule extends AuditableEntity {
   get effectiveServiceLevel(): number {
     // Adjust service level based on recent performance
     let adjustedLevel = this.serviceLevel;
-    
+
     if (this.stockoutsPrevented > 0 && this.overstockIncidents > 0) {
-      const ratio = this.stockoutsPrevented / (this.stockoutsPrevented + this.overstockIncidents);
+      const ratio =
+        this.stockoutsPrevented /
+        (this.stockoutsPrevented + this.overstockIncidents);
       if (ratio < 0.8) {
         adjustedLevel = Math.min(0.99, this.serviceLevel + 0.05);
       } else if (ratio > 0.95) {
         adjustedLevel = Math.max(0.8, this.serviceLevel - 0.05);
       }
     }
-    
+
     return adjustedLevel;
   }
 
   // Business Methods
   calculateEOQ(): number {
-    if (!this.annualDemand || !this.orderingCost || !this.holdingCostRate || !this.unitCost) {
+    if (
+      !this.annualDemand ||
+      !this.orderingCost ||
+      !this.holdingCostRate ||
+      !this.unitCost
+    ) {
       return this.reorderQuantity;
     }
 
     const holdingCost = this.unitCost * (this.holdingCostRate / 100);
-    const eoq = Math.sqrt((2 * this.annualDemand * this.orderingCost) / holdingCost);
-    
+    const eoq = Math.sqrt(
+      (2 * this.annualDemand * this.orderingCost) / holdingCost,
+    );
+
     return Math.round(eoq);
   }
 
@@ -337,25 +353,29 @@ export class ReorderRule extends AuditableEntity {
 
     // Using normal distribution approximation for service level
     const zScore = this.getZScoreForServiceLevel(this.effectiveServiceLevel);
-    const leadTimeVariance = Math.pow(this.leadTimeDays || 7, 2) * demandVariance;
+    const leadTimeVariance =
+      Math.pow(this.leadTimeDays || 7, 2) * demandVariance;
     const safetyStock = zScore * Math.sqrt(leadTimeVariance);
-    
+
     return Math.round(safetyStock);
   }
 
   calculateReorderPoint(averageDemand: number, demandVariance: number): number {
     const leadTimeDemand = averageDemand * (this.leadTimeDays || 7);
-    const safetyStock = this.calculateSafetyStock(averageDemand, demandVariance);
-    
+    const safetyStock = this.calculateSafetyStock(
+      averageDemand,
+      demandVariance,
+    );
+
     return Math.round(leadTimeDemand + safetyStock);
   }
 
   getSeasonalFactor(month?: number): number {
     if (!this.seasonalFactors) return 1.0;
-    
+
     const targetMonth = month || new Date().getMonth() + 1;
     const monthKey = targetMonth.toString();
-    
+
     return this.seasonalFactors[monthKey] || 1.0;
   }
 
@@ -371,9 +391,13 @@ export class ReorderRule extends AuditableEntity {
     }
   }
 
-  recordExecution(success: boolean, orderValue?: number, errorMessage?: string): void {
+  recordExecution(
+    success: boolean,
+    orderValue?: number,
+    errorMessage?: string,
+  ): void {
     this.lastExecutedAt = new Date();
-    
+
     if (success) {
       this.totalOrdersGenerated += 1;
       if (orderValue) {
@@ -387,7 +411,7 @@ export class ReorderRule extends AuditableEntity {
       this.lastErrorAt = new Date();
       this.lastErrorMessage = errorMessage || 'Unknown error';
     }
-    
+
     this.updateNextReviewDate();
   }
 
@@ -398,7 +422,7 @@ export class ReorderRule extends AuditableEntity {
   pause(reason?: string, durationHours?: number): void {
     this.isPaused = true;
     this.pauseReason = reason;
-    
+
     if (durationHours) {
       this.pausedUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000);
     }
@@ -414,7 +438,7 @@ export class ReorderRule extends AuditableEntity {
   private getZScoreForServiceLevel(serviceLevel: number): number {
     // Approximation of Z-scores for common service levels
     const zScores: { [key: string]: number } = {
-      '0.50': 0.00,
+      '0.50': 0.0,
       '0.80': 0.84,
       '0.85': 1.04,
       '0.90': 1.28,

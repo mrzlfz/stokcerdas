@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere, Between, In, DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -16,7 +21,11 @@ import {
 } from '../entities/privacy-management.entity';
 import { User } from '../../users/entities/user.entity';
 import { SOC2AuditLogService } from './soc2-audit-log.service';
-import { AuditEventType, AuditEventOutcome, AuditEventSeverity } from '../entities/soc2-audit-log.entity';
+import {
+  AuditEventType,
+  AuditEventOutcome,
+  AuditEventSeverity,
+} from '../entities/soc2-audit-log.entity';
 
 export interface DataSubjectRequestDto {
   userId: string;
@@ -120,7 +129,10 @@ export class DataSubjectRightsService {
       dueDate.setDate(dueDate.getDate() + 30);
 
       // Determine priority based on request type and urgency
-      const priority = this.determinePriority(request.requestType, request.urgentRequest);
+      const priority = this.determinePriority(
+        request.requestType,
+        request.urgentRequest,
+      );
 
       const dataSubjectRequest = this.requestRepository.create({
         tenantId,
@@ -142,13 +154,15 @@ export class DataSubjectRightsService {
           identityVerified: false,
           verificationMethod: 'email',
         },
-        processingLog: [{
-          step: 'request_submitted',
-          timestamp: new Date(),
-          processedBy: submittedBy,
-          status: 'pending_review',
-          notes: 'Initial request submission',
-        }],
+        processingLog: [
+          {
+            step: 'request_submitted',
+            timestamp: new Date(),
+            processedBy: submittedBy,
+            status: 'pending_review',
+            notes: 'Initial request submission',
+          },
+        ],
         requestorIp: request.ipAddress,
         requestorUserAgent: request.userAgent,
         priority,
@@ -156,7 +170,9 @@ export class DataSubjectRightsService {
         createdBy: submittedBy,
       });
 
-      const savedRequest = await this.requestRepository.save(dataSubjectRequest);
+      const savedRequest = await this.requestRepository.save(
+        dataSubjectRequest,
+      );
 
       // Emit request submitted event
       this.eventEmitter.emit('privacy.data_subject_request.submitted', {
@@ -189,11 +205,15 @@ export class DataSubjectRightsService {
         },
       });
 
-      this.logger.log(`Data subject request submitted: ${savedRequest.requestId} for user ${request.userId}`);
+      this.logger.log(
+        `Data subject request submitted: ${savedRequest.requestId} for user ${request.userId}`,
+      );
       return savedRequest;
-
     } catch (error) {
-      this.logger.error(`Error submitting data subject request: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error submitting data subject request: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to submit data subject request');
     }
   }
@@ -208,9 +228,11 @@ export class DataSubjectRightsService {
   ): Promise<DataPortabilityReport> {
     try {
       const request = await this.getRequestById(tenantId, requestId);
-      
+
       if (request.requestType !== DataSubjectRight.ACCESS) {
-        throw new BadRequestException('Invalid request type for access processing');
+        throw new BadRequestException(
+          'Invalid request type for access processing',
+        );
       }
 
       // Update request status
@@ -233,11 +255,16 @@ export class DataSubjectRightsService {
           userId: request.userId,
           requestId,
           legalBasis: 'UU PDP Article 27 - Right to Access',
-          retentionPolicies: await this.getApplicableRetentionPolicies(tenantId),
+          retentionPolicies: await this.getApplicableRetentionPolicies(
+            tenantId,
+          ),
         },
         statistics: {
           totalRecords: this.countTotalRecords(userData),
-          dataCategories: await this.getDataCategories(tenantId, request.userId),
+          dataCategories: await this.getDataCategories(
+            tenantId,
+            request.userId,
+          ),
           oldestRecord: await this.getOldestRecord(tenantId, request.userId),
           newestRecord: new Date(),
         },
@@ -255,7 +282,8 @@ export class DataSubjectRightsService {
       await this.completeRequest(tenantId, requestId, {
         exportResult,
         processedBy,
-        responseMessage: 'Your personal data has been compiled and is ready for download.',
+        responseMessage:
+          'Your personal data has been compiled and is ready for download.',
       });
 
       // Log completion
@@ -278,7 +306,6 @@ export class DataSubjectRightsService {
       });
 
       return portabilityReport;
-
     } catch (error) {
       await this.handleRequestError(tenantId, requestId, error, processedBy);
       throw error;
@@ -295,9 +322,11 @@ export class DataSubjectRightsService {
   ): Promise<DataDeletionResult> {
     try {
       const request = await this.getRequestById(tenantId, requestId);
-      
+
       if (request.requestType !== DataSubjectRight.ERASURE) {
-        throw new BadRequestException('Invalid request type for erasure processing');
+        throw new BadRequestException(
+          'Invalid request type for erasure processing',
+        );
       }
 
       // Update request status
@@ -309,7 +338,10 @@ export class DataSubjectRightsService {
       });
 
       // Check legal obligations for data retention
-      const retentionRequirements = await this.checkRetentionRequirements(tenantId, request.userId);
+      const retentionRequirements = await this.checkRetentionRequirements(
+        tenantId,
+        request.userId,
+      );
 
       // Perform data deletion/anonymization
       const deletionResult = await this.performDataDeletion(
@@ -346,7 +378,6 @@ export class DataSubjectRightsService {
       });
 
       return deletionResult;
-
     } catch (error) {
       await this.handleRequestError(tenantId, requestId, error, processedBy);
       throw error;
@@ -364,9 +395,11 @@ export class DataSubjectRightsService {
   ): Promise<void> {
     try {
       const request = await this.getRequestById(tenantId, requestId);
-      
+
       if (request.requestType !== DataSubjectRight.RECTIFICATION) {
-        throw new BadRequestException('Invalid request type for rectification processing');
+        throw new BadRequestException(
+          'Invalid request type for rectification processing',
+        );
       }
 
       // Update request status
@@ -427,7 +460,6 @@ export class DataSubjectRightsService {
           fieldsUpdated: Object.keys(corrections),
         },
       });
-
     } catch (error) {
       await this.handleRequestError(tenantId, requestId, error, processedBy);
       throw error;
@@ -490,9 +522,11 @@ export class DataSubjectRightsService {
       });
 
       return { requests, total };
-
     } catch (error) {
-      this.logger.error(`Error getting requests: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting requests: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve requests');
     }
   }
@@ -515,7 +549,7 @@ export class DataSubjectRightsService {
 
       for (const request of overdueRequests) {
         const daysOverdue = Math.ceil(
-          (Date.now() - request.dueDate!.getTime()) / (1000 * 60 * 60 * 24)
+          (Date.now() - request.dueDate!.getTime()) / (1000 * 60 * 60 * 24),
         );
 
         // Emit overdue alert
@@ -533,7 +567,10 @@ export class DataSubjectRightsService {
         await this.auditLogService.logEvent(request.tenantId, {
           eventType: AuditEventType.SECURITY_VIOLATION,
           eventDescription: `Data subject request ${request.requestId} is overdue by ${daysOverdue} days`,
-          severity: daysOverdue > 7 ? AuditEventSeverity.HIGH : AuditEventSeverity.MEDIUM,
+          severity:
+            daysOverdue > 7
+              ? AuditEventSeverity.HIGH
+              : AuditEventSeverity.MEDIUM,
           outcome: AuditEventOutcome.WARNING,
           userId: request.userId,
           resourceType: 'data_subject_request',
@@ -550,15 +587,20 @@ export class DataSubjectRightsService {
       }
 
       this.logger.log(`Found ${overdueRequests.length} overdue requests`);
-
     } catch (error) {
-      this.logger.error(`Error checking overdue requests: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error checking overdue requests: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
   // Private helper methods
 
-  private async getRequestById(tenantId: string, requestId: string): Promise<DataSubjectRequest> {
+  private async getRequestById(
+    tenantId: string,
+    requestId: string,
+  ): Promise<DataSubjectRequest> {
     const request = await this.requestRepository.findOne({
       where: { tenantId, requestId, isDeleted: false },
     });
@@ -580,9 +622,12 @@ export class DataSubjectRightsService {
     return `REF-${requestId}`;
   }
 
-  private determinePriority(requestType: DataSubjectRight, urgent?: boolean): string {
+  private determinePriority(
+    requestType: DataSubjectRight,
+    urgent?: boolean,
+  ): string {
     if (urgent) return 'urgent';
-    
+
     switch (requestType) {
       case DataSubjectRight.ERASURE:
         return 'high';
@@ -606,11 +651,14 @@ export class DataSubjectRightsService {
     }
   }
 
-  private async collectUserData(tenantId: string, userId: string): Promise<any> {
+  private async collectUserData(
+    tenantId: string,
+    userId: string,
+  ): Promise<any> {
     // This would collect data from all tables where user data exists
     // Implementation would depend on the specific database schema
     const queryRunner = this.dataSource.createQueryRunner();
-    
+
     try {
       const userData = {
         personalInformation: {},
@@ -623,7 +671,7 @@ export class DataSubjectRightsService {
       // Collect user profile data
       const user = await queryRunner.query(
         'SELECT * FROM users WHERE id = $1 AND tenant_id = $2 AND is_deleted = false',
-        [userId, tenantId]
+        [userId, tenantId],
       );
       userData.personalInformation = user[0] || {};
 
@@ -638,7 +686,6 @@ export class DataSubjectRightsService {
       }
 
       return userData;
-
     } finally {
       await queryRunner.release();
     }
@@ -650,7 +697,7 @@ export class DataSubjectRightsService {
     update: RequestProcessingDto,
   ): Promise<void> {
     const request = await this.getRequestById(tenantId, requestId);
-    
+
     request.status = update.status;
     request.responseMessage = update.responseMessage;
     request.rejectionReason = update.rejectionReason;
@@ -744,15 +791,20 @@ export class DataSubjectRightsService {
 
       for (const classification of dataClassifications) {
         const tableName = classification.entityName;
-        
+
         if (retentionRequirements[tableName]) {
           // Data must be retained for legal reasons
           recordsRetained.push(tableName);
           retentionReasons[tableName] = retentionRequirements[tableName].reason;
-          
+
           if (classification.processingDetails?.anonymizationPossible) {
             // Anonymize instead of delete
-            await this.anonymizeUserData(queryRunner, tableName, userId, tenantId);
+            await this.anonymizeUserData(
+              queryRunner,
+              tableName,
+              userId,
+              tenantId,
+            );
             recordsAnonymized++;
           }
         } else {
@@ -760,9 +812,9 @@ export class DataSubjectRightsService {
           const result = await queryRunner.query(
             `UPDATE ${tableName} SET is_deleted = true, deleted_at = $1, deleted_by = $2 
              WHERE user_id = $3 AND tenant_id = $4 AND is_deleted = false`,
-            [deletionDate, 'system_erasure', userId, tenantId]
+            [deletionDate, 'system_erasure', userId, tenantId],
           );
-          
+
           if (result.affectedRows > 0) {
             tablesAffected.push(tableName);
             recordsDeleted += result.affectedRows;
@@ -781,7 +833,6 @@ export class DataSubjectRightsService {
         recordsRetained,
         retentionReasons,
       };
-
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -819,7 +870,7 @@ export class DataSubjectRightsService {
     await queryRunner.query(
       `UPDATE ${tableName} SET ${setClause}, updated_at = $1, updated_by = $2 
        WHERE user_id = $3 AND tenant_id = $4 AND is_deleted = false`,
-      values
+      values,
     );
   }
 
@@ -835,7 +886,7 @@ export class DataSubjectRightsService {
     },
   ): Promise<void> {
     const request = await this.getRequestById(tenantId, requestId);
-    
+
     request.status = RequestStatus.COMPLETED;
     request.completedAt = new Date();
     request.responseMessage = completion.responseMessage;
@@ -886,7 +937,9 @@ export class DataSubjectRightsService {
         notes: `Processing failed: ${error.message}`,
       });
     } catch (updateError) {
-      this.logger.error(`Failed to update request status after error: ${updateError.message}`);
+      this.logger.error(
+        `Failed to update request status after error: ${updateError.message}`,
+      );
     }
   }
 
@@ -898,13 +951,15 @@ export class DataSubjectRightsService {
 
   private convertToXML(data: any): string {
     // Simple XML conversion - would need more sophisticated implementation
-    return `<?xml version="1.0" encoding="UTF-8"?><data>${JSON.stringify(data)}</data>`;
+    return `<?xml version="1.0" encoding="UTF-8"?><data>${JSON.stringify(
+      data,
+    )}</data>`;
   }
 
   private countTotalRecords(userData: any): number {
     // Count all records in the user data
     let count = 0;
-    
+
     function countRecords(obj: any): void {
       if (Array.isArray(obj)) {
         count += obj.length;
@@ -913,41 +968,52 @@ export class DataSubjectRightsService {
         Object.values(obj).forEach(countRecords);
       }
     }
-    
+
     countRecords(userData);
     return count;
   }
 
-  private async getDataCategories(tenantId: string, userId: string): Promise<PersonalDataCategory[]> {
+  private async getDataCategories(
+    tenantId: string,
+    userId: string,
+  ): Promise<PersonalDataCategory[]> {
     const classifications = await this.dataClassificationRepository.find({
       where: { tenantId, isActive: true, isDeleted: false },
     });
-    
+
     return [...new Set(classifications.map(c => c.category))];
   }
 
-  private async getOldestRecord(tenantId: string, userId: string): Promise<Date> {
+  private async getOldestRecord(
+    tenantId: string,
+    userId: string,
+  ): Promise<Date> {
     // Query to find the oldest record for the user
     const queryRunner = this.dataSource.createQueryRunner();
-    
+
     try {
       const result = await queryRunner.query(
         'SELECT MIN(created_at) as oldest FROM users WHERE id = $1 AND tenant_id = $2',
-        [userId, tenantId]
+        [userId, tenantId],
       );
-      
+
       return result[0]?.oldest || new Date();
     } finally {
       await queryRunner.release();
     }
   }
 
-  private async getApplicableRetentionPolicies(tenantId: string): Promise<any[]> {
+  private async getApplicableRetentionPolicies(
+    tenantId: string,
+  ): Promise<any[]> {
     // Get retention policies that apply to this tenant
     return []; // Implementation would depend on retention policy structure
   }
 
-  private async checkRetentionRequirements(tenantId: string, userId: string): Promise<any> {
+  private async checkRetentionRequirements(
+    tenantId: string,
+    userId: string,
+  ): Promise<any> {
     // Check legal and business requirements for data retention
     return {}; // Implementation would check various retention rules
   }

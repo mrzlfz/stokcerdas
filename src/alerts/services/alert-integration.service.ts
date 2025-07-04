@@ -5,9 +5,19 @@ import { Repository } from 'typeorm';
 
 import { AlertManagementService } from './alert-management.service';
 import { AlertConfigurationService } from './alert-configuration.service';
-import { AlertType, AlertSeverity } from '../entities/alert-configuration.entity';
-import { AlertInstance, AlertStatus, AlertPriority } from '../entities/alert-instance.entity';
-import { InventoryUpdateEvent, StockAlert } from '../../inventory/services/inventory-realtime.service';
+import {
+  AlertType,
+  AlertSeverity,
+} from '../entities/alert-configuration.entity';
+import {
+  AlertInstance,
+  AlertStatus,
+  AlertPriority,
+} from '../entities/alert-instance.entity';
+import {
+  InventoryUpdateEvent,
+  StockAlert,
+} from '../../inventory/services/inventory-realtime.service';
 
 @Injectable()
 export class AlertIntegrationService {
@@ -30,16 +40,19 @@ export class AlertIntegrationService {
       const { tenantId } = event;
 
       // Check if there's a configuration for this alert type
-      const configuration = await this.alertConfigurationService.getConfigurationForAlert(
-        tenantId,
-        this.mapStockAlertTypeToAlertType(alert.type),
-        alert.inventoryItem.productId,
-        alert.inventoryItem.locationId,
-      );
+      const configuration =
+        await this.alertConfigurationService.getConfigurationForAlert(
+          tenantId,
+          this.mapStockAlertTypeToAlertType(alert.type),
+          alert.inventoryItem.productId,
+          alert.inventoryItem.locationId,
+        );
 
       // Skip if alert type is disabled
       if (configuration && !configuration.isEnabled) {
-        this.logger.debug(`Alert type ${alert.type} disabled for tenant ${tenantId}`);
+        this.logger.debug(
+          `Alert type ${alert.type} disabled for tenant ${tenantId}`,
+        );
         return;
       }
 
@@ -54,7 +67,9 @@ export class AlertIntegrationService {
       if (existingAlert) {
         // Update existing alert with new data
         await this.updateExistingAlert(existingAlert, alert);
-        this.logger.debug(`Updated existing alert ${existingAlert.id} for ${alert.type}`);
+        this.logger.debug(
+          `Updated existing alert ${existingAlert.id} for ${alert.type}`,
+        );
         return;
       }
 
@@ -66,11 +81,15 @@ export class AlertIntegrationService {
       );
 
       this.logger.log(
-        `Created alert instance ${alertInstance.id} for ${alert.type} - ${alert.inventoryItem.product?.name || 'Unknown'}`
+        `Created alert instance ${alertInstance.id} for ${alert.type} - ${
+          alert.inventoryItem.product?.name || 'Unknown'
+        }`,
       );
-
     } catch (error) {
-      this.logger.error(`Error handling inventory alert: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error handling inventory alert: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -81,12 +100,14 @@ export class AlertIntegrationService {
   async handleInventoryUpdate(event: InventoryUpdateEvent): Promise<void> {
     try {
       const { tenantId, data } = event;
-      
+
       // Check if this update resolves any active alerts
       await this.checkAndResolveAlerts(tenantId, data);
-
     } catch (error) {
-      this.logger.error(`Error handling inventory update for alerts: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error handling inventory update for alerts: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -100,20 +121,23 @@ export class AlertIntegrationService {
   ): Promise<AlertInstance> {
     const alertType = this.mapStockAlertTypeToAlertType(stockAlert.type);
     const severity = stockAlert.severity as AlertSeverity;
-    
+
     const title = this.generateAlertTitle(stockAlert);
     const message = stockAlert.message;
 
     const alertData = {
       currentQuantity: stockAlert.currentValue,
       threshold: stockAlert.threshold,
-      reorderPoint: stockAlert.inventoryItem.reorderPoint || stockAlert.inventoryItem.product?.reorderPoint,
+      reorderPoint:
+        stockAlert.inventoryItem.reorderPoint ||
+        stockAlert.inventoryItem.product?.reorderPoint,
       availableQuantity: stockAlert.inventoryItem.quantityAvailable,
     };
 
     // Add expiry-specific data
     if (stockAlert.type === 'expiring_soon' || stockAlert.type === 'expired') {
-      alertData['expiryDate'] = stockAlert.inventoryItem.expiryDate?.toISOString();
+      alertData['expiryDate'] =
+        stockAlert.inventoryItem.expiryDate?.toISOString();
       alertData['daysUntilExpiry'] = stockAlert.currentValue;
     }
 
@@ -186,7 +210,11 @@ export class AlertIntegrationService {
     tenantId: string,
     inventoryData: any,
   ): Promise<void> {
-    const { id: inventoryItemId, quantityAvailable, expiryDate } = inventoryData;
+    const {
+      id: inventoryItemId,
+      quantityAvailable,
+      expiryDate,
+    } = inventoryData;
 
     // Find active alerts for this inventory item
     const activeAlerts = await this.alertInstanceRepository.find({
@@ -202,24 +230,33 @@ export class AlertIntegrationService {
       const resolutionNotes = [];
 
       // Check stock-related alerts
-      if (['low_stock', 'out_of_stock', 'reorder_needed'].includes(alert.alertType)) {
+      if (
+        ['low_stock', 'out_of_stock', 'reorder_needed'].includes(
+          alert.alertType,
+        )
+      ) {
         const threshold = alert.data?.threshold || 0;
         if (quantityAvailable > threshold) {
           shouldResolve = true;
-          resolutionNotes.push(`Stok kembali tersedia: ${quantityAvailable} > ${threshold}`);
+          resolutionNotes.push(
+            `Stok kembali tersedia: ${quantityAvailable} > ${threshold}`,
+          );
         }
       }
 
       // Check expiry alerts
       if (alert.alertType === 'expiring_soon' && expiryDate) {
         const daysUntilExpiry = Math.ceil(
-          (new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+          (new Date(expiryDate).getTime() - new Date().getTime()) /
+            (1000 * 60 * 60 * 24),
         );
         const warningDays = alert.data?.daysUntilExpiry || 30;
-        
+
         if (daysUntilExpiry > warningDays) {
           shouldResolve = true;
-          resolutionNotes.push(`Tanggal kadaluarsa diperpanjang: ${daysUntilExpiry} hari`);
+          resolutionNotes.push(
+            `Tanggal kadaluarsa diperpanjang: ${daysUntilExpiry} hari`,
+          );
         }
       }
 
@@ -231,7 +268,9 @@ export class AlertIntegrationService {
           'system',
         );
 
-        this.logger.log(`Auto-resolved alert ${alert.id}: ${resolutionNotes.join(', ')}`);
+        this.logger.log(
+          `Auto-resolved alert ${alert.id}: ${resolutionNotes.join(', ')}`,
+        );
       }
     }
   }
@@ -241,12 +280,12 @@ export class AlertIntegrationService {
    */
   private mapStockAlertTypeToAlertType(stockAlertType: string): AlertType {
     const mapping = {
-      'low_stock': AlertType.LOW_STOCK,
-      'out_of_stock': AlertType.OUT_OF_STOCK,
-      'overstock': AlertType.OVERSTOCK,
-      'expiring_soon': AlertType.EXPIRING_SOON,
-      'expired': AlertType.EXPIRED,
-      'reorder_needed': AlertType.REORDER_NEEDED,
+      low_stock: AlertType.LOW_STOCK,
+      out_of_stock: AlertType.OUT_OF_STOCK,
+      overstock: AlertType.OVERSTOCK,
+      expiring_soon: AlertType.EXPIRING_SOON,
+      expired: AlertType.EXPIRED,
+      reorder_needed: AlertType.REORDER_NEEDED,
     };
 
     return mapping[stockAlertType] || AlertType.LOW_STOCK;
@@ -256,16 +295,18 @@ export class AlertIntegrationService {
    * Generate alert title
    */
   private generateAlertTitle(stockAlert: StockAlert): string {
-    const productName = stockAlert.inventoryItem.product?.name || 'Unknown Product';
-    const locationName = stockAlert.inventoryItem.location?.name || 'Unknown Location';
+    const productName =
+      stockAlert.inventoryItem.product?.name || 'Unknown Product';
+    const locationName =
+      stockAlert.inventoryItem.location?.name || 'Unknown Location';
 
     const titles = {
-      'low_stock': `Stok Rendah: ${productName}`,
-      'out_of_stock': `Stok Habis: ${productName}`,
-      'overstock': `Stok Berlebih: ${productName}`,
-      'expiring_soon': `Segera Kadaluarsa: ${productName}`,
-      'expired': `Sudah Kadaluarsa: ${productName}`,
-      'reorder_needed': `Perlu Reorder: ${productName}`,
+      low_stock: `Stok Rendah: ${productName}`,
+      out_of_stock: `Stok Habis: ${productName}`,
+      overstock: `Stok Berlebih: ${productName}`,
+      expiring_soon: `Segera Kadaluarsa: ${productName}`,
+      expired: `Sudah Kadaluarsa: ${productName}`,
+      reorder_needed: `Perlu Reorder: ${productName}`,
     };
 
     return titles[stockAlert.type] || `Alert: ${productName}`;
@@ -298,7 +339,12 @@ export class AlertIntegrationService {
    * Escalate priority
    */
   private escalatePriority(currentPriority: AlertPriority): AlertPriority {
-    const priorities = [AlertPriority.LOW, AlertPriority.MEDIUM, AlertPriority.HIGH, AlertPriority.CRITICAL];
+    const priorities = [
+      AlertPriority.LOW,
+      AlertPriority.MEDIUM,
+      AlertPriority.HIGH,
+      AlertPriority.CRITICAL,
+    ];
     const currentIndex = priorities.indexOf(currentPriority);
     return priorities[Math.min(currentIndex + 1, priorities.length - 1)];
   }
@@ -329,9 +375,14 @@ export class AlertIntegrationService {
         'system',
       );
 
-      this.logger.log(`Created system maintenance alert for tenant ${event.tenantId}: ${event.title}`);
+      this.logger.log(
+        `Created system maintenance alert for tenant ${event.tenantId}: ${event.title}`,
+      );
     } catch (error) {
-      this.logger.error(`Error creating system maintenance alert: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating system maintenance alert: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -345,12 +396,14 @@ export class AlertIntegrationService {
     const result = await this.alertInstanceRepository
       .createQueryBuilder()
       .delete()
-      .where('status IN (:...statuses)', { statuses: ['resolved', 'dismissed'] })
+      .where('status IN (:...statuses)', {
+        statuses: ['resolved', 'dismissed'],
+      })
       .andWhere('updatedAt < :cutoffDate', { cutoffDate })
       .execute();
 
     const deletedCount = result.affected || 0;
-    
+
     if (deletedCount > 0) {
       this.logger.log(`Cleaned up ${deletedCount} old alert instances`);
     }

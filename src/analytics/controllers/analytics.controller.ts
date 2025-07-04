@@ -66,12 +66,13 @@ export class AnalyticsController {
 
   @Get('dashboard')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get comprehensive dashboard metrics',
-    description: 'Returns key performance indicators, real-time metrics, and dashboard alerts for business intelligence overview'
+    description:
+      'Returns key performance indicators, real-time metrics, and dashboard alerts for business intelligence overview',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Dashboard metrics retrieved successfully',
     type: DashboardMetricsResponseDto,
   })
@@ -80,14 +81,19 @@ export class AnalyticsController {
     @Query() query: DashboardMetricsQueryDto,
   ): Promise<DashboardMetricsResponseDto> {
     try {
-      this.logger.debug(`Getting dashboard metrics for tenant ${user.tenantId}`);
-      
+      this.logger.debug(
+        `Getting dashboard metrics for tenant ${user.tenantId}`,
+      );
+
       return await this.businessIntelligenceService.generateDashboardMetrics(
         user.tenantId,
         query,
       );
     } catch (error) {
-      this.logger.error(`Failed to get dashboard metrics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get dashboard metrics: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -102,12 +108,13 @@ export class AnalyticsController {
 
   @Get('revenue')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate revenue analytics report',
-    description: 'Comprehensive revenue analysis including profit margins, COGS, trends, and comparisons'
+    description:
+      'Comprehensive revenue analysis including profit margins, COGS, trends, and comparisons',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Revenue analytics generated successfully',
     type: RevenueAnalyticsResponseDto,
   })
@@ -116,14 +123,19 @@ export class AnalyticsController {
     @Query() query: RevenueAnalyticsQueryDto,
   ): Promise<RevenueAnalyticsResponseDto> {
     try {
-      this.logger.debug(`Generating revenue analytics for tenant ${user.tenantId}`);
-      
+      this.logger.debug(
+        `Generating revenue analytics for tenant ${user.tenantId}`,
+      );
+
       return await this.businessIntelligenceService.generateRevenueAnalytics(
         user.tenantId,
         query,
       );
     } catch (error) {
-      this.logger.error(`Failed to generate revenue analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate revenue analytics: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -136,24 +148,33 @@ export class AnalyticsController {
 
   @Get('revenue/trends')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get revenue trends analysis',
-    description: 'Historical revenue trends with forecasting and seasonal analysis'
+    description:
+      'Historical revenue trends with forecasting and seasonal analysis',
   })
-  @ApiQuery({ name: 'granularity', enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], required: false })
+  @ApiQuery({
+    name: 'granularity',
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    required: false,
+  })
   @ApiQuery({ name: 'startDate', type: String, required: false })
   @ApiQuery({ name: 'endDate', type: String, required: false })
-  @ApiResponse({ status: 200, description: 'Revenue trends retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Revenue trends retrieved successfully',
+  })
   async getRevenueTrends(
     @CurrentUser() user: any,
     @Query() query: RevenueAnalyticsQueryDto,
   ) {
     try {
       // Focus on trend data from revenue analytics
-      const analytics = await this.businessIntelligenceService.generateRevenueAnalytics(
-        user.tenantId,
-        { ...query, includeTrends: true },
-      );
+      const analytics =
+        await this.businessIntelligenceService.generateRevenueAnalytics(
+          user.tenantId,
+          { ...query, includeTrends: true },
+        );
 
       return {
         success: true,
@@ -161,7 +182,10 @@ export class AnalyticsController {
         meta: analytics.meta,
       };
     } catch (error) {
-      this.logger.error(`Failed to get revenue trends: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get revenue trends: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -176,12 +200,13 @@ export class AnalyticsController {
 
   @Get('inventory/turnover')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate inventory turnover analysis',
-    description: 'Comprehensive inventory turnover analysis with fast/slow moving items, aging, and optimization recommendations'
+    description:
+      'Comprehensive inventory turnover analysis with fast/slow moving items, aging, and optimization recommendations',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Inventory turnover analysis generated successfully',
     type: InventoryTurnoverResponseDto,
   })
@@ -190,14 +215,19 @@ export class AnalyticsController {
     @Query() query: InventoryTurnoverQueryDto,
   ): Promise<InventoryTurnoverResponseDto> {
     try {
-      this.logger.debug(`Generating inventory turnover analysis for tenant ${user.tenantId}`);
-      
+      this.logger.debug(
+        `Generating inventory turnover analysis for tenant ${user.tenantId}`,
+      );
+
       return await this.businessIntelligenceService.generateInventoryTurnoverAnalysis(
         user.tenantId,
         query,
       );
     } catch (error) {
-      this.logger.error(`Failed to generate inventory turnover analysis: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate inventory turnover analysis: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -210,24 +240,31 @@ export class AnalyticsController {
 
   @Get('inventory/slow-moving')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get slow-moving inventory items',
-    description: 'Identify slow-moving and dead stock items with actionable recommendations'
+    description:
+      'Identify slow-moving and dead stock items with actionable recommendations',
   })
-  @ApiResponse({ status: 200, description: 'Slow-moving inventory items retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Slow-moving inventory items retrieved successfully',
+  })
   async getSlowMovingInventory(
     @CurrentUser() user: any,
     @Query() query: InventoryTurnoverQueryDto,
   ) {
     try {
-      const analysis = await this.businessIntelligenceService.generateInventoryTurnoverAnalysis(
-        user.tenantId,
-        { ...query, includeSlowMoving: true },
-      );
+      const analysis =
+        await this.businessIntelligenceService.generateInventoryTurnoverAnalysis(
+          user.tenantId,
+          { ...query, includeSlowMoving: true },
+        );
 
       // Filter for slow-moving and dead stock items
       const slowMovingItems = analysis.data.filter(
-        item => item.stockStatus === 'slow_moving' || item.stockStatus === 'dead_stock'
+        item =>
+          item.stockStatus === 'slow_moving' ||
+          item.stockStatus === 'dead_stock',
       );
 
       return {
@@ -239,7 +276,10 @@ export class AnalyticsController {
         },
         summary: {
           totalSlowMovingItems: slowMovingItems.length,
-          totalValue: slowMovingItems.reduce((sum, item) => sum + item.averageInventoryValue, 0),
+          totalValue: slowMovingItems.reduce(
+            (sum, item) => sum + item.averageInventoryValue,
+            0,
+          ),
           recommendedActions: slowMovingItems.map(item => ({
             productId: item.productId,
             recommendation: item.recommendation,
@@ -247,7 +287,10 @@ export class AnalyticsController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get slow-moving inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get slow-moving inventory: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -262,12 +305,13 @@ export class AnalyticsController {
 
   @Get('products/performance')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate product performance analytics',
-    description: 'Comprehensive product performance analysis with ABC classification, profitability, and growth metrics'
+    description:
+      'Comprehensive product performance analysis with ABC classification, profitability, and growth metrics',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Product performance analytics generated successfully',
     type: ProductPerformanceResponseDto,
   })
@@ -276,14 +320,19 @@ export class AnalyticsController {
     @Query() query: ProductPerformanceQueryDto,
   ): Promise<ProductPerformanceResponseDto> {
     try {
-      this.logger.debug(`Generating product performance analytics for tenant ${user.tenantId}`);
-      
+      this.logger.debug(
+        `Generating product performance analytics for tenant ${user.tenantId}`,
+      );
+
       return await this.businessIntelligenceService.generateProductPerformanceAnalytics(
         user.tenantId,
         query,
       );
     } catch (error) {
-      this.logger.error(`Failed to generate product performance analytics: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate product performance analytics: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -296,20 +345,25 @@ export class AnalyticsController {
 
   @Get('products/abc-analysis')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get ABC analysis of products',
-    description: 'Pareto analysis (80/20 rule) of products by revenue contribution'
+    description:
+      'Pareto analysis (80/20 rule) of products by revenue contribution',
   })
-  @ApiResponse({ status: 200, description: 'ABC analysis retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'ABC analysis retrieved successfully',
+  })
   async getABCAnalysis(
     @CurrentUser() user: any,
     @Query() query: ProductPerformanceQueryDto,
   ) {
     try {
-      const analytics = await this.businessIntelligenceService.generateProductPerformanceAnalytics(
-        user.tenantId,
-        { ...query, includeABCAnalysis: true },
-      );
+      const analytics =
+        await this.businessIntelligenceService.generateProductPerformanceAnalytics(
+          user.tenantId,
+          { ...query, includeABCAnalysis: true },
+        );
 
       // Group by ABC classification
       const abcGroups = {
@@ -325,23 +379,41 @@ export class AnalyticsController {
         summary: {
           classA: {
             count: abcGroups.A.length,
-            revenueContribution: abcGroups.A.reduce((sum, p) => sum + p.revenueContribution, 0),
-            averageMargin: abcGroups.A.reduce((sum, p) => sum + p.profitMargin, 0) / abcGroups.A.length || 0,
+            revenueContribution: abcGroups.A.reduce(
+              (sum, p) => sum + p.revenueContribution,
+              0,
+            ),
+            averageMargin:
+              abcGroups.A.reduce((sum, p) => sum + p.profitMargin, 0) /
+                abcGroups.A.length || 0,
           },
           classB: {
             count: abcGroups.B.length,
-            revenueContribution: abcGroups.B.reduce((sum, p) => sum + p.revenueContribution, 0),
-            averageMargin: abcGroups.B.reduce((sum, p) => sum + p.profitMargin, 0) / abcGroups.B.length || 0,
+            revenueContribution: abcGroups.B.reduce(
+              (sum, p) => sum + p.revenueContribution,
+              0,
+            ),
+            averageMargin:
+              abcGroups.B.reduce((sum, p) => sum + p.profitMargin, 0) /
+                abcGroups.B.length || 0,
           },
           classC: {
             count: abcGroups.C.length,
-            revenueContribution: abcGroups.C.reduce((sum, p) => sum + p.revenueContribution, 0),
-            averageMargin: abcGroups.C.reduce((sum, p) => sum + p.profitMargin, 0) / abcGroups.C.length || 0,
+            revenueContribution: abcGroups.C.reduce(
+              (sum, p) => sum + p.revenueContribution,
+              0,
+            ),
+            averageMargin:
+              abcGroups.C.reduce((sum, p) => sum + p.profitMargin, 0) /
+                abcGroups.C.length || 0,
           },
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get ABC analysis: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get ABC analysis: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -354,13 +426,21 @@ export class AnalyticsController {
 
   @Get('products/top-performers')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get top performing products',
-    description: 'List of top performing products by revenue, profit, or volume'
+    description:
+      'List of top performing products by revenue, profit, or volume',
   })
-  @ApiQuery({ name: 'metric', enum: ['revenue', 'profit', 'volume'], required: false })
+  @ApiQuery({
+    name: 'metric',
+    enum: ['revenue', 'profit', 'volume'],
+    required: false,
+  })
   @ApiQuery({ name: 'limit', type: Number, required: false })
-  @ApiResponse({ status: 200, description: 'Top performing products retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Top performing products retrieved successfully',
+  })
   async getTopPerformers(
     @CurrentUser() user: any,
     @Query() query: ProductPerformanceQueryDto,
@@ -368,10 +448,11 @@ export class AnalyticsController {
     @Query('limit') limit: number = 10,
   ) {
     try {
-      const analytics = await this.businessIntelligenceService.generateProductPerformanceAnalytics(
-        user.tenantId,
-        { ...query, limit: 100 }, // Get more data for sorting
-      );
+      const analytics =
+        await this.businessIntelligenceService.generateProductPerformanceAnalytics(
+          user.tenantId,
+          { ...query, limit: 100 }, // Get more data for sorting
+        );
 
       // Sort by requested metric and take top performers
       const sortedProducts = analytics.data.sort((a, b) => {
@@ -397,7 +478,10 @@ export class AnalyticsController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get top performers: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get top performers: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -412,12 +496,13 @@ export class AnalyticsController {
 
   @Get('customers/insights')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate customer insights analytics',
-    description: 'Customer segmentation, lifetime value, and behavioral analysis'
+    description:
+      'Customer segmentation, lifetime value, and behavioral analysis',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Customer insights generated successfully',
     type: CustomerInsightsResponseDto,
   })
@@ -456,7 +541,10 @@ export class AnalyticsController {
         trends: [],
       };
     } catch (error) {
-      this.logger.error(`Failed to generate customer insights: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate customer insights: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -471,12 +559,13 @@ export class AnalyticsController {
 
   @Post('custom-metrics')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Calculate custom metric',
-    description: 'Calculate custom business metrics using user-defined formulas and parameters'
+    description:
+      'Calculate custom business metrics using user-defined formulas and parameters',
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Custom metric calculated successfully',
     type: CustomMetricResponseDto,
   })
@@ -485,14 +574,19 @@ export class AnalyticsController {
     @Body() query: CustomMetricQueryDto,
   ): Promise<CustomMetricResponseDto> {
     try {
-      this.logger.debug(`Calculating custom metric '${query.metricName}' for tenant ${user.tenantId}`);
-      
+      this.logger.debug(
+        `Calculating custom metric '${query.metricName}' for tenant ${user.tenantId}`,
+      );
+
       return await this.customMetricsService.calculateCustomMetric(
         user.tenantId,
         query,
       );
     } catch (error) {
-      this.logger.error(`Failed to calculate custom metric: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to calculate custom metric: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -507,12 +601,13 @@ export class AnalyticsController {
 
   @Get('benchmarking')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate benchmarking analysis',
-    description: 'Compare business metrics against industry standards, category averages, or historical performance'
+    description:
+      'Compare business metrics against industry standards, category averages, or historical performance',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Benchmarking analysis generated successfully',
     type: BenchmarkingResponseDto,
   })
@@ -521,14 +616,19 @@ export class AnalyticsController {
     @Query() query: BenchmarkingQueryDto,
   ): Promise<BenchmarkingResponseDto> {
     try {
-      this.logger.debug(`Generating benchmarking analysis for tenant ${user.tenantId}`);
-      
+      this.logger.debug(
+        `Generating benchmarking analysis for tenant ${user.tenantId}`,
+      );
+
       return await this.benchmarkingService.generateBenchmarkingAnalysis(
         user.tenantId,
         query,
       );
     } catch (error) {
-      this.logger.error(`Failed to generate benchmarking analysis: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate benchmarking analysis: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -541,12 +641,20 @@ export class AnalyticsController {
 
   @Get('benchmarking/industry-standards')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get industry standard benchmarks',
-    description: 'Retrieve current industry standard benchmarks for Indonesian retail sector'
+    description:
+      'Retrieve current industry standard benchmarks for Indonesian retail sector',
   })
-  @ApiQuery({ name: 'industry', enum: ['retail_food', 'retail_fashion', 'retail_electronics'], required: false })
-  @ApiResponse({ status: 200, description: 'Industry standards retrieved successfully' })
+  @ApiQuery({
+    name: 'industry',
+    enum: ['retail_food', 'retail_fashion', 'retail_electronics'],
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Industry standards retrieved successfully',
+  })
   async getIndustryStandards(
     @CurrentUser() user: any,
     @Query('industry') industry: string = 'retail_food',
@@ -558,21 +666,76 @@ export class AnalyticsController {
         lastUpdated: new Date().toISOString(),
         benchmarks: {
           grossMargin: {
-            average: industry === 'retail_food' ? 25.5 : industry === 'retail_fashion' ? 52.8 : 18.3,
-            percentile25: industry === 'retail_food' ? 18.0 : industry === 'retail_fashion' ? 42.0 : 12.5,
-            percentile50: industry === 'retail_food' ? 25.5 : industry === 'retail_fashion' ? 52.8 : 18.3,
-            percentile75: industry === 'retail_food' ? 32.0 : industry === 'retail_fashion' ? 63.5 : 24.8,
-            percentile90: industry === 'retail_food' ? 38.5 : industry === 'retail_fashion' ? 72.0 : 30.5,
+            average:
+              industry === 'retail_food'
+                ? 25.5
+                : industry === 'retail_fashion'
+                ? 52.8
+                : 18.3,
+            percentile25:
+              industry === 'retail_food'
+                ? 18.0
+                : industry === 'retail_fashion'
+                ? 42.0
+                : 12.5,
+            percentile50:
+              industry === 'retail_food'
+                ? 25.5
+                : industry === 'retail_fashion'
+                ? 52.8
+                : 18.3,
+            percentile75:
+              industry === 'retail_food'
+                ? 32.0
+                : industry === 'retail_fashion'
+                ? 63.5
+                : 24.8,
+            percentile90:
+              industry === 'retail_food'
+                ? 38.5
+                : industry === 'retail_fashion'
+                ? 72.0
+                : 30.5,
           },
           inventoryTurnover: {
-            average: industry === 'retail_food' ? 8.2 : industry === 'retail_fashion' ? 4.5 : 6.7,
-            percentile25: industry === 'retail_food' ? 6.1 : industry === 'retail_fashion' ? 3.2 : 4.8,
-            percentile50: industry === 'retail_food' ? 8.2 : industry === 'retail_fashion' ? 4.5 : 6.7,
-            percentile75: industry === 'retail_food' ? 10.8 : industry === 'retail_fashion' ? 5.9 : 8.9,
-            percentile90: industry === 'retail_food' ? 13.5 : industry === 'retail_fashion' ? 7.8 : 11.2,
+            average:
+              industry === 'retail_food'
+                ? 8.2
+                : industry === 'retail_fashion'
+                ? 4.5
+                : 6.7,
+            percentile25:
+              industry === 'retail_food'
+                ? 6.1
+                : industry === 'retail_fashion'
+                ? 3.2
+                : 4.8,
+            percentile50:
+              industry === 'retail_food'
+                ? 8.2
+                : industry === 'retail_fashion'
+                ? 4.5
+                : 6.7,
+            percentile75:
+              industry === 'retail_food'
+                ? 10.8
+                : industry === 'retail_fashion'
+                ? 5.9
+                : 8.9,
+            percentile90:
+              industry === 'retail_food'
+                ? 13.5
+                : industry === 'retail_fashion'
+                ? 7.8
+                : 11.2,
           },
         },
-        sampleSize: industry === 'retail_food' ? 1250 : industry === 'retail_fashion' ? 850 : 650,
+        sampleSize:
+          industry === 'retail_food'
+            ? 1250
+            : industry === 'retail_fashion'
+            ? 850
+            : 650,
         notes: 'Benchmarks based on Indonesian retail sector data',
       };
 
@@ -581,7 +744,10 @@ export class AnalyticsController {
         data: benchmarks,
       };
     } catch (error) {
-      this.logger.error(`Failed to get industry standards: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get industry standards: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -596,9 +762,10 @@ export class AnalyticsController {
 
   @Get('health')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Check analytics service health',
-    description: 'Health check endpoint for analytics and business intelligence services'
+    description:
+      'Health check endpoint for analytics and business intelligence services',
   })
   @ApiResponse({ status: 200, description: 'Analytics service health status' })
   async getServiceHealth() {

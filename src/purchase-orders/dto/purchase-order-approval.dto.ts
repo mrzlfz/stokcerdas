@@ -145,10 +145,16 @@ export class UpdateApprovalStatusDto {
 export class BulkApprovalDto {
   @ApiProperty({
     description: 'Daftar ID purchase orders yang akan di-approve/reject',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d7-b789-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d7-b789-123456789abc',
+    ],
     type: [String],
   })
-  @IsUUID(4, { each: true, message: 'Setiap PO ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap PO ID harus berupa UUID yang valid',
+  })
   purchaseOrderIds: string[];
 
   @ApiProperty({
@@ -156,7 +162,9 @@ export class BulkApprovalDto {
     example: 'approve',
     enum: ['approve', 'reject'],
   })
-  @IsEnum(['approve', 'reject'], { message: 'Action harus approve atau reject' })
+  @IsEnum(['approve', 'reject'], {
+    message: 'Action harus approve atau reject',
+  })
   action: 'approve' | 'reject';
 
   @ApiPropertyOptional({
@@ -230,7 +238,10 @@ export class BulkApprovalResponseDto {
   @ApiProperty({ description: 'Jumlah PO yang gagal diproses' })
   failed: number;
 
-  @ApiProperty({ description: 'Daftar ID PO yang berhasil diproses', type: [String] })
+  @ApiProperty({
+    description: 'Daftar ID PO yang berhasil diproses',
+    type: [String],
+  })
   successfulIds: string[];
 
   @ApiProperty({ description: 'Daftar error yang terjadi', type: [Object] })

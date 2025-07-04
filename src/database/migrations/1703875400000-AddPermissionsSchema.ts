@@ -109,20 +109,32 @@ export class AddPermissionsSchema1703875400000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop triggers
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_role_permissions_updated_at ON "role_permissions"`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_permissions_updated_at ON "permissions"`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_role_permissions_updated_at ON "role_permissions"`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_permissions_updated_at ON "permissions"`,
+    );
 
     // Drop indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_permissions_active"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_role_permissions_active"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_permissions_role"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permissions_active"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permissions_action"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permissions_resource"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_role_permissions_role_permission"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_permissions_resource_action"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_role_permissions_role_permission"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_permissions_resource_action"`,
+    );
 
     // Drop foreign key constraint
-    await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT IF EXISTS "FK_role_permissions_permission"`);
+    await queryRunner.query(
+      `ALTER TABLE "role_permissions" DROP CONSTRAINT IF EXISTS "FK_role_permissions_permission"`,
+    );
 
     // Drop tables
     await queryRunner.query(`DROP TABLE "role_permissions"`);

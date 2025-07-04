@@ -25,16 +25,8 @@ import { ReportsController } from './controllers/reports.controller';
       Product,
     ]),
   ],
-  controllers: [
-    ReportsController,
-  ],
-  providers: [
-    ReportGenerationService,
-    ReportExportService,
-  ],
-  exports: [
-    ReportGenerationService,
-    ReportExportService,
-  ],
+  controllers: [ReportsController],
+  providers: [ReportGenerationService, ReportExportService],
+  exports: [ReportGenerationService, ReportExportService],
 })
 export class ReportsModule {}

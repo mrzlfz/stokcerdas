@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
 
-import { Product, ProductVariant } from '../entities/product.entity';
+import { Product } from '../entities/product.entity';
+import { ProductVariant } from '../entities/product-variant.entity';
 
 @Injectable()
 export class BarcodeService {
@@ -17,7 +18,10 @@ export class BarcodeService {
   /**
    * Generate barcode untuk product
    */
-  async generateProductBarcode(tenantId: string, productId: string): Promise<string> {
+  async generateProductBarcode(
+    tenantId: string,
+    productId: string,
+  ): Promise<string> {
     const product = await this.productRepository.findOne({
       where: { id: productId, tenantId },
     });
@@ -33,7 +37,7 @@ export class BarcodeService {
 
     // Generate barcode baru
     const barcode = await this.generateUniqueBarcode(tenantId, 'product');
-    
+
     // Update product dengan barcode baru
     await this.productRepository.update(productId, { barcode });
 
@@ -43,7 +47,10 @@ export class BarcodeService {
   /**
    * Generate barcode untuk product variant
    */
-  async generateVariantBarcode(tenantId: string, variantId: string): Promise<string> {
+  async generateVariantBarcode(
+    tenantId: string,
+    variantId: string,
+  ): Promise<string> {
     const variant = await this.variantRepository.findOne({
       where: { id: variantId, tenantId },
     });
@@ -59,7 +66,7 @@ export class BarcodeService {
 
     // Generate barcode baru
     const barcode = await this.generateUniqueBarcode(tenantId, 'variant');
-    
+
     // Update variant dengan barcode baru
     await this.variantRepository.update(variantId, { barcode });
 
@@ -69,7 +76,11 @@ export class BarcodeService {
   /**
    * Validate format barcode
    */
-  validateBarcodeFormat(barcode: string): { isValid: boolean; format?: string; error?: string } {
+  validateBarcodeFormat(barcode: string): {
+    isValid: boolean;
+    format?: string;
+    error?: string;
+  } {
     // Remove spaces and convert to string
     const cleanBarcode = barcode.toString().replace(/\s/g, '');
 
@@ -104,7 +115,11 @@ export class BarcodeService {
     }
 
     // Code 128 (alphanumeric)
-    if (/^[A-Z0-9\-\.\$\/\+%\s]+$/i.test(cleanBarcode) && cleanBarcode.length >= 1 && cleanBarcode.length <= 48) {
+    if (
+      /^[A-Z0-9\-\.\$\/\+%\s]+$/i.test(cleanBarcode) &&
+      cleanBarcode.length >= 1 &&
+      cleanBarcode.length <= 48
+    ) {
       return {
         isValid: true,
         format: 'Code 128',
@@ -121,14 +136,22 @@ export class BarcodeService {
 
     return {
       isValid: false,
-      error: 'Format barcode tidak dikenali. Mendukung: EAN-13, EAN-8, UPC-A, Code 128, atau format internal',
+      error:
+        'Format barcode tidak dikenali. Mendukung: EAN-13, EAN-8, UPC-A, Code 128, atau format internal',
     };
   }
 
   /**
    * Search product by barcode
    */
-  async findProductByBarcode(tenantId: string, barcode: string): Promise<{ product?: Product; variant?: ProductVariant; type: 'product' | 'variant' | null }> {
+  async findProductByBarcode(
+    tenantId: string,
+    barcode: string,
+  ): Promise<{
+    product?: Product;
+    variant?: ProductVariant;
+    type: 'product' | 'variant' | null;
+  }> {
     // Cari di products table
     const product = await this.productRepository.findOne({
       where: { barcode, tenantId, isDeleted: false },
@@ -155,7 +178,10 @@ export class BarcodeService {
   /**
    * Generate bulk barcodes untuk products tanpa barcode
    */
-  async generateBulkBarcodes(tenantId: string, limit: number = 100): Promise<{
+  async generateBulkBarcodes(
+    tenantId: string,
+    limit: number = 100,
+  ): Promise<{
     productsUpdated: number;
     variantsUpdated: number;
     errors: string[];
@@ -200,10 +226,14 @@ export class BarcodeService {
   }
 
   // Private helper methods
-  private async generateUniqueBarcode(tenantId: string, type: 'product' | 'variant', maxAttempts: number = 10): Promise<string> {
+  private async generateUniqueBarcode(
+    tenantId: string,
+    type: 'product' | 'variant',
+    maxAttempts: number = 10,
+  ): Promise<string> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const barcode = this.generateInternalBarcode();
-      
+
       // Check uniqueness across both products and variants
       const existingProduct = await this.productRepository.findOne({
         where: { barcode, tenantId },
@@ -218,7 +248,9 @@ export class BarcodeService {
       }
     }
 
-    throw new Error(`Gagal generate barcode unik setelah ${maxAttempts} percobaan`);
+    throw new Error(
+      `Gagal generate barcode unik setelah ${maxAttempts} percobaan`,
+    );
   }
 
   private generateInternalBarcode(): string {

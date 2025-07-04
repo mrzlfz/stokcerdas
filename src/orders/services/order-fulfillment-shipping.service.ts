@@ -4,12 +4,20 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { Order, FulfillmentStatus, OrderStatus } from '../entities/order.entity';
+import {
+  Order,
+  FulfillmentStatus,
+  OrderStatus,
+} from '../entities/order.entity';
 import { InventoryLocation } from '../../inventory/entities/inventory-location.entity';
 
 // Services
 import { OrderFulfillmentService } from './order-fulfillment.service';
-import { ShippingService, ShippingQuoteRequest, CreateShippingLabelRequest } from '../../shipping/services/shipping.service';
+import {
+  ShippingService,
+  ShippingQuoteRequest,
+  CreateShippingLabelRequest,
+} from '../../shipping/services/shipping.service';
 import { JneShippingService } from '../../shipping/integrations/jne/services/jne-shipping.service';
 import { JntShippingService } from '../../shipping/integrations/jnt/services/jnt-shipping.service';
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
@@ -97,9 +105,14 @@ export class OrderFulfillmentShippingService {
   /**
    * Get complete fulfillment options including shipping quotes
    */
-  async getCompleteFulfillmentOptions(tenantId: string, orderId: string): Promise<FulfillmentWithShipping> {
+  async getCompleteFulfillmentOptions(
+    tenantId: string,
+    orderId: string,
+  ): Promise<FulfillmentWithShipping> {
     try {
-      this.logger.debug(`Getting complete fulfillment options for order ${orderId}`);
+      this.logger.debug(
+        `Getting complete fulfillment options for order ${orderId}`,
+      );
 
       // Get order details
       const order = await this.orderRepository.findOne({
@@ -116,7 +129,8 @@ export class OrderFulfillmentShippingService {
       }
 
       // Get fulfillment options from existing service
-      const fulfillmentOptions = await this.fulfillmentService.getFulfillmentOptions(tenantId, orderId);
+      const fulfillmentOptions =
+        await this.fulfillmentService.getFulfillmentOptions(tenantId, orderId);
       const recommendedFulfillment = fulfillmentOptions.recommended;
 
       // Get location details for sender address
@@ -140,21 +154,31 @@ export class OrderFulfillmentShippingService {
         packageInfo,
         includeInsurance: true,
         isCod: order.paymentMethod === 'cod',
-        codAmount: order.paymentMethod === 'cod' ? order.totalAmount : undefined,
+        codAmount:
+          order.paymentMethod === 'cod' ? order.totalAmount : undefined,
       };
 
       // Get shipping quotes
-      const shippingQuotes = await this.shippingService.getShippingQuotes(tenantId, shippingQuoteRequest);
+      const shippingQuotes = await this.shippingService.getShippingQuotes(
+        tenantId,
+        shippingQuoteRequest,
+      );
 
       // Find recommended shipping option (lowest cost with reasonable time)
-      const recommendedShipping = this.selectRecommendedShipping(shippingQuotes);
+      const recommendedShipping =
+        this.selectRecommendedShipping(shippingQuotes);
 
       // Calculate total estimates
-      const totalCost = recommendedFulfillment.cost.total + recommendedShipping.cost.totalCost;
-      const totalTime = recommendedFulfillment.timeframe.total + (recommendedShipping.timeframe.estimatedDays * 24);
-      
+      const totalCost =
+        recommendedFulfillment.cost.total + recommendedShipping.cost.totalCost;
+      const totalTime =
+        recommendedFulfillment.timeframe.total +
+        recommendedShipping.timeframe.estimatedDays * 24;
+
       const estimatedDeliveryDate = new Date();
-      estimatedDeliveryDate.setHours(estimatedDeliveryDate.getHours() + totalTime);
+      estimatedDeliveryDate.setHours(
+        estimatedDeliveryDate.getHours() + totalTime,
+      );
 
       return {
         orderId,
@@ -184,9 +208,11 @@ export class OrderFulfillmentShippingService {
         totalTime,
         estimatedDeliveryDate,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get complete fulfillment options: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get complete fulfillment options: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -194,7 +220,10 @@ export class OrderFulfillmentShippingService {
   /**
    * Complete order fulfillment with shipping label creation
    */
-  async completeOrderFulfillment(tenantId: string, request: CompleteOrderFulfillmentRequest): Promise<{
+  async completeOrderFulfillment(
+    tenantId: string,
+    request: CompleteOrderFulfillmentRequest,
+  ): Promise<{
     success: boolean;
     fulfillment: {
       assignment: any;
@@ -212,21 +241,27 @@ export class OrderFulfillmentShippingService {
       this.logger.debug(`Completing fulfillment for order ${request.orderId}`);
 
       // Step 1: Assign order to fulfillment location
-      const fulfillmentAssignment = await this.fulfillmentService.assignOrderFulfillment(
-        tenantId,
-        request.orderId,
-        request.locationId,
-      );
+      const fulfillmentAssignment =
+        await this.fulfillmentService.assignOrderFulfillment(
+          tenantId,
+          request.orderId,
+          request.locationId,
+        );
 
       if (!fulfillmentAssignment.success) {
         throw new BadRequestException('Failed to assign order fulfillment');
       }
 
       // Step 2: Get shipping rate for label creation
-      const shippingQuotes = await this.getShippingQuotesForOrder(tenantId, request.orderId, request.carrierId);
-      const selectedRate = shippingQuotes.find(quote => 
-        quote.carrierId === request.carrierId && 
-        quote.serviceCode === request.serviceCode
+      const shippingQuotes = await this.getShippingQuotesForOrder(
+        tenantId,
+        request.orderId,
+        request.carrierId,
+      );
+      const selectedRate = shippingQuotes.find(
+        quote =>
+          quote.carrierId === request.carrierId &&
+          quote.serviceCode === request.serviceCode,
       );
 
       if (!selectedRate) {
@@ -247,20 +282,30 @@ export class OrderFulfillmentShippingService {
         specialInstructions: request.specialInstructions,
       };
 
-      const shippingLabel = await this.shippingService.createShippingLabel(tenantId, labelRequest);
+      const shippingLabel = await this.shippingService.createShippingLabel(
+        tenantId,
+        labelRequest,
+      );
 
       // Step 4: Generate shipping label with carrier
-      const generatedLabel = await this.shippingService.generateShippingLabel(tenantId, shippingLabel.id);
+      const generatedLabel = await this.shippingService.generateShippingLabel(
+        tenantId,
+        shippingLabel.id,
+      );
 
       // Step 5: Update order status to ready for shipping
-      await this.updateOrderForShipping(tenantId, request.orderId, generatedLabel);
+      await this.updateOrderForShipping(
+        tenantId,
+        request.orderId,
+        generatedLabel,
+      );
 
       // Step 6: Calculate final delivery estimate
       const estimatedDeliveryDate = new Date();
       estimatedDeliveryDate.setHours(
-        estimatedDeliveryDate.getHours() + 
-        fulfillmentAssignment.assignment.estimatedTime + 
-        (selectedRate.timeframe.estimatedDays * 24)
+        estimatedDeliveryDate.getHours() +
+          fulfillmentAssignment.assignment.estimatedTime +
+          selectedRate.timeframe.estimatedDays * 24,
       );
 
       // Get location name
@@ -306,9 +351,11 @@ export class OrderFulfillmentShippingService {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Failed to complete order fulfillment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to complete order fulfillment: ${error.message}`,
+        error.stack,
+      );
 
       // Log failure
       await this.logService.logError(tenantId, 'fulfillment-shipping', error, {
@@ -326,11 +373,15 @@ export class OrderFulfillmentShippingService {
   /**
    * Mark order as shipped and update tracking
    */
-  async markOrderShipped(tenantId: string, orderId: string, trackingDetails?: {
-    actualPickupDate?: Date;
-    courierName?: string;
-    estimatedDeliveryDate?: Date;
-  }): Promise<{
+  async markOrderShipped(
+    tenantId: string,
+    orderId: string,
+    trackingDetails?: {
+      actualPickupDate?: Date;
+      courierName?: string;
+      estimatedDeliveryDate?: Date;
+    },
+  ): Promise<{
     success: boolean;
     order: Order;
   }> {
@@ -353,7 +404,7 @@ export class OrderFulfillmentShippingService {
       order.status = OrderStatus.SHIPPED;
       order.fulfillmentStatus = FulfillmentStatus.SHIPPED;
       order.shippedAt = trackingDetails?.actualPickupDate || new Date();
-      
+
       if (trackingDetails?.estimatedDeliveryDate) {
         order.estimatedDeliveryDate = trackingDetails.estimatedDeliveryDate;
       }
@@ -386,9 +437,11 @@ export class OrderFulfillmentShippingService {
         success: true,
         order,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to mark order as shipped: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to mark order as shipped: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -396,16 +449,20 @@ export class OrderFulfillmentShippingService {
   /**
    * Mark order as delivered
    */
-  async markOrderDelivered(tenantId: string, orderId: string, deliveryDetails: {
-    actualDeliveryDate: Date;
-    recipientName?: string;
-    signedBy?: string;
-    deliveryNotes?: string;
-    proofOfDelivery?: {
-      photoUrl?: string;
-      signatureUrl?: string;
-    };
-  }): Promise<{
+  async markOrderDelivered(
+    tenantId: string,
+    orderId: string,
+    deliveryDetails: {
+      actualDeliveryDate: Date;
+      recipientName?: string;
+      signedBy?: string;
+      deliveryNotes?: string;
+      proofOfDelivery?: {
+        photoUrl?: string;
+        signatureUrl?: string;
+      };
+    },
+  ): Promise<{
     success: boolean;
     order: Order;
   }> {
@@ -453,9 +510,11 @@ export class OrderFulfillmentShippingService {
         success: true,
         order,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to mark order as delivered: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to mark order as delivered: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -463,7 +522,10 @@ export class OrderFulfillmentShippingService {
   /**
    * Get order fulfillment timeline
    */
-  async getOrderFulfillmentTimeline(tenantId: string, orderId: string): Promise<{
+  async getOrderFulfillmentTimeline(
+    tenantId: string,
+    orderId: string,
+  ): Promise<{
     order: {
       orderNumber: string;
       status: string;
@@ -494,16 +556,23 @@ export class OrderFulfillmentShippingService {
       }
 
       // Build timeline based on order status
-      const timeline = [
+      const timeline: Array<{
+        stage: string;
+        status: 'completed' | 'in_progress' | 'pending';
+        timestamp?: Date;
+        estimatedTime?: Date;
+        description: string;
+        details?: any;
+      }> = [
         {
           stage: 'order_confirmed',
-          status: order.confirmedAt ? 'completed' : 'pending' as 'completed' | 'in_progress' | 'pending',
+          status: order.confirmedAt ? 'completed' : 'pending',
           timestamp: order.confirmedAt,
           description: 'Order confirmed and payment received',
         },
         {
           stage: 'fulfillment_assigned',
-          status: order.processingLocationId ? 'completed' : 'pending' as 'completed' | 'in_progress' | 'pending',
+          status: order.processingLocationId ? 'completed' : 'pending',
           timestamp: order.processingLocationId ? new Date() : undefined, // Would track actual assignment time
           description: 'Order assigned to fulfillment location',
           details: {
@@ -512,21 +581,38 @@ export class OrderFulfillmentShippingService {
         },
         {
           stage: 'preparing',
-          status: order.fulfillmentStatus === FulfillmentStatus.PROCESSING ? 'in_progress' : 
-                 [FulfillmentStatus.READY, FulfillmentStatus.SHIPPED, FulfillmentStatus.DELIVERED].includes(order.fulfillmentStatus) ? 'completed' : 'pending',
+          status:
+            order.fulfillmentStatus === FulfillmentStatus.PROCESSING
+              ? 'in_progress'
+              : [
+                  FulfillmentStatus.READY,
+                  FulfillmentStatus.SHIPPED,
+                  FulfillmentStatus.DELIVERED,
+                ].includes(order.fulfillmentStatus)
+              ? 'completed'
+              : 'pending',
           timestamp: undefined,
           description: 'Order being prepared for shipping',
         },
         {
           stage: 'ready_for_shipping',
-          status: order.fulfillmentStatus === FulfillmentStatus.READY ? 'in_progress' : 
-                 [FulfillmentStatus.SHIPPED, FulfillmentStatus.DELIVERED].includes(order.fulfillmentStatus) ? 'completed' : 'pending',
+          status:
+            order.fulfillmentStatus === FulfillmentStatus.READY
+              ? 'in_progress'
+              : [
+                  FulfillmentStatus.SHIPPED,
+                  FulfillmentStatus.DELIVERED,
+                ].includes(order.fulfillmentStatus)
+              ? 'completed'
+              : 'pending',
           timestamp: undefined,
           description: 'Order ready for pickup/shipping',
         },
         {
           stage: 'shipped',
-          status: order.shippedAt ? 'completed' : 'pending' as 'completed' | 'in_progress' | 'pending',
+          status: order.shippedAt
+            ? 'completed'
+            : ('pending' as 'completed' | 'in_progress' | 'pending'),
           timestamp: order.shippedAt,
           description: 'Order shipped and in transit',
           details: {
@@ -536,18 +622,26 @@ export class OrderFulfillmentShippingService {
         },
         {
           stage: 'delivered',
-          status: order.deliveredAt ? 'completed' : 'pending' as 'completed' | 'in_progress' | 'pending',
+          status: order.deliveredAt
+            ? 'completed'
+            : ('pending' as 'completed' | 'in_progress' | 'pending'),
           timestamp: order.deliveredAt,
           description: 'Order delivered to customer',
         },
       ];
 
       // Determine current and next stage
-      const currentStageIndex = timeline.findIndex(stage => stage.status === 'in_progress');
-      const currentStage = currentStageIndex >= 0 ? timeline[currentStageIndex].stage : 'completed';
-      const nextStage = currentStageIndex >= 0 && currentStageIndex < timeline.length - 1 
-        ? timeline[currentStageIndex + 1].stage 
-        : undefined;
+      const currentStageIndex = timeline.findIndex(
+        stage => stage.status === 'in_progress',
+      );
+      const currentStage =
+        currentStageIndex >= 0
+          ? timeline[currentStageIndex].stage
+          : 'completed';
+      const nextStage =
+        currentStageIndex >= 0 && currentStageIndex < timeline.length - 1
+          ? timeline[currentStageIndex + 1].stage
+          : undefined;
 
       return {
         order: {
@@ -560,9 +654,11 @@ export class OrderFulfillmentShippingService {
         nextStage,
         estimatedCompletion: order.estimatedDeliveryDate,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get fulfillment timeline: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get fulfillment timeline: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -581,18 +677,20 @@ export class OrderFulfillmentShippingService {
     // This is simplified - in production, you'd have product dimensions and weights
     const itemCount = order.items?.length || 1;
     const estimatedWeight = itemCount * 500; // 500g per item (simplified)
-    
+
     // Estimate package dimensions based on item count
     const baseLength = 20; // cm
     const baseWidth = 15; // cm
     const baseHeight = 5; // cm
-    
+
     const length = baseLength + Math.floor(itemCount / 3) * 5;
     const width = baseWidth + Math.floor(itemCount / 5) * 3;
     const height = baseHeight + Math.floor(itemCount / 2) * 2;
 
     // Generate content description
-    const content = order.items?.map(item => item.productName).join(', ') || 'General Merchandise';
+    const content =
+      order.items?.map(item => item.productName).join(', ') ||
+      'General Merchandise';
 
     return {
       weight: estimatedWeight,
@@ -613,8 +711,8 @@ export class OrderFulfillmentShippingService {
     const scoredQuotes = quotes.map(quote => {
       const costScore = 1 / (quote.cost.totalCost / 10000); // Lower cost = higher score
       const timeScore = 1 / quote.timeframe.estimatedDays; // Faster = higher score
-      const balancedScore = (costScore * 0.6) + (timeScore * 0.4); // Favor cost slightly
-      
+      const balancedScore = costScore * 0.6 + timeScore * 0.4; // Favor cost slightly
+
       return {
         ...quote,
         score: balancedScore,
@@ -625,7 +723,11 @@ export class OrderFulfillmentShippingService {
     return scoredQuotes.sort((a, b) => b.score - a.score)[0];
   }
 
-  private async getShippingQuotesForOrder(tenantId: string, orderId: string, carrierId: string): Promise<any[]> {
+  private async getShippingQuotesForOrder(
+    tenantId: string,
+    orderId: string,
+    carrierId: string,
+  ): Promise<any[]> {
     // This would get actual quotes - simplified for now
     return [
       {
@@ -639,17 +741,21 @@ export class OrderFulfillmentShippingService {
 
   private mapServiceCodeToServiceType(serviceCode: string): any {
     const mapping: Record<string, any> = {
-      'REG': 'regular',
-      'YES': 'express',
-      'OKE': 'economy',
-      'STANDARD': 'regular',
-      'EXPRESS': 'express',
+      REG: 'regular',
+      YES: 'express',
+      OKE: 'economy',
+      STANDARD: 'regular',
+      EXPRESS: 'express',
     };
-    
+
     return mapping[serviceCode.toUpperCase()] || 'regular';
   }
 
-  private async updateOrderForShipping(tenantId: string, orderId: string, shippingLabel: any): Promise<void> {
+  private async updateOrderForShipping(
+    tenantId: string,
+    orderId: string,
+    shippingLabel: any,
+  ): Promise<void> {
     const order = await this.orderRepository.findOne({
       where: { tenantId, id: orderId },
     });

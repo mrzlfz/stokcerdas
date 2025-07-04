@@ -6,7 +6,10 @@ import { LazadaApiService, LazadaConfig } from './lazada-api.service';
 import { ApiConfig } from '../../common/services/base-api.service';
 import { LazadaAuthService } from './lazada-auth.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 import { InventoryItem } from '../../../inventory/entities/inventory-item.entity';
 
 export interface LazadaInventoryItem {
@@ -78,7 +81,12 @@ export class LazadaInventoryService {
     tenantId: string,
     channelId: string,
     options: InventorySyncOptions = {},
-  ): Promise<{ success: boolean; syncedCount: number; errorCount: number; errors: string[] }> {
+  ): Promise<{
+    success: boolean;
+    syncedCount: number;
+    errorCount: number;
+    errors: string[];
+  }> {
     const errors: string[] = [];
     let syncedCount = 0;
     let errorCount = 0;
@@ -91,7 +99,10 @@ export class LazadaInventoryService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -148,7 +159,6 @@ export class LazadaInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Inventory sync failed: ${error.message}`, error.stack);
 
@@ -178,7 +188,12 @@ export class LazadaInventoryService {
     tenantId: string,
     channelId: string,
     updates: StockUpdateRequest[],
-  ): Promise<{ success: boolean; updatedCount: number; errorCount: number; errors: string[] }> {
+  ): Promise<{
+    success: boolean;
+    updatedCount: number;
+    errorCount: number;
+    errors: string[];
+  }> {
     const errors: string[] = [];
     let updatedCount = 0;
     let errorCount = 0;
@@ -191,7 +206,10 @@ export class LazadaInventoryService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -222,7 +240,7 @@ export class LazadaInventoryService {
 
           if (result.success) {
             updatedCount += batch.length;
-            
+
             // Log successful batch update
             await this.logService.log({
               tenantId,
@@ -238,10 +256,14 @@ export class LazadaInventoryService {
           } else {
             throw new Error(result.error || 'Batch update failed');
           }
-
         } catch (error) {
-          this.logger.error(`Batch inventory update failed: ${error.message}`, error.stack);
-          errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${error.message}`);
+          this.logger.error(
+            `Batch inventory update failed: ${error.message}`,
+            error.stack,
+          );
+          errors.push(
+            `Batch ${Math.floor(i / batchSize) + 1}: ${error.message}`,
+          );
           errorCount += batch.length;
         }
       }
@@ -252,9 +274,11 @@ export class LazadaInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
-      this.logger.error(`Inventory update failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Inventory update failed: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         updatedCount,
@@ -271,7 +295,12 @@ export class LazadaInventoryService {
     tenantId: string,
     channelId: string,
     updates: PriceUpdateRequest[],
-  ): Promise<{ success: boolean; updatedCount: number; errorCount: number; errors: string[] }> {
+  ): Promise<{
+    success: boolean;
+    updatedCount: number;
+    errorCount: number;
+    errors: string[];
+  }> {
     const errors: string[] = [];
     let updatedCount = 0;
     let errorCount = 0;
@@ -284,7 +313,10 @@ export class LazadaInventoryService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -315,7 +347,7 @@ export class LazadaInventoryService {
 
           if (result.success) {
             updatedCount += batch.length;
-            
+
             // Log successful batch update
             await this.logService.log({
               tenantId,
@@ -331,10 +363,14 @@ export class LazadaInventoryService {
           } else {
             throw new Error(result.error || 'Batch price update failed');
           }
-
         } catch (error) {
-          this.logger.error(`Batch price update failed: ${error.message}`, error.stack);
-          errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${error.message}`);
+          this.logger.error(
+            `Batch price update failed: ${error.message}`,
+            error.stack,
+          );
+          errors.push(
+            `Batch ${Math.floor(i / batchSize) + 1}: ${error.message}`,
+          );
           errorCount += batch.length;
         }
       }
@@ -345,7 +381,6 @@ export class LazadaInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Price update failed: ${error.message}`, error.stack);
       return {
@@ -364,7 +399,11 @@ export class LazadaInventoryService {
     tenantId: string,
     channelId: string,
     sellerSkus: string[],
-  ): Promise<{ success: boolean; data?: LazadaStockResponse[]; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    data?: LazadaStockResponse[];
+    error?: string;
+  }> {
     try {
       this.logger.debug(`Getting Lazada stock levels`, {
         tenantId,
@@ -373,7 +412,10 @@ export class LazadaInventoryService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -383,20 +425,17 @@ export class LazadaInventoryService {
       };
 
       // Get stock levels from Lazada
-      const result = await this.lazadaApi.makeLazadaRequest<LazadaStockResponse[]>(
-        tenantId,
-        channelId,
-        lazadaConfig,
-        {
-          method: 'GET',
-          path: '/product/quantity/get',
-          params: {
-            seller_sku: sellerSkus.join(','),
-          },
-          requiresAuth: true,
-          rateLimitKey: 'stock_get',
+      const result = await this.lazadaApi.makeLazadaRequest<
+        LazadaStockResponse[]
+      >(tenantId, channelId, lazadaConfig, {
+        method: 'GET',
+        path: '/product/quantity/get',
+        params: {
+          seller_sku: sellerSkus.join(','),
         },
-      );
+        requiresAuth: true,
+        rateLimitKey: 'stock_get',
+      });
 
       if (!result.success) {
         return {
@@ -409,9 +448,11 @@ export class LazadaInventoryService {
         success: true,
         data: result.data,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get stock levels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get stock levels: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -426,7 +467,11 @@ export class LazadaInventoryService {
     tenantId: string,
     channelId: string,
     sellerSkus: string[],
-  ): Promise<{ success: boolean; data?: LazadaPriceResponse[]; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    data?: LazadaPriceResponse[];
+    error?: string;
+  }> {
     try {
       this.logger.debug(`Getting Lazada prices`, {
         tenantId,
@@ -435,7 +480,10 @@ export class LazadaInventoryService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -445,20 +493,17 @@ export class LazadaInventoryService {
       };
 
       // Get prices from Lazada
-      const result = await this.lazadaApi.makeLazadaRequest<LazadaPriceResponse[]>(
-        tenantId,
-        channelId,
-        lazadaConfig,
-        {
-          method: 'GET',
-          path: '/product/price/get',
-          params: {
-            seller_sku: sellerSkus.join(','),
-          },
-          requiresAuth: true,
-          rateLimitKey: 'price_get',
+      const result = await this.lazadaApi.makeLazadaRequest<
+        LazadaPriceResponse[]
+      >(tenantId, channelId, lazadaConfig, {
+        method: 'GET',
+        path: '/product/price/get',
+        params: {
+          seller_sku: sellerSkus.join(','),
         },
-      );
+        requiresAuth: true,
+        rateLimitKey: 'price_get',
+      });
 
       if (!result.success) {
         return {
@@ -471,7 +516,6 @@ export class LazadaInventoryService {
         success: true,
         data: result.data,
       };
-
     } catch (error) {
       this.logger.error(`Failed to get prices: ${error.message}`, error.stack);
       return {
@@ -497,8 +541,12 @@ export class LazadaInventoryService {
       });
 
       // Get stock and price data
-      const stockResult = await this.getLazadaStock(tenantId, channelId, [sellerSku]);
-      const priceResult = await this.getLazadaPrice(tenantId, channelId, [sellerSku]);
+      const stockResult = await this.getLazadaStock(tenantId, channelId, [
+        sellerSku,
+      ]);
+      const priceResult = await this.getLazadaPrice(tenantId, channelId, [
+        sellerSku,
+      ]);
 
       if (!stockResult.success) {
         throw new Error(`Failed to get stock: ${stockResult.error}`);
@@ -516,12 +564,19 @@ export class LazadaInventoryService {
       }
 
       // Update local inventory
-      await this.updateLocalInventoryFromLazada(tenantId, channelId, stockData, priceData);
+      await this.updateLocalInventoryFromLazada(
+        tenantId,
+        channelId,
+        stockData,
+        priceData,
+      );
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to sync single SKU inventory: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync single SKU inventory: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -566,7 +621,9 @@ export class LazadaInventoryService {
       );
 
       if (!result.success || !result.data) {
-        throw new Error(result.error?.message || 'Failed to fetch stock from Lazada');
+        throw new Error(
+          result.error?.message || 'Failed to fetch stock from Lazada',
+        );
       }
 
       const stockData = result.data;
@@ -577,12 +634,14 @@ export class LazadaInventoryService {
           await this.updateLocalStockFromLazada(tenantId, channelId, stockItem);
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to sync stock for ${stockItem.seller_sku}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to sync stock for ${stockItem.seller_sku}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Stock ${stockItem.seller_sku}: ${error.message}`);
           errorCount++;
         }
       }
-
     } catch (error) {
       this.logger.error(`Stock sync failed: ${error.message}`, error.stack);
       errors.push(error.message);
@@ -627,7 +686,9 @@ export class LazadaInventoryService {
       );
 
       if (!result.success || !result.data) {
-        throw new Error(result.error?.message || 'Failed to fetch prices from Lazada');
+        throw new Error(
+          result.error?.message || 'Failed to fetch prices from Lazada',
+        );
       }
 
       const priceData = result.data;
@@ -638,12 +699,14 @@ export class LazadaInventoryService {
           await this.updateLocalPriceFromLazada(tenantId, channelId, priceItem);
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to sync price for ${priceItem.seller_sku}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to sync price for ${priceItem.seller_sku}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Price ${priceItem.seller_sku}: ${error.message}`);
           errorCount++;
         }
       }
-
     } catch (error) {
       this.logger.error(`Price sync failed: ${error.message}`, error.stack);
       errors.push(error.message);
@@ -697,12 +760,15 @@ export class LazadaInventoryService {
     priceData: LazadaPriceResponse,
   ): Promise<void> {
     // Combined update for both stock and price
-    this.logger.debug(`Updating local inventory for SKU: ${stockData.seller_sku}`, {
-      tenantId,
-      channelId,
-      stock: stockData,
-      price: priceData,
-    });
+    this.logger.debug(
+      `Updating local inventory for SKU: ${stockData.seller_sku}`,
+      {
+        tenantId,
+        channelId,
+        stock: stockData,
+        price: priceData,
+      },
+    );
 
     // Implementation would update both inventory levels and pricing
     // For now, just log the update

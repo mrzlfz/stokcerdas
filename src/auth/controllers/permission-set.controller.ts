@@ -31,8 +31,15 @@ import { PermissionsGuard } from '../guards/permissions.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { CurrentTenant } from '../decorators/current-tenant.decorator';
 import { Permissions } from '../decorators/permissions.decorator';
-import { PermissionResource, PermissionAction } from '../entities/permission.entity';
-import { PermissionSetStatus, PermissionSetType, PermissionSetScope } from '../entities/permission-set.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../entities/permission.entity';
+import {
+  PermissionSetStatus,
+  PermissionSetType,
+  PermissionSetScope,
+} from '../entities/permission-set.entity';
 import {
   CreatePermissionSetDto,
   UpdatePermissionSetDto,
@@ -67,9 +74,16 @@ export class PermissionSetController {
     description: 'Permission set berhasil dibuat',
     type: PermissionSetResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Data tidak valid atau kode sudah ada' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk membuat permission set' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.CREATE })
+  @ApiBadRequestResponse({
+    description: 'Data tidak valid atau kode sudah ada',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk membuat permission set',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.CREATE,
+  })
   async create(
     @Body() createPermissionSetDto: CreatePermissionSetDto,
     @CurrentTenant() tenantId: string,
@@ -86,7 +100,9 @@ export class PermissionSetController {
       message: 'Permission set berhasil dibuat',
       data: {
         ...permissionSet,
-        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: permissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -102,13 +118,40 @@ export class PermissionSetController {
     description: 'Daftar permission set berhasil diambil',
     type: [PermissionSetResponseDto],
   })
-  @ApiQuery({ name: 'type', required: false, description: 'Filter berdasarkan jenis' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter berdasarkan status' })
-  @ApiQuery({ name: 'scope', required: false, description: 'Filter berdasarkan scope' })
-  @ApiQuery({ name: 'category', required: false, description: 'Filter berdasarkan kategori' })
-  @ApiQuery({ name: 'search', required: false, description: 'Kata kunci pencarian' })
-  @ApiQuery({ name: 'templatesOnly', required: false, description: 'Hanya tampilkan template' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filter berdasarkan jenis',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter berdasarkan status',
+  })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    description: 'Filter berdasarkan scope',
+  })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Filter berdasarkan kategori',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Kata kunci pencarian',
+  })
+  @ApiQuery({
+    name: 'templatesOnly',
+    required: false,
+    description: 'Hanya tampilkan template',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async findAll(
     @Query() query: PermissionSetQueryDto,
     @CurrentTenant() tenantId: string,
@@ -124,7 +167,10 @@ export class PermissionSetController {
     } else if (query.templatesOnly) {
       permissionSets = await this.permissionSetService.getTemplates(tenantId);
     } else if (query.type) {
-      permissionSets = await this.permissionSetService.findByType(query.type, tenantId);
+      permissionSets = await this.permissionSetService.findByType(
+        query.type,
+        tenantId,
+      );
     } else if (query.category) {
       permissionSets = await this.permissionSetService.findByCategory(
         query.category,
@@ -153,13 +199,17 @@ export class PermissionSetController {
   @Get('templates')
   @ApiOperation({
     summary: 'Dapatkan daftar template permission set',
-    description: 'Mengambil daftar template yang dapat digunakan untuk membuat permission set baru',
+    description:
+      'Mengambil daftar template yang dapat digunakan untuk membuat permission set baru',
   })
   @ApiOkResponse({
     description: 'Daftar template berhasil diambil',
     type: [PermissionSetResponseDto],
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async getTemplates(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<PermissionSetResponseDto[]>> {
@@ -170,7 +220,8 @@ export class PermissionSetController {
       message: 'Daftar template permission set berhasil diambil',
       data: templates.map(template => ({
         ...template,
-        permissions: template.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          template.permissions?.map(p => `${p.resource}:${p.action}`) || [],
         permissionCount: template.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       })) as PermissionSetResponseDto[],
@@ -186,20 +237,30 @@ export class PermissionSetController {
     description: 'Permission set populer berhasil diambil',
     type: [PermissionSetResponseDto],
   })
-  @ApiQuery({ name: 'limit', required: false, description: 'Batas hasil', example: 10 })
-  @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Batas hasil',
+    example: 10,
+  })
+  @Permissions({
+    resource: PermissionResource.ANALYTICS,
+    action: PermissionAction.READ,
+  })
   async getPopular(
     @Query('limit') limit: number = 10,
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<PermissionSetResponseDto[]>> {
-    const popularSets = await this.permissionSetService.getPopularPermissionSets(tenantId, limit);
+    const popularSets =
+      await this.permissionSetService.getPopularPermissionSets(tenantId, limit);
 
     return {
       success: true,
       message: 'Permission set populer berhasil diambil',
       data: popularSets.map(set => ({
         ...set,
-        permissions: set.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          set.permissions?.map(p => `${p.resource}:${p.action}`) || [],
         permissionCount: set.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       })) as PermissionSetResponseDto[],
@@ -215,20 +276,33 @@ export class PermissionSetController {
     description: 'Permission set terbaru berhasil diambil',
     type: [PermissionSetResponseDto],
   })
-  @ApiQuery({ name: 'limit', required: false, description: 'Batas hasil', example: 10 })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Batas hasil',
+    example: 10,
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async getRecent(
     @Query('limit') limit: number = 10,
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<PermissionSetResponseDto[]>> {
-    const recentSets = await this.permissionSetService.getRecentlyUsedPermissionSets(tenantId, limit);
+    const recentSets =
+      await this.permissionSetService.getRecentlyUsedPermissionSets(
+        tenantId,
+        limit,
+      );
 
     return {
       success: true,
       message: 'Permission set yang baru digunakan berhasil diambil',
       data: recentSets.map(set => ({
         ...set,
-        permissions: set.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          set.permissions?.map(p => `${p.resource}:${p.action}`) || [],
         permissionCount: set.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       })) as PermissionSetResponseDto[],
@@ -238,17 +312,23 @@ export class PermissionSetController {
   @Get('stats')
   @ApiOperation({
     summary: 'Dapatkan statistik permission set',
-    description: 'Mengambil statistik permission set termasuk jumlah per jenis dan usage',
+    description:
+      'Mengambil statistik permission set termasuk jumlah per jenis dan usage',
   })
   @ApiOkResponse({
     description: 'Statistik permission set berhasil diambil',
     type: PermissionSetStatsDto,
   })
-  @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.ANALYTICS,
+    action: PermissionAction.READ,
+  })
   async getStats(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<PermissionSetStatsDto>> {
-    const stats = await this.permissionSetService.getPermissionSetStats(tenantId);
+    const stats = await this.permissionSetService.getPermissionSetStats(
+      tenantId,
+    );
 
     return {
       success: true,
@@ -268,19 +348,27 @@ export class PermissionSetController {
     type: PermissionSetResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Permission set tidak ditemukan' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<PermissionSetResponseDto>> {
-    const permissionSet = await this.permissionSetService.findById(id, tenantId);
+    const permissionSet = await this.permissionSetService.findById(
+      id,
+      tenantId,
+    );
 
     return {
       success: true,
       message: 'Detail permission set berhasil diambil',
       data: {
         ...permissionSet,
-        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: permissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -290,11 +378,20 @@ export class PermissionSetController {
   @Get(':id/effective-permissions')
   @ApiOperation({
     summary: 'Dapatkan effective permissions',
-    description: 'Mengambil semua permission efektif untuk permission set dengan konteks tertentu',
+    description:
+      'Mengambil semua permission efektif untuk permission set dengan konteks tertentu',
   })
   @ApiParam({ name: 'id', description: 'ID permission set' })
-  @ApiQuery({ name: 'departmentId', required: false, description: 'Context departemen' })
-  @ApiQuery({ name: 'ipAddress', required: false, description: 'IP address untuk validasi' })
+  @ApiQuery({
+    name: 'departmentId',
+    required: false,
+    description: 'Context departemen',
+  })
+  @ApiQuery({
+    name: 'ipAddress',
+    required: false,
+    description: 'IP address untuk validasi',
+  })
   @ApiOkResponse({
     description: 'Effective permissions berhasil diambil',
     schema: {
@@ -313,18 +410,23 @@ export class PermissionSetController {
       },
     },
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async getEffectivePermissions(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('departmentId') departmentId: string,
     @Query('ipAddress') ipAddress: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-  ): Promise<StandardResponse<{
-    permissionSetId: string;
-    permissions: string[];
-    effectiveAt: string;
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      permissionSetId: string;
+      permissions: string[];
+      effectiveAt: string;
+    }>
+  > {
     const context = {
       departmentId,
       userId,
@@ -361,8 +463,14 @@ export class PermissionSetController {
   })
   @ApiNotFoundResponse({ description: 'Permission set tidak ditemukan' })
   @ApiBadRequestResponse({ description: 'Data tidak valid' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin atau permission set adalah system-defined' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description:
+      'Tidak memiliki izin atau permission set adalah system-defined',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePermissionSetDto: UpdatePermissionSetDto,
@@ -381,7 +489,9 @@ export class PermissionSetController {
       message: 'Permission set berhasil diperbarui',
       data: {
         ...permissionSet,
-        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: permissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -398,7 +508,10 @@ export class PermissionSetController {
     description: 'Status permission set berhasil diubah',
     type: PermissionSetResponseDto,
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: PermissionSetStatus,
@@ -417,7 +530,9 @@ export class PermissionSetController {
       message: 'Status permission set berhasil diubah',
       data: {
         ...permissionSet,
-        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: permissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -434,7 +549,10 @@ export class PermissionSetController {
     description: 'Permission berhasil ditambahkan',
     type: PermissionSetResponseDto,
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async addPermission(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() managePermissionDto: ManagePermissionDto,
@@ -453,7 +571,9 @@ export class PermissionSetController {
       message: 'Permission berhasil ditambahkan ke permission set',
       data: {
         ...permissionSet,
-        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: permissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -470,7 +590,10 @@ export class PermissionSetController {
     description: 'Permission berhasil dihapus',
     type: PermissionSetResponseDto,
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async removePermission(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() managePermissionDto: ManagePermissionDto,
@@ -489,7 +612,9 @@ export class PermissionSetController {
       message: 'Permission berhasil dihapus dari permission set',
       data: {
         ...permissionSet,
-        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: permissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -507,7 +632,10 @@ export class PermissionSetController {
     type: PermissionSetResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Kode permission set baru sudah ada' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.CREATE,
+  })
   async clone(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() clonePermissionSetDto: ClonePermissionSetDto,
@@ -527,7 +655,10 @@ export class PermissionSetController {
       message: 'Permission set berhasil di-clone',
       data: {
         ...clonedPermissionSet,
-        permissions: clonedPermissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          clonedPermissionSet.permissions?.map(
+            p => `${p.resource}:${p.action}`,
+          ) || [],
         permissionCount: clonedPermissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -537,14 +668,18 @@ export class PermissionSetController {
   @Post(':id/create-template')
   @ApiOperation({
     summary: 'Buat template dari permission set',
-    description: 'Membuat template yang dapat digunakan berulang kali dari permission set existing',
+    description:
+      'Membuat template yang dapat digunakan berulang kali dari permission set existing',
   })
   @ApiParam({ name: 'id', description: 'ID permission set sumber' })
   @ApiCreatedResponse({
     description: 'Template berhasil dibuat',
     type: PermissionSetResponseDto,
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.CREATE,
+  })
   async createTemplate(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() createTemplateDto: CreateTemplateDto,
@@ -564,7 +699,8 @@ export class PermissionSetController {
       message: 'Template permission set berhasil dibuat',
       data: {
         ...template,
-        permissions: template.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          template.permissions?.map(p => `${p.resource}:${p.action}`) || [],
         permissionCount: template.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -574,15 +710,21 @@ export class PermissionSetController {
   @Post(':id/apply-template')
   @ApiOperation({
     summary: 'Terapkan template untuk membuat permission set',
-    description: 'Menggunakan template untuk membuat permission set baru dengan customization',
+    description:
+      'Menggunakan template untuk membuat permission set baru dengan customization',
   })
   @ApiParam({ name: 'id', description: 'ID template yang akan diterapkan' })
   @ApiCreatedResponse({
     description: 'Permission set dari template berhasil dibuat',
     type: PermissionSetResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Template tidak valid atau kode sudah ada' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.CREATE })
+  @ApiBadRequestResponse({
+    description: 'Template tidak valid atau kode sudah ada',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.CREATE,
+  })
   async applyTemplate(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() applyTemplateDto: ApplyTemplateDto,
@@ -607,7 +749,9 @@ export class PermissionSetController {
       message: 'Permission set dari template berhasil dibuat',
       data: {
         ...newPermissionSet,
-        permissions: newPermissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          newPermissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: newPermissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -637,16 +781,21 @@ export class PermissionSetController {
       },
     },
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async checkPermission(
     @Query('permissionSetId', ParseUUIDPipe) permissionSetId: string,
     @Body() checkPermissionDto: CheckPermissionDto,
     @CurrentTenant() tenantId: string,
-  ): Promise<StandardResponse<{
-    hasPermission: boolean;
-    permissionKey: string;
-    checkedAt: string;
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      hasPermission: boolean;
+      permissionKey: string;
+      checkedAt: string;
+    }>
+  > {
     const hasPermission = await this.permissionSetService.hasPermission(
       permissionSetId,
       checkPermissionDto.permissionKey,
@@ -668,13 +817,17 @@ export class PermissionSetController {
   @Post('compare')
   @ApiOperation({
     summary: 'Bandingkan permission set',
-    description: 'Membandingkan dua permission set untuk melihat perbedaan permission',
+    description:
+      'Membandingkan dua permission set untuk melihat perbedaan permission',
   })
   @ApiOkResponse({
     description: 'Perbandingan permission set berhasil',
     type: PermissionSetComparisonDto,
   })
-  @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.ANALYTICS,
+    action: PermissionAction.READ,
+  })
   async compare(
     @Body() compareDto: ComparePermissionSetsDto,
     @CurrentTenant() tenantId: string,
@@ -709,12 +862,18 @@ export class PermissionSetController {
       },
     },
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.EXPORT })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.EXPORT,
+  })
   async exportPermissionSet(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<any>> {
-    const exportData = await this.permissionSetService.exportPermissionSet(id, tenantId);
+    const exportData = await this.permissionSetService.exportPermissionSet(
+      id,
+      tenantId,
+    );
 
     return {
       success: true,
@@ -733,24 +892,31 @@ export class PermissionSetController {
     type: PermissionSetResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Data import tidak valid' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.IMPORT })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.IMPORT,
+  })
   async importPermissionSet(
     @Body() importDto: ImportPermissionSetDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<PermissionSetResponseDto>> {
-    const importedPermissionSet = await this.permissionSetService.importPermissionSet(
-      importDto.importData,
-      tenantId,
-      userId,
-    );
+    const importedPermissionSet =
+      await this.permissionSetService.importPermissionSet(
+        importDto.importData,
+        tenantId,
+        userId,
+      );
 
     return {
       success: true,
       message: 'Permission set berhasil diimport',
       data: {
         ...importedPermissionSet,
-        permissions: importedPermissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          importedPermissionSet.permissions?.map(
+            p => `${p.resource}:${p.action}`,
+          ) || [],
         permissionCount: importedPermissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -763,7 +929,10 @@ export class PermissionSetController {
     description: 'Mengubah status beberapa permission set sekaligus',
   })
   @ApiOkResponse({ description: 'Status permission set berhasil diubah' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async bulkUpdateStatus(
     @Body() bulkUpdateDto: BulkUpdatePermissionSetStatusDto,
     @CurrentTenant() tenantId: string,
@@ -792,21 +961,32 @@ export class PermissionSetController {
     description: 'Permission set berhasil dipulihkan',
     type: PermissionSetResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'Permission set yang dihapus tidak ditemukan' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @ApiNotFoundResponse({
+    description: 'Permission set yang dihapus tidak ditemukan',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async restore(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
   ): Promise<StandardResponse<PermissionSetResponseDto>> {
-    const permissionSet = await this.permissionSetService.restore(id, tenantId, userId);
+    const permissionSet = await this.permissionSetService.restore(
+      id,
+      tenantId,
+      userId,
+    );
 
     return {
       success: true,
       message: 'Permission set berhasil dipulihkan',
       data: {
         ...permissionSet,
-        permissions: permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) || [],
+        permissions:
+          permissionSet.permissions?.map(p => `${p.resource}:${p.action}`) ||
+          [],
         permissionCount: permissionSet.permissions?.length || 0,
         usageCount: 0, // This would be tracked separately
       } as PermissionSetResponseDto,
@@ -816,14 +996,22 @@ export class PermissionSetController {
   @Delete(':id')
   @ApiOperation({
     summary: 'Hapus permission set',
-    description: 'Menghapus permission set (soft delete). Permission set sistem tidak dapat dihapus.',
+    description:
+      'Menghapus permission set (soft delete). Permission set sistem tidak dapat dihapus.',
   })
   @ApiParam({ name: 'id', description: 'ID permission set' })
   @ApiNoContentResponse({ description: 'Permission set berhasil dihapus' })
   @ApiNotFoundResponse({ description: 'Permission set tidak ditemukan' })
-  @ApiBadRequestResponse({ description: 'Permission set masih digunakan atau adalah system-defined' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk menghapus permission set' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.DELETE })
+  @ApiBadRequestResponse({
+    description: 'Permission set masih digunakan atau adalah system-defined',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk menghapus permission set',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.DELETE,
+  })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,

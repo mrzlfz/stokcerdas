@@ -1,8 +1,12 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole, UserStatus } from '../../users/entities/user.entity';
-import { ProductCategory } from '../../products/entities/product.entity';
-import { InventoryLocation, LocationType, LocationStatus } from '../../inventory/entities/inventory-location.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+import {
+  InventoryLocation,
+  LocationType,
+  LocationStatus,
+} from '../../inventory/entities/inventory-location.entity';
 
 export class InitialDataSeed {
   static async run(dataSource: DataSource): Promise<void> {
@@ -17,7 +21,7 @@ export class InitialDataSeed {
 
     // Create test admin user
     const hashedPassword = await bcrypt.hash('admin123', 12);
-    
+
     const adminUser = new User();
     (adminUser as any).tenantId = testTenantId;
     adminUser.email = 'admin@stokcerdas.test';
@@ -101,8 +105,8 @@ export class InitialDataSeed {
         phoneNumber: '+62-21-12345678',
         email: 'warehouse.jakarta@stokcerdas.com',
         contactPerson: 'Budi Santoso',
-        totalArea: 1500.00,
-        usableArea: 1200.00,
+        totalArea: 1500.0,
+        usableArea: 1200.0,
         maxCapacity: 10000,
         isPickupLocation: true,
         isDropoffLocation: true,
@@ -122,8 +126,8 @@ export class InitialDataSeed {
         phoneNumber: '+62-21-87654321',
         email: 'store.thamrin@stokcerdas.com',
         contactPerson: 'Sari Dewi',
-        totalArea: 200.00,
-        usableArea: 150.00,
+        totalArea: 200.0,
+        usableArea: 150.0,
         maxCapacity: 1000,
         isPickupLocation: true,
         isDropoffLocation: false,
@@ -152,8 +156,8 @@ export class InitialDataSeed {
         phoneNumber: '+62-31-11223344',
         email: 'warehouse.surabaya@stokcerdas.com',
         contactPerson: 'Agus Prasetyo',
-        totalArea: 1000.00,
-        usableArea: 800.00,
+        totalArea: 1000.0,
+        usableArea: 800.0,
         maxCapacity: 7500,
         isPickupLocation: true,
         isDropoffLocation: true,
@@ -176,7 +180,7 @@ export class InitialDataSeed {
       const location = new InventoryLocation();
       (location as any).tenantId = testTenantId;
       (location as any).createdBy = (savedAdminUser as any).id;
-      
+
       // Assign all location properties
       Object.assign(location, locationData);
 

@@ -7,10 +7,16 @@ import { Queue } from 'bull';
 
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 import { WhatsAppApiService } from './whatsapp-api.service';
 import { WhatsAppAuthService } from './whatsapp-auth.service';
-import { WebhookEvent, WebhookProcessingStatus } from '../../entities/webhook-event.entity';
+import {
+  WebhookEvent,
+  WebhookProcessingStatus,
+} from '../../entities/webhook-event.entity';
 
 export interface WhatsAppWebhookPayload {
   object: 'whatsapp_business_account';
@@ -24,7 +30,14 @@ export interface WhatsAppWebhookEntry {
 
 export interface WhatsAppWebhookChange {
   value: WhatsAppWebhookValue;
-  field: 'messages' | 'message_template_status_update' | 'account_alerts' | 'account_update' | 'phone_number_name_update' | 'phone_number_quality_update' | 'template_category_update';
+  field:
+    | 'messages'
+    | 'message_template_status_update'
+    | 'account_alerts'
+    | 'account_update'
+    | 'phone_number_name_update'
+    | 'phone_number_quality_update'
+    | 'template_category_update';
 }
 
 export interface WhatsAppWebhookValue {
@@ -60,7 +73,19 @@ export interface WhatsAppIncomingMessage {
   id: string;
   from: string;
   timestamp: string;
-  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'sticker' | 'location' | 'contacts' | 'interactive' | 'button' | 'order' | 'system';
+  type:
+    | 'text'
+    | 'image'
+    | 'audio'
+    | 'video'
+    | 'document'
+    | 'sticker'
+    | 'location'
+    | 'contacts'
+    | 'interactive'
+    | 'button'
+    | 'order'
+    | 'system';
   context?: {
     from: string;
     id: string;
@@ -230,14 +255,24 @@ export class WhatsAppWebhookService {
       const webhookData: WhatsAppWebhookPayload = JSON.parse(payload);
 
       // Verify webhook signature
-      const credentials = await this.authService.getCredentials(tenantId, channelId);
+      const credentials = await this.authService.getCredentials(
+        tenantId,
+        channelId,
+      );
       if (!credentials) {
-        throw new Error('No WhatsApp credentials found for signature verification');
+        throw new Error(
+          'No WhatsApp credentials found for signature verification',
+        );
       }
 
-      const signature = headers['x-hub-signature-256'] || headers['X-Hub-Signature-256'];
+      const signature =
+        headers['x-hub-signature-256'] || headers['X-Hub-Signature-256'];
       if (signature) {
-        const isValid = this.apiService.verifyWebhookSignature(payload, signature, credentials.appSecret);
+        const isValid = this.apiService.verifyWebhookSignature(
+          payload,
+          signature,
+          credentials.appSecret,
+        );
         if (!isValid) {
           throw new Error('Invalid webhook signature');
         }
@@ -274,14 +309,20 @@ export class WhatsAppWebhookService {
             processedCount++;
           }
         } catch (error) {
-          this.logger.error(`Failed to process webhook entry ${entry.id}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to process webhook entry ${entry.id}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Entry ${entry.id}: ${error.message}`);
         }
       }
 
       // Update webhook status
       await this.webhookEventRepository.update(webhookId, {
-        processingStatus: errors.length === 0 ? WebhookProcessingStatus.PROCESSED : WebhookProcessingStatus.FAILED,
+        processingStatus:
+          errors.length === 0
+            ? WebhookProcessingStatus.PROCESSED
+            : WebhookProcessingStatus.FAILED,
         processedAt: new Date(),
         processingDurationMs: Date.now() - startTime,
         processingDetails: {
@@ -312,15 +353,17 @@ export class WhatsAppWebhookService {
         errors,
         webhookId,
       };
-
     } catch (error) {
-      this.logger.error(`WhatsApp webhook processing failed: ${error.message}`, {
-        tenantId,
-        channelId,
-        webhookType,
-        error: error.message,
-        stack: error.stack,
-      });
+      this.logger.error(
+        `WhatsApp webhook processing failed: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          webhookType,
+          error: error.message,
+          stack: error.stack,
+        },
+      );
 
       // Update webhook status if we have an ID
       if (webhookId) {
@@ -376,7 +419,12 @@ export class WhatsAppWebhookService {
         break;
 
       case 'message_template_status_update':
-        await this.processTemplateStatusUpdate(tenantId, channelId, webhookId, value);
+        await this.processTemplateStatusUpdate(
+          tenantId,
+          channelId,
+          webhookId,
+          value,
+        );
         break;
 
       case 'account_alerts':
@@ -389,11 +437,22 @@ export class WhatsAppWebhookService {
 
       case 'phone_number_name_update':
       case 'phone_number_quality_update':
-        await this.processPhoneNumberUpdate(tenantId, channelId, webhookId, change.field, value);
+        await this.processPhoneNumberUpdate(
+          tenantId,
+          channelId,
+          webhookId,
+          change.field,
+          value,
+        );
         break;
 
       case 'template_category_update':
-        await this.processTemplateCategoryUpdate(tenantId, channelId, webhookId, value);
+        await this.processTemplateCategoryUpdate(
+          tenantId,
+          channelId,
+          webhookId,
+          value,
+        );
         break;
 
       default:
@@ -418,7 +477,13 @@ export class WhatsAppWebhookService {
     // Process incoming messages
     if (value.messages) {
       for (const message of value.messages) {
-        await this.processIncomingMessage(tenantId, channelId, webhookId, message, value.contacts);
+        await this.processIncomingMessage(
+          tenantId,
+          channelId,
+          webhookId,
+          message,
+          value.contacts,
+        );
       }
     }
 
@@ -448,13 +513,16 @@ export class WhatsAppWebhookService {
     contacts?: WhatsAppContact[],
   ): Promise<void> {
     try {
-      this.logger.debug(`Processing incoming WhatsApp message: ${message.type}`, {
-        tenantId,
-        channelId,
-        messageId: message.id,
-        from: message.from,
-        type: message.type,
-      });
+      this.logger.debug(
+        `Processing incoming WhatsApp message: ${message.type}`,
+        {
+          tenantId,
+          channelId,
+          messageId: message.id,
+          from: message.from,
+          type: message.type,
+        },
+      );
 
       // Find contact info
       const contact = contacts?.find(c => c.wa_id === message.from);
@@ -467,13 +535,17 @@ export class WhatsAppWebhookService {
 
       if (options.markAsRead) {
         // Queue mark as read operation
-        await this.whatsappQueue.add('mark-as-read', {
-          tenantId,
-          channelId,
-          messageId: message.id,
-        }, {
-          delay: 1000, // Small delay to avoid rate limits
-        });
+        await this.whatsappQueue.add(
+          'mark-as-read',
+          {
+            tenantId,
+            channelId,
+            messageId: message.id,
+          },
+          {
+            delay: 1000, // Small delay to avoid rate limits
+          },
+        );
       }
 
       // Store message in database (if enabled)
@@ -499,7 +571,12 @@ export class WhatsAppWebhookService {
           break;
 
         case 'interactive':
-          await this.handleInteractiveMessage(tenantId, channelId, message, contact);
+          await this.handleInteractiveMessage(
+            tenantId,
+            channelId,
+            message,
+            contact,
+          );
           break;
 
         case 'button':
@@ -519,11 +596,21 @@ export class WhatsAppWebhookService {
           break;
 
         case 'location':
-          await this.handleLocationMessage(tenantId, channelId, message, contact);
+          await this.handleLocationMessage(
+            tenantId,
+            channelId,
+            message,
+            contact,
+          );
           break;
 
         case 'contacts':
-          await this.handleContactsMessage(tenantId, channelId, message, contact);
+          await this.handleContactsMessage(
+            tenantId,
+            channelId,
+            message,
+            contact,
+          );
           break;
 
         case 'system':
@@ -554,15 +641,17 @@ export class WhatsAppWebhookService {
           contactName: contact?.profile?.name,
         },
       });
-
     } catch (error) {
-      this.logger.error(`Failed to process incoming message: ${error.message}`, {
-        tenantId,
-        channelId,
-        messageId: message.id,
-        error: error.message,
-        stack: error.stack,
-      });
+      this.logger.error(
+        `Failed to process incoming message: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          messageId: message.id,
+          error: error.message,
+          stack: error.stack,
+        },
+      );
 
       throw error;
     }
@@ -615,7 +704,6 @@ export class WhatsAppWebhookService {
           pricing: status.pricing,
         },
       });
-
     } catch (error) {
       this.logger.error(`Failed to process message status: ${error.message}`, {
         tenantId,
@@ -673,9 +761,11 @@ export class WhatsAppWebhookService {
           reason: value.reason,
         },
       });
-
     } catch (error) {
-      this.logger.error(`Failed to process template status update: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to process template status update: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -725,11 +815,14 @@ export class WhatsAppWebhookService {
     value: WhatsAppWebhookValue,
   ): Promise<void> {
     // Implementation for phone number updates
-    this.logger.warn(`Phone number update processing not implemented yet: ${updateType}`, {
-      tenantId,
-      channelId,
-      webhookId,
-    });
+    this.logger.warn(
+      `Phone number update processing not implemented yet: ${updateType}`,
+      {
+        tenantId,
+        channelId,
+        webhookId,
+      },
+    );
   }
 
   /**
@@ -742,11 +835,14 @@ export class WhatsAppWebhookService {
     value: WhatsAppWebhookValue,
   ): Promise<void> {
     // Implementation for template category updates
-    this.logger.warn('Template category update processing not implemented yet', {
-      tenantId,
-      channelId,
-      webhookId,
-    });
+    this.logger.warn(
+      'Template category update processing not implemented yet',
+      {
+        tenantId,
+        channelId,
+        webhookId,
+      },
+    );
   }
 
   /**
@@ -769,15 +865,20 @@ export class WhatsAppWebhookService {
     });
 
     // Log webhook error
-    await this.logService.logError(tenantId, channelId, new Error(error.message), {
-      metadata: {
-        operation: 'webhook_error',
-        webhookId,
-        errorCode: error.code,
-        errorTitle: error.title,
-        errorDetails: error.error_data?.details,
+    await this.logService.logError(
+      tenantId,
+      channelId,
+      new Error(error.message),
+      {
+        metadata: {
+          operation: 'webhook_error',
+          webhookId,
+          errorCode: error.code,
+          errorTitle: error.title,
+          errorDetails: error.error_data?.details,
+        },
       },
-    });
+    );
   }
 
   // Message type handlers
@@ -859,7 +960,12 @@ export class WhatsAppWebhookService {
       message,
       contact,
       mediaType: message.type,
-      mediaId: message.image?.id || message.audio?.id || message.video?.id || message.document?.id || message.sticker?.id,
+      mediaId:
+        message.image?.id ||
+        message.audio?.id ||
+        message.video?.id ||
+        message.document?.id ||
+        message.sticker?.id,
     });
   }
 

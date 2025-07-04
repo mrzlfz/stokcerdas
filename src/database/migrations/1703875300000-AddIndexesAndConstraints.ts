@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddIndexesAndConstraints1703875300000 implements MigrationInterface {
+export class AddIndexesAndConstraints1703875300000
+  implements MigrationInterface
+{
   name = 'AddIndexesAndConstraints1703875300000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -239,12 +241,12 @@ export class AddIndexesAndConstraints1703875300000 implements MigrationInterface
     // Apply trigger to all tables
     const tables = [
       'users',
-      'product_categories', 
+      'product_categories',
       'products',
       'product_variants',
       'inventory_locations',
       'inventory_items',
-      'inventory_transactions'
+      'inventory_transactions',
     ];
 
     for (const table of tables) {
@@ -260,62 +262,136 @@ export class AddIndexesAndConstraints1703875300000 implements MigrationInterface
     // Drop triggers
     const tables = [
       'users',
-      'product_categories', 
+      'product_categories',
       'products',
       'product_variants',
       'inventory_locations',
       'inventory_items',
-      'inventory_transactions'
+      'inventory_transactions',
     ];
 
     for (const table of tables) {
-      await queryRunner.query(`DROP TRIGGER IF EXISTS update_${table}_updated_at ON "${table}"`);
+      await queryRunner.query(
+        `DROP TRIGGER IF EXISTS update_${table}_updated_at ON "${table}"`,
+      );
     }
 
-    await queryRunner.query(`DROP FUNCTION IF EXISTS update_updated_at_column()`);
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS update_updated_at_column()`,
+    );
 
     // Drop all indexes
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_reference"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_date"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_location"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_product"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_items_tenant_quantity"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_items_tenant_product"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_items_tenant_location"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_type"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_product_variants_tenant_product"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_products_tenant_deleted"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_products_tenant_category"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_products_tenant_status"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_reference"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_date"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_type"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_location"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_transactions_tenant_product"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_items_tenant_quantity"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_items_tenant_product"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_items_tenant_location"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_status"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_type"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_product_variants_tenant_product"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_products_tenant_deleted"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_products_tenant_category"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_products_tenant_status"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_users_tenant_deleted"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_users_tenant_role"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_users_tenant_status"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_items_tenant_product_location"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_code"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_product_variants_tenant_sku"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_products_tenant_barcode"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_items_tenant_product_location"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_inventory_locations_tenant_code"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_product_variants_tenant_sku"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_products_tenant_barcode"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_products_tenant_sku"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_product_categories_tenant_name"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_product_categories_tenant_name"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_users_tenant_email"`);
 
     // Drop foreign key constraints
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_related_transaction"`);
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_cancelled_by"`);
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_processed_by"`);
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_destination_location"`);
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_source_location"`);
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_inventory_item"`);
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_location"`);
-    await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_product"`);
-    await queryRunner.query(`ALTER TABLE "inventory_items" DROP CONSTRAINT IF EXISTS "FK_inventory_items_location"`);
-    await queryRunner.query(`ALTER TABLE "inventory_items" DROP CONSTRAINT IF EXISTS "FK_inventory_items_product"`);
-    await queryRunner.query(`ALTER TABLE "inventory_locations" DROP CONSTRAINT IF EXISTS "FK_inventory_locations_parent"`);
-    await queryRunner.query(`ALTER TABLE "product_variants" DROP CONSTRAINT IF EXISTS "FK_product_variants_product"`);
-    await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT IF EXISTS "FK_products_category"`);
-    await queryRunner.query(`ALTER TABLE "product_categories" DROP CONSTRAINT IF EXISTS "FK_product_categories_parent"`);
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_related_transaction"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_cancelled_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_processed_by"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_destination_location"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_source_location"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_inventory_item"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_location"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_transactions" DROP CONSTRAINT IF EXISTS "FK_inventory_transactions_product"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_items" DROP CONSTRAINT IF EXISTS "FK_inventory_items_location"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_items" DROP CONSTRAINT IF EXISTS "FK_inventory_items_product"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "inventory_locations" DROP CONSTRAINT IF EXISTS "FK_inventory_locations_parent"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "product_variants" DROP CONSTRAINT IF EXISTS "FK_product_variants_product"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "products" DROP CONSTRAINT IF EXISTS "FK_products_category"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "product_categories" DROP CONSTRAINT IF EXISTS "FK_product_categories_parent"`,
+    );
   }
 }

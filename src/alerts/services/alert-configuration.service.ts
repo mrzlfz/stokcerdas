@@ -1,8 +1,17 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { AlertConfiguration, AlertType, AlertSeverity } from '../entities/alert-configuration.entity';
+import {
+  AlertConfiguration,
+  AlertType,
+  AlertSeverity,
+} from '../entities/alert-configuration.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryLocation } from '../../inventory/entities/inventory-location.entity';
 import { CreateAlertConfigurationDto } from '../dto/create-alert-configuration.dto';
@@ -49,12 +58,15 @@ export class AlertConfigurationService {
 
     if (existing) {
       throw new ConflictException(
-        'Konfigurasi alert untuk kombinasi type/product/location ini sudah ada'
+        'Konfigurasi alert untuk kombinasi type/product/location ini sudah ada',
       );
     }
 
     // Validate alert type specific requirements
-    this.validateAlertTypeConfiguration(createDto.alertType, createDto.configuration);
+    this.validateAlertTypeConfiguration(
+      createDto.alertType,
+      createDto.configuration,
+    );
 
     const configuration = this.alertConfigRepository.create({
       ...createDto,
@@ -129,10 +141,7 @@ export class AlertConfigurationService {
 
     // Apply pagination
     const offset = (page - 1) * limit;
-    queryBuilder
-      .orderBy('config.createdAt', 'DESC')
-      .skip(offset)
-      .take(limit);
+    queryBuilder.orderBy('config.createdAt', 'DESC').skip(offset).take(limit);
 
     const data = await queryBuilder.getMany();
 
@@ -185,8 +194,14 @@ export class AlertConfigurationService {
     }
 
     // Validate alert type configuration if alert type is being changed
-    if (updateDto.alertType && updateDto.alertType !== configuration.alertType) {
-      this.validateAlertTypeConfiguration(updateDto.alertType, updateDto.configuration);
+    if (
+      updateDto.alertType &&
+      updateDto.alertType !== configuration.alertType
+    ) {
+      this.validateAlertTypeConfiguration(
+        updateDto.alertType,
+        updateDto.configuration,
+      );
     }
 
     // Update configuration
@@ -243,7 +258,13 @@ export class AlertConfigurationService {
         // Location specific
         { tenantId, alertType, productId: null, locationId, isEnabled: true },
         // Global
-        { tenantId, alertType, productId: null, locationId: null, isEnabled: true },
+        {
+          tenantId,
+          alertType,
+          productId: null,
+          locationId: null,
+          isEnabled: true,
+        },
       ],
       order: {
         createdAt: 'DESC',
@@ -272,13 +293,19 @@ export class AlertConfigurationService {
     }
 
     // Return global configuration
-    return configurations.find(config => !config.productId && !config.locationId) || null;
+    return (
+      configurations.find(config => !config.productId && !config.locationId) ||
+      null
+    );
   }
 
   /**
    * Initialize default alert configurations for tenant
    */
-  async initializeDefaultConfigurations(tenantId: string, userId: string): Promise<void> {
+  async initializeDefaultConfigurations(
+    tenantId: string,
+    userId: string,
+  ): Promise<void> {
     const defaultConfigs = [
       {
         alertType: AlertType.LOW_STOCK,
@@ -412,7 +439,10 @@ export class AlertConfigurationService {
   }
 
   // Private helper methods
-  private async validateProduct(tenantId: string, productId: string): Promise<void> {
+  private async validateProduct(
+    tenantId: string,
+    productId: string,
+  ): Promise<void> {
     const product = await this.productRepository.findOne({
       where: { id: productId, tenantId, isDeleted: false },
     });
@@ -422,7 +452,10 @@ export class AlertConfigurationService {
     }
   }
 
-  private async validateLocation(tenantId: string, locationId: string): Promise<void> {
+  private async validateLocation(
+    tenantId: string,
+    locationId: string,
+  ): Promise<void> {
     const location = await this.locationRepository.findOne({
       where: { id: locationId, tenantId, isDeleted: false },
     });
@@ -432,28 +465,41 @@ export class AlertConfigurationService {
     }
   }
 
-  private validateAlertTypeConfiguration(alertType: AlertType, configuration?: any): void {
+  private validateAlertTypeConfiguration(
+    alertType: AlertType,
+    configuration?: any,
+  ): void {
     if (!configuration) return;
 
     switch (alertType) {
       case AlertType.LOW_STOCK:
       case AlertType.REORDER_NEEDED:
-        if (configuration.reorderPoint !== undefined && configuration.reorderPoint < 0) {
+        if (
+          configuration.reorderPoint !== undefined &&
+          configuration.reorderPoint < 0
+        ) {
           throw new BadRequestException('Reorder point harus >= 0');
         }
         break;
 
       case AlertType.EXPIRING_SOON:
         if (configuration.expiryWarningDays !== undefined) {
-          if (configuration.expiryWarningDays < 1 || configuration.expiryWarningDays > 365) {
-            throw new BadRequestException('Expiry warning days harus antara 1-365');
+          if (
+            configuration.expiryWarningDays < 1 ||
+            configuration.expiryWarningDays > 365
+          ) {
+            throw new BadRequestException(
+              'Expiry warning days harus antara 1-365',
+            );
           }
         }
         break;
 
       case AlertType.SYSTEM_MAINTENANCE:
         if (!configuration.maintenanceMessage) {
-          throw new BadRequestException('Maintenance message diperlukan untuk system maintenance alert');
+          throw new BadRequestException(
+            'Maintenance message diperlukan untuk system maintenance alert',
+          );
         }
         break;
     }

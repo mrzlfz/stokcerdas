@@ -1,4 +1,15 @@
-import { IsOptional, IsEnum, IsDateString, IsArray, IsUUID, IsString, IsInt, Min, Max, IsNumber } from 'class-validator';
+import {
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  IsArray,
+  IsUUID,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+  IsNumber,
+} from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 

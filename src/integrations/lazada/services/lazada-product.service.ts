@@ -5,8 +5,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LazadaApiService, LazadaConfig } from './lazada-api.service';
 import { LazadaAuthService } from './lazada-auth.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
-import { Product, ProductType, ProductStatus } from '../../../products/entities/product.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
+import {
+  Product,
+  ProductType,
+  ProductStatus,
+} from '../../../products/entities/product.entity';
 import { Channel } from '../../../channels/entities/channel.entity';
 
 export interface LazadaProduct {
@@ -112,7 +119,12 @@ export class LazadaProductService {
     tenantId: string,
     channelId: string,
     options: ProductSyncOptions = {},
-  ): Promise<{ success: boolean; syncedCount: number; errorCount: number; errors: string[] }> {
+  ): Promise<{
+    success: boolean;
+    syncedCount: number;
+    errorCount: number;
+    errors: string[];
+  }> {
     const errors: string[] = [];
     let syncedCount = 0;
     let errorCount = 0;
@@ -125,7 +137,10 @@ export class LazadaProductService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -166,18 +181,16 @@ export class LazadaProductService {
       }
 
       // Get products from Lazada
-      const result = await this.lazadaApi.makeLazadaRequest<{ products: LazadaProduct[]; total_products: number }>(
-        tenantId,
-        channelId,
-        lazadaConfig,
-        {
-          method: 'GET',
-          path: '/products/get',
-          params,
-          requiresAuth: true,
-          rateLimitKey: 'products_get',
-        },
-      );
+      const result = await this.lazadaApi.makeLazadaRequest<{
+        products: LazadaProduct[];
+        total_products: number;
+      }>(tenantId, channelId, lazadaConfig, {
+        method: 'GET',
+        path: '/products/get',
+        params,
+        requiresAuth: true,
+        rateLimitKey: 'products_get',
+      });
 
       if (!result.success || !result.data) {
         throw new Error(result.error || 'Failed to fetch products from Lazada');
@@ -185,19 +198,29 @@ export class LazadaProductService {
 
       const lazadaProducts = result.data.products || [];
 
-      this.logger.debug(`Fetched ${lazadaProducts.length} products from Lazada`, {
-        tenantId,
-        channelId,
-        total: result.data.total_products,
-      });
+      this.logger.debug(
+        `Fetched ${lazadaProducts.length} products from Lazada`,
+        {
+          tenantId,
+          channelId,
+          total: result.data.total_products,
+        },
+      );
 
       // Sync each product
       for (const lazadaProduct of lazadaProducts) {
         try {
-          await this.syncSingleProductFromLazada(tenantId, channelId, lazadaProduct);
+          await this.syncSingleProductFromLazada(
+            tenantId,
+            channelId,
+            lazadaProduct,
+          );
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to sync product ${lazadaProduct.item_id}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to sync product ${lazadaProduct.item_id}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Product ${lazadaProduct.item_id}: ${error.message}`);
           errorCount++;
         }
@@ -224,7 +247,6 @@ export class LazadaProductService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Product sync failed: ${error.message}`, error.stack);
 
@@ -273,7 +295,10 @@ export class LazadaProductService {
       }
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -283,18 +308,35 @@ export class LazadaProductService {
       };
 
       // Check if product already exists in Lazada
-      const existingMapping = await this.findProductMapping(tenantId, channelId, productId);
+      const existingMapping = await this.findProductMapping(
+        tenantId,
+        channelId,
+        productId,
+      );
 
       if (existingMapping) {
         // Update existing product
-        return this.updateLazadaProduct(tenantId, channelId, lazadaConfig, product, existingMapping.externalId);
+        return this.updateLazadaProduct(
+          tenantId,
+          channelId,
+          lazadaConfig,
+          product,
+          existingMapping.externalId,
+        );
       } else {
         // Create new product
-        return this.createLazadaProduct(tenantId, channelId, lazadaConfig, product);
+        return this.createLazadaProduct(
+          tenantId,
+          channelId,
+          lazadaConfig,
+          product,
+        );
       }
-
     } catch (error) {
-      this.logger.error(`Failed to sync product to Lazada: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync product to Lazada: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -312,7 +354,10 @@ export class LazadaProductService {
   ): Promise<{ success: boolean; data?: LazadaProduct; error?: string }> {
     try {
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -346,9 +391,11 @@ export class LazadaProductService {
         success: true,
         data: result.data,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get product details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get product details: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -367,7 +414,10 @@ export class LazadaProductService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -408,9 +458,11 @@ export class LazadaProductService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to update product images: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update product images: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -426,21 +478,36 @@ export class LazadaProductService {
     lazadaProduct: LazadaProduct,
   ): Promise<void> {
     // Find or create local product
-    let localProduct = await this.findLocalProductByExternalId(tenantId, lazadaProduct.item_id.toString());
+    let localProduct = await this.findLocalProductByExternalId(
+      tenantId,
+      lazadaProduct.item_id.toString(),
+    );
 
     if (!localProduct) {
       // Create new local product
-      localProduct = await this.createLocalProductFromLazada(tenantId, channelId, lazadaProduct);
+      localProduct = await this.createLocalProductFromLazada(
+        tenantId,
+        channelId,
+        lazadaProduct,
+      );
     } else {
       // Update existing local product
       await this.updateLocalProductFromLazada(localProduct, lazadaProduct);
     }
 
     // Store mapping if not exists
-    await this.ensureProductMapping(tenantId, channelId, localProduct.id, lazadaProduct.item_id.toString());
+    await this.ensureProductMapping(
+      tenantId,
+      channelId,
+      localProduct.id,
+      lazadaProduct.item_id.toString(),
+    );
   }
 
-  private async findLocalProductByExternalId(tenantId: string, externalId: string): Promise<Product | null> {
+  private async findLocalProductByExternalId(
+    tenantId: string,
+    externalId: string,
+  ): Promise<Product | null> {
     // This would need to query through channel mappings
     // For now, return null to always create new products
     return null;
@@ -454,11 +521,16 @@ export class LazadaProductService {
     // Extract product information from Lazada product
     const productData = {
       tenantId,
-      name: lazadaProduct.attributes?.name || `Lazada Product ${lazadaProduct.item_id}`,
+      name:
+        lazadaProduct.attributes?.name ||
+        `Lazada Product ${lazadaProduct.item_id}`,
       description: lazadaProduct.short_description || '',
       sku: lazadaProduct.item_sku || `LAZ-${lazadaProduct.item_id}`,
       type: ProductType.SIMPLE,
-      status: lazadaProduct.status === 'active' ? ProductStatus.ACTIVE : ProductStatus.INACTIVE,
+      status:
+        lazadaProduct.status === 'active'
+          ? ProductStatus.ACTIVE
+          : ProductStatus.INACTIVE,
       categoryId: lazadaProduct.primary_category?.toString(),
       // Add other fields as needed
     };
@@ -473,9 +545,13 @@ export class LazadaProductService {
   ): Promise<void> {
     // Update local product with Lazada data
     localProduct.name = lazadaProduct.attributes?.name || localProduct.name;
-    localProduct.description = lazadaProduct.short_description || localProduct.description;
-    localProduct.status = lazadaProduct.status === 'active' ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
-    
+    localProduct.description =
+      lazadaProduct.short_description || localProduct.description;
+    localProduct.status =
+      lazadaProduct.status === 'active'
+        ? ProductStatus.ACTIVE
+        : ProductStatus.INACTIVE;
+
     await this.productRepository.save(localProduct);
   }
 
@@ -488,18 +564,22 @@ export class LazadaProductService {
     try {
       // Prepare product data for Lazada
       const createRequest: ProductCreateRequest = {
-        primary_category: product.category?.id ? parseInt(product.category.id) : 1,
+        primary_category: product.category?.id
+          ? parseInt(product.category.id)
+          : 1,
         attributes: {
           name: product.name,
           description: product.description,
           short_description: product.description?.substring(0, 255),
           brand: product.brand || 'Generic',
         },
-        skus: [{
-          seller_sku: product.sku,
-          quantity: 0, // Will be updated separately
-          price: 0, // Will be updated separately
-        }],
+        skus: [
+          {
+            seller_sku: product.sku,
+            quantity: 0, // Will be updated separately
+            price: 0, // Will be updated separately
+          },
+        ],
       };
 
       // Create product in Lazada
@@ -538,9 +618,11 @@ export class LazadaProductService {
         success: true,
         externalId: itemId,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to create Lazada product: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create Lazada product: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -591,9 +673,11 @@ export class LazadaProductService {
         success: true,
         externalId,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to update Lazada product: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update Lazada product: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,

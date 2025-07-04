@@ -60,7 +60,13 @@ export interface WhatsAppPhoneNumber {
   quality_rating: 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
   verified_name: string;
   code_verification_status: string;
-  status: 'CONNECTED' | 'DISCONNECTED' | 'FLAGGED' | 'MIGRATED' | 'PENDING' | 'RESTRICTED';
+  status:
+    | 'CONNECTED'
+    | 'DISCONNECTED'
+    | 'FLAGGED'
+    | 'MIGRATED'
+    | 'PENDING'
+    | 'RESTRICTED';
   throughput: {
     level: string;
     optin_phone_numbers: number;
@@ -71,7 +77,17 @@ export interface WhatsAppMessage {
   messaging_product: 'whatsapp';
   recipient_type: 'individual';
   to: string;
-  type: 'text' | 'template' | 'interactive' | 'image' | 'audio' | 'video' | 'document' | 'sticker' | 'location' | 'contacts';
+  type:
+    | 'text'
+    | 'template'
+    | 'interactive'
+    | 'image'
+    | 'audio'
+    | 'video'
+    | 'document'
+    | 'sticker'
+    | 'location'
+    | 'contacts';
   text?: {
     preview_url?: boolean;
     body: string;
@@ -168,14 +184,16 @@ export class WhatsAppApiService extends BaseApiService {
       );
 
       const version = config.version || 'v18.0';
-      const baseUrl = config.sandbox ? this.baseUrls.sandbox : this.baseUrls.production;
+      const baseUrl = config.sandbox
+        ? this.baseUrls.sandbox
+        : this.baseUrls.production;
       const url = `${baseUrl}/${version}${requestConfig.endpoint}`;
 
       // Prepare headers
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'User-Agent': 'StokCerdas-WhatsApp-Integration/1.0',
-        'Authorization': `Bearer ${config.accessToken}`,
+        Authorization: `Bearer ${config.accessToken}`,
       };
 
       // Log request
@@ -214,13 +232,16 @@ export class WhatsAppApiService extends BaseApiService {
         { data: response.data },
       );
 
-      this.logger.debug(`WhatsApp API request successful: ${requestConfig.method} ${url}`, {
-        tenantId,
-        channelId,
-        requestId,
-        status: response.status,
-        processingTime,
-      });
+      this.logger.debug(
+        `WhatsApp API request successful: ${requestConfig.method} ${url}`,
+        {
+          tenantId,
+          channelId,
+          requestId,
+          status: response.status,
+          processingTime,
+        },
+      );
 
       return {
         success: true,
@@ -228,7 +249,6 @@ export class WhatsAppApiService extends BaseApiService {
         requestId,
         processingTime,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
 
@@ -243,18 +263,13 @@ export class WhatsAppApiService extends BaseApiService {
       });
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        {
-          requestId,
-          httpMethod: requestConfig.method,
-          httpUrl: requestConfig.endpoint,
-          httpStatus: error.response?.status,
-          metadata: { processingTime },
-        },
-      );
+      await this.logService.logError(tenantId, channelId, error, {
+        requestId,
+        httpMethod: requestConfig.method,
+        httpUrl: requestConfig.endpoint,
+        httpStatus: error.response?.status,
+        metadata: { processingTime },
+      });
 
       return {
         success: false,
@@ -285,7 +300,8 @@ export class WhatsAppApiService extends BaseApiService {
         method: 'GET',
         endpoint: `/${config.businessAccountId}`,
         params: {
-          fields: 'id,name,account_review_status,business_verification_status,country,currency,message_template_namespace,primary_business_location,timezone_id,phone_numbers{id,display_phone_number,quality_rating,verified_name,code_verification_status,status,throughput}',
+          fields:
+            'id,name,account_review_status,business_verification_status,country,currency,message_template_namespace,primary_business_location,timezone_id,phone_numbers{id,display_phone_number,quality_rating,verified_name,code_verification_status,status,throughput}',
         },
         requiresAuth: true,
       },
@@ -308,7 +324,8 @@ export class WhatsAppApiService extends BaseApiService {
         method: 'GET',
         endpoint: `/${config.phoneNumberId}`,
         params: {
-          fields: 'id,display_phone_number,quality_rating,verified_name,code_verification_status,status,throughput',
+          fields:
+            'id,display_phone_number,quality_rating,verified_name,code_verification_status,status,throughput',
         },
         requiresAuth: true,
       },
@@ -323,18 +340,17 @@ export class WhatsAppApiService extends BaseApiService {
     channelId: string,
     config: WhatsAppConfig,
     message: WhatsAppMessage,
-  ): Promise<WhatsAppApiResponse<{ messages: Array<{ id: string; message_status: string }> }>> {
-    return this.makeWhatsAppRequest(
-      tenantId,
-      channelId,
-      config,
-      {
-        method: 'POST',
-        endpoint: `/${config.phoneNumberId}/messages`,
-        data: message,
-        requiresAuth: true,
-      },
-    );
+  ): Promise<
+    WhatsAppApiResponse<{
+      messages: Array<{ id: string; message_status: string }>;
+    }>
+  > {
+    return this.makeWhatsAppRequest(tenantId, channelId, config, {
+      method: 'POST',
+      endpoint: `/${config.phoneNumberId}/messages`,
+      data: message,
+      requiresAuth: true,
+    });
   }
 
   /**
@@ -351,16 +367,22 @@ export class WhatsAppApiService extends BaseApiService {
     // Create form data for media upload
     const formData = new FormData();
     formData.append('messaging_product', 'whatsapp');
-    formData.append('file', new Blob([mediaData], { type: mimeType }), filename);
+    formData.append(
+      'file',
+      new Blob([mediaData], { type: mimeType }),
+      filename,
+    );
     formData.append('type', mimeType);
 
     const headers: Record<string, string> = {
-      'Authorization': `Bearer ${config.accessToken}`,
+      Authorization: `Bearer ${config.accessToken}`,
       'User-Agent': 'StokCerdas-WhatsApp-Integration/1.0',
     };
 
     const version = config.version || 'v18.0';
-    const baseUrl = config.sandbox ? this.baseUrls.sandbox : this.baseUrls.production;
+    const baseUrl = config.sandbox
+      ? this.baseUrls.sandbox
+      : this.baseUrls.production;
     const url = `${baseUrl}/${version}/${config.phoneNumberId}/media`;
 
     try {
@@ -378,9 +400,11 @@ export class WhatsAppApiService extends BaseApiService {
         success: true,
         data: response.data,
       };
-
     } catch (error) {
-      this.logger.error(`WhatsApp media upload failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `WhatsApp media upload failed: ${error.message}`,
+        error.stack,
+      );
 
       return {
         success: false,
@@ -401,17 +425,19 @@ export class WhatsAppApiService extends BaseApiService {
     channelId: string,
     config: WhatsAppConfig,
     mediaId: string,
-  ): Promise<WhatsAppApiResponse<{ url: string; mime_type: string; sha256: string; file_size: number }>> {
-    return this.makeWhatsAppRequest(
-      tenantId,
-      channelId,
-      config,
-      {
-        method: 'GET',
-        endpoint: `/${mediaId}`,
-        requiresAuth: true,
-      },
-    );
+  ): Promise<
+    WhatsAppApiResponse<{
+      url: string;
+      mime_type: string;
+      sha256: string;
+      file_size: number;
+    }>
+  > {
+    return this.makeWhatsAppRequest(tenantId, channelId, config, {
+      method: 'GET',
+      endpoint: `/${mediaId}`,
+      requiresAuth: true,
+    });
   }
 
   /**
@@ -423,21 +449,16 @@ export class WhatsAppApiService extends BaseApiService {
     config: WhatsAppConfig,
     messageId: string,
   ): Promise<WhatsAppApiResponse<{ success: boolean }>> {
-    return this.makeWhatsAppRequest(
-      tenantId,
-      channelId,
-      config,
-      {
-        method: 'POST',
-        endpoint: `/${config.phoneNumberId}/messages`,
-        data: {
-          messaging_product: 'whatsapp',
-          status: 'read',
-          message_id: messageId,
-        },
-        requiresAuth: true,
+    return this.makeWhatsAppRequest(tenantId, channelId, config, {
+      method: 'POST',
+      endpoint: `/${config.phoneNumberId}/messages`,
+      data: {
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId,
       },
-    );
+      requiresAuth: true,
+    });
   }
 
   /**
@@ -450,7 +471,7 @@ export class WhatsAppApiService extends BaseApiService {
   ): Promise<WhatsAppApiResponse<{ status: string; message: string }>> {
     try {
       const result = await this.getPhoneNumberInfo(tenantId, channelId, config);
-      
+
       if (result.success) {
         return {
           success: true,
@@ -499,7 +520,9 @@ export class WhatsAppApiService extends BaseApiService {
         Buffer.from(receivedSignature, 'hex'),
       );
     } catch (error) {
-      this.logger.error(`Webhook signature verification failed: ${error.message}`);
+      this.logger.error(
+        `Webhook signature verification failed: ${error.message}`,
+      );
       return false;
     }
   }
@@ -517,13 +540,13 @@ export class WhatsAppApiService extends BaseApiService {
       this.logger.log('Webhook challenge verified successfully');
       return challenge;
     }
-    
+
     this.logger.warn('Webhook challenge verification failed', {
       mode,
       token,
       expectedToken: verifyToken,
     });
-    
+
     return null;
   }
 

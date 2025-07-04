@@ -6,7 +6,10 @@ import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import * as moment from 'moment-timezone';
 
-import { InventoryTransaction, TransactionType } from '../../inventory/entities/inventory-transaction.entity';
+import {
+  InventoryTransaction,
+  TransactionType,
+} from '../../inventory/entities/inventory-transaction.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 
@@ -47,13 +50,13 @@ export class DataPipelineService {
   constructor(
     @InjectRepository(InventoryTransaction)
     private inventoryTransactionRepo: Repository<InventoryTransaction>,
-    
+
     @InjectRepository(Product)
     private productRepo: Repository<Product>,
-    
+
     @InjectRepository(InventoryItem)
     private inventoryItemRepo: Repository<InventoryItem>,
-    
+
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
   ) {}
@@ -63,13 +66,13 @@ export class DataPipelineService {
    */
   async extractSalesData(
     tenantId: string,
-    config: DataPipelineConfig
+    config: DataPipelineConfig,
   ): Promise<TimeSeriesDataPoint[]> {
     this.logger.debug(`Extracting sales data for tenant ${tenantId}`);
 
     const cacheKey = `sales_data_${tenantId}_${JSON.stringify(config)}`;
     const cached = await this.cacheManager.get<TimeSeriesDataPoint[]>(cacheKey);
-    
+
     if (cached) {
       this.logger.debug('Returning cached sales data');
       return cached;
@@ -79,28 +82,30 @@ export class DataPipelineService {
       .createQueryBuilder('transaction')
       .leftJoinAndSelect('transaction.product', 'product')
       .where('transaction.tenantId = :tenantId', { tenantId })
-      .andWhere('transaction.type = :saleType', { saleType: TransactionType.SALE })
+      .andWhere('transaction.type = :saleType', {
+        saleType: TransactionType.SALE,
+      })
       .andWhere('transaction.transactionDate BETWEEN :from AND :to', {
         from: config.dateRange.from,
-        to: config.dateRange.to
+        to: config.dateRange.to,
       })
       .andWhere('transaction.status = :status', { status: 'completed' });
 
     if (config.productIds?.length) {
       queryBuilder.andWhere('transaction.productId IN (:...productIds)', {
-        productIds: config.productIds
+        productIds: config.productIds,
       });
     }
 
     if (config.categoryIds?.length) {
       queryBuilder.andWhere('product.categoryId IN (:...categoryIds)', {
-        categoryIds: config.categoryIds
+        categoryIds: config.categoryIds,
       });
     }
 
     if (config.locationIds?.length) {
       queryBuilder.andWhere('transaction.locationId IN (:...locationIds)', {
-        locationIds: config.locationIds
+        locationIds: config.locationIds,
       });
     }
 
@@ -108,11 +113,14 @@ export class DataPipelineService {
       .orderBy('transaction.transactionDate', 'ASC')
       .getMany();
 
-    const timeSeries = this.aggregateTransactionData(transactions, config.aggregation);
-    
+    const timeSeries = this.aggregateTransactionData(
+      transactions,
+      config.aggregation,
+    );
+
     // Cache for 1 hour
     await this.cacheManager.set(cacheKey, timeSeries, 3600);
-    
+
     this.logger.debug(`Extracted ${timeSeries.length} data points`);
     return timeSeries;
   }
@@ -122,14 +130,14 @@ export class DataPipelineService {
    */
   async extractProductFeatures(
     tenantId: string,
-    productIds: string[]
+    productIds: string[],
   ): Promise<Record<string, FeatureSet>> {
     this.logger.debug(`Extracting features for ${productIds.length} products`);
 
     const products = await this.productRepo.find({
       where: {
         tenantId,
-        id: productIds.length ? { $in: productIds } as any : undefined,
+        id: productIds.length ? ({ $in: productIds } as any) : undefined,
       },
       relations: ['category', 'inventoryItems'],
     });
@@ -137,7 +145,10 @@ export class DataPipelineService {
     const features: Record<string, FeatureSet> = {};
 
     for (const product of products) {
-      features[product.id] = await this.extractSingleProductFeatures(tenantId, product);
+      features[product.id] = await this.extractSingleProductFeatures(
+        tenantId,
+        product,
+      );
     }
 
     return features;
@@ -148,7 +159,7 @@ export class DataPipelineService {
    */
   async extractTemporalFeatures(
     timeSeries: TimeSeriesDataPoint[],
-    aggregation: 'daily' | 'weekly' | 'monthly'
+    aggregation: 'daily' | 'weekly' | 'monthly',
   ): Promise<Record<string, any>> {
     this.logger.debug('Extracting temporal features');
 
@@ -159,8 +170,8 @@ export class DataPipelineService {
     const features: Record<string, any> = {};
 
     // Sort by date
-    const sortedData = timeSeries.sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
+    const sortedData = timeSeries.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
 
     // Basic statistics
@@ -173,13 +184,16 @@ export class DataPipelineService {
 
     // Trend analysis
     features.trend = this.calculateTrend(sortedData);
-    
+
     // Seasonality analysis
     const seasonality = this.calculateSeasonality(sortedData, aggregation);
     features.seasonality = seasonality;
 
     // Autocorrelation
-    features.autocorrelation = this.calculateAutocorrelation(values, [1, 7, 30]);
+    features.autocorrelation = this.calculateAutocorrelation(
+      values,
+      [1, 7, 30],
+    );
 
     // Volatility
     features.volatility = this.calculateVolatility(values);
@@ -196,7 +210,7 @@ export class DataPipelineService {
   async preprocessData(
     timeSeries: TimeSeriesDataPoint[],
     features: Record<string, FeatureSet>,
-    config: DataPipelineConfig
+    config: DataPipelineConfig,
   ): Promise<{
     features: number[][];
     target: number[];
@@ -223,13 +237,13 @@ export class DataPipelineService {
       const productFeatureMatrix = this.createFeatureMatrix(
         productData,
         productFeatures,
-        config.features
+        config.features,
       );
 
       processedData.features.push(...productFeatureMatrix.features);
       processedData.target.push(...productFeatureMatrix.target);
       processedData.dates.push(...productFeatureMatrix.dates);
-      
+
       // Store feature names (only once)
       if (processedData.featureNames.length === 0) {
         processedData.featureNames = productFeatureMatrix.featureNames;
@@ -244,8 +258,10 @@ export class DataPipelineService {
       this.normalizeFeatures(processedData.features);
     }
 
-    this.logger.debug(`Preprocessed data: ${processedData.features.length} samples, ${processedData.featureNames.length} features`);
-    
+    this.logger.debug(
+      `Preprocessed data: ${processedData.features.length} samples, ${processedData.featureNames.length} features`,
+    );
+
     return processedData;
   }
 
@@ -257,12 +273,14 @@ export class DataPipelineService {
     target: number[],
     dates: string[],
     splitRatio: number = 0.8,
-    method: 'time_series' | 'random' = 'time_series'
+    method: 'time_series' | 'random' = 'time_series',
   ): {
     train: { features: number[][]; target: number[]; dates: string[] };
     validation: { features: number[][]; target: number[]; dates: string[] };
   } {
-    this.logger.debug(`Creating train/validation split with ratio ${splitRatio}`);
+    this.logger.debug(
+      `Creating train/validation split with ratio ${splitRatio}`,
+    );
 
     const totalSamples = features.length;
     const trainSize = Math.floor(totalSamples * splitRatio);
@@ -309,7 +327,7 @@ export class DataPipelineService {
    */
   async getExternalFactors(
     dateRange: { from: string; to: string },
-    tenantId: string
+    tenantId: string,
   ): Promise<Record<string, any>> {
     this.logger.debug('Getting external factors');
 
@@ -317,10 +335,10 @@ export class DataPipelineService {
 
     // Indonesian holidays and events
     factors.holidays = this.getIndonesianHolidays(dateRange);
-    
+
     // Ramadan and religious periods
     factors.religiousPeriods = this.getReligiousPeriods(dateRange);
-    
+
     // Economic indicators (placeholder - would integrate with external APIs)
     factors.economicIndicators = this.getEconomicIndicators(dateRange);
 
@@ -334,12 +352,15 @@ export class DataPipelineService {
 
   private aggregateTransactionData(
     transactions: InventoryTransaction[],
-    aggregation: 'daily' | 'weekly' | 'monthly'
+    aggregation: 'daily' | 'weekly' | 'monthly',
   ): TimeSeriesDataPoint[] {
     const aggregated: Record<string, Record<string, number>> = {};
 
     for (const transaction of transactions) {
-      const date = this.getAggregationKey(transaction.transactionDate, aggregation);
+      const date = this.getAggregationKey(
+        transaction.transactionDate,
+        aggregation,
+      );
       const productId = transaction.productId;
 
       if (!aggregated[date]) {
@@ -354,7 +375,7 @@ export class DataPipelineService {
     }
 
     const result: TimeSeriesDataPoint[] = [];
-    
+
     for (const [date, products] of Object.entries(aggregated)) {
       for (const [productId, value] of Object.entries(products)) {
         result.push({
@@ -371,14 +392,14 @@ export class DataPipelineService {
 
   private async extractSingleProductFeatures(
     tenantId: string,
-    product: Product
+    product: Product,
   ): Promise<FeatureSet> {
     const productFeatures: Record<string, any> = {
       // Price features
       costPrice: product.costPrice,
       sellingPrice: product.sellingPrice,
       profitMargin: product.profitMargin,
-      
+
       // Product characteristics
       hasVariants: product.hasVariants,
       trackStock: product.trackStock,
@@ -386,26 +407,29 @@ export class DataPipelineService {
       minStock: product.minStock,
       maxStock: product.maxStock,
       reorderPoint: product.reorderPoint,
-      
+
       // Historical performance
       salesCount: product.salesCount,
       totalRevenue: product.totalRevenue,
       viewCount: product.viewCount,
-      
+
       // Category features
       categoryId: product.categoryId || 'unknown',
       brand: product.brand || 'unknown',
       unit: product.unit || 'pcs',
-      
+
       // Time features
       daysSinceCreated: moment().diff(moment(product.createdAt), 'days'),
-      daysSinceLastSold: product.lastSoldAt 
-        ? moment().diff(moment(product.lastSoldAt), 'days') 
+      daysSinceLastSold: product.lastSoldAt
+        ? moment().diff(moment(product.lastSoldAt), 'days')
         : 0,
     };
 
     // Get current inventory levels
-    const inventoryFeatures = await this.getInventoryFeatures(tenantId, product.id);
+    const inventoryFeatures = await this.getInventoryFeatures(
+      tenantId,
+      product.id,
+    );
 
     return {
       productFeatures,
@@ -416,15 +440,24 @@ export class DataPipelineService {
 
   private async getInventoryFeatures(
     tenantId: string,
-    productId: string
+    productId: string,
   ): Promise<Record<string, any>> {
     const inventoryItems = await this.inventoryItemRepo.find({
       where: { tenantId, productId },
     });
 
-    const totalStock = inventoryItems.reduce((sum, item) => sum + item.quantityOnHand, 0);
-    const totalReserved = inventoryItems.reduce((sum, item) => sum + item.quantityReserved, 0);
-    const totalValue = inventoryItems.reduce((sum, item) => sum + item.totalValue, 0);
+    const totalStock = inventoryItems.reduce(
+      (sum, item) => sum + item.quantityOnHand,
+      0,
+    );
+    const totalReserved = inventoryItems.reduce(
+      (sum, item) => sum + item.quantityReserved,
+      0,
+    );
+    const totalValue = inventoryItems.reduce(
+      (sum, item) => sum + item.totalValue,
+      0,
+    );
 
     return {
       totalStock,
@@ -432,14 +465,18 @@ export class DataPipelineService {
       totalValue,
       stockLocations: inventoryItems.length,
       averageCost: totalStock > 0 ? totalValue / totalStock : 0,
-      stockoutLocations: inventoryItems.filter(item => item.quantityOnHand <= 0).length,
+      stockoutLocations: inventoryItems.filter(item => item.quantityOnHand <= 0)
+        .length,
       lowStockLocations: inventoryItems.filter(item => item.isLowStock).length,
     };
   }
 
-  private getAggregationKey(date: Date, aggregation: 'daily' | 'weekly' | 'monthly'): string {
+  private getAggregationKey(
+    date: Date,
+    aggregation: 'daily' | 'weekly' | 'monthly',
+  ): string {
     const momentDate = moment(date).tz('Asia/Jakarta');
-    
+
     switch (aggregation) {
       case 'daily':
         return momentDate.format('YYYY-MM-DD');
@@ -453,24 +490,24 @@ export class DataPipelineService {
   }
 
   private groupTimeSeriesByProduct(
-    timeSeries: TimeSeriesDataPoint[]
+    timeSeries: TimeSeriesDataPoint[],
   ): Record<string, TimeSeriesDataPoint[]> {
     const grouped: Record<string, TimeSeriesDataPoint[]> = {};
-    
+
     for (const point of timeSeries) {
       if (!grouped[point.productId]) {
         grouped[point.productId] = [];
       }
       grouped[point.productId].push(point);
     }
-    
+
     return grouped;
   }
 
   private createFeatureMatrix(
     timeSeries: TimeSeriesDataPoint[],
     productFeatures: FeatureSet,
-    requestedFeatures: string[]
+    requestedFeatures: string[],
   ): {
     features: number[][];
     target: number[];
@@ -491,22 +528,28 @@ export class DataPipelineService {
     });
 
     // Add temporal features
-    featureNames.push('day_of_week', 'day_of_month', 'month', 'quarter', 'is_weekend');
+    featureNames.push(
+      'day_of_week',
+      'day_of_month',
+      'month',
+      'quarter',
+      'is_weekend',
+    );
 
     // Create feature matrix
     for (const point of timeSeries) {
       const featureRow: number[] = [];
-      
+
       // Product features
       Object.values(productFeatures.productFeatures).forEach(value => {
         featureRow.push(typeof value === 'number' ? value : 0);
       });
-      
+
       // Inventory features
       Object.values(productFeatures.inventoryFeatures).forEach(value => {
         featureRow.push(typeof value === 'number' ? value : 0);
       });
-      
+
       // Temporal features
       const momentDate = moment(point.date);
       featureRow.push(momentDate.day()); // day of week
@@ -514,7 +557,7 @@ export class DataPipelineService {
       featureRow.push(momentDate.month() + 1); // month
       featureRow.push(momentDate.quarter()); // quarter
       featureRow.push(momentDate.day() === 0 || momentDate.day() === 6 ? 1 : 0); // is weekend
-      
+
       features.push(featureRow);
       target.push(point.value);
       dates.push(point.date);
@@ -537,34 +580,37 @@ export class DataPipelineService {
   private calculateMedian(values: number[]): number {
     const sorted = [...values].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 
-      ? (sorted[mid - 1] + sorted[mid]) / 2 
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
       : sorted[mid];
   }
 
   private calculateTrend(data: TimeSeriesDataPoint[]): number {
     if (data.length < 2) return 0;
-    
+
     // Simple linear trend calculation
     const n = data.length;
     const sumX = data.reduce((sum, _, index) => sum + index, 0);
     const sumY = data.reduce((sum, point) => sum + point.value, 0);
-    const sumXY = data.reduce((sum, point, index) => sum + index * point.value, 0);
+    const sumXY = data.reduce(
+      (sum, point, index) => sum + index * point.value,
+      0,
+    );
     const sumXX = data.reduce((sum, _, index) => sum + index * index, 0);
-    
+
     return (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
   }
 
   private calculateSeasonality(
     data: TimeSeriesDataPoint[],
-    aggregation: 'daily' | 'weekly' | 'monthly'
+    aggregation: 'daily' | 'weekly' | 'monthly',
   ): Record<string, number> {
     const seasonality: Record<string, number[]> = {};
-    
+
     for (const point of data) {
       const momentDate = moment(point.date);
       let key: string;
-      
+
       switch (aggregation) {
         case 'daily':
           key = momentDate.format('dddd'); // Day of week
@@ -578,97 +624,100 @@ export class DataPipelineService {
         default:
           key = momentDate.format('dddd');
       }
-      
+
       if (!seasonality[key]) {
         seasonality[key] = [];
       }
       seasonality[key].push(point.value);
     }
-    
+
     // Calculate average for each seasonal component
     const result: Record<string, number> = {};
     for (const [key, values] of Object.entries(seasonality)) {
       result[key] = this.calculateMean(values);
     }
-    
+
     return result;
   }
 
-  private calculateAutocorrelation(values: number[], lags: number[]): Record<string, number> {
+  private calculateAutocorrelation(
+    values: number[],
+    lags: number[],
+  ): Record<string, number> {
     const result: Record<string, number> = {};
     const n = values.length;
     const mean = this.calculateMean(values);
-    
+
     for (const lag of lags) {
       if (lag >= n) {
         result[`lag_${lag}`] = 0;
         continue;
       }
-      
+
       let numerator = 0;
       let denominator = 0;
-      
+
       for (let i = 0; i < n - lag; i++) {
         numerator += (values[i] - mean) * (values[i + lag] - mean);
       }
-      
+
       for (let i = 0; i < n; i++) {
         denominator += Math.pow(values[i] - mean, 2);
       }
-      
+
       result[`lag_${lag}`] = denominator !== 0 ? numerator / denominator : 0;
     }
-    
+
     return result;
   }
 
   private calculateVolatility(values: number[]): number {
     if (values.length < 2) return 0;
-    
+
     const returns = [];
     for (let i = 1; i < values.length; i++) {
       if (values[i - 1] !== 0) {
         returns.push((values[i] - values[i - 1]) / values[i - 1]);
       }
     }
-    
+
     return this.calculateStandardDeviation(returns);
   }
 
   private calculateGrowthRate(values: number[]): number {
     if (values.length < 2) return 0;
-    
+
     const firstValue = values[0];
     const lastValue = values[values.length - 1];
     const periods = values.length - 1;
-    
+
     if (firstValue <= 0) return 0;
-    
+
     return Math.pow(lastValue / firstValue, 1 / periods) - 1;
   }
 
   private handleMissingValues(features: number[][]): void {
     // Simple imputation with column means
     if (features.length === 0) return;
-    
+
     const numFeatures = features[0].length;
     const columnMeans = new Array(numFeatures).fill(0);
-    
+
     // Calculate means for each column
     for (let col = 0; col < numFeatures; col++) {
       let sum = 0;
       let count = 0;
-      
+
       for (let row = 0; row < features.length; row++) {
         if (!isNaN(features[row][col]) && isFinite(features[row][col])) {
           sum += features[row][col];
           count++;
         }
       }
-      
+
       columnMeans[col] = count > 0 ? sum / count : 0;
     }
-    
+
     // Replace missing values with column means
     for (let row = 0; row < features.length; row++) {
       for (let col = 0; col < numFeatures; col++) {
@@ -681,17 +730,17 @@ export class DataPipelineService {
 
   private normalizeFeatures(features: number[][]): void {
     if (features.length === 0) return;
-    
+
     const numFeatures = features[0].length;
-    
+
     for (let col = 0; col < numFeatures; col++) {
       const values = features.map(row => row[col]);
       const min = Math.min(...values);
       const max = Math.max(...values);
       const range = max - min;
-      
+
       if (range === 0) continue;
-      
+
       for (let row = 0; row < features.length; row++) {
         features[row][col] = (features[row][col] - min) / range;
       }
@@ -706,9 +755,12 @@ export class DataPipelineService {
   }
 
   // Indonesian-specific external factors
-  private getIndonesianHolidays(dateRange: { from: string; to: string }): Record<string, boolean> {
+  private getIndonesianHolidays(dateRange: {
+    from: string;
+    to: string;
+  }): Record<string, boolean> {
     const holidays: Record<string, boolean> = {};
-    
+
     // Major Indonesian holidays (simplified)
     const holidayDates = [
       '01-01', // New Year
@@ -716,10 +768,10 @@ export class DataPipelineService {
       '12-25', // Christmas
       // Add more holidays based on calendar
     ];
-    
+
     const startYear = new Date(dateRange.from).getFullYear();
     const endYear = new Date(dateRange.to).getFullYear();
-    
+
     for (let year = startYear; year <= endYear; year++) {
       for (const holiday of holidayDates) {
         const date = `${year}-${holiday}`;
@@ -728,16 +780,22 @@ export class DataPipelineService {
         }
       }
     }
-    
+
     return holidays;
   }
 
-  private getReligiousPeriods(dateRange: { from: string; to: string }): Record<string, string> {
+  private getReligiousPeriods(dateRange: {
+    from: string;
+    to: string;
+  }): Record<string, string> {
     // Simplified - would need proper Islamic calendar integration
     return {};
   }
 
-  private getEconomicIndicators(dateRange: { from: string; to: string }): Record<string, number> {
+  private getEconomicIndicators(dateRange: {
+    from: string;
+    to: string;
+  }): Record<string, number> {
     // Placeholder - would integrate with external economic data APIs
     return {
       inflationRate: 3.5,
@@ -746,25 +804,28 @@ export class DataPipelineService {
     };
   }
 
-  private getPaydayCycles(dateRange: { from: string; to: string }): Record<string, boolean> {
+  private getPaydayCycles(dateRange: {
+    from: string;
+    to: string;
+  }): Record<string, boolean> {
     const paydayCycles: Record<string, boolean> = {};
-    
+
     const start = moment(dateRange.from);
     const end = moment(dateRange.to);
-    
-    let current = start.clone();
-    
+
+    const current = start.clone();
+
     while (current.isSameOrBefore(end)) {
       const day = current.date();
-      
+
       // Common payday cycles in Indonesia: 25th and 10th
       if (day === 25 || day === 10) {
         paydayCycles[current.format('YYYY-MM-DD')] = true;
       }
-      
+
       current.add(1, 'day');
     }
-    
+
     return paydayCycles;
   }
 }

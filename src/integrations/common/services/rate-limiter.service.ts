@@ -23,7 +23,7 @@ export class RateLimiterService {
   private readonly logger = new Logger(RateLimiterService.name);
 
   private readonly redis: Redis | null = null; // Placeholder
-  
+
   constructor(
     // @InjectRedis() private readonly redis: Redis,
     private readonly configService: ConfigService,
@@ -43,19 +43,19 @@ export class RateLimiterService {
     try {
       // Use Redis pipeline for atomic operations
       const pipeline = this.redis.pipeline();
-      
+
       // Remove expired entries
       pipeline.zremrangebyscore(redisKey, 0, windowStart);
-      
+
       // Count current requests in window
       pipeline.zcard(redisKey);
-      
+
       // Add current request
       pipeline.zadd(redisKey, now, `${now}-${Math.random()}`);
-      
+
       // Set expiration
       pipeline.expire(redisKey, Math.ceil(config.windowSizeMs / 1000));
-      
+
       const results = await pipeline.exec();
 
       if (!results || results.some(([err]) => err)) {
@@ -77,7 +77,7 @@ export class RateLimiterService {
       if (!allowed) {
         // Remove the request we just added since it's not allowed
         await this.redis.zrem(redisKey, `${now}-${Math.random()}`);
-        
+
         return {
           allowed: false,
           limit: config.maxRequests,
@@ -93,10 +93,12 @@ export class RateLimiterService {
         remaining: remaining - 1, // Account for current request
         resetTime,
       };
-
     } catch (error) {
-      this.logger.error(`Rate limit check error: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Rate limit check error: ${error.message}`,
+        error.stack,
+      );
+
       // Fail open - allow request if there's an error
       return {
         allowed: true,
@@ -113,7 +115,11 @@ export class RateLimiterService {
   async checkMultipleRateLimits(
     key: string,
     configs: Array<RateLimitConfig & { name: string }>,
-  ): Promise<{ allowed: boolean; limitedBy?: string; results: Record<string, RateLimitResult> }> {
+  ): Promise<{
+    allowed: boolean;
+    limitedBy?: string;
+    results: Record<string, RateLimitResult>;
+  }> {
     const results: Record<string, RateLimitResult> = {};
     let allowed = true;
     let limitedBy: string | undefined;
@@ -155,10 +161,9 @@ export class RateLimiterService {
         remaining,
         resetTime,
       };
-
     } catch (error) {
       this.logger.error(`Rate limit status check error: ${error.message}`);
-      
+
       return {
         limit: config.maxRequests,
         remaining: config.maxRequests,
@@ -172,12 +177,15 @@ export class RateLimiterService {
    */
   async resetRateLimit(key: string, keyPrefix?: string): Promise<void> {
     const redisKey = `${keyPrefix || 'rate_limit'}:${key}`;
-    
+
     try {
       await this.redis.del(redisKey);
       this.logger.debug(`Rate limit reset for key: ${key}`);
     } catch (error) {
-      this.logger.error(`Failed to reset rate limit for key: ${key}`, error.stack);
+      this.logger.error(
+        `Failed to reset rate limit for key: ${key}`,
+        error.stack,
+      );
     }
   }
 
@@ -257,13 +265,13 @@ export class RateLimiterService {
     config: RateLimitConfig,
   ): Promise<RateLimitResult> {
     const result = await this.checkRateLimit(key, config);
-    
+
     if (!result.allowed && result.retryAfter) {
       await this.waitForRateLimit(result.retryAfter);
       // Try again after waiting
       return await this.checkRateLimit(key, config);
     }
-    
+
     return result;
   }
 
@@ -275,15 +283,15 @@ export class RateLimiterService {
     config: RateLimitConfig,
   ): Promise<Record<string, RateLimitResult>> {
     const results: Record<string, RateLimitResult> = {};
-    
+
     // Use Promise.all for concurrent checks
-    const promises = keys.map(async (key) => {
+    const promises = keys.map(async key => {
       const result = await this.checkRateLimit(key, config);
       return { key, result };
     });
 
     const resolvedResults = await Promise.all(promises);
-    
+
     resolvedResults.forEach(({ key, result }) => {
       results[key] = result;
     });

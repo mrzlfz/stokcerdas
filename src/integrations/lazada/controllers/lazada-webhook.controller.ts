@@ -37,8 +37,16 @@ export class LazadaWebhookController {
   @ApiOperation({ summary: 'Receive Lazada webhook notifications' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-lazada-signature', description: 'Webhook signature', required: false })
-  @ApiHeader({ name: 'x-lazada-hmac-sha256', description: 'Alternative webhook signature', required: false })
+  @ApiHeader({
+    name: 'x-lazada-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiHeader({
+    name: 'x-lazada-hmac-sha256',
+    description: 'Alternative webhook signature',
+    required: false,
+  })
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid webhook data' })
   @ApiResponse({ status: 401, description: 'Invalid signature' })
@@ -126,10 +134,9 @@ export class LazadaWebhookController {
           processingTime,
         });
       }
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.error(`Lazada webhook error: ${error.message}`, {
         tenantId,
         channelId,
@@ -168,8 +175,15 @@ export class LazadaWebhookController {
   @ApiOperation({ summary: 'Receive Lazada order status webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-lazada-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Order status webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-lazada-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order status webhook processed successfully',
+  })
   async handleOrderStatusWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -205,15 +219,19 @@ export class LazadaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Order status webhook processed' : result.error,
+        message: result.success
+          ? 'Order status webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Order status webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Order status webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -229,8 +247,15 @@ export class LazadaWebhookController {
   @ApiOperation({ summary: 'Receive Lazada order tracking webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-lazada-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Order tracking webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-lazada-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Order tracking webhook processed successfully',
+  })
   async handleOrderTrackingWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -266,15 +291,19 @@ export class LazadaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Order tracking webhook processed' : result.error,
+        message: result.success
+          ? 'Order tracking webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Order tracking webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Order tracking webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -290,8 +319,15 @@ export class LazadaWebhookController {
   @ApiOperation({ summary: 'Receive Lazada product update webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-lazada-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Product update webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-lazada-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Product update webhook processed successfully',
+  })
   async handleProductUpdateWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -327,15 +363,19 @@ export class LazadaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Product update webhook processed' : result.error,
+        message: result.success
+          ? 'Product update webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Product update webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Product update webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -351,8 +391,15 @@ export class LazadaWebhookController {
   @ApiOperation({ summary: 'Receive Lazada inventory update webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-lazada-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Inventory update webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-lazada-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory update webhook processed successfully',
+  })
   async handleInventoryUpdateWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -388,15 +435,19 @@ export class LazadaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Inventory update webhook processed' : result.error,
+        message: result.success
+          ? 'Inventory update webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Inventory update webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Inventory update webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -412,8 +463,15 @@ export class LazadaWebhookController {
   @ApiOperation({ summary: 'Receive Lazada price update webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-lazada-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'Price update webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-lazada-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Price update webhook processed successfully',
+  })
   async handlePriceUpdateWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -449,15 +507,19 @@ export class LazadaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'Price update webhook processed' : result.error,
+        message: result.success
+          ? 'Price update webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`Price update webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `Price update webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -473,8 +535,15 @@ export class LazadaWebhookController {
   @ApiOperation({ summary: 'Receive Lazada system notification webhook' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiHeader({ name: 'x-lazada-signature', description: 'Webhook signature', required: false })
-  @ApiResponse({ status: 200, description: 'System notification webhook processed successfully' })
+  @ApiHeader({
+    name: 'x-lazada-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'System notification webhook processed successfully',
+  })
   async handleSystemNotificationWebhook(
     @Param('tenantId') tenantId: string,
     @Param('channelId') channelId: string,
@@ -510,15 +579,19 @@ export class LazadaWebhookController {
 
       res.status(HttpStatus.OK).json({
         success: result.success,
-        message: result.success ? 'System notification webhook processed' : result.error,
+        message: result.success
+          ? 'System notification webhook processed'
+          : result.error,
         requestId,
         processingTime,
       });
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error(`System notification webhook error: ${error.message}`, error.stack);
+
+      this.logger.error(
+        `System notification webhook error: ${error.message}`,
+        error.stack,
+      );
 
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -546,7 +619,9 @@ export class LazadaWebhookController {
   // Private helper methods
 
   private generateRequestId(): string {
-    return `lazada_webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `lazada_webhook_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
   }
 
   private getClientIpAddress(req: Request): string {
@@ -560,9 +635,11 @@ export class LazadaWebhookController {
     );
   }
 
-  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+  private sanitizeHeaders(
+    headers: Record<string, string>,
+  ): Record<string, string> {
     const sanitized = { ...headers };
-    
+
     // Remove sensitive headers for logging
     const sensitiveHeaders = [
       'authorization',
@@ -572,7 +649,7 @@ export class LazadaWebhookController {
       'cookie',
       'set-cookie',
     ];
-    
+
     sensitiveHeaders.forEach(header => {
       if (sanitized[header]) {
         sanitized[header] = '[REDACTED]';
@@ -581,7 +658,7 @@ export class LazadaWebhookController {
         sanitized[header.toLowerCase()] = '[REDACTED]';
       }
     });
-    
+
     return sanitized;
   }
 }

@@ -15,7 +15,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { LocationType, LocationStatus } from '../entities/inventory-location.entity';
+import {
+  LocationType,
+  LocationStatus,
+} from '../entities/inventory-location.entity';
 
 class OperatingHoursDto {
   @ApiPropertyOptional({

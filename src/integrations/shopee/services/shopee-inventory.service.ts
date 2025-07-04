@@ -3,12 +3,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { ShopeeApiService, ShopeeCredentials, ShopeeApiRequest } from './shopee-api.service';
+import {
+  ShopeeApiService,
+  ShopeeCredentials,
+  ShopeeApiRequest,
+} from './shopee-api.service';
 import { ShopeeAuthService } from './shopee-auth.service';
 import { InventoryTransaction } from '../../../inventory/entities/inventory-transaction.entity';
 import { InventoryLocation } from '../../../inventory/entities/inventory-location.entity';
 import { ChannelMapping } from '../../../channels/entities/channel-mapping.entity';
-import { ChannelInventory, AllocationStrategy } from '../../../channels/entities/channel-inventory.entity';
+import {
+  ChannelInventory,
+  AllocationStrategy,
+} from '../../../channels/entities/channel-inventory.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
 export interface ShopeeStock {
@@ -113,8 +120,11 @@ export class ShopeeInventoryService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -149,7 +159,7 @@ export class ShopeeInventoryService {
       // Process items in batches
       for (let i = 0; i < itemIds.length; i += batchSize) {
         const batch = itemIds.slice(i, i + batchSize);
-        
+
         try {
           const batchResult = await this.syncInventoryBatch(
             credentials,
@@ -162,16 +172,18 @@ export class ShopeeInventoryService {
           syncedCount += batchResult.syncedCount;
           errorCount += batchResult.errorCount;
           errors.push(...batchResult.errors);
-
         } catch (error) {
-          this.logger.error(`Inventory batch sync failed: ${error.message}`, error.stack);
+          this.logger.error(
+            `Inventory batch sync failed: ${error.message}`,
+            error.stack,
+          );
           errorCount += batch.length;
           errors.push(`Batch sync failed: ${error.message}`);
         }
       }
 
       const duration = Date.now() - startTime;
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -187,10 +199,9 @@ export class ShopeeInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Inventory sync failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -227,8 +238,11 @@ export class ShopeeInventoryService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -242,7 +256,7 @@ export class ShopeeInventoryService {
       const batchSize = 20;
       for (let i = 0; i < updates.length; i += batchSize) {
         const batch = updates.slice(i, i + batchSize);
-        
+
         try {
           const batchResult = await this.updateStockBatch(
             credentials,
@@ -254,9 +268,11 @@ export class ShopeeInventoryService {
           updatedCount += batchResult.updatedCount;
           errorCount += batchResult.errorCount;
           errors.push(...batchResult.errors);
-
         } catch (error) {
-          this.logger.error(`Stock update batch failed: ${error.message}`, error.stack);
+          this.logger.error(
+            `Stock update batch failed: ${error.message}`,
+            error.stack,
+          );
           errorCount += batch.length;
           errors.push(`Batch update failed: ${error.message}`);
         }
@@ -277,10 +293,12 @@ export class ShopeeInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
-      this.logger.error(`Inventory update failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Inventory update failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -317,8 +335,11 @@ export class ShopeeInventoryService {
     const errors: string[] = [];
 
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
-      
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -344,9 +365,10 @@ export class ShopeeInventoryService {
             errorCount++;
             errors.push(`Item ${update.itemId}: ${result.error}`);
           }
-
         } catch (error) {
-          this.logger.error(`Price update failed for item ${update.itemId}: ${error.message}`);
+          this.logger.error(
+            `Price update failed for item ${update.itemId}: ${error.message}`,
+          );
           errorCount++;
           errors.push(`Item ${update.itemId}: ${error.message}`);
         }
@@ -367,10 +389,9 @@ export class ShopeeInventoryService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Price update failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logSync(
         tenantId,
         channelId,
@@ -398,7 +419,10 @@ export class ShopeeInventoryService {
     itemIds: number[],
   ): Promise<{ success: boolean; data?: ShopeeStock[]; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const request: ShopeeApiRequest = {
         method: 'GET',
@@ -426,9 +450,11 @@ export class ShopeeInventoryService {
           error: response.error?.message || 'Failed to get stock info',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Shopee stock: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Shopee stock: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -445,7 +471,10 @@ export class ShopeeInventoryService {
     itemIds: number[],
   ): Promise<{ success: boolean; data?: ShopeePrice[]; error?: string }> {
     try {
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const request: ShopeeApiRequest = {
         method: 'GET',
@@ -473,9 +502,11 @@ export class ShopeeInventoryService {
           error: response.error?.message || 'Failed to get price info',
         };
       }
-
     } catch (error) {
-      this.logger.error(`Failed to get Shopee price: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Shopee price: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -503,8 +534,12 @@ export class ShopeeInventoryService {
     // Sync stock if enabled
     if (options.syncStock !== false) {
       try {
-        const stockResult = await this.getShopeeStock(tenantId, channelId, itemIds);
-        
+        const stockResult = await this.getShopeeStock(
+          tenantId,
+          channelId,
+          itemIds,
+        );
+
         if (stockResult.success && stockResult.data) {
           for (const stockInfo of stockResult.data) {
             try {
@@ -516,7 +551,9 @@ export class ShopeeInventoryService {
               );
               syncedCount++;
             } catch (error) {
-              errors.push(`Stock sync for item ${stockInfo.item_id}: ${error.message}`);
+              errors.push(
+                `Stock sync for item ${stockInfo.item_id}: ${error.message}`,
+              );
               errorCount++;
             }
           }
@@ -533,19 +570,21 @@ export class ShopeeInventoryService {
     // Sync prices if enabled
     if (options.syncPrices) {
       try {
-        const priceResult = await this.getShopeePrice(tenantId, channelId, itemIds);
-        
+        const priceResult = await this.getShopeePrice(
+          tenantId,
+          channelId,
+          itemIds,
+        );
+
         if (priceResult.success && priceResult.data) {
           for (const priceInfo of priceResult.data) {
             try {
-              await this.syncSingleItemPrice(
-                tenantId,
-                channelId,
-                priceInfo,
-              );
+              await this.syncSingleItemPrice(tenantId, channelId, priceInfo);
               // Don't increment syncedCount here to avoid double counting
             } catch (error) {
-              errors.push(`Price sync for item ${priceInfo.item_id}: ${error.message}`);
+              errors.push(
+                `Price sync for item ${priceInfo.item_id}: ${error.message}`,
+              );
               // Don't increment errorCount here to avoid double counting
             }
           }
@@ -577,7 +616,9 @@ export class ShopeeInventoryService {
     });
 
     if (!mapping) {
-      this.logger.warn(`No product mapping found for Shopee item ${stockInfo.item_id}`);
+      this.logger.warn(
+        `No product mapping found for Shopee item ${stockInfo.item_id}`,
+      );
       return;
     }
 
@@ -598,7 +639,8 @@ export class ShopeeInventoryService {
           channelId,
           productId: mapping.internalId,
           allocatedQuantity: stockDetail.current_stock,
-          availableQuantity: stockDetail.current_stock - stockDetail.reserved_stock,
+          availableQuantity:
+            stockDetail.current_stock - stockDetail.reserved_stock,
           reservedQuantity: stockDetail.reserved_stock,
           allocationStrategy: AllocationStrategy.FIXED_AMOUNT,
           allocationValue: stockDetail.current_stock,
@@ -606,7 +648,8 @@ export class ShopeeInventoryService {
         });
       } else {
         channelInventory.allocatedQuantity = stockDetail.current_stock;
-        channelInventory.availableQuantity = stockDetail.current_stock - stockDetail.reserved_stock;
+        channelInventory.availableQuantity =
+          stockDetail.current_stock - stockDetail.reserved_stock;
         channelInventory.reservedQuantity = stockDetail.reserved_stock;
         channelInventory.lastSyncAt = new Date();
       }
@@ -629,14 +672,15 @@ export class ShopeeInventoryService {
 
         if (variantMapping) {
           for (const stockDetail of modelStock.stock_info_list) {
-            let channelInventory = await this.channelInventoryRepository.findOne({
-              where: {
-                tenantId,
-                channelId,
-                productId: mapping.internalId,
-                variantId: variantMapping.internalId,
-              },
-            });
+            let channelInventory =
+              await this.channelInventoryRepository.findOne({
+                where: {
+                  tenantId,
+                  channelId,
+                  productId: mapping.internalId,
+                  variantId: variantMapping.internalId,
+                },
+              });
 
             if (!channelInventory) {
               channelInventory = this.channelInventoryRepository.create({
@@ -645,15 +689,17 @@ export class ShopeeInventoryService {
                 productId: mapping.internalId,
                 variantId: variantMapping.internalId,
                 allocatedQuantity: stockDetail.current_stock,
-                availableQuantity: stockDetail.current_stock - stockDetail.reserved_stock,
+                availableQuantity:
+                  stockDetail.current_stock - stockDetail.reserved_stock,
                 reservedQuantity: stockDetail.reserved_stock,
                 allocationStrategy: AllocationStrategy.FIXED_AMOUNT,
-          allocationValue: stockDetail.current_stock,
+                allocationValue: stockDetail.current_stock,
                 priority: 1,
               });
             } else {
               channelInventory.allocatedQuantity = stockDetail.current_stock;
-              channelInventory.availableQuantity = stockDetail.current_stock - stockDetail.reserved_stock;
+              channelInventory.availableQuantity =
+                stockDetail.current_stock - stockDetail.reserved_stock;
               channelInventory.reservedQuantity = stockDetail.reserved_stock;
               channelInventory.lastSyncAt = new Date();
             }
@@ -690,7 +736,9 @@ export class ShopeeInventoryService {
     });
 
     if (!mapping) {
-      this.logger.warn(`No product mapping found for Shopee item ${priceInfo.item_id}`);
+      this.logger.warn(
+        `No product mapping found for Shopee item ${priceInfo.item_id}`,
+      );
       return;
     }
 
@@ -724,7 +772,7 @@ export class ShopeeInventoryService {
 
     // Group updates by item (Shopee API can handle multiple stock updates per item)
     const itemUpdates = new Map<number, StockUpdateRequest[]>();
-    
+
     for (const update of updates) {
       if (!itemUpdates.has(update.itemId)) {
         itemUpdates.set(update.itemId, []);
@@ -749,9 +797,10 @@ export class ShopeeInventoryService {
           errorCount += itemStockUpdates.length;
           errors.push(`Item ${itemId}: ${result.error}`);
         }
-
       } catch (error) {
-        this.logger.error(`Stock update failed for item ${itemId}: ${error.message}`);
+        this.logger.error(
+          `Stock update failed for item ${itemId}: ${error.message}`,
+        );
         errorCount += itemStockUpdates.length;
         errors.push(`Item ${itemId}: ${error.message}`);
       }

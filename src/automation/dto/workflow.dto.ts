@@ -1,15 +1,15 @@
-import { 
-  IsString, 
-  IsOptional, 
-  IsEnum, 
-  IsNumber, 
-  IsBoolean, 
-  IsUUID, 
-  IsArray, 
-  IsObject, 
-  ValidateNested, 
-  Min, 
-  Max, 
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsUUID,
+  IsArray,
+  IsObject,
+  ValidateNested,
+  Min,
+  Max,
   IsDateString,
   IsEmail,
   ArrayMinSize,
@@ -18,21 +18,21 @@ import {
   MaxLength,
   IsInt,
   IsPositive,
-  Matches
+  Matches,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
-import { 
-  WorkflowCategory, 
-  WorkflowTriggerType, 
-  WorkflowPriority, 
-  WorkflowStatus 
+import {
+  WorkflowCategory,
+  WorkflowTriggerType,
+  WorkflowPriority,
+  WorkflowStatus,
 } from '../entities/workflow.entity';
-import { 
-  WorkflowStepType, 
-  ConditionOperator, 
-  DataTransformOperation 
+import {
+  WorkflowStepType,
+  ConditionOperator,
+  DataTransformOperation,
 } from '../entities/workflow-step.entity';
 
 // =============================================
@@ -197,8 +197,8 @@ export class WorkflowConfigDto {
     default: 'stop',
   })
   @IsOptional()
-  @IsEnum(['stop', 'continue', 'retry', 'skip'], { 
-    message: 'On error action harus berupa: stop, continue, retry, atau skip' 
+  @IsEnum(['stop', 'continue', 'retry', 'skip'], {
+    message: 'On error action harus berupa: stop, continue, retry, atau skip',
   })
   onErrorAction?: 'stop' | 'continue' | 'retry' | 'skip';
 
@@ -228,7 +228,9 @@ export class WorkflowConfigDto {
   })
   @IsOptional()
   @IsString({ message: 'Resource group harus berupa string' })
-  @MaxLength(50, { message: 'Resource group tidak boleh lebih dari 50 karakter' })
+  @MaxLength(50, {
+    message: 'Resource group tidak boleh lebih dari 50 karakter',
+  })
   resourceGroup?: string;
 
   @ApiPropertyOptional({
@@ -296,7 +298,13 @@ export class NotificationConfigDto {
   })
   @IsOptional()
   @IsArray({ message: 'Email recipients harus berupa array' })
-  @IsEmail({}, { each: true, message: 'Setiap email recipient harus berupa email yang valid' })
+  @IsEmail(
+    {},
+    {
+      each: true,
+      message: 'Setiap email recipient harus berupa email yang valid',
+    },
+  )
   emailRecipients?: string[];
 
   @ApiPropertyOptional({
@@ -343,8 +351,8 @@ export class WorkflowVariableDto {
     enum: ['string', 'number', 'boolean', 'object', 'array'],
     example: 'string',
   })
-  @IsEnum(['string', 'number', 'boolean', 'object', 'array'], { 
-    message: 'Type harus berupa: string, number, boolean, object, atau array' 
+  @IsEnum(['string', 'number', 'boolean', 'object', 'array'], {
+    message: 'Type harus berupa: string, number, boolean, object, atau array',
   })
   type: 'string' | 'number' | 'boolean' | 'object' | 'array';
 
@@ -387,7 +395,10 @@ export class WorkflowPermissionsDto {
   })
   @IsOptional()
   @IsArray({ message: 'Can edit harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap user ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap user ID harus berupa UUID yang valid',
+  })
   canEdit?: string[];
 
   @ApiPropertyOptional({
@@ -397,7 +408,10 @@ export class WorkflowPermissionsDto {
   })
   @IsOptional()
   @IsArray({ message: 'Can execute harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap user ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap user ID harus berupa UUID yang valid',
+  })
   canExecute?: string[];
 
   @ApiPropertyOptional({
@@ -407,7 +421,10 @@ export class WorkflowPermissionsDto {
   })
   @IsOptional()
   @IsArray({ message: 'Can view harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap user ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap user ID harus berupa UUID yang valid',
+  })
   canView?: string[];
 
   @ApiPropertyOptional({
@@ -437,7 +454,9 @@ export class StepConditionDto {
     enum: ConditionOperator,
     example: ConditionOperator.LESS_THAN,
   })
-  @IsEnum(ConditionOperator, { message: 'Operator harus berupa nilai yang valid' })
+  @IsEnum(ConditionOperator, {
+    message: 'Operator harus berupa nilai yang valid',
+  })
   operator: ConditionOperator;
 
   @ApiProperty({
@@ -452,7 +471,9 @@ export class StepConditionDto {
     default: 'AND',
   })
   @IsOptional()
-  @IsEnum(['AND', 'OR'], { message: 'Logical operator harus berupa AND atau OR' })
+  @IsEnum(['AND', 'OR'], {
+    message: 'Logical operator harus berupa AND atau OR',
+  })
   logicalOperator?: 'AND' | 'OR';
 }
 
@@ -579,8 +600,9 @@ export class StepErrorHandlingDto {
     enum: ['stop', 'continue', 'retry', 'skip', 'goto_step'],
     example: 'retry',
   })
-  @IsEnum(['stop', 'continue', 'retry', 'skip', 'goto_step'], { 
-    message: 'On error harus berupa: stop, continue, retry, skip, atau goto_step' 
+  @IsEnum(['stop', 'continue', 'retry', 'skip', 'goto_step'], {
+    message:
+      'On error harus berupa: stop, continue, retry, skip, atau goto_step',
   })
   onError: 'stop' | 'continue' | 'retry' | 'skip' | 'goto_step';
 
@@ -706,7 +728,9 @@ export class StepUiConfigDto {
   })
   @IsOptional()
   @IsString({ message: 'Color harus berupa string' })
-  @Matches(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, { message: 'Color harus berupa hex color yang valid' })
+  @Matches(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
+    message: 'Color harus berupa hex color yang valid',
+  })
   color?: string;
 
   @ApiPropertyOptional({
@@ -748,7 +772,9 @@ export class CreateWorkflowDto {
   })
   @IsString({ message: 'Nama workflow harus berupa string' })
   @MinLength(1, { message: 'Nama workflow tidak boleh kosong' })
-  @MaxLength(100, { message: 'Nama workflow tidak boleh lebih dari 100 karakter' })
+  @MaxLength(100, {
+    message: 'Nama workflow tidak boleh lebih dari 100 karakter',
+  })
   name: string;
 
   @ApiPropertyOptional({
@@ -766,7 +792,9 @@ export class CreateWorkflowDto {
     enum: WorkflowCategory,
     example: WorkflowCategory.INVENTORY_MANAGEMENT,
   })
-  @IsEnum(WorkflowCategory, { message: 'Category harus berupa nilai yang valid' })
+  @IsEnum(WorkflowCategory, {
+    message: 'Category harus berupa nilai yang valid',
+  })
   category: WorkflowCategory;
 
   @ApiProperty({
@@ -774,7 +802,9 @@ export class CreateWorkflowDto {
     enum: WorkflowTriggerType,
     example: WorkflowTriggerType.SCHEDULED,
   })
-  @IsEnum(WorkflowTriggerType, { message: 'Trigger type harus berupa nilai yang valid' })
+  @IsEnum(WorkflowTriggerType, {
+    message: 'Trigger type harus berupa nilai yang valid',
+  })
   triggerType: WorkflowTriggerType;
 
   @ApiPropertyOptional({
@@ -783,7 +813,9 @@ export class CreateWorkflowDto {
     default: WorkflowPriority.NORMAL,
   })
   @IsOptional()
-  @IsEnum(WorkflowPriority, { message: 'Priority harus berupa nilai yang valid' })
+  @IsEnum(WorkflowPriority, {
+    message: 'Priority harus berupa nilai yang valid',
+  })
   priority?: WorkflowPriority;
 
   @ApiPropertyOptional({
@@ -832,7 +864,10 @@ export class CreateWorkflowDto {
   @IsArray({ message: 'Tags harus berupa array' })
   @ArrayMaxSize(10, { message: 'Tags maksimal 10 item' })
   @IsString({ each: true, message: 'Setiap tag harus berupa string' })
-  @MaxLength(50, { each: true, message: 'Setiap tag tidak boleh lebih dari 50 karakter' })
+  @MaxLength(50, {
+    each: true,
+    message: 'Setiap tag tidak boleh lebih dari 50 karakter',
+  })
   tags?: string[];
 
   @ApiPropertyOptional({
@@ -882,7 +917,9 @@ export class CreateWorkflowStepDto {
   })
   @IsOptional()
   @IsString({ message: 'Deskripsi step harus berupa string' })
-  @MaxLength(500, { message: 'Deskripsi step tidak boleh lebih dari 500 karakter' })
+  @MaxLength(500, {
+    message: 'Deskripsi step tidak boleh lebih dari 500 karakter',
+  })
   description?: string;
 
   @ApiProperty({
@@ -890,7 +927,9 @@ export class CreateWorkflowStepDto {
     enum: WorkflowStepType,
     example: WorkflowStepType.CHECK_STOCK_LEVEL,
   })
-  @IsEnum(WorkflowStepType, { message: 'Step type harus berupa nilai yang valid' })
+  @IsEnum(WorkflowStepType, {
+    message: 'Step type harus berupa nilai yang valid',
+  })
   stepType: WorkflowStepType;
 
   @ApiProperty({
@@ -913,29 +952,43 @@ export class CreateWorkflowStepDto {
 
   @ApiPropertyOptional({
     description: 'Input mapping untuk step',
-    example: { productId: { source: 'workflow_variable', path: 'selectedProductId' } },
+    example: {
+      productId: { source: 'workflow_variable', path: 'selectedProductId' },
+    },
   })
   @IsOptional()
   @IsObject({ message: 'Input mapping harus berupa object' })
-  inputMapping?: Record<string, {
-    source: 'workflow_variable' | 'previous_step' | 'static_value' | 'user_input';
-    path?: string;
-    defaultValue?: any;
-    required?: boolean;
-    validation?: Record<string, any>;
-  }>;
+  inputMapping?: Record<
+    string,
+    {
+      source:
+        | 'workflow_variable'
+        | 'previous_step'
+        | 'static_value'
+        | 'user_input';
+      path?: string;
+      defaultValue?: any;
+      required?: boolean;
+      validation?: Record<string, any>;
+    }
+  >;
 
   @ApiPropertyOptional({
     description: 'Output mapping untuk step',
-    example: { currentStock: { target: 'workflow_variable', path: 'stockLevel' } },
+    example: {
+      currentStock: { target: 'workflow_variable', path: 'stockLevel' },
+    },
   })
   @IsOptional()
   @IsObject({ message: 'Output mapping harus berupa object' })
-  outputMapping?: Record<string, {
-    target: 'workflow_variable' | 'next_step' | 'workflow_output';
-    path?: string;
-    transform?: string;
-  }>;
+  outputMapping?: Record<
+    string,
+    {
+      target: 'workflow_variable' | 'next_step' | 'workflow_output';
+      path?: string;
+      transform?: string;
+    }
+  >;
 
   @ApiPropertyOptional({
     description: 'Error handling untuk step',
@@ -1071,7 +1124,9 @@ export class WorkflowQueryDto {
     enum: WorkflowCategory,
   })
   @IsOptional()
-  @IsEnum(WorkflowCategory, { message: 'Category harus berupa nilai yang valid' })
+  @IsEnum(WorkflowCategory, {
+    message: 'Category harus berupa nilai yang valid',
+  })
   category?: WorkflowCategory;
 
   @ApiPropertyOptional({
@@ -1087,7 +1142,9 @@ export class WorkflowQueryDto {
     enum: WorkflowTriggerType,
   })
   @IsOptional()
-  @IsEnum(WorkflowTriggerType, { message: 'Trigger type harus berupa nilai yang valid' })
+  @IsEnum(WorkflowTriggerType, {
+    message: 'Trigger type harus berupa nilai yang valid',
+  })
   triggerType?: WorkflowTriggerType;
 
   @ApiPropertyOptional({
@@ -1155,13 +1212,23 @@ export class WorkflowQueryDto {
   @ApiPropertyOptional({
     description: 'Sortir berdasarkan field',
     example: 'createdAt',
-    enum: ['name', 'createdAt', 'updatedAt', 'lastExecutionAt', 'totalExecutions'],
+    enum: [
+      'name',
+      'createdAt',
+      'updatedAt',
+      'lastExecutionAt',
+      'totalExecutions',
+    ],
   })
   @IsOptional()
   @IsString({ message: 'Sort by harus berupa string' })
-  @IsEnum(['name', 'createdAt', 'updatedAt', 'lastExecutionAt', 'totalExecutions'], {
-    message: 'Sort by harus berupa: name, createdAt, updatedAt, lastExecutionAt, atau totalExecutions'
-  })
+  @IsEnum(
+    ['name', 'createdAt', 'updatedAt', 'lastExecutionAt', 'totalExecutions'],
+    {
+      message:
+        'Sort by harus berupa: name, createdAt, updatedAt, lastExecutionAt, atau totalExecutions',
+    },
+  )
   sortBy?: string;
 
   @ApiPropertyOptional({
@@ -1233,7 +1300,9 @@ export class WorkflowValidationResultDto {
   @ApiProperty({
     description: 'List suggestions untuk improvement',
     type: [String],
-    example: ['Pertimbangkan untuk menambahkan error handling pada step API call'],
+    example: [
+      'Pertimbangkan untuk menambahkan error handling pada step API call',
+    ],
   })
   suggestions: string[];
 }

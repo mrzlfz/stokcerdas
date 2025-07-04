@@ -90,7 +90,7 @@ export class TransferItemDto {
 
   @ApiPropertyOptional({
     description: 'Unit cost untuk item ini',
-    example: 15000.50,
+    example: 15000.5,
   })
   @IsOptional()
   @IsNumber({}, { message: 'Unit cost harus berupa angka' })
@@ -110,7 +110,9 @@ export class CreateInventoryTransferDto {
     description: 'ID lokasi tujuan',
     example: 'uuid-destination-location-id',
   })
-  @IsUUID(4, { message: 'Destination location ID harus berformat UUID yang valid' })
+  @IsUUID(4, {
+    message: 'Destination location ID harus berformat UUID yang valid',
+  })
   destinationLocationId: string;
 
   @ApiProperty({
@@ -172,7 +174,9 @@ export class CreateInventoryTransferDto {
     enum: ['low', 'normal', 'high', 'urgent'],
   })
   @IsOptional()
-  @IsEnum(['low', 'normal', 'high', 'urgent'], { message: 'Priority tidak valid' })
+  @IsEnum(['low', 'normal', 'high', 'urgent'], {
+    message: 'Priority tidak valid',
+  })
   priority?: 'low' | 'normal' | 'high' | 'urgent';
 
   @ApiPropertyOptional({
@@ -212,7 +216,10 @@ export class UpdateTransferStatusDto {
 
   @ApiPropertyOptional({
     description: 'Metadata tambahan untuk status update',
-    example: { trackingNumber: 'TRK123456789', estimatedArrival: '2024-07-02T15:00:00Z' },
+    example: {
+      trackingNumber: 'TRK123456789',
+      estimatedArrival: '2024-07-02T15:00:00Z',
+    },
   })
   @IsOptional()
   @IsObject()
@@ -235,8 +242,8 @@ export class TransferReceiptDto {
         productId: 'uuid-product-id',
         quantityReceived: 48,
         quantityDamaged: 2,
-        notes: 'Ada 2 unit rusak saat pengiriman'
-      }
+        notes: 'Ada 2 unit rusak saat pengiriman',
+      },
     ],
   })
   @IsArray()

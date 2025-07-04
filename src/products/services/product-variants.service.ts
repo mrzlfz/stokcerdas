@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 
-import { ProductVariant, Product, ProductType } from '../entities/product.entity';
+import { Product, ProductType } from '../entities/product.entity';
+import { ProductVariant } from '../entities/product-variant.entity';
 import { CreateProductVariantDto } from '../dto/create-product-variant.dto';
 import { UpdateProductVariantDto } from '../dto/update-product-variant.dto';
 
@@ -15,9 +21,16 @@ export class ProductVariantsService {
     private readonly productRepository: Repository<Product>,
   ) {}
 
-  async create(tenantId: string, createVariantDto: CreateProductVariantDto, userId?: string): Promise<ProductVariant> {
+  async create(
+    tenantId: string,
+    createVariantDto: CreateProductVariantDto,
+    userId?: string,
+  ): Promise<ProductVariant> {
     // Validasi produk parent ada dan aktif
-    const product = await this.validateParentProduct(tenantId, createVariantDto.productId);
+    const product = await this.validateParentProduct(
+      tenantId,
+      createVariantDto.productId,
+    );
 
     // Validasi SKU unik per tenant
     await this.validateSkuUnique(tenantId, createVariantDto.sku);
@@ -28,7 +41,11 @@ export class ProductVariantsService {
     }
 
     // Validasi atribut variant tidak duplikasi untuk produk yang sama
-    await this.validateVariantAttributes(tenantId, createVariantDto.productId, createVariantDto.attributes);
+    await this.validateVariantAttributes(
+      tenantId,
+      createVariantDto.productId,
+      createVariantDto.attributes,
+    );
 
     const variant = this.variantRepository.create({
       ...createVariantDto,
@@ -41,15 +58,20 @@ export class ProductVariantsService {
 
     // Update product type menjadi VARIANT jika belum
     if (product.type !== ProductType.VARIANT) {
-      await this.productRepository.update(product.id, { type: ProductType.VARIANT });
+      await this.productRepository.update(product.id, {
+        type: ProductType.VARIANT,
+      });
     }
 
     return savedVariant;
   }
 
-  async findAll(tenantId: string, productId?: string): Promise<ProductVariant[]> {
+  async findAll(
+    tenantId: string,
+    productId?: string,
+  ): Promise<ProductVariant[]> {
     const whereCondition: any = { tenantId, isActive: true };
-    
+
     if (productId) {
       whereCondition.productId = productId;
     }
@@ -81,26 +103,38 @@ export class ProductVariantsService {
     });
 
     if (!variant) {
-      throw new NotFoundException(`Variant dengan SKU "${sku}" tidak ditemukan`);
+      throw new NotFoundException(
+        `Variant dengan SKU "${sku}" tidak ditemukan`,
+      );
     }
 
     return variant;
   }
 
-  async findByBarcode(tenantId: string, barcode: string): Promise<ProductVariant> {
+  async findByBarcode(
+    tenantId: string,
+    barcode: string,
+  ): Promise<ProductVariant> {
     const variant = await this.variantRepository.findOne({
       where: { barcode, tenantId, isActive: true },
       relations: ['product'],
     });
 
     if (!variant) {
-      throw new NotFoundException(`Variant dengan barcode "${barcode}" tidak ditemukan`);
+      throw new NotFoundException(
+        `Variant dengan barcode "${barcode}" tidak ditemukan`,
+      );
     }
 
     return variant;
   }
 
-  async update(tenantId: string, id: string, updateVariantDto: UpdateProductVariantDto, userId?: string): Promise<ProductVariant> {
+  async update(
+    tenantId: string,
+    id: string,
+    updateVariantDto: UpdateProductVariantDto,
+    userId?: string,
+  ): Promise<ProductVariant> {
     const variant = await this.findOne(tenantId, id);
 
     // Validasi SKU jika berubah
@@ -109,13 +143,21 @@ export class ProductVariantsService {
     }
 
     // Validasi barcode jika berubah
-    if (updateVariantDto.barcode && updateVariantDto.barcode !== variant.barcode) {
+    if (
+      updateVariantDto.barcode &&
+      updateVariantDto.barcode !== variant.barcode
+    ) {
       await this.validateBarcodeUnique(tenantId, updateVariantDto.barcode, id);
     }
 
     // Validasi atribut jika berubah
     if (updateVariantDto.attributes) {
-      await this.validateVariantAttributes(tenantId, variant.productId, updateVariantDto.attributes, id);
+      await this.validateVariantAttributes(
+        tenantId,
+        variant.productId,
+        updateVariantDto.attributes,
+        id,
+      );
     }
 
     // Update timestamps
@@ -141,11 +183,16 @@ export class ProductVariantsService {
 
     // If no more variants, change product type back to SIMPLE
     if (remainingVariants === 0) {
-      await this.productRepository.update(variant.productId, { type: ProductType.SIMPLE });
+      await this.productRepository.update(variant.productId, {
+        type: ProductType.SIMPLE,
+      });
     }
   }
 
-  async getVariantsByProduct(tenantId: string, productId: string): Promise<ProductVariant[]> {
+  async getVariantsByProduct(
+    tenantId: string,
+    productId: string,
+  ): Promise<ProductVariant[]> {
     await this.validateParentProduct(tenantId, productId);
 
     return this.variantRepository.find({
@@ -154,7 +201,10 @@ export class ProductVariantsService {
     });
   }
 
-  async getVariantMatrix(tenantId: string, productId: string): Promise<{
+  async getVariantMatrix(
+    tenantId: string,
+    productId: string,
+  ): Promise<{
     attributes: string[];
     attributeValues: Record<string, string[]>;
     variants: Array<ProductVariant & { attributeString: string }>;
@@ -176,11 +226,11 @@ export class ProductVariantsService {
     variants.forEach(variant => {
       Object.keys(variant.attributes).forEach(attr => {
         attributeSet.add(attr);
-        
+
         if (!attributeValues[attr]) {
           attributeValues[attr] = new Set();
         }
-        
+
         attributeValues[attr].add(variant.attributes[attr]);
       });
     });
@@ -193,12 +243,15 @@ export class ProductVariantsService {
     });
 
     // Buat string atribut untuk setiap variant
-    const variantsWithString = variants.map(variant => ({
-      ...variant,
-      attributeString: attributes
-        .map(attr => `${attr}: ${variant.attributes[attr] || 'N/A'}`)
-        .join(', '),
-    }));
+    const variantsWithString = variants.map(variant => {
+      // Create a proper variant instance with all required methods
+      const variantWithString = Object.assign(new ProductVariant(), variant, {
+        attributeString: attributes
+          .map(attr => `${attr}: ${variant.attributes[attr] || 'N/A'}`)
+          .join(', '),
+      });
+      return variantWithString;
+    });
 
     return {
       attributes,
@@ -208,13 +261,18 @@ export class ProductVariantsService {
   }
 
   async bulkUpdatePrices(
-    tenantId: string, 
-    productId: string, 
-    priceUpdate: { costPrice?: number; sellingPrice?: number; adjustment?: number; adjustmentType?: 'amount' | 'percentage' },
-    userId?: string
+    tenantId: string,
+    productId: string,
+    priceUpdate: {
+      costPrice?: number;
+      sellingPrice?: number;
+      adjustment?: number;
+      adjustmentType?: 'amount' | 'percentage';
+    },
+    userId?: string,
   ): Promise<{ updated: number; errors: string[] }> {
     const variants = await this.getVariantsByProduct(tenantId, productId);
-    
+
     if (variants.length === 0) {
       throw new NotFoundException('Tidak ada variant untuk produk ini');
     }
@@ -234,14 +292,20 @@ export class ProductVariantsService {
           updateData.sellingPrice = priceUpdate.sellingPrice;
         }
 
-        if (priceUpdate.adjustment !== undefined && priceUpdate.adjustmentType) {
+        if (
+          priceUpdate.adjustment !== undefined &&
+          priceUpdate.adjustmentType
+        ) {
           if (priceUpdate.adjustmentType === 'percentage') {
-            updateData.sellingPrice = variant.sellingPrice * (1 + priceUpdate.adjustment / 100);
+            updateData.sellingPrice =
+              variant.sellingPrice * (1 + priceUpdate.adjustment / 100);
             if (priceUpdate.costPrice === undefined) {
-              updateData.costPrice = variant.costPrice * (1 + priceUpdate.adjustment / 100);
+              updateData.costPrice =
+                variant.costPrice * (1 + priceUpdate.adjustment / 100);
             }
           } else {
-            updateData.sellingPrice = variant.sellingPrice + priceUpdate.adjustment;
+            updateData.sellingPrice =
+              variant.sellingPrice + priceUpdate.adjustment;
             if (priceUpdate.costPrice === undefined) {
               updateData.costPrice = variant.costPrice + priceUpdate.adjustment;
             }
@@ -250,11 +314,16 @@ export class ProductVariantsService {
 
         // Validasi harga tidak negatif
         if (updateData.costPrice !== undefined && updateData.costPrice < 0) {
-          errors.push(`Variant ${variant.sku}: Harga modal tidak boleh negatif`);
+          errors.push(
+            `Variant ${variant.sku}: Harga modal tidak boleh negatif`,
+          );
           continue;
         }
 
-        if (updateData.sellingPrice !== undefined && updateData.sellingPrice < 0) {
+        if (
+          updateData.sellingPrice !== undefined &&
+          updateData.sellingPrice < 0
+        ) {
           errors.push(`Variant ${variant.sku}: Harga jual tidak boleh negatif`);
           continue;
         }
@@ -270,7 +339,10 @@ export class ProductVariantsService {
   }
 
   // Private helper methods
-  private async validateParentProduct(tenantId: string, productId: string): Promise<Product> {
+  private async validateParentProduct(
+    tenantId: string,
+    productId: string,
+  ): Promise<Product> {
     const product = await this.productRepository.findOne({
       where: { id: productId, tenantId, isDeleted: false },
     });
@@ -286,9 +358,13 @@ export class ProductVariantsService {
     return product;
   }
 
-  private async validateSkuUnique(tenantId: string, sku: string, excludeId?: string): Promise<void> {
+  private async validateSkuUnique(
+    tenantId: string,
+    sku: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, sku };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -311,9 +387,13 @@ export class ProductVariantsService {
     }
   }
 
-  private async validateBarcodeUnique(tenantId: string, barcode: string, excludeId?: string): Promise<void> {
+  private async validateBarcodeUnique(
+    tenantId: string,
+    barcode: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, barcode };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -323,7 +403,9 @@ export class ProductVariantsService {
     });
 
     if (existingVariant) {
-      throw new ConflictException(`Barcode variant "${barcode}" sudah digunakan`);
+      throw new ConflictException(
+        `Barcode variant "${barcode}" sudah digunakan`,
+      );
     }
 
     // Also check in products table
@@ -332,13 +414,20 @@ export class ProductVariantsService {
     });
 
     if (existingProduct) {
-      throw new ConflictException(`Barcode "${barcode}" sudah digunakan untuk produk`);
+      throw new ConflictException(
+        `Barcode "${barcode}" sudah digunakan untuk produk`,
+      );
     }
   }
 
-  private async validateVariantAttributes(tenantId: string, productId: string, attributes: Record<string, any>, excludeId?: string): Promise<void> {
+  private async validateVariantAttributes(
+    tenantId: string,
+    productId: string,
+    attributes: Record<string, any>,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, productId, isActive: true };
-    
+
     if (excludeId) {
       whereCondition.id = Not(excludeId);
     }
@@ -352,19 +441,25 @@ export class ProductVariantsService {
     const attributeString = JSON.stringify(this.sortObjectKeys(attributes));
 
     for (const variant of existingVariants) {
-      const existingAttributeString = JSON.stringify(this.sortObjectKeys(variant.attributes));
-      
+      const existingAttributeString = JSON.stringify(
+        this.sortObjectKeys(variant.attributes),
+      );
+
       if (attributeString === existingAttributeString) {
-        throw new ConflictException('Kombinasi atribut variant sudah ada untuk produk ini');
+        throw new ConflictException(
+          'Kombinasi atribut variant sudah ada untuk produk ini',
+        );
       }
     }
   }
 
   private sortObjectKeys(obj: Record<string, any>): Record<string, any> {
     const sorted: Record<string, any> = {};
-    Object.keys(obj).sort().forEach(key => {
-      sorted[key] = obj[key];
-    });
+    Object.keys(obj)
+      .sort()
+      .forEach(key => {
+        sorted[key] = obj[key];
+      });
     return sorted;
   }
 }

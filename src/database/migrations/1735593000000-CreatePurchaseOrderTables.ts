@@ -1,6 +1,14 @@
-import { MigrationInterface, QueryRunner, Table, Index, ForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  Index,
+  ForeignKey,
+} from 'typeorm';
 
-export class CreatePurchaseOrderTables1735593000000 implements MigrationInterface {
+export class CreatePurchaseOrderTables1735593000000
+  implements MigrationInterface
+{
   name = 'CreatePurchaseOrderTables1735593000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -42,7 +50,13 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
           {
             name: 'type',
             type: 'enum',
-            enum: ['standard', 'drop_ship', 'consignment', 'service', 'emergency'],
+            enum: [
+              'standard',
+              'drop_ship',
+              'consignment',
+              'service',
+              'emergency',
+            ],
             default: "'standard'",
           },
           {
@@ -58,7 +72,7 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
               'partially_received',
               'received',
               'closed',
-              'cancelled'
+              'cancelled',
             ],
             default: "'draft'",
           },
@@ -167,7 +181,16 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
           {
             name: 'payment_terms',
             type: 'enum',
-            enum: ['cod', 'net_7', 'net_15', 'net_30', 'net_45', 'net_60', 'prepaid', 'custom'],
+            enum: [
+              'cod',
+              'net_7',
+              'net_15',
+              'net_30',
+              'net_45',
+              'net_60',
+              'prepaid',
+              'custom',
+            ],
             default: "'net_30'",
           },
           {
@@ -208,7 +231,13 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
           {
             name: 'approval_status',
             type: 'enum',
-            enum: ['not_required', 'pending', 'approved', 'rejected', 'escalated'],
+            enum: [
+              'not_required',
+              'pending',
+              'approved',
+              'rejected',
+              'escalated',
+            ],
             default: "'not_required'",
           },
           {
@@ -685,7 +714,7 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
               'partially_received',
               'received',
               'closed',
-              'cancelled'
+              'cancelled',
             ],
             isNullable: false,
           },
@@ -702,7 +731,7 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
               'partially_received',
               'received',
               'closed',
-              'cancelled'
+              'cancelled',
             ],
             isNullable: true,
           },
@@ -773,25 +802,51 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
     );
 
     // Create indexes for purchase_orders table
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_purchase_orders_tenant_id_po_number" ON "purchase_orders" ("tenant_id", "po_number")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_supplier_id" ON "purchase_orders" ("tenant_id", "supplier_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_status" ON "purchase_orders" ("tenant_id", "status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_priority" ON "purchase_orders" ("tenant_id", "priority")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_order_date" ON "purchase_orders" ("tenant_id", "order_date")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_expected_delivery_date" ON "purchase_orders" ("tenant_id", "expected_delivery_date")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_orders_tenant_id_approval_status" ON "purchase_orders" ("tenant_id", "approval_status")`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_purchase_orders_tenant_id_po_number" ON "purchase_orders" ("tenant_id", "po_number")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_orders_tenant_id_supplier_id" ON "purchase_orders" ("tenant_id", "supplier_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_orders_tenant_id_status" ON "purchase_orders" ("tenant_id", "status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_orders_tenant_id_priority" ON "purchase_orders" ("tenant_id", "priority")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_orders_tenant_id_order_date" ON "purchase_orders" ("tenant_id", "order_date")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_orders_tenant_id_expected_delivery_date" ON "purchase_orders" ("tenant_id", "expected_delivery_date")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_orders_tenant_id_approval_status" ON "purchase_orders" ("tenant_id", "approval_status")`,
+    );
 
     // Create indexes for purchase_order_items table
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_items_tenant_id_purchase_order_id" ON "purchase_order_items" ("tenant_id", "purchase_order_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_items_tenant_id_product_id" ON "purchase_order_items" ("tenant_id", "product_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_items_tenant_id_sku" ON "purchase_order_items" ("tenant_id", "sku")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_order_items_tenant_id_purchase_order_id" ON "purchase_order_items" ("tenant_id", "purchase_order_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_order_items_tenant_id_product_id" ON "purchase_order_items" ("tenant_id", "product_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_order_items_tenant_id_sku" ON "purchase_order_items" ("tenant_id", "sku")`,
+    );
 
     // Create indexes for purchase_order_approvals table
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_approvals_tenant_id_purchase_order_id" ON "purchase_order_approvals" ("tenant_id", "purchase_order_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_approvals_tenant_id_approver_id" ON "purchase_order_approvals" ("tenant_id", "approver_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_order_approvals_tenant_id_purchase_order_id" ON "purchase_order_approvals" ("tenant_id", "purchase_order_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_order_approvals_tenant_id_approver_id" ON "purchase_order_approvals" ("tenant_id", "approver_id")`,
+    );
 
     // Create indexes for purchase_order_status_history table
-    await queryRunner.query(`CREATE INDEX "IDX_purchase_order_status_history_tenant_id_purchase_order_id" ON "purchase_order_status_history" ("tenant_id", "purchase_order_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_purchase_order_status_history_tenant_id_purchase_order_id" ON "purchase_order_status_history" ("tenant_id", "purchase_order_id")`,
+    );
 
     // Create foreign key constraints
     await queryRunner.query(`
@@ -824,39 +879,63 @@ export class CreatePurchaseOrderTables1735593000000 implements MigrationInterfac
       FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE
     `);
 
-    // Note: Purchase order permissions will be added in a separate migration 
+    // Note: Purchase order permissions will be added in a separate migration
     // due to PostgreSQL enum value transaction limitations
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remove foreign key constraints
     const purchaseOrdersTable = await queryRunner.getTable('purchase_orders');
-    const supplierFK = purchaseOrdersTable?.foreignKeys.find(fk => fk.columnNames.indexOf('supplier_id') !== -1);
+    const supplierFK = purchaseOrdersTable?.foreignKeys.find(
+      fk => fk.columnNames.indexOf('supplier_id') !== -1,
+    );
     if (supplierFK) {
       await queryRunner.dropForeignKey('purchase_orders', supplierFK);
     }
 
-    const purchaseOrderItemsTable = await queryRunner.getTable('purchase_order_items');
-    const purchaseOrderFK = purchaseOrderItemsTable?.foreignKeys.find(fk => fk.columnNames.indexOf('purchase_order_id') !== -1);
+    const purchaseOrderItemsTable = await queryRunner.getTable(
+      'purchase_order_items',
+    );
+    const purchaseOrderFK = purchaseOrderItemsTable?.foreignKeys.find(
+      fk => fk.columnNames.indexOf('purchase_order_id') !== -1,
+    );
     if (purchaseOrderFK) {
       await queryRunner.dropForeignKey('purchase_order_items', purchaseOrderFK);
     }
 
-    const productFK = purchaseOrderItemsTable?.foreignKeys.find(fk => fk.columnNames.indexOf('product_id') !== -1);
+    const productFK = purchaseOrderItemsTable?.foreignKeys.find(
+      fk => fk.columnNames.indexOf('product_id') !== -1,
+    );
     if (productFK) {
       await queryRunner.dropForeignKey('purchase_order_items', productFK);
     }
 
-    const purchaseOrderApprovalsTable = await queryRunner.getTable('purchase_order_approvals');
-    const approvalPurchaseOrderFK = purchaseOrderApprovalsTable?.foreignKeys.find(fk => fk.columnNames.indexOf('purchase_order_id') !== -1);
+    const purchaseOrderApprovalsTable = await queryRunner.getTable(
+      'purchase_order_approvals',
+    );
+    const approvalPurchaseOrderFK =
+      purchaseOrderApprovalsTable?.foreignKeys.find(
+        fk => fk.columnNames.indexOf('purchase_order_id') !== -1,
+      );
     if (approvalPurchaseOrderFK) {
-      await queryRunner.dropForeignKey('purchase_order_approvals', approvalPurchaseOrderFK);
+      await queryRunner.dropForeignKey(
+        'purchase_order_approvals',
+        approvalPurchaseOrderFK,
+      );
     }
 
-    const purchaseOrderStatusHistoryTable = await queryRunner.getTable('purchase_order_status_history');
-    const historyPurchaseOrderFK = purchaseOrderStatusHistoryTable?.foreignKeys.find(fk => fk.columnNames.indexOf('purchase_order_id') !== -1);
+    const purchaseOrderStatusHistoryTable = await queryRunner.getTable(
+      'purchase_order_status_history',
+    );
+    const historyPurchaseOrderFK =
+      purchaseOrderStatusHistoryTable?.foreignKeys.find(
+        fk => fk.columnNames.indexOf('purchase_order_id') !== -1,
+      );
     if (historyPurchaseOrderFK) {
-      await queryRunner.dropForeignKey('purchase_order_status_history', historyPurchaseOrderFK);
+      await queryRunner.dropForeignKey(
+        'purchase_order_status_history',
+        historyPurchaseOrderFK,
+      );
     }
 
     // Drop tables (this will also drop all indexes)

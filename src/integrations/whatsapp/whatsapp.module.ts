@@ -114,6 +114,18 @@ import { ChannelMapping } from '../../channels/entities/channel-mapping.entity';
           removeOnFail: 100,
         },
       },
+      {
+        name: 'integrations',
+        defaultJobOptions: {
+          removeOnComplete: 25,
+          removeOnFail: 15,
+          attempts: 5,
+          backoff: {
+            type: 'exponential',
+            delay: 10000,
+          },
+        },
+      },
     ),
   ],
 
@@ -134,10 +146,7 @@ import { ChannelMapping } from '../../channels/entities/channel-mapping.entity';
     WhatsAppProcessor,
   ],
 
-  controllers: [
-    WhatsAppController,
-    WhatsAppWebhookController,
-  ],
+  controllers: [WhatsAppController, WhatsAppWebhookController],
 
   exports: [
     // Export services for use in other modules

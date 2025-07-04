@@ -12,18 +12,39 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../users/entities/user.entity';
-import { QuickBooksApiService, QuickBooksCredentials } from '../services/quickbooks-api.service';
-import { QuickBooksItemSyncService, ItemSyncOptions } from '../services/quickbooks-item-sync.service';
-import { QuickBooksCOGSService, COGSConfiguration } from '../services/quickbooks-cogs.service';
-import { QuickBooksInvoiceService, InvoiceGenerationOptions } from '../services/quickbooks-invoice.service';
+import {
+  QuickBooksApiService,
+  QuickBooksCredentials,
+} from '../services/quickbooks-api.service';
+import {
+  QuickBooksItemSyncService,
+  ItemSyncOptions,
+} from '../services/quickbooks-item-sync.service';
+import {
+  QuickBooksCOGSService,
+  COGSConfiguration,
+} from '../services/quickbooks-cogs.service';
+import {
+  QuickBooksInvoiceService,
+  InvoiceGenerationOptions,
+} from '../services/quickbooks-invoice.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AccountingAccount, AccountingPlatform, AccountingConnectionStatus } from '../../entities/accounting-account.entity';
+import {
+  AccountingAccount,
+  AccountingPlatform,
+  AccountingConnectionStatus,
+} from '../../entities/accounting-account.entity';
 
 @ApiTags('QuickBooks Integration')
 @Controller('api/v1/integrations/quickbooks')
@@ -44,7 +65,10 @@ export class QuickBooksController {
   @Get('auth/url')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get QuickBooks OAuth authorization URL' })
-  @ApiResponse({ status: 200, description: 'Authorization URL generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authorization URL generated successfully',
+  })
   getAuthorizationUrl(
     @Query('redirect_uri') redirectUri: string,
     @Query('state') state: string,
@@ -72,7 +96,9 @@ export class QuickBooksController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to generate authorization URL: ${error.message}`);
+      this.logger.error(
+        `Failed to generate authorization URL: ${error.message}`,
+      );
       return {
         success: false,
         error: {
@@ -88,7 +114,8 @@ export class QuickBooksController {
   @ApiOperation({ summary: 'Exchange authorization code for access token' })
   @ApiResponse({ status: 200, description: 'Token exchanged successfully' })
   async exchangeToken(
-    @Body() body: {
+    @Body()
+    body: {
       authCode: string;
       redirectUri: string;
       realmId: string;
@@ -116,7 +143,9 @@ export class QuickBooksController {
       );
 
       if (!tokenResponse.success) {
-        throw new Error(`Token exchange failed: ${tokenResponse.error?.message}`);
+        throw new Error(
+          `Token exchange failed: ${tokenResponse.error?.message}`,
+        );
       }
 
       const tokenData = tokenResponse.data!;
@@ -130,7 +159,9 @@ export class QuickBooksController {
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
           realmId,
-          environment: process.env.QUICKBOOKS_ENVIRONMENT as 'sandbox' | 'production' || 'production',
+          environment:
+            (process.env.QUICKBOOKS_ENVIRONMENT as 'sandbox' | 'production') ||
+            'production',
           expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
         },
         req.user.id,
@@ -141,7 +172,10 @@ export class QuickBooksController {
         data: {
           accountId: accountingAccount.id,
           connected: true,
-          companyInfo: await this.getCompanyInfo(accountingAccount.id, tenantId),
+          companyInfo: await this.getCompanyInfo(
+            accountingAccount.id,
+            tenantId,
+          ),
         },
       };
     } catch (error) {
@@ -166,7 +200,10 @@ export class QuickBooksController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const result = await this.quickBooksApiService.testConnection(
@@ -198,14 +235,20 @@ export class QuickBooksController {
   @Get(':accountId/company-info')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get QuickBooks company information' })
-  @ApiResponse({ status: 200, description: 'Company information retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company information retrieved successfully',
+  })
   async getCompanyInfo(
     @Param('accountId') accountId: string,
     @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.quickBooksApiService.getCompanyInfo(
@@ -215,7 +258,9 @@ export class QuickBooksController {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to get company info: ${response.error?.message}`);
+        throw new Error(
+          `Failed to get company info: ${response.error?.message}`,
+        );
       }
 
       return {
@@ -305,7 +350,10 @@ export class QuickBooksController {
   @Post(':accountId/items/bidirectional-sync')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Perform bidirectional item sync' })
-  @ApiResponse({ status: 200, description: 'Bidirectional sync completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bidirectional sync completed successfully',
+  })
   async bidirectionalItemSync(
     @Param('accountId') accountId: string,
     @Body() options: ItemSyncOptions,
@@ -339,10 +387,14 @@ export class QuickBooksController {
   @Post(':accountId/cogs/calculate')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Calculate and post COGS to QuickBooks' })
-  @ApiResponse({ status: 200, description: 'COGS calculated and posted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'COGS calculated and posted successfully',
+  })
   async calculateCOGS(
     @Param('accountId') accountId: string,
-    @Body() body: {
+    @Body()
+    body: {
       startDate: string;
       endDate: string;
       config: COGSConfiguration;
@@ -380,12 +432,16 @@ export class QuickBooksController {
   @Get(':accountId/cogs/report')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Generate COGS report' })
-  @ApiResponse({ status: 200, description: 'COGS report generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'COGS report generated successfully',
+  })
   async generateCOGSReport(
     @Param('accountId') accountId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
-    @Query('costingMethod') costingMethod: COGSConfiguration['costingMethod'] = 'average',
+    @Query('costingMethod')
+    costingMethod: COGSConfiguration['costingMethod'] = 'average',
     @Request() req: any,
   ) {
     try {
@@ -431,7 +487,8 @@ export class QuickBooksController {
   @ApiResponse({ status: 200, description: 'Invoice generated successfully' })
   async generateInvoice(
     @Param('accountId') accountId: string,
-    @Body() body: {
+    @Body()
+    body: {
       orderId: string;
       options?: InvoiceGenerationOptions;
     },
@@ -441,12 +498,13 @@ export class QuickBooksController {
       const tenantId = req.user.tenantId;
       const { orderId, options = {} } = body;
 
-      const result = await this.quickBooksInvoiceService.generateInvoiceFromOrder(
-        accountId,
-        orderId,
-        tenantId,
-        options,
-      );
+      const result =
+        await this.quickBooksInvoiceService.generateInvoiceFromOrder(
+          accountId,
+          orderId,
+          tenantId,
+          options,
+        );
 
       return {
         success: true,
@@ -467,10 +525,14 @@ export class QuickBooksController {
   @Post(':accountId/invoices/batch-generate')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Generate QuickBooks invoices for multiple orders' })
-  @ApiResponse({ status: 200, description: 'Batch invoice generation completed' })
+  @ApiResponse({
+    status: 200,
+    description: 'Batch invoice generation completed',
+  })
   async generateInvoiceBatch(
     @Param('accountId') accountId: string,
-    @Body() body: {
+    @Body()
+    body: {
       orderIds: string[];
       options?: InvoiceGenerationOptions;
     },
@@ -506,7 +568,10 @@ export class QuickBooksController {
   @Get(':accountId/invoices/:invoiceId/status')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get QuickBooks invoice status' })
-  @ApiResponse({ status: 200, description: 'Invoice status retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invoice status retrieved successfully',
+  })
   async getInvoiceStatus(
     @Param('accountId') accountId: string,
     @Param('invoiceId') invoiceId: string,
@@ -540,14 +605,20 @@ export class QuickBooksController {
   @Get(':accountId/accounts')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get QuickBooks chart of accounts' })
-  @ApiResponse({ status: 200, description: 'Chart of accounts retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chart of accounts retrieved successfully',
+  })
   async getAccounts(
     @Param('accountId') accountId: string,
     @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.quickBooksApiService.getAccounts(
@@ -586,7 +657,10 @@ export class QuickBooksController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.quickBooksApiService.getTaxCodes(
@@ -618,7 +692,10 @@ export class QuickBooksController {
   @Delete(':accountId/disconnect')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Disconnect QuickBooks account' })
-  @ApiResponse({ status: 200, description: 'Account disconnected successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account disconnected successfully',
+  })
   async disconnectAccount(
     @Param('accountId') accountId: string,
     @Request() req: any,
@@ -657,9 +734,16 @@ export class QuickBooksController {
 
   // Helper methods
 
-  private async getAccountingAccount(accountId: string, tenantId: string): Promise<AccountingAccount> {
+  private async getAccountingAccount(
+    accountId: string,
+    tenantId: string,
+  ): Promise<AccountingAccount> {
     const account = await this.accountingAccountRepository.findOne({
-      where: { id: accountId, tenantId, platform: AccountingPlatform.QUICKBOOKS },
+      where: {
+        id: accountId,
+        tenantId,
+        platform: AccountingPlatform.QUICKBOOKS,
+      },
     });
 
     if (!account) {
@@ -669,14 +753,17 @@ export class QuickBooksController {
     return account;
   }
 
-  private getCredentials(accountingAccount: AccountingAccount): QuickBooksCredentials {
+  private getCredentials(
+    accountingAccount: AccountingAccount,
+  ): QuickBooksCredentials {
     return {
       clientId: accountingAccount.clientId!,
       clientSecret: accountingAccount.clientSecret!,
       accessToken: accountingAccount.accessToken!,
       refreshToken: accountingAccount.refreshToken!,
       realmId: accountingAccount.platformConfig?.realmId!,
-      environment: accountingAccount.platformConfig?.environment || 'production',
+      environment:
+        accountingAccount.platformConfig?.environment || 'production',
       expiresAt: accountingAccount.tokenExpiresAt,
     };
   }
@@ -713,8 +800,13 @@ export class QuickBooksController {
     };
 
     if (existingAccount) {
-      await this.accountingAccountRepository.update(existingAccount.id, accountData);
-      return this.accountingAccountRepository.findOne({ where: { id: existingAccount.id } });
+      await this.accountingAccountRepository.update(
+        existingAccount.id,
+        accountData,
+      );
+      return this.accountingAccountRepository.findOne({
+        where: { id: existingAccount.id },
+      });
     } else {
       const newAccount = this.accountingAccountRepository.create({
         ...accountData,

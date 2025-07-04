@@ -9,7 +9,14 @@ import {
   OneToMany,
   Index,
 } from 'typeorm';
-import { IsEnum, IsOptional, IsString, IsBoolean, IsDate, IsNumber } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsDate,
+  IsNumber,
+} from 'class-validator';
 
 // Base auditable entity with tenant isolation
 export abstract class PrivacyAuditableEntity {
@@ -495,11 +502,22 @@ export class PrivacyBreachLog extends PrivacyAuditableEntity {
 
   @Column({
     type: 'enum',
-    enum: ['detected', 'investigating', 'contained', 'resolved', 'reported_to_authority'],
+    enum: [
+      'detected',
+      'investigating',
+      'contained',
+      'resolved',
+      'reported_to_authority',
+    ],
     default: 'detected',
     nullable: false,
   })
-  status: 'detected' | 'investigating' | 'contained' | 'resolved' | 'reported_to_authority';
+  status:
+    | 'detected'
+    | 'investigating'
+    | 'contained'
+    | 'resolved'
+    | 'reported_to_authority';
 
   @Column({ type: 'timestamp with time zone', nullable: false })
   detectedAt: Date;
@@ -525,7 +543,12 @@ export class PrivacyBreachLog extends PrivacyAuditableEntity {
 
   @Column({ type: 'jsonb', nullable: true })
   breachDetails: {
-    causeOfBreach: 'human_error' | 'system_failure' | 'malicious_attack' | 'unauthorized_access' | 'other';
+    causeOfBreach:
+      | 'human_error'
+      | 'system_failure'
+      | 'malicious_attack'
+      | 'unauthorized_access'
+      | 'other';
     breachSource: 'internal' | 'external' | 'third_party' | 'unknown';
     accessMethod: string;
     vulnerabilityExploited?: string;
@@ -553,7 +576,11 @@ export class PrivacyBreachLog extends PrivacyAuditableEntity {
       measure: string;
       implementedAt: Date;
       responsibleParty: string;
-      effectiveness: 'effective' | 'partially_effective' | 'ineffective' | 'pending_assessment';
+      effectiveness:
+        | 'effective'
+        | 'partially_effective'
+        | 'ineffective'
+        | 'pending_assessment';
     }[];
     preventiveMeasures: {
       measure: string;
@@ -645,7 +672,14 @@ export class DataProcessingActivity extends PrivacyAuditableEntity {
 
   @Column({ type: 'jsonb', nullable: false })
   dataSubjects: {
-    categories: ('customers' | 'employees' | 'suppliers' | 'visitors' | 'minors' | 'other')[];
+    categories: (
+      | 'customers'
+      | 'employees'
+      | 'suppliers'
+      | 'visitors'
+      | 'minors'
+      | 'other'
+    )[];
     estimatedNumber: number;
     description: string;
   };

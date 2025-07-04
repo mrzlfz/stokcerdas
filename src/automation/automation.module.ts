@@ -5,10 +5,16 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Entities
 import { ReorderRule, ReorderExecution } from './entities/reorder-rule.entity';
-import { AutomationSchedule, ScheduleExecution } from './entities/automation-schedule.entity';
+import {
+  AutomationSchedule,
+  ScheduleExecution,
+} from './entities/automation-schedule.entity';
 import { Workflow } from './entities/workflow.entity';
 import { WorkflowStep } from './entities/workflow-step.entity';
-import { WorkflowExecution, WorkflowStepExecution } from './entities/workflow-execution.entity';
+import {
+  WorkflowExecution,
+  WorkflowStepExecution,
+} from './entities/workflow-execution.entity';
 
 // Controllers
 import { AutomationController } from './controllers/automation.controller';
@@ -29,6 +35,7 @@ import { AutomationProcessor } from './processors/automation.processor';
 import { WorkflowProcessor } from './processors/workflow.processor';
 
 // External Dependencies
+import { AuthModule } from '../auth/auth.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { ProductsModule } from '../products/products.module';
 import { SuppliersModule } from '../suppliers/suppliers.module';
@@ -42,6 +49,7 @@ import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { Product } from '../products/entities/product.entity';
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity';
+import { User } from '../users/entities/user.entity';
 
 @Module({
   imports: [
@@ -52,18 +60,19 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
       ReorderExecution,
       AutomationSchedule,
       ScheduleExecution,
-      
+
       // Workflow entities
       Workflow,
       WorkflowStep,
       WorkflowExecution,
       WorkflowStepExecution,
-      
+
       // External entities needed by services
       InventoryItem,
       Product,
       Supplier,
       PurchaseOrder,
+      User,
     ]),
 
     // Bull Queue for background job processing
@@ -76,7 +85,7 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
           delay: 5000,
         },
         removeOnComplete: 50, // Keep last 50 completed jobs
-        removeOnFail: 100,    // Keep last 100 failed jobs for debugging
+        removeOnFail: 100, // Keep last 100 failed jobs for debugging
       },
     }),
 
@@ -90,7 +99,7 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
           delay: 2000,
         },
         removeOnComplete: 100, // Keep more workflow execution history
-        removeOnFail: 200,     // Keep more failed workflows for debugging
+        removeOnFail: 200, // Keep more failed workflows for debugging
       },
     }),
 
@@ -98,6 +107,7 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
     EventEmitterModule,
 
     // External module dependencies
+    AuthModule,
     InventoryModule,
     ProductsModule,
     SuppliersModule,
@@ -107,10 +117,7 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
     MLForecastingModule,
   ],
 
-  controllers: [
-    AutomationController,
-    WorkflowController,
-  ],
+  controllers: [AutomationController, WorkflowController],
 
   providers: [
     // Core automation services
@@ -136,13 +143,13 @@ import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity
     SupplierSelectionService,
     AutomatedPurchasingService,
     AutomationRuleEngine,
-    
+
     // Export workflow services for use in other modules
     WorkflowBuilderService,
     WorkflowExecutionService,
     TriggerConfigurationService,
     ActionTemplateService,
-    
+
     // Export TypeORM repositories for direct access if needed
     TypeOrmModule,
   ],
@@ -151,14 +158,30 @@ export class AutomationModule {
   constructor() {
     // Module initialization logging
     console.log('🤖 AutomationModule initialized with:');
-    console.log('  ✅ Automation Entities: ReorderRule, ReorderExecution, AutomationSchedule, ScheduleExecution');
-    console.log('  ✅ Workflow Entities: Workflow, WorkflowStep, WorkflowExecution, WorkflowStepExecution');
-    console.log('  ✅ Automation Services: ReorderCalculation, SupplierSelection, AutomatedPurchasing, RuleEngine');
-    console.log('  ✅ Workflow Services: WorkflowBuilder, WorkflowExecution, TriggerConfiguration, ActionTemplate');
-    console.log('  ✅ Controllers: AutomationController (35+ endpoints), WorkflowController (50+ endpoints)');
-    console.log('  ✅ Processors: AutomationProcessor (5 job types), WorkflowProcessor (8 job types)');
-    console.log('  ✅ Queues: Bull queues for automation and workflow background processing');
-    console.log('  ✅ Dependencies: Inventory, Products, Suppliers, PurchaseOrders, Alerts, Notifications, ML');
+    console.log(
+      '  ✅ Automation Entities: ReorderRule, ReorderExecution, AutomationSchedule, ScheduleExecution',
+    );
+    console.log(
+      '  ✅ Workflow Entities: Workflow, WorkflowStep, WorkflowExecution, WorkflowStepExecution',
+    );
+    console.log(
+      '  ✅ Automation Services: ReorderCalculation, SupplierSelection, AutomatedPurchasing, RuleEngine',
+    );
+    console.log(
+      '  ✅ Workflow Services: WorkflowBuilder, WorkflowExecution, TriggerConfiguration, ActionTemplate',
+    );
+    console.log(
+      '  ✅ Controllers: AutomationController (35+ endpoints), WorkflowController (50+ endpoints)',
+    );
+    console.log(
+      '  ✅ Processors: AutomationProcessor (5 job types), WorkflowProcessor (8 job types)',
+    );
+    console.log(
+      '  ✅ Queues: Bull queues for automation and workflow background processing',
+    );
+    console.log(
+      '  ✅ Dependencies: Inventory, Products, Suppliers, PurchaseOrders, Alerts, Notifications, ML',
+    );
     console.log('  🎯 Complete Task 11.2: Workflow Automation System Ready!');
   }
 }

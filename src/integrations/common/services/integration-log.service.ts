@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere, Between, In, Not } from 'typeorm';
-import { IntegrationLog, IntegrationLogLevel, IntegrationLogType } from '../../entities/integration-log.entity';
+import {
+  IntegrationLog,
+  IntegrationLogLevel,
+  IntegrationLogType,
+} from '../../entities/integration-log.entity';
 
 export interface CreateLogEntry {
   tenantId: string;
@@ -68,7 +72,10 @@ export class IntegrationLogService {
       const logEntry = this.logRepository.create(entry);
       return await this.logRepository.save(logEntry);
     } catch (error) {
-      this.logger.error(`Failed to create log entry: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create log entry: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -110,8 +117,9 @@ export class IntegrationLogService {
     responseTimeMs: number,
     metadata?: Record<string, any>,
   ): Promise<IntegrationLog> {
-    const level = status >= 400 ? IntegrationLogLevel.ERROR : IntegrationLogLevel.DEBUG;
-    
+    const level =
+      status >= 400 ? IntegrationLogLevel.ERROR : IntegrationLogLevel.DEBUG;
+
     return this.log({
       tenantId,
       channelId,
@@ -138,8 +146,11 @@ export class IntegrationLogService {
     details?: string,
     metadata?: Record<string, any>,
   ): Promise<IntegrationLog> {
-    const level = status === 'failed' ? IntegrationLogLevel.ERROR : IntegrationLogLevel.INFO;
-    
+    const level =
+      status === 'failed'
+        ? IntegrationLogLevel.ERROR
+        : IntegrationLogLevel.INFO;
+
     return this.log({
       tenantId,
       channelId,
@@ -162,8 +173,11 @@ export class IntegrationLogService {
     details?: string,
     metadata?: Record<string, any>,
   ): Promise<IntegrationLog> {
-    const level = status === 'failed' ? IntegrationLogLevel.ERROR : IntegrationLogLevel.INFO;
-    
+    const level =
+      status === 'failed'
+        ? IntegrationLogLevel.ERROR
+        : IntegrationLogLevel.INFO;
+
     return this.log({
       tenantId,
       channelId,
@@ -186,8 +200,9 @@ export class IntegrationLogService {
     details?: string,
     metadata?: Record<string, any>,
   ): Promise<IntegrationLog> {
-    const level = status === 'failed' ? IntegrationLogLevel.WARN : IntegrationLogLevel.INFO;
-    
+    const level =
+      status === 'failed' ? IntegrationLogLevel.WARN : IntegrationLogLevel.INFO;
+
     return this.log({
       tenantId,
       channelId,
@@ -251,7 +266,9 @@ export class IntegrationLogService {
       }
 
       if (query.level) {
-        where.level = Array.isArray(query.level) ? In(query.level) : query.level;
+        where.level = Array.isArray(query.level)
+          ? In(query.level)
+          : query.level;
       }
 
       if (query.requestId) {
@@ -340,9 +357,13 @@ export class IntegrationLogService {
         select: ['responseTimeMs'],
       });
 
-      const avgResponseTime = apiResponseLogs.length > 0
-        ? apiResponseLogs.reduce((sum, log) => sum + (log.responseTimeMs || 0), 0) / apiResponseLogs.length
-        : 0;
+      const avgResponseTime =
+        apiResponseLogs.length > 0
+          ? apiResponseLogs.reduce(
+              (sum, log) => sum + (log.responseTimeMs || 0),
+              0,
+            ) / apiResponseLogs.length
+          : 0;
 
       // Get top errors
       const topErrorsQuery = await this.logRepository
@@ -359,10 +380,13 @@ export class IntegrationLogService {
       }
 
       if (startDate || endDate) {
-        topErrorsQuery.andWhere('log.createdAt BETWEEN :startDate AND :endDate', {
-          startDate: startDate || new Date(Date.now() - 24 * 60 * 60 * 1000),
-          endDate: endDate || new Date(),
-        });
+        topErrorsQuery.andWhere(
+          'log.createdAt BETWEEN :startDate AND :endDate',
+          {
+            startDate: startDate || new Date(Date.now() - 24 * 60 * 60 * 1000),
+            endDate: endDate || new Date(),
+          },
+        );
       }
 
       const rawTopErrors = await topErrorsQuery
@@ -386,7 +410,10 @@ export class IntegrationLogService {
         topErrors,
       };
     } catch (error) {
-      this.logger.error(`Failed to get log stats: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get log stats: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -433,10 +460,15 @@ export class IntegrationLogService {
         }
       }
 
-      this.logger.log(`Cleaned up ${deletedCount} old logs for tenant ${tenantId}`);
+      this.logger.log(
+        `Cleaned up ${deletedCount} old logs for tenant ${tenantId}`,
+      );
       return deletedCount;
     } catch (error) {
-      this.logger.error(`Failed to cleanup old logs: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cleanup old logs: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }

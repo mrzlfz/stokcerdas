@@ -12,7 +12,13 @@ export interface InventoryUpdateEvent {
 }
 
 export interface StockAlert {
-  type: 'low_stock' | 'out_of_stock' | 'overstock' | 'expiring_soon' | 'expired' | 'reorder_needed';
+  type:
+    | 'low_stock'
+    | 'out_of_stock'
+    | 'overstock'
+    | 'expiring_soon'
+    | 'expired'
+    | 'reorder_needed';
   severity: 'info' | 'warning' | 'critical';
   inventoryItem: InventoryItem;
   message: string;
@@ -22,14 +28,15 @@ export interface StockAlert {
 
 @Injectable()
 export class InventoryRealtimeService {
-  constructor(
-    private readonly eventEmitter: EventEmitter2,
-  ) {}
+  constructor(private readonly eventEmitter: EventEmitter2) {}
 
   /**
    * Emit real-time inventory update
    */
-  async emitInventoryUpdate(tenantId: string, inventoryItem: InventoryItem): Promise<void> {
+  async emitInventoryUpdate(
+    tenantId: string,
+    inventoryItem: InventoryItem,
+  ): Promise<void> {
     const event: InventoryUpdateEvent = {
       tenantId,
       type: 'inventory_update',
@@ -45,17 +52,21 @@ export class InventoryRealtimeService {
         averageCost: inventoryItem.averageCost,
         lastMovementAt: inventoryItem.lastMovementAt,
         // Include product and location info for context
-        product: inventoryItem.product ? {
-          id: inventoryItem.product.id,
-          name: inventoryItem.product.name,
-          sku: inventoryItem.product.sku,
-          barcode: inventoryItem.product.barcode,
-        } : undefined,
-        location: inventoryItem.location ? {
-          id: inventoryItem.location.id,
-          name: inventoryItem.location.name,
-          code: inventoryItem.location.code,
-        } : undefined,
+        product: inventoryItem.product
+          ? {
+              id: inventoryItem.product.id,
+              name: inventoryItem.product.name,
+              sku: inventoryItem.product.sku,
+              barcode: inventoryItem.product.barcode,
+            }
+          : undefined,
+        location: inventoryItem.location
+          ? {
+              id: inventoryItem.location.id,
+              name: inventoryItem.location.name,
+              code: inventoryItem.location.code,
+            }
+          : undefined,
       },
       timestamp: new Date(),
     };
@@ -70,7 +81,10 @@ export class InventoryRealtimeService {
   /**
    * Emit location update
    */
-  async emitLocationUpdate(tenantId: string, location: InventoryLocation): Promise<void> {
+  async emitLocationUpdate(
+    tenantId: string,
+    location: InventoryLocation,
+  ): Promise<void> {
     const event: InventoryUpdateEvent = {
       tenantId,
       type: 'location_update',
@@ -96,7 +110,10 @@ export class InventoryRealtimeService {
   /**
    * Check and emit alerts for inventory item
    */
-  async checkAndEmitAlerts(tenantId: string, inventoryItem: InventoryItem): Promise<StockAlert[]> {
+  async checkAndEmitAlerts(
+    tenantId: string,
+    inventoryItem: InventoryItem,
+  ): Promise<StockAlert[]> {
     const alerts: StockAlert[] = [];
 
     // Check low stock
@@ -146,7 +163,10 @@ export class InventoryRealtimeService {
   /**
    * Emit stock alert
    */
-  private async emitStockAlert(tenantId: string, alert: StockAlert): Promise<void> {
+  private async emitStockAlert(
+    tenantId: string,
+    alert: StockAlert,
+  ): Promise<void> {
     const event: InventoryUpdateEvent = {
       tenantId,
       type: 'stock_alert',
@@ -180,10 +200,11 @@ export class InventoryRealtimeService {
     };
   }> {
     const quantityAvailable = inventoryItem.quantityAvailable;
-    
+
     // Determine stock status
-    let stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock' | 'overstock' = 'in_stock';
-    
+    let stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock' | 'overstock' =
+      'in_stock';
+
     if (quantityAvailable <= 0) {
       stockStatus = 'out_of_stock';
     } else if (inventoryItem.isLowStock) {
@@ -194,7 +215,10 @@ export class InventoryRealtimeService {
 
     // Calculate days of stock (simplified - would need sales data for accurate calculation)
     let daysOfStock: number | null = null;
-    if (inventoryItem.product?.salesCount && inventoryItem.product.salesCount > 0) {
+    if (
+      inventoryItem.product?.salesCount &&
+      inventoryItem.product.salesCount > 0
+    ) {
       // Assume average daily sales based on total sales count (this is simplified)
       const averageDailySales = inventoryItem.product.salesCount / 365; // Very rough estimate
       if (averageDailySales > 0) {
@@ -205,7 +229,8 @@ export class InventoryRealtimeService {
     // Calculate turnover rate (simplified)
     let turnoverRate: number | null = null;
     if (inventoryItem.product?.totalRevenue && inventoryItem.totalValue > 0) {
-      turnoverRate = inventoryItem.product.totalRevenue / inventoryItem.totalValue;
+      turnoverRate =
+        inventoryItem.product.totalRevenue / inventoryItem.totalValue;
     }
 
     // Reorder suggestion
@@ -223,15 +248,17 @@ export class InventoryRealtimeService {
   /**
    * Get real-time stock levels for multiple items
    */
-  async getRealtimeStockLevels(inventoryItems: InventoryItem[]): Promise<Array<{
-    inventoryItemId: string;
-    productId: string;
-    locationId: string;
-    quantityOnHand: number;
-    quantityAvailable: number;
-    metrics: any;
-    alerts: StockAlert[];
-  }>> {
+  async getRealtimeStockLevels(inventoryItems: InventoryItem[]): Promise<
+    Array<{
+      inventoryItemId: string;
+      productId: string;
+      locationId: string;
+      quantityOnHand: number;
+      quantityAvailable: number;
+      metrics: any;
+      alerts: StockAlert[];
+    }>
+  > {
     const results = [];
 
     for (const item of inventoryItems) {
@@ -256,13 +283,16 @@ export class InventoryRealtimeService {
   private checkLowStock(inventoryItem: InventoryItem): StockAlert | null {
     if (!inventoryItem.isLowStock) return null;
 
-    const reorderPoint = inventoryItem.reorderPoint || inventoryItem.product?.reorderPoint || 0;
-    
+    const reorderPoint =
+      inventoryItem.reorderPoint || inventoryItem.product?.reorderPoint || 0;
+
     return {
       type: 'low_stock',
       severity: 'warning',
       inventoryItem,
-      message: `Stok produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${inventoryItem.location?.name || 'Unknown'} sudah rendah`,
+      message: `Stok produk ${
+        inventoryItem.product?.name || 'Unknown'
+      } di lokasi ${inventoryItem.location?.name || 'Unknown'} sudah rendah`,
       threshold: reorderPoint,
       currentValue: inventoryItem.quantityAvailable,
     };
@@ -275,7 +305,9 @@ export class InventoryRealtimeService {
       type: 'out_of_stock',
       severity: 'critical',
       inventoryItem,
-      message: `Stok produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${inventoryItem.location?.name || 'Unknown'} habis`,
+      message: `Stok produk ${
+        inventoryItem.product?.name || 'Unknown'
+      } di lokasi ${inventoryItem.location?.name || 'Unknown'} habis`,
       threshold: 0,
       currentValue: inventoryItem.quantityAvailable,
     };
@@ -284,13 +316,18 @@ export class InventoryRealtimeService {
   private checkOverstock(inventoryItem: InventoryItem): StockAlert | null {
     if (!inventoryItem.isOverStock) return null;
 
-    const maxStock = inventoryItem.maxStock || inventoryItem.product?.maxStock || 0;
+    const maxStock =
+      inventoryItem.maxStock || inventoryItem.product?.maxStock || 0;
 
     return {
       type: 'overstock',
       severity: 'info',
       inventoryItem,
-      message: `Stok produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${inventoryItem.location?.name || 'Unknown'} melebihi batas maksimum`,
+      message: `Stok produk ${
+        inventoryItem.product?.name || 'Unknown'
+      } di lokasi ${
+        inventoryItem.location?.name || 'Unknown'
+      } melebihi batas maksimum`,
       threshold: maxStock,
       currentValue: inventoryItem.quantityOnHand,
     };
@@ -303,9 +340,16 @@ export class InventoryRealtimeService {
       type: 'expiring_soon',
       severity: 'warning',
       inventoryItem,
-      message: `Produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${inventoryItem.location?.name || 'Unknown'} akan segera kadaluarsa`,
+      message: `Produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${
+        inventoryItem.location?.name || 'Unknown'
+      } akan segera kadaluarsa`,
       threshold: 30, // days
-      currentValue: inventoryItem.expiryDate ? Math.ceil((inventoryItem.expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : undefined,
+      currentValue: inventoryItem.expiryDate
+        ? Math.ceil(
+            (inventoryItem.expiryDate.getTime() - new Date().getTime()) /
+              (1000 * 60 * 60 * 24),
+          )
+        : undefined,
     };
   }
 
@@ -316,9 +360,16 @@ export class InventoryRealtimeService {
       type: 'expired',
       severity: 'critical',
       inventoryItem,
-      message: `Produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${inventoryItem.location?.name || 'Unknown'} sudah kadaluarsa`,
+      message: `Produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${
+        inventoryItem.location?.name || 'Unknown'
+      } sudah kadaluarsa`,
       threshold: 0,
-      currentValue: inventoryItem.expiryDate ? Math.ceil((inventoryItem.expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : undefined,
+      currentValue: inventoryItem.expiryDate
+        ? Math.ceil(
+            (inventoryItem.expiryDate.getTime() - new Date().getTime()) /
+              (1000 * 60 * 60 * 24),
+          )
+        : undefined,
     };
   }
 
@@ -329,8 +380,11 @@ export class InventoryRealtimeService {
       type: 'reorder_needed',
       severity: 'warning',
       inventoryItem,
-      message: `Perlu reorder produk ${inventoryItem.product?.name || 'Unknown'} di lokasi ${inventoryItem.location?.name || 'Unknown'}`,
-      threshold: inventoryItem.reorderPoint || inventoryItem.product?.reorderPoint || 0,
+      message: `Perlu reorder produk ${
+        inventoryItem.product?.name || 'Unknown'
+      } di lokasi ${inventoryItem.location?.name || 'Unknown'}`,
+      threshold:
+        inventoryItem.reorderPoint || inventoryItem.product?.reorderPoint || 0,
       currentValue: inventoryItem.quantityOnHand,
     };
   }
@@ -341,9 +395,14 @@ export class InventoryRealtimeService {
     urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
   } {
     const quantityAvailable = inventoryItem.quantityAvailable;
-    const reorderPoint = inventoryItem.reorderPoint || inventoryItem.product?.reorderPoint || 0;
-    const reorderQuantity = inventoryItem.reorderQuantity || inventoryItem.product?.reorderQuantity || 0;
-    const maxStock = inventoryItem.maxStock || inventoryItem.product?.maxStock || 0;
+    const reorderPoint =
+      inventoryItem.reorderPoint || inventoryItem.product?.reorderPoint || 0;
+    const reorderQuantity =
+      inventoryItem.reorderQuantity ||
+      inventoryItem.product?.reorderQuantity ||
+      0;
+    const maxStock =
+      inventoryItem.maxStock || inventoryItem.product?.maxStock || 0;
 
     let shouldReorder = false;
     let suggestedQuantity = 0;
@@ -352,11 +411,15 @@ export class InventoryRealtimeService {
     if (quantityAvailable <= 0) {
       shouldReorder = true;
       urgencyLevel = 'critical';
-      suggestedQuantity = Math.max(reorderQuantity, maxStock || reorderQuantity);
+      suggestedQuantity = Math.max(
+        reorderQuantity,
+        maxStock || reorderQuantity,
+      );
     } else if (quantityAvailable <= reorderPoint) {
       shouldReorder = true;
-      urgencyLevel = quantityAvailable <= (reorderPoint * 0.5) ? 'high' : 'medium';
-      
+      urgencyLevel =
+        quantityAvailable <= reorderPoint * 0.5 ? 'high' : 'medium';
+
       if (maxStock > 0) {
         suggestedQuantity = maxStock - quantityAvailable;
       } else {

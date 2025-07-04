@@ -1,5 +1,8 @@
 import { SetMetadata } from '@nestjs/common';
-import { PermissionResource, PermissionAction } from '../../auth/entities/permission.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../../auth/entities/permission.entity';
 
 export const PERMISSIONS_KEY = 'permissions';
 
@@ -10,9 +13,9 @@ export interface RequiredPermission {
 
 /**
  * Decorator to specify required permissions for accessing an endpoint
- * 
+ *
  * @param permissions - Array of permissions required to access this endpoint
- * 
+ *
  * @example
  * ```typescript
  * @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.CREATE })
@@ -22,12 +25,12 @@ export interface RequiredPermission {
  * }
  * ```
  */
-export const Permissions = (...permissions: RequiredPermission[]) => 
+export const Permissions = (...permissions: RequiredPermission[]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
 
 /**
  * Helper function to create permission objects more easily
- * 
+ *
  * @example
  * ```typescript
  * @Permissions(
@@ -37,8 +40,8 @@ export const Permissions = (...permissions: RequiredPermission[]) =>
  * ```
  */
 export const Permission = (
-  resource: PermissionResource, 
-  action: PermissionAction
+  resource: PermissionResource,
+  action: PermissionAction,
 ): RequiredPermission => ({
   resource,
   action,

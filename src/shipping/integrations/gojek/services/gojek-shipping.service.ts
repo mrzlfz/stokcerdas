@@ -1,17 +1,37 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { ShippingLabel, ShippingServiceType, ShippingLabelStatus } from '../../../entities/shipping-label.entity';
-import { ShippingTracking, TrackingStatus } from '../../../entities/shipping-tracking.entity';
+import {
+  ShippingLabel,
+  ShippingServiceType,
+  ShippingLabelStatus,
+} from '../../../entities/shipping-label.entity';
+import {
+  ShippingTracking,
+  TrackingStatus,
+} from '../../../entities/shipping-tracking.entity';
 import { ShippingRate, RateType } from '../../../entities/shipping-rate.entity';
 
 // Services
-import { GojekApiService, GojekCredentials, GojekDeliveryRequest, GojekPriceEstimateRequest } from './gojek-api.service';
+import {
+  GojekApiService,
+  GojekCredentials,
+  GojekDeliveryRequest,
+  GojekPriceEstimateRequest,
+} from './gojek-api.service';
 import { IntegrationLogService } from '../../../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../../../integrations/entities/integration-log.entity';
 
 // Interfaces
 export interface GojekShippingQuote {
@@ -102,7 +122,9 @@ export class GojekShippingService {
   /**
    * Get Gojek credentials for tenant
    */
-  private async getGojekCredentials(tenantId: string): Promise<GojekCredentials> {
+  private async getGojekCredentials(
+    tenantId: string,
+  ): Promise<GojekCredentials> {
     // In a real implementation, this would fetch from tenant configuration
     // For now, return mock credentials
     return {
@@ -117,7 +139,9 @@ export class GojekShippingService {
   /**
    * Test Gojek API connection
    */
-  async testConnection(tenantId: string): Promise<{ success: boolean; message: string }> {
+  async testConnection(
+    tenantId: string,
+  ): Promise<{ success: boolean; message: string }> {
     try {
       const credentials = await this.getGojekCredentials(tenantId);
       const response = await this.gojekApiService.testConnection(
@@ -140,8 +164,11 @@ export class GojekShippingService {
         throw new Error(response.error?.message || 'Connection test failed');
       }
     } catch (error) {
-      this.logger.error(`Gojek connection test failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Gojek connection test failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.log({
         tenantId,
         type: IntegrationLogType.INSTANT_DELIVERY,
@@ -164,7 +191,7 @@ export class GojekShippingService {
       delivery: { latitude: number; longitude: number };
       package: { weight: number; value: number };
       serviceTypes?: string[];
-    }
+    },
   ): Promise<GojekShippingQuote[]> {
     try {
       this.logger.debug(`Getting Gojek shipping quotes for tenant ${tenantId}`);
@@ -173,7 +200,11 @@ export class GojekShippingService {
       const quotes: GojekShippingQuote[] = [];
 
       // Get price estimates for different service types
-      const serviceTypes = request.serviceTypes || ['instant', 'same_day', 'next_day'];
+      const serviceTypes = request.serviceTypes || [
+        'instant',
+        'same_day',
+        'next_day',
+      ];
 
       for (const serviceType of serviceTypes) {
         try {
@@ -197,7 +228,8 @@ export class GojekShippingService {
           if (response.success && response.data) {
             const estimatedDeliveryTime = new Date();
             estimatedDeliveryTime.setMinutes(
-              estimatedDeliveryTime.getMinutes() + response.data.data.estimatedDuration
+              estimatedDeliveryTime.getMinutes() +
+                response.data.data.estimatedDuration,
             );
 
             const quote: GojekShippingQuote = {
@@ -205,7 +237,8 @@ export class GojekShippingService {
               carrierName: 'Gojek',
               serviceCode: serviceType.toUpperCase(),
               serviceName: this.getServiceName(serviceType),
-              serviceType: this.mapServiceTypeToShippingServiceType(serviceType),
+              serviceType:
+                this.mapServiceTypeToShippingServiceType(serviceType),
               cost: {
                 baseCost: response.data.data.priceBreakdown.baseFare,
                 serviceFee: response.data.data.priceBreakdown.serviceFee,
@@ -227,7 +260,9 @@ export class GojekShippingService {
             quotes.push(quote);
           }
         } catch (serviceError) {
-          this.logger.warn(`Failed to get quote for service type ${serviceType}: ${serviceError.message}`);
+          this.logger.warn(
+            `Failed to get quote for service type ${serviceType}: ${serviceError.message}`,
+          );
         }
       }
 
@@ -236,9 +271,11 @@ export class GojekShippingService {
 
       this.logger.debug(`Found ${quotes.length} Gojek shipping quotes`);
       return quotes;
-
     } catch (error) {
-      this.logger.error(`Failed to get Gojek shipping quotes: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get Gojek shipping quotes: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -248,7 +285,7 @@ export class GojekShippingService {
    */
   async createShipment(
     tenantId: string,
-    request: GojekShipmentRequest
+    request: GojekShipmentRequest,
   ): Promise<ShippingLabel> {
     try {
       this.logger.debug(`Creating Gojek shipment for order ${request.orderId}`);
@@ -300,7 +337,7 @@ export class GojekShippingService {
 
       if (!response.success || !response.data) {
         throw new BadRequestException(
-          response.error?.message || 'Failed to create Gojek delivery'
+          response.error?.message || 'Failed to create Gojek delivery',
         );
       }
 
@@ -310,7 +347,9 @@ export class GojekShippingService {
       shippingLabel.orderId = request.orderId;
       shippingLabel.carrierId = 'gojek';
       shippingLabel.carrierName = 'Gojek';
-      shippingLabel.serviceType = this.mapServiceTypeToShippingServiceType(request.serviceType);
+      shippingLabel.serviceType = this.mapServiceTypeToShippingServiceType(
+        request.serviceType,
+      );
       shippingLabel.serviceCode = request.serviceType.toUpperCase();
       shippingLabel.serviceName = this.getServiceName(request.serviceType);
       shippingLabel.status = ShippingLabelStatus.GENERATED;
@@ -346,8 +385,12 @@ export class GojekShippingService {
 
       // Set delivery estimates
       const now = new Date();
-      shippingLabel.estimatedPickupDate = new Date(response.data.data.estimatedPickupTime);
-      shippingLabel.estimatedDeliveryDate = new Date(response.data.data.estimatedDeliveryTime);
+      shippingLabel.estimatedPickupDate = new Date(
+        response.data.data.estimatedPickupTime,
+      );
+      shippingLabel.estimatedDeliveryDate = new Date(
+        response.data.data.estimatedDeliveryTime,
+      );
       shippingLabel.generatedAt = now;
 
       // Additional Gojek-specific fields
@@ -399,9 +442,11 @@ export class GojekShippingService {
       });
 
       return savedLabel;
-
     } catch (error) {
-      this.logger.error(`Failed to create Gojek shipment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create Gojek shipment: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -409,19 +454,24 @@ export class GojekShippingService {
   /**
    * Update tracking information from Gojek
    */
-  async updateTracking(tenantId: string, trackingNumber: string): Promise<void> {
+  async updateTracking(
+    tenantId: string,
+    trackingNumber: string,
+  ): Promise<void> {
     try {
       this.logger.debug(`Updating Gojek tracking for ${trackingNumber}`);
 
       const credentials = await this.getGojekCredentials(tenantId);
-      
+
       // Find shipping label
       const shippingLabel = await this.shippingLabelRepository.findOne({
         where: { tenantId, trackingNumber, carrierId: 'gojek' },
       });
 
       if (!shippingLabel) {
-        throw new NotFoundException(`Shipping label not found for tracking number: ${trackingNumber}`);
+        throw new NotFoundException(
+          `Shipping label not found for tracking number: ${trackingNumber}`,
+        );
       }
 
       // Get tracking info from Gojek
@@ -433,10 +483,14 @@ export class GojekShippingService {
       );
 
       if (!response.success || !response.data) {
-        throw new Error(response.error?.message || 'Failed to get Gojek tracking info');
+        throw new Error(
+          response.error?.message || 'Failed to get Gojek tracking info',
+        );
       }
 
-      const trackingData = this.gojekApiService.formatTrackingData(response.data);
+      const trackingData = this.gojekApiService.formatTrackingData(
+        response.data,
+      );
 
       // Update shipping label with latest info
       if (trackingData.driverInfo) {
@@ -452,7 +506,9 @@ export class GojekShippingService {
       }
 
       // Update status if needed
-      const latestStatus = this.mapGojekStatusToLabelStatus(response.data.data.status);
+      const latestStatus = this.mapGojekStatusToLabelStatus(
+        response.data.data.status,
+      );
       if (latestStatus !== shippingLabel.status) {
         shippingLabel.updateStatus(latestStatus, undefined);
       }
@@ -463,14 +519,15 @@ export class GojekShippingService {
       if (trackingData.timeline && trackingData.timeline.length > 0) {
         for (const event of trackingData.timeline) {
           // Check if this event already exists
-          const existingTracking = await this.shippingTrackingRepository.findOne({
-            where: {
-              tenantId,
-              trackingNumber,
-              eventTime: new Date(event.timestamp),
-              description: event.description,
-            },
-          });
+          const existingTracking =
+            await this.shippingTrackingRepository.findOne({
+              where: {
+                tenantId,
+                trackingNumber,
+                eventTime: new Date(event.timestamp),
+                description: event.description,
+              },
+            });
 
           if (!existingTracking) {
             await this.createTrackingEntry(tenantId, {
@@ -495,9 +552,11 @@ export class GojekShippingService {
         shippingLabel,
         trackingData,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to update Gojek tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update Gojek tracking: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -508,20 +567,22 @@ export class GojekShippingService {
   async cancelDelivery(
     tenantId: string,
     trackingNumber: string,
-    reason: string
+    reason: string,
   ): Promise<void> {
     try {
       this.logger.debug(`Cancelling Gojek delivery ${trackingNumber}`);
 
       const credentials = await this.getGojekCredentials(tenantId);
-      
+
       // Find shipping label
       const shippingLabel = await this.shippingLabelRepository.findOne({
         where: { tenantId, trackingNumber, carrierId: 'gojek' },
       });
 
       if (!shippingLabel) {
-        throw new NotFoundException(`Shipping label not found for tracking number: ${trackingNumber}`);
+        throw new NotFoundException(
+          `Shipping label not found for tracking number: ${trackingNumber}`,
+        );
       }
 
       // Cancel with Gojek
@@ -535,7 +596,7 @@ export class GojekShippingService {
 
       if (!response.success) {
         throw new BadRequestException(
-          response.error?.message || 'Failed to cancel Gojek delivery'
+          response.error?.message || 'Failed to cancel Gojek delivery',
         );
       }
 
@@ -570,24 +631,29 @@ export class GojekShippingService {
         reason,
         cancellationFee: response.data?.cancellationFee,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to cancel Gojek delivery: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel Gojek delivery: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   // Private helper methods
 
-  private async createTrackingEntry(tenantId: string, data: {
-    shippingLabelId: string;
-    trackingNumber: string;
-    status: TrackingStatus | string;
-    description: string;
-    location?: any;
-    eventTime: Date;
-    additionalData?: any;
-  }): Promise<ShippingTracking> {
+  private async createTrackingEntry(
+    tenantId: string,
+    data: {
+      shippingLabelId: string;
+      trackingNumber: string;
+      status: TrackingStatus | string;
+      description: string;
+      location?: any;
+      eventTime: Date;
+      additionalData?: any;
+    },
+  ): Promise<ShippingTracking> {
     // Get sequence number
     const lastTracking = await this.shippingTrackingRepository.findOne({
       where: { tenantId, trackingNumber: data.trackingNumber },
@@ -619,7 +685,9 @@ export class GojekShippingService {
     return serviceNames[serviceType] || `Gojek ${serviceType}`;
   }
 
-  private mapServiceTypeToShippingServiceType(serviceType: string): ShippingServiceType {
+  private mapServiceTypeToShippingServiceType(
+    serviceType: string,
+  ): ShippingServiceType {
     const mapping = {
       instant: ShippingServiceType.INSTANT,
       same_day: ShippingServiceType.SAME_DAY,
@@ -628,7 +696,9 @@ export class GojekShippingService {
     return mapping[serviceType] || ShippingServiceType.REGULAR;
   }
 
-  private mapGojekStatusToLabelStatus(gojekStatus: string): ShippingLabelStatus {
+  private mapGojekStatusToLabelStatus(
+    gojekStatus: string,
+  ): ShippingLabelStatus {
     const statusMapping = {
       ORDER_CREATED: ShippingLabelStatus.GENERATED,
       DRIVER_ASSIGNED: ShippingLabelStatus.PRINTED,
@@ -636,6 +706,8 @@ export class GojekShippingService {
       PACKAGE_DELIVERED: ShippingLabelStatus.SHIPPED,
       ORDER_CANCELLED: ShippingLabelStatus.CANCELLED,
     };
-    return statusMapping[gojekStatus.toUpperCase()] || ShippingLabelStatus.GENERATED;
+    return (
+      statusMapping[gojekStatus.toUpperCase()] || ShippingLabelStatus.GENERATED
+    );
   }
 }

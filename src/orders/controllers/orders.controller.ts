@@ -48,7 +48,12 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 
 // Entities and Enums
-import { OrderStatus, OrderType, PaymentStatus, FulfillmentStatus } from '../entities/order.entity';
+import {
+  OrderStatus,
+  OrderType,
+  PaymentStatus,
+  FulfillmentStatus,
+} from '../entities/order.entity';
 import { UserRole } from '../../users/entities/user.entity';
 
 // Services
@@ -345,17 +350,17 @@ export class UpdateOrderDto {
 export class OrdersQueryDto {
   @IsOptional()
   @IsEnum(OrderStatus, { each: true })
-  @Transform(({ value }) => Array.isArray(value) ? value : [value])
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   status?: OrderStatus | OrderStatus[];
 
   @IsOptional()
   @IsEnum(PaymentStatus, { each: true })
-  @Transform(({ value }) => Array.isArray(value) ? value : [value])
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   paymentStatus?: PaymentStatus | PaymentStatus[];
 
   @IsOptional()
   @IsEnum(FulfillmentStatus, { each: true })
-  @Transform(({ value }) => Array.isArray(value) ? value : [value])
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   fulfillmentStatus?: FulfillmentStatus | FulfillmentStatus[];
 
   @IsOptional()
@@ -429,7 +434,7 @@ export class OrdersQueryDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => Array.isArray(value) ? value : value.split(','))
+  @Transform(({ value }) => (Array.isArray(value) ? value : value.split(',')))
   tags?: string[];
 
   @IsOptional()
@@ -521,18 +526,91 @@ export class OrdersController {
 
   constructor(
     private readonly ordersService: OrdersService,
-    private readonly fulfillmentService: OrderFulfillmentService,
-    // private readonly routingService: OrderRoutingService,
+    private readonly fulfillmentService: OrderFulfillmentService, // private readonly routingService: OrderRoutingService,
   ) {}
+
+  // ==================== HELPER METHODS ====================
+
+  /**
+   * Transform OrdersQueryDto (string dates) to OrderListQuery (Date objects)
+   */
+  private transformQueryDto(query: OrdersQueryDto): any {
+    const transformed: any = { ...query };
+
+    // Transform date strings to Date objects
+    if (query.orderDateFrom) {
+      transformed.orderDateFrom = new Date(query.orderDateFrom);
+    }
+    if (query.orderDateTo) {
+      transformed.orderDateTo = new Date(query.orderDateTo);
+    }
+    if (query.createdFrom) {
+      transformed.createdFrom = new Date(query.createdFrom);
+    }
+    if (query.createdTo) {
+      transformed.createdTo = new Date(query.createdTo);
+    }
+
+    return transformed;
+  }
+
+  /**
+   * Transform CreateOrderDto (string dates) to service CreateOrderDto (Date objects)
+   */
+  private transformCreateOrderDto(dto: CreateOrderDto): any {
+    const transformed: any = { ...dto };
+
+    // Transform date string to Date object
+    if (dto.orderDate) {
+      transformed.orderDate = new Date(dto.orderDate);
+    }
+
+    return transformed;
+  }
+
+  /**
+   * Transform UpdateOrderDto (string dates) to service UpdateOrderDto (Date objects)
+   */
+  private transformUpdateOrderDto(dto: UpdateOrderDto): any {
+    const transformed: any = { ...dto };
+
+    // Transform date strings to Date objects
+    if (dto.estimatedDeliveryDate) {
+      transformed.estimatedDeliveryDate = new Date(dto.estimatedDeliveryDate);
+    }
+    if (dto.actualDeliveryDate) {
+      transformed.actualDeliveryDate = new Date(dto.actualDeliveryDate);
+    }
+    if (dto.paidAt) {
+      transformed.paidAt = new Date(dto.paidAt);
+    }
+
+    return transformed;
+  }
 
   // ==================== BASIC CRUD OPERATIONS ====================
 
   @Get()
   @ApiOperation({ summary: 'Get all orders with filtering and pagination' })
   @ApiResponse({ status: 200, description: 'Orders retrieved successfully' })
-  @ApiQuery({ name: 'status', enum: OrderStatus, required: false, isArray: true })
-  @ApiQuery({ name: 'paymentStatus', enum: PaymentStatus, required: false, isArray: true })
-  @ApiQuery({ name: 'fulfillmentStatus', enum: FulfillmentStatus, required: false, isArray: true })
+  @ApiQuery({
+    name: 'status',
+    enum: OrderStatus,
+    required: false,
+    isArray: true,
+  })
+  @ApiQuery({
+    name: 'paymentStatus',
+    enum: PaymentStatus,
+    required: false,
+    isArray: true,
+  })
+  @ApiQuery({
+    name: 'fulfillmentStatus',
+    enum: FulfillmentStatus,
+    required: false,
+    isArray: true,
+  })
   @ApiQuery({ name: 'orderType', enum: OrderType, required: false })
   @ApiQuery({ name: 'channelId', type: 'string', required: false })
   @ApiQuery({ name: 'search', type: 'string', required: false })
@@ -541,13 +619,15 @@ export class OrdersController {
   @ApiQuery({ name: 'includeItems', type: 'boolean', required: false })
   @ApiQuery({ name: 'includeMetrics', type: 'boolean', required: false })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  async getOrders(
-    @CurrentUser() user: any,
-    @Query() query: OrdersQueryDto,
-  ) {
+  async getOrders(@CurrentUser() user: any, @Query() query: OrdersQueryDto) {
     try {
-      const result = await this.ordersService.getOrders(user.tenantId, query);
-      
+      // Convert DTO to service interface by transforming date strings to Date objects
+      const serviceQuery = this.transformQueryDto(query);
+      const result = await this.ordersService.getOrders(
+        user.tenantId,
+        serviceQuery,
+      );
+
       return {
         success: true,
         data: result.orders,
@@ -580,8 +660,11 @@ export class OrdersController {
     @Param('orderId') orderId: string,
   ) {
     try {
-      const order = await this.ordersService.getOrderById(user.tenantId, orderId);
-      
+      const order = await this.ordersService.getOrderById(
+        user.tenantId,
+        orderId,
+      );
+
       return {
         success: true,
         data: order,
@@ -608,14 +691,20 @@ export class OrdersController {
     @Param('orderNumber') orderNumber: string,
   ) {
     try {
-      const order = await this.ordersService.getOrderByNumber(user.tenantId, orderNumber);
-      
+      const order = await this.ordersService.getOrderByNumber(
+        user.tenantId,
+        orderNumber,
+      );
+
       return {
         success: true,
         data: order,
       };
     } catch (error) {
-      this.logger.error(`Failed to get order by number: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order by number: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -636,8 +725,11 @@ export class OrdersController {
     @Param('externalOrderId') externalOrderId: string,
   ) {
     try {
-      const order = await this.ordersService.getOrderByExternalId(user.tenantId, externalOrderId);
-      
+      const order = await this.ordersService.getOrderByExternalId(
+        user.tenantId,
+        externalOrderId,
+      );
+
       if (!order) {
         throw new HttpException(
           {
@@ -647,13 +739,16 @@ export class OrdersController {
           HttpStatus.NOT_FOUND,
         );
       }
-      
+
       return {
         success: true,
         data: order,
       };
     } catch (error) {
-      this.logger.error(`Failed to get order by external ID: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order by external ID: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -673,14 +768,21 @@ export class OrdersController {
     @Body() createDto: CreateOrderDto,
   ) {
     try {
-      const order = await this.ordersService.createOrder(user.tenantId, createDto);
-      
+      const transformedDto = this.transformCreateOrderDto(createDto);
+      const order = await this.ordersService.createOrder(
+        user.tenantId,
+        transformedDto,
+      );
+
       return {
         success: true,
         data: order,
       };
     } catch (error) {
-      this.logger.error(`Failed to create order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create order: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -702,19 +804,23 @@ export class OrdersController {
     @Body() updateDto: UpdateOrderDto,
   ) {
     try {
+      const transformedDto = this.transformUpdateOrderDto(updateDto);
       const order = await this.ordersService.updateOrder(
         user.tenantId,
         orderId,
-        updateDto,
+        transformedDto,
         user.id,
       );
-      
+
       return {
         success: true,
         data: order,
       };
     } catch (error) {
-      this.logger.error(`Failed to update order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update order: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -729,7 +835,10 @@ export class OrdersController {
 
   @Patch(':orderId/status')
   @ApiOperation({ summary: 'Update order status' })
-  @ApiResponse({ status: 200, description: 'Order status updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Order status updated successfully',
+  })
   @ApiParam({ name: 'orderId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async updateOrderStatus(
@@ -744,14 +853,17 @@ export class OrdersController {
         { status: body.status },
         user.id,
       );
-      
+
       return {
         success: true,
         data: order,
         message: `Order status updated to ${body.status}`,
       };
     } catch (error) {
-      this.logger.error(`Failed to update order status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update order status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -779,14 +891,17 @@ export class OrdersController {
         cancelDto.reason,
         user.id,
       );
-      
+
       return {
         success: true,
         data: order,
         message: 'Order cancelled successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to cancel order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel order: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -801,7 +916,10 @@ export class OrdersController {
 
   @Get(':orderId/fulfillment/options')
   @ApiOperation({ summary: 'Get fulfillment options for order' })
-  @ApiResponse({ status: 200, description: 'Fulfillment options retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Fulfillment options retrieved successfully',
+  })
   @ApiParam({ name: 'orderId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getFulfillmentOptions(
@@ -809,14 +927,20 @@ export class OrdersController {
     @Param('orderId') orderId: string,
   ) {
     try {
-      const options = await this.fulfillmentService.getFulfillmentOptions(user.tenantId, orderId);
-      
+      const options = await this.fulfillmentService.getFulfillmentOptions(
+        user.tenantId,
+        orderId,
+      );
+
       return {
         success: true,
         data: options,
       };
     } catch (error) {
-      this.logger.error(`Failed to get fulfillment options: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get fulfillment options: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -829,7 +953,10 @@ export class OrdersController {
 
   @Post(':orderId/fulfillment/assign')
   @ApiOperation({ summary: 'Assign order to fulfillment location' })
-  @ApiResponse({ status: 200, description: 'Fulfillment assigned successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Fulfillment assigned successfully',
+  })
   @ApiParam({ name: 'orderId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async assignFulfillment(
@@ -844,14 +971,17 @@ export class OrdersController {
         body.locationId,
         body.force || false,
       );
-      
+
       return {
         success: true,
         data: assignment,
         message: 'Fulfillment assigned successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to assign fulfillment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to assign fulfillment: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -864,7 +994,10 @@ export class OrdersController {
 
   @Patch(':orderId/fulfillment/status')
   @ApiOperation({ summary: 'Update fulfillment status' })
-  @ApiResponse({ status: 200, description: 'Fulfillment status updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Fulfillment status updated successfully',
+  })
   @ApiParam({ name: 'orderId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async updateFulfillmentStatus(
@@ -880,13 +1013,16 @@ export class OrdersController {
         updateDto.notes,
         user.id,
       );
-      
+
       return {
         success: true,
         message: `Fulfillment status updated to ${updateDto.status}`,
       };
     } catch (error) {
-      this.logger.error(`Failed to update fulfillment status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update fulfillment status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -899,7 +1035,7 @@ export class OrdersController {
 
   // ==================== ROUTING & MULTI-CHANNEL ====================
   // Note: Routing functionality to be implemented
-  
+
   /*
   @Post(':orderId/route')
   @ApiOperation({ summary: 'Route order through intelligent routing system' })
@@ -1015,7 +1151,7 @@ export class OrdersController {
   //   ) {
   //     try {
   //       const conflicts = await this.routingService.detectCrossChannelConflicts(user.tenantId, orderId);
-  //       
+  //
   //       return {
   //         success: true,
   //         data: conflicts,
@@ -1036,22 +1172,32 @@ export class OrdersController {
 
   @Post('bulk/action')
   @ApiOperation({ summary: 'Perform bulk action on orders' })
-  @ApiResponse({ status: 200, description: 'Bulk action completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk action completed successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async bulkOrderAction(
     @CurrentUser() user: any,
     @Body() actionDto: BulkOrderActionDto,
   ) {
     try {
-      const result = await this.ordersService.bulkAction(user.tenantId, actionDto, user.id);
-      
+      const result = await this.ordersService.bulkAction(
+        user.tenantId,
+        actionDto,
+        user.id,
+      );
+
       return {
         success: true,
         data: result,
         message: `Bulk action completed: ${result.processedCount}/${actionDto.orderIds.length} processed`,
       };
     } catch (error) {
-      this.logger.error(`Failed to perform bulk action: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to perform bulk action: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1100,26 +1246,36 @@ export class OrdersController {
 
   @Post('fulfillment/batch/optimize')
   @ApiOperation({ summary: 'Optimize batch fulfillment for multiple orders' })
-  @ApiResponse({ status: 200, description: 'Batch fulfillment optimized successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Batch fulfillment optimized successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async optimizeBatchFulfillment(
     @CurrentUser() user: any,
-    @Body() body: {
+    @Body()
+    body: {
       orderIds: string[];
       constraints?: any;
       optimization?: 'cost' | 'speed' | 'balanced';
     },
   ) {
     try {
-      const result = await this.fulfillmentService.optimizeBatchFulfillment(user.tenantId, body);
-      
+      const result = await this.fulfillmentService.optimizeBatchFulfillment(
+        user.tenantId,
+        body,
+      );
+
       return {
         success: true,
         data: result,
         message: `Batch fulfillment optimized: ${result.assignments.length} assignments created`,
       };
     } catch (error) {
-      this.logger.error(`Failed to optimize batch fulfillment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to optimize batch fulfillment: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1134,33 +1290,49 @@ export class OrdersController {
 
   @Get('analytics/summary')
   @ApiOperation({ summary: 'Get order analytics summary' })
-  @ApiResponse({ status: 200, description: 'Analytics summary retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Analytics summary retrieved successfully',
+  })
   @ApiQuery({ name: 'dateFrom', type: 'string', required: false })
   @ApiQuery({ name: 'dateTo', type: 'string', required: false })
-  @ApiQuery({ name: 'groupBy', enum: ['day', 'week', 'month'], required: false })
+  @ApiQuery({
+    name: 'groupBy',
+    enum: ['day', 'week', 'month'],
+    required: false,
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  async getAnalyticsSummary(
-    @CurrentUser() user: any,
-    @Query() query: any,
-  ) {
+  async getAnalyticsSummary(@CurrentUser() user: any, @Query() query: any) {
     try {
       const filters: any = {};
-      
+
       if (query.dateFrom) {
-        filters.orderDateFrom = typeof query.dateFrom === 'string' ? new Date(query.dateFrom) : query.dateFrom;
+        filters.orderDateFrom =
+          typeof query.dateFrom === 'string'
+            ? new Date(query.dateFrom)
+            : query.dateFrom;
       }
       if (query.dateTo) {
-        filters.orderDateTo = typeof query.dateTo === 'string' ? new Date(query.dateTo) : query.dateTo;
+        filters.orderDateTo =
+          typeof query.dateTo === 'string'
+            ? new Date(query.dateTo)
+            : query.dateTo;
       }
 
-      const summary = await this.ordersService.getOrderSummary(user.tenantId, filters);
-      
+      const summary = await this.ordersService.getOrderSummary(
+        user.tenantId,
+        filters,
+      );
+
       return {
         success: true,
         data: summary,
       };
     } catch (error) {
-      this.logger.error(`Failed to get analytics summary: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get analytics summary: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1201,20 +1373,26 @@ export class OrdersController {
 
   @Get('capacity/locations')
   @ApiOperation({ summary: 'Get location capacity information' })
-  @ApiResponse({ status: 200, description: 'Location capacities retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Location capacities retrieved successfully',
+  })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  async getLocationCapacities(
-    @CurrentUser() user: any,
-  ) {
+  async getLocationCapacities(@CurrentUser() user: any) {
     try {
-      const capacities = await this.fulfillmentService.getLocationCapacities(user.tenantId);
-      
+      const capacities = await this.fulfillmentService.getLocationCapacities(
+        user.tenantId,
+      );
+
       return {
         success: true,
         data: capacities,
       };
     } catch (error) {
-      this.logger.error(`Failed to get location capacities: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get location capacities: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1229,7 +1407,10 @@ export class OrdersController {
 
   @Get('channel/:channelId')
   @ApiOperation({ summary: 'Get orders by channel' })
-  @ApiResponse({ status: 200, description: 'Channel orders retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Channel orders retrieved successfully',
+  })
   @ApiParam({ name: 'channelId', type: 'string' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async getOrdersByChannel(
@@ -1238,14 +1419,22 @@ export class OrdersController {
     @Query() query: OrdersQueryDto,
   ) {
     try {
-      const orders = await this.ordersService.getOrdersByChannel(user.tenantId, channelId, query);
-      
+      const serviceQuery = this.transformQueryDto(query);
+      const orders = await this.ordersService.getOrdersByChannel(
+        user.tenantId,
+        channelId,
+        serviceQuery,
+      );
+
       return {
         success: true,
         data: orders,
       };
     } catch (error) {
-      this.logger.error(`Failed to get orders by channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get orders by channel: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -1269,7 +1458,7 @@ export class OrdersController {
     try {
       // Implementation would handle actual export generation
       // For now, return success message
-      
+
       return {
         success: true,
         message: `Export initiated for ${format} format`,
@@ -1280,7 +1469,10 @@ export class OrdersController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to export orders: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to export orders: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

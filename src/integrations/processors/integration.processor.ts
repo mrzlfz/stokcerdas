@@ -1,11 +1,20 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { WebhookHandlerService } from '../common/services/webhook-handler.service';
 import { IntegrationLogService } from '../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../entities/integration-log.entity';
 import { RateLimiterService } from '../common/services/rate-limiter.service';
 
 export interface IntegrationJobData {
@@ -80,15 +89,18 @@ export class IntegrationProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`Integration job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `Integration job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -119,19 +131,35 @@ export class IntegrationProcessor {
 
       switch (jobType) {
         case 'data_validation':
-          result = await this.processDataValidation(tenantId, channelId, payload);
+          result = await this.processDataValidation(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
-        
+
         case 'error_recovery':
-          result = await this.processErrorRecovery(tenantId, channelId, payload);
+          result = await this.processErrorRecovery(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
-        
+
         case 'batch_operation':
-          result = await this.processBatchOperation(tenantId, channelId, payload);
+          result = await this.processBatchOperation(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
-        
+
         case 'scheduled_sync':
-          result = await this.processScheduledSync(tenantId, channelId, payload);
+          result = await this.processScheduledSync(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
 
         default:
@@ -158,19 +186,16 @@ export class IntegrationProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Generic integration job failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Generic integration job failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
-      await this.logService.logError(
-        tenantId,
-        channelId,
-        error,
-        {
-          metadata: { jobId: job.id, jobType, payload },
-        },
-      );
+      await this.logService.logError(tenantId, channelId, error, {
+        metadata: { jobId: job.id, jobType, payload },
+      });
 
       throw error;
     }
@@ -218,7 +243,6 @@ export class IntegrationProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Log cleanup failed: ${error.message}`, error.stack);
 
@@ -234,7 +258,8 @@ export class IntegrationProcessor {
    */
   @Process('webhook-retry')
   async processWebhookRetry(job: Job<WebhookRetryJobData>) {
-    const { webhookId, tenantId, channelId, retryAttempt, maxRetries } = job.data;
+    const { webhookId, tenantId, channelId, retryAttempt, maxRetries } =
+      job.data;
 
     try {
       this.logger.debug(`Processing webhook retry: ${webhookId}`, {
@@ -246,11 +271,15 @@ export class IntegrationProcessor {
       });
 
       if (retryAttempt >= maxRetries) {
-        throw new Error(`Maximum retry attempts (${maxRetries}) exceeded for webhook ${webhookId}`);
+        throw new Error(
+          `Maximum retry attempts (${maxRetries}) exceeded for webhook ${webhookId}`,
+        );
       }
 
       // Mark webhook as processing
-      const webhook = await this.webhookHandler.markWebhookAsProcessing(webhookId);
+      const webhook = await this.webhookHandler.markWebhookAsProcessing(
+        webhookId,
+      );
 
       if (!webhook) {
         throw new Error(`Webhook not found: ${webhookId}`);
@@ -276,7 +305,6 @@ export class IntegrationProcessor {
       );
 
       return result;
-
     } catch (error) {
       this.logger.error(`Webhook retry failed: ${error.message}`, error.stack);
 
@@ -305,16 +333,27 @@ export class IntegrationProcessor {
    */
   @Process('sync-operation')
   async processSyncOperation(job: Job<SyncJobData>) {
-    const { tenantId, channelId, entityType, syncDirection, entityIds, batchSize, options } = job.data;
+    const {
+      tenantId,
+      channelId,
+      entityType,
+      syncDirection,
+      entityIds,
+      batchSize,
+      options,
+    } = job.data;
 
     try {
-      this.logger.debug(`Processing sync operation: ${entityType} ${syncDirection}`, {
-        tenantId,
-        channelId,
-        entityType,
-        syncDirection,
-        entityCount: entityIds?.length || 0,
-      });
+      this.logger.debug(
+        `Processing sync operation: ${entityType} ${syncDirection}`,
+        {
+          tenantId,
+          channelId,
+          entityType,
+          syncDirection,
+          entityCount: entityIds?.length || 0,
+        },
+      );
 
       // Log sync start
       await this.logService.logSync(
@@ -330,19 +369,43 @@ export class IntegrationProcessor {
 
       switch (entityType) {
         case 'product':
-          result = await this.processSyncProducts(tenantId, channelId, syncDirection, entityIds, options);
+          result = await this.processSyncProducts(
+            tenantId,
+            channelId,
+            syncDirection,
+            entityIds,
+            options,
+          );
           break;
-        
+
         case 'order':
-          result = await this.processSyncOrders(tenantId, channelId, syncDirection, entityIds, options);
+          result = await this.processSyncOrders(
+            tenantId,
+            channelId,
+            syncDirection,
+            entityIds,
+            options,
+          );
           break;
-        
+
         case 'inventory':
-          result = await this.processSyncInventory(tenantId, channelId, syncDirection, entityIds, options);
+          result = await this.processSyncInventory(
+            tenantId,
+            channelId,
+            syncDirection,
+            entityIds,
+            options,
+          );
           break;
-        
+
         case 'customer':
-          result = await this.processSyncCustomers(tenantId, channelId, syncDirection, entityIds, options);
+          result = await this.processSyncCustomers(
+            tenantId,
+            channelId,
+            syncDirection,
+            entityIds,
+            options,
+          );
           break;
 
         default:
@@ -369,7 +432,6 @@ export class IntegrationProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Sync operation failed: ${error.message}`, error.stack);
 
@@ -407,15 +469,15 @@ export class IntegrationProcessor {
         case 'api_status':
           result = await this.checkApiStatus(tenantId, platforms);
           break;
-        
+
         case 'auth_status':
           result = await this.checkAuthStatus(tenantId, platforms);
           break;
-        
+
         case 'rate_limits':
           result = await this.checkRateLimits(tenantId, platforms);
           break;
-        
+
         case 'webhook_health':
           result = await this.checkWebhookHealth(tenantId);
           break;
@@ -442,7 +504,6 @@ export class IntegrationProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Health check failed: ${error.message}`, error.stack);
 
@@ -464,7 +525,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement data validation logic
     this.logger.debug(`Processing data validation for tenant ${tenantId}`);
-    
+
     return {
       validated: true,
       errors: [],
@@ -479,7 +540,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement error recovery logic
     this.logger.debug(`Processing error recovery for tenant ${tenantId}`);
-    
+
     return {
       recovered: true,
       actions: [],
@@ -493,7 +554,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement batch operation logic
     this.logger.debug(`Processing batch operation for tenant ${tenantId}`);
-    
+
     return {
       processed: 0,
       successful: 0,
@@ -508,7 +569,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement scheduled sync logic
     this.logger.debug(`Processing scheduled sync for tenant ${tenantId}`);
-    
+
     return {
       syncType: payload.syncType || 'unknown',
       status: 'completed',
@@ -524,7 +585,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement product sync logic
     this.logger.debug(`Processing product sync: ${syncDirection}`);
-    
+
     return {
       entityType: 'product',
       syncDirection,
@@ -543,7 +604,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement order sync logic
     this.logger.debug(`Processing order sync: ${syncDirection}`);
-    
+
     return {
       entityType: 'order',
       syncDirection,
@@ -562,7 +623,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement inventory sync logic
     this.logger.debug(`Processing inventory sync: ${syncDirection}`);
-    
+
     return {
       entityType: 'inventory',
       syncDirection,
@@ -581,7 +642,7 @@ export class IntegrationProcessor {
   ): Promise<any> {
     // Implement customer sync logic
     this.logger.debug(`Processing customer sync: ${syncDirection}`);
-    
+
     return {
       entityType: 'customer',
       syncDirection,
@@ -591,16 +652,23 @@ export class IntegrationProcessor {
     };
   }
 
-  private async checkApiStatus(tenantId: string, platforms?: string[]): Promise<any> {
+  private async checkApiStatus(
+    tenantId: string,
+    platforms?: string[],
+  ): Promise<any> {
     // Implement API status check
-    this.logger.debug(`Checking API status for platforms: ${platforms?.join(', ')}`);
-    
-    const checks = (platforms || ['shopee', 'lazada', 'tokopedia']).map(platform => ({
-      platform,
-      status: 'healthy',
-      responseTime: Math.random() * 100 + 50, // Mock response time
-      lastCheck: new Date(),
-    }));
+    this.logger.debug(
+      `Checking API status for platforms: ${platforms?.join(', ')}`,
+    );
+
+    const checks = (platforms || ['shopee', 'lazada', 'tokopedia']).map(
+      platform => ({
+        platform,
+        status: 'healthy',
+        responseTime: Math.random() * 100 + 50, // Mock response time
+        lastCheck: new Date(),
+      }),
+    );
 
     return {
       overall: 'healthy',
@@ -608,16 +676,23 @@ export class IntegrationProcessor {
     };
   }
 
-  private async checkAuthStatus(tenantId: string, platforms?: string[]): Promise<any> {
+  private async checkAuthStatus(
+    tenantId: string,
+    platforms?: string[],
+  ): Promise<any> {
     // Implement auth status check
-    this.logger.debug(`Checking auth status for platforms: ${platforms?.join(', ')}`);
-    
-    const checks = (platforms || ['shopee', 'lazada', 'tokopedia']).map(platform => ({
-      platform,
-      authenticated: true,
-      tokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
-      lastCheck: new Date(),
-    }));
+    this.logger.debug(
+      `Checking auth status for platforms: ${platforms?.join(', ')}`,
+    );
+
+    const checks = (platforms || ['shopee', 'lazada', 'tokopedia']).map(
+      platform => ({
+        platform,
+        authenticated: true,
+        tokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+        lastCheck: new Date(),
+      }),
+    );
 
     return {
       overall: 'authenticated',
@@ -625,17 +700,24 @@ export class IntegrationProcessor {
     };
   }
 
-  private async checkRateLimits(tenantId: string, platforms?: string[]): Promise<any> {
+  private async checkRateLimits(
+    tenantId: string,
+    platforms?: string[],
+  ): Promise<any> {
     // Implement rate limit check
-    this.logger.debug(`Checking rate limits for platforms: ${platforms?.join(', ')}`);
-    
-    const checks = (platforms || ['shopee', 'lazada', 'tokopedia']).map(platform => ({
-      platform,
-      remaining: Math.floor(Math.random() * 1000),
-      limit: 1000,
-      resetTime: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
-      status: 'healthy',
-    }));
+    this.logger.debug(
+      `Checking rate limits for platforms: ${platforms?.join(', ')}`,
+    );
+
+    const checks = (platforms || ['shopee', 'lazada', 'tokopedia']).map(
+      platform => ({
+        platform,
+        remaining: Math.floor(Math.random() * 1000),
+        limit: 1000,
+        resetTime: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
+        status: 'healthy',
+      }),
+    );
 
     return {
       overall: 'healthy',
@@ -646,9 +728,9 @@ export class IntegrationProcessor {
   private async checkWebhookHealth(tenantId: string): Promise<any> {
     // Implement webhook health check
     this.logger.debug(`Checking webhook health for tenant: ${tenantId}`);
-    
+
     const stats = await this.webhookHandler.getWebhookStats(tenantId);
-    
+
     return {
       status: stats.successRate > 90 ? 'healthy' : 'degraded',
       stats,

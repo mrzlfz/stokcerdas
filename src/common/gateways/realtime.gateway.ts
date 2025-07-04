@@ -37,7 +37,9 @@ export interface ClientSubscription {
   namespace: 'realtime',
   transports: ['websocket', 'polling'],
 })
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -46,26 +48,28 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   private tenantRooms = new Map<string, Set<string>>(); // tenantId -> Set of socketIds
   private clientSubscriptions = new Map<string, ClientSubscription>(); // socketId -> subscriptions
 
-  constructor(
-    private readonly jwtService: JwtService,
-  ) {}
+  constructor(private readonly jwtService: JwtService) {}
 
   afterInit(server: Server) {
     this.logger.log('🔗 Real-time WebSocket Gateway initialized');
-    
+
     // Configure Socket.io adapter for Redis if in production
     if (process.env.NODE_ENV === 'production') {
       // TODO: Add Redis adapter for horizontal scaling
-      this.logger.log('📡 Production mode: Consider adding Redis adapter for scaling');
+      this.logger.log(
+        '📡 Production mode: Consider adding Redis adapter for scaling',
+      );
     }
   }
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
       const token = this.extractTokenFromSocket(client);
-      
+
       if (!token) {
-        this.logger.warn(`❌ Client ${client.id} connected without authentication token`);
+        this.logger.warn(
+          `❌ Client ${client.id} connected without authentication token`,
+        );
         client.emit('error', { message: 'Authentication required' });
         client.disconnect();
         return;
@@ -91,7 +95,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
       // Track connected clients
       this.connectedClients.set(client.id, client);
-      
+
       // Track tenant rooms
       if (!this.tenantRooms.has(client.tenantId)) {
         this.tenantRooms.set(client.tenantId, new Set());
@@ -106,8 +110,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         alertTypes: ['low_stock', 'out_of_stock', 'expired', 'expiring_soon'],
       });
 
-      this.logger.log(`✅ Client ${client.id} connected to tenant room: ${tenantRoom}`);
-      
+      this.logger.log(
+        `✅ Client ${client.id} connected to tenant room: ${tenantRoom}`,
+      );
+
       // Send connection success
       client.emit('connected', {
         message: 'Connected to StokCerdas real-time updates',
@@ -118,9 +124,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
       // Send current tenant stats
       await this.sendTenantStats(client);
-
     } catch (error) {
-      this.logger.error(`❌ Error handling connection for client ${client.id}:`, error);
+      this.logger.error(
+        `❌ Error handling connection for client ${client.id}:`,
+        error,
+      );
       client.emit('error', { message: 'Connection failed' });
       client.disconnect();
     }
@@ -128,7 +136,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   async handleDisconnect(client: AuthenticatedSocket) {
     const tenantId = client.tenantId;
-    
+
     if (tenantId) {
       // Remove from tenant room tracking
       const tenantClients = this.tenantRooms.get(tenantId);
@@ -144,7 +152,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.connectedClients.delete(client.id);
     this.clientSubscriptions.delete(client.id);
 
-    this.logger.log(`🔌 Client ${client.id} disconnected from tenant: ${tenantId}`);
+    this.logger.log(
+      `🔌 Client ${client.id} disconnected from tenant: ${tenantId}`,
+    );
   }
 
   @SubscribeMessage('subscribe_inventory_items')
@@ -160,8 +170,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const subscription = this.clientSubscriptions.get(client.id);
     if (subscription) {
       subscription.inventoryItems = data.inventoryItemIds;
-      this.logger.log(`📊 Client ${client.id} subscribed to ${data.inventoryItemIds.length} inventory items`);
-      
+      this.logger.log(
+        `📊 Client ${client.id} subscribed to ${data.inventoryItemIds.length} inventory items`,
+      );
+
       client.emit('subscription_updated', {
         type: 'inventory_items',
         items: data.inventoryItemIds,
@@ -183,8 +195,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const subscription = this.clientSubscriptions.get(client.id);
     if (subscription) {
       subscription.locations = data.locationIds;
-      this.logger.log(`📍 Client ${client.id} subscribed to ${data.locationIds.length} locations`);
-      
+      this.logger.log(
+        `📍 Client ${client.id} subscribed to ${data.locationIds.length} locations`,
+      );
+
       client.emit('subscription_updated', {
         type: 'locations',
         items: data.locationIds,
@@ -206,8 +220,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const subscription = this.clientSubscriptions.get(client.id);
     if (subscription) {
       subscription.alertTypes = data.alertTypes;
-      this.logger.log(`🚨 Client ${client.id} subscribed to alert types: ${data.alertTypes.join(', ')}`);
-      
+      this.logger.log(
+        `🚨 Client ${
+          client.id
+        } subscribed to alert types: ${data.alertTypes.join(', ')}`,
+      );
+
       client.emit('subscription_updated', {
         type: 'alert_types',
         items: data.alertTypes,
@@ -224,7 +242,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   @SubscribeMessage('get_connection_status')
   handleConnectionStatus(@ConnectedSocket() client: AuthenticatedSocket) {
     const subscription = this.clientSubscriptions.get(client.id);
-    
+
     client.emit('connection_status', {
       tenantId: client.tenantId,
       userId: client.userId,
@@ -238,24 +256,25 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   @OnEvent('inventory.updated')
   async handleInventoryUpdate(event: InventoryUpdateEvent) {
     const tenantRoom = `tenant:${event.tenantId}`;
-    
+
     // Get all clients in the tenant room
     const tenantClients = this.tenantRooms.get(event.tenantId) || new Set();
-    
+
     for (const clientId of tenantClients) {
       const client = this.connectedClients.get(clientId);
       const subscription = this.clientSubscriptions.get(clientId);
-      
+
       if (client && subscription) {
         // Check if client is subscribed to this inventory item
         const inventoryItemId = event.data.id;
         const locationId = event.data.locationId;
-        
-        const shouldReceiveUpdate = 
+
+        const shouldReceiveUpdate =
           !subscription.inventoryItems?.length || // No specific subscription
           subscription.inventoryItems.includes(inventoryItemId) ||
-          (subscription.locations && subscription.locations.includes(locationId));
-        
+          (subscription.locations &&
+            subscription.locations.includes(locationId));
+
         if (shouldReceiveUpdate) {
           client.emit('inventory_updated', {
             type: event.type,
@@ -266,27 +285,29 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       }
     }
 
-    this.logger.debug(`📡 Broadcast inventory update to ${tenantClients.size} clients in tenant: ${event.tenantId}`);
+    this.logger.debug(
+      `📡 Broadcast inventory update to ${tenantClients.size} clients in tenant: ${event.tenantId}`,
+    );
   }
 
   @OnEvent('inventory.alert')
   async handleInventoryAlert(event: InventoryUpdateEvent) {
     const tenantRoom = `tenant:${event.tenantId}`;
     const alert = event.data;
-    
+
     // Get all clients in the tenant room
     const tenantClients = this.tenantRooms.get(event.tenantId) || new Set();
-    
+
     for (const clientId of tenantClients) {
       const client = this.connectedClients.get(clientId);
       const subscription = this.clientSubscriptions.get(clientId);
-      
+
       if (client && subscription) {
         // Check if client is subscribed to this alert type
-        const shouldReceiveAlert = 
+        const shouldReceiveAlert =
           !subscription.alertTypes?.length || // No specific subscription
           subscription.alertTypes.includes(alert.type);
-        
+
         if (shouldReceiveAlert) {
           client.emit('inventory_alert', {
             type: event.type,
@@ -297,13 +318,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       }
     }
 
-    this.logger.log(`🚨 Broadcast ${alert.type} alert to ${tenantClients.size} clients in tenant: ${event.tenantId}`);
+    this.logger.log(
+      `🚨 Broadcast ${alert.type} alert to ${tenantClients.size} clients in tenant: ${event.tenantId}`,
+    );
   }
 
   @OnEvent('location.updated')
   async handleLocationUpdate(event: InventoryUpdateEvent) {
     const tenantRoom = `tenant:${event.tenantId}`;
-    
+
     // Broadcast to all clients in tenant room (location updates are always relevant)
     this.server.to(tenantRoom).emit('location_updated', {
       type: event.type,
@@ -311,14 +334,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       timestamp: event.timestamp,
     });
 
-    this.logger.debug(`📍 Broadcast location update to tenant: ${event.tenantId}`);
+    this.logger.debug(
+      `📍 Broadcast location update to tenant: ${event.tenantId}`,
+    );
   }
 
   // Utility Methods
   private extractTokenFromSocket(client: Socket): string | null {
-    const token = client.handshake.auth?.token || 
-                  client.handshake.headers?.authorization?.replace('Bearer ', '') ||
-                  client.request.headers?.authorization?.replace('Bearer ', '');
+    const token =
+      client.handshake.auth?.token ||
+      client.handshake.headers?.authorization?.replace('Bearer ', '') ||
+      client.request.headers?.authorization?.replace('Bearer ', '');
     return token || null;
   }
 
@@ -347,7 +373,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      this.logger.error(`❌ Error sending tenant stats to client ${client.id}:`, error);
+      this.logger.error(
+        `❌ Error sending tenant stats to client ${client.id}:`,
+        error,
+      );
     }
   }
 
@@ -375,9 +404,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     return {
       totalConnections: this.connectedClients.size,
       tenantsWithConnections: this.tenantRooms.size,
-      averageConnectionsPerTenant: this.tenantRooms.size > 0 
-        ? Math.round(this.connectedClients.size / this.tenantRooms.size * 100) / 100 
-        : 0,
+      averageConnectionsPerTenant:
+        this.tenantRooms.size > 0
+          ? Math.round(
+              (this.connectedClients.size / this.tenantRooms.size) * 100,
+            ) / 100
+          : 0,
     };
   }
 }

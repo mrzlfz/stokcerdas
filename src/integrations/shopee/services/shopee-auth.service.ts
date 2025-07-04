@@ -4,7 +4,10 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 
 import { ShopeeApiService, ShopeeCredentials } from './shopee-api.service';
-import { Channel, ChannelStatus } from '../../../channels/entities/channel.entity';
+import {
+  Channel,
+  ChannelStatus,
+} from '../../../channels/entities/channel.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 
 export interface ShopeeAuthConfig {
@@ -47,7 +50,7 @@ export class ShopeeAuthService {
     try {
       // Generate state if not provided
       const authState = state || this.generateState(tenantId, channelId);
-      
+
       const authUrl = this.shopeeApiService.getAuthorizationUrl(
         config.partnerId,
         config.redirectUri,
@@ -65,10 +68,12 @@ export class ShopeeAuthService {
       );
 
       return { authUrl, state: authState };
-
     } catch (error) {
-      this.logger.error(`Failed to generate Shopee auth URL: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to generate Shopee auth URL: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logAuth(
         tenantId,
         channelId,
@@ -140,10 +145,9 @@ export class ShopeeAuthService {
       );
 
       return tokenInfo;
-
     } catch (error) {
       this.logger.error(`Token exchange failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logAuth(
         tenantId,
         channelId,
@@ -207,10 +211,9 @@ export class ShopeeAuthService {
       );
 
       return tokenInfo;
-
     } catch (error) {
       this.logger.error(`Token refresh failed: ${error.message}`, error.stack);
-      
+
       await this.logService.logAuth(
         tenantId,
         channelId,
@@ -236,22 +239,30 @@ export class ShopeeAuthService {
 
       // Check if token is expired or will expire soon (5 minutes buffer)
       const expiryBuffer = 5 * 60 * 1000; // 5 minutes
-      const isExpired = credentials.expiresAt && 
+      const isExpired =
+        credentials.expiresAt &&
         credentials.expiresAt.getTime() <= Date.now() + expiryBuffer;
 
       if (isExpired && credentials.refreshToken) {
-        this.logger.debug(`Token expired for channel ${channelId}, refreshing...`);
-        const refreshedTokens = await this.refreshAccessToken(tenantId, channelId);
-        
+        this.logger.debug(
+          `Token expired for channel ${channelId}, refreshing...`,
+        );
+        const refreshedTokens = await this.refreshAccessToken(
+          tenantId,
+          channelId,
+        );
+
         return this.extractCredentialsFromChannel(
-          await this.getChannelWithCredentials(tenantId, channelId)
+          await this.getChannelWithCredentials(tenantId, channelId),
         );
       }
 
       return credentials;
-
     } catch (error) {
-      this.logger.error(`Failed to get valid credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get valid credentials: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -265,7 +276,7 @@ export class ShopeeAuthService {
   ): Promise<{ valid: boolean; shopInfo?: any; error?: string }> {
     try {
       const credentials = await this.getValidCredentials(tenantId, channelId);
-      
+
       const response = await this.shopeeApiService.getShopInfo(
         credentials,
         tenantId,
@@ -300,10 +311,12 @@ export class ShopeeAuthService {
           error: response.error?.message,
         };
       }
-
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logAuth(
         tenantId,
         channelId,
@@ -328,7 +341,7 @@ export class ShopeeAuthService {
   ): Promise<void> {
     try {
       const channel = await this.getChannelWithCredentials(tenantId, channelId);
-      
+
       // Clear credentials from channel
       channel.config = {
         ...channel.config,
@@ -344,10 +357,12 @@ export class ShopeeAuthService {
         'success',
         'Shopee authentication revoked',
       );
-
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logAuth(
         tenantId,
         channelId,
@@ -386,7 +401,8 @@ export class ShopeeAuthService {
 
       // Check if token needs refresh (30 minutes buffer)
       const refreshBuffer = 30 * 60 * 1000; // 30 minutes
-      const needsRefresh = credentials.expiresAt &&
+      const needsRefresh =
+        credentials.expiresAt &&
         credentials.expiresAt.getTime() <= Date.now() + refreshBuffer;
 
       // Get shop info if authenticated
@@ -411,9 +427,11 @@ export class ShopeeAuthService {
         shopName: shopInfo?.shop_name,
         needsRefresh: !!needsRefresh,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get auth status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get auth status: ${error.message}`,
+        error.stack,
+      );
       return {
         isAuthenticated: false,
         needsRefresh: false,
@@ -460,7 +478,9 @@ export class ShopeeAuthService {
       shopId: credentials.shopId || '',
       accessToken: credentials.accessToken || '',
       refreshToken: credentials.refreshToken,
-      expiresAt: credentials.expiresAt ? new Date(credentials.expiresAt) : undefined,
+      expiresAt: credentials.expiresAt
+        ? new Date(credentials.expiresAt)
+        : undefined,
       isSandbox: credentials.isSandbox || false,
     };
   }

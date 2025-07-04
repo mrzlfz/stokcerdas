@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, Index, ForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  Index,
+  ForeignKey,
+} from 'typeorm';
 
 export class CreateSuppliers1719663000000 implements MigrationInterface {
   name = 'CreateSuppliers1719663000000';
@@ -47,7 +53,14 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
           {
             name: 'type',
             type: 'enum',
-            enum: ['manufacturer', 'distributor', 'wholesaler', 'retailer', 'service_provider', 'dropshipper'],
+            enum: [
+              'manufacturer',
+              'distributor',
+              'wholesaler',
+              'retailer',
+              'service_provider',
+              'dropshipper',
+            ],
             default: "'distributor'",
           },
           {
@@ -142,7 +155,16 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
           {
             name: 'payment_terms',
             type: 'enum',
-            enum: ['cod', 'net_7', 'net_15', 'net_30', 'net_45', 'net_60', 'prepaid', 'custom'],
+            enum: [
+              'cod',
+              'net_7',
+              'net_15',
+              'net_30',
+              'net_45',
+              'net_60',
+              'prepaid',
+              'custom',
+            ],
             default: "'net_30'",
           },
           {
@@ -302,7 +324,9 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
     );
 
     // Create indexes for suppliers table
-    await queryRunner.query(`CREATE INDEX "IDX_suppliers_tenant_id_is_deleted" ON "suppliers" ("tenant_id", "is_deleted")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_suppliers_tenant_id_is_deleted" ON "suppliers" ("tenant_id", "is_deleted")`,
+    );
 
     await queryRunner.query(`
       CREATE UNIQUE INDEX "IDX_suppliers_tenant_id_code" 
@@ -316,9 +340,13 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
       WHERE is_deleted = false
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_suppliers_tenant_id_status" ON "suppliers" ("tenant_id", "status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_suppliers_tenant_id_status" ON "suppliers" ("tenant_id", "status")`,
+    );
 
-    await queryRunner.query(`CREATE INDEX "IDX_suppliers_tenant_id_type" ON "suppliers" ("tenant_id", "type")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_suppliers_tenant_id_type" ON "suppliers" ("tenant_id", "type")`,
+    );
 
     // Add supplier_id column to products table
     await queryRunner.query(
@@ -326,7 +354,9 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
     );
 
     // Create index for supplier_id in products table
-    await queryRunner.query(`CREATE INDEX "IDX_products_tenant_id_supplier_id" ON "products" ("tenant_id", "supplier_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_products_tenant_id_supplier_id" ON "products" ("tenant_id", "supplier_id")`,
+    );
 
     // Create foreign key constraint
     await queryRunner.query(`
@@ -349,13 +379,18 @@ export class CreateSuppliers1719663000000 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remove foreign key constraint
     const table = await queryRunner.getTable('products');
-    const foreignKey = table.foreignKeys.find(fk => fk.columnNames.indexOf('supplier_id') !== -1);
+    const foreignKey = table.foreignKeys.find(
+      fk => fk.columnNames.indexOf('supplier_id') !== -1,
+    );
     if (foreignKey) {
       await queryRunner.dropForeignKey('products', foreignKey);
     }
 
     // Remove index
-    await queryRunner.dropIndex('products', 'IDX_products_tenant_id_supplier_id');
+    await queryRunner.dropIndex(
+      'products',
+      'IDX_products_tenant_id_supplier_id',
+    );
 
     // Remove supplier_id column from products table
     await queryRunner.dropColumn('products', 'supplier_id');

@@ -14,7 +14,12 @@ export interface PurchaseOrderEmailData {
   tenantId: string;
   purchaseOrder: PurchaseOrder;
   recipients?: string[];
-  emailType: 'creation' | 'approval' | 'rejection' | 'sent_to_supplier' | 'status_update';
+  emailType:
+    | 'creation'
+    | 'approval'
+    | 'rejection'
+    | 'sent_to_supplier'
+    | 'status_update';
   customSubject?: string;
   customMessage?: string;
   additionalData?: Record<string, any>;
@@ -75,11 +80,13 @@ export class PurchaseOrderEmailService {
       const recipients = await this.getRecipients(data);
 
       if (!recipients || recipients.length === 0) {
-        this.logger.warn(`No recipients found for PO ${data.purchaseOrder.poNumber}`);
+        this.logger.warn(
+          `No recipients found for PO ${data.purchaseOrder.poNumber}`,
+        );
         return true;
       }
 
-      let attachments = [];
+      const attachments = [];
 
       // Generate PDF attachment for supplier emails
       if (data.emailType === 'sent_to_supplier') {
@@ -90,7 +97,10 @@ export class PurchaseOrderEmailService {
             path: pdfPath,
           });
         } catch (error) {
-          this.logger.error(`Failed to generate PDF for PO ${data.purchaseOrder.poNumber}`, error.stack);
+          this.logger.error(
+            `Failed to generate PDF for PO ${data.purchaseOrder.poNumber}`,
+            error.stack,
+          );
         }
       }
 
@@ -98,7 +108,10 @@ export class PurchaseOrderEmailService {
       const mailOptions = {
         from: {
           name: 'StokCerdas System',
-          address: this.configService.get('SMTP_FROM', 'noreply@stokcerdas.com'),
+          address: this.configService.get(
+            'SMTP_FROM',
+            'noreply@stokcerdas.com',
+          ),
         },
         to: recipients,
         subject: template.subject,
@@ -108,11 +121,18 @@ export class PurchaseOrderEmailService {
       };
 
       const result = await this.emailTransporter.sendMail(mailOptions);
-      this.logger.log(`Email sent successfully for PO ${data.purchaseOrder.poNumber} to ${recipients.join(', ')}`);
-      
+      this.logger.log(
+        `Email sent successfully for PO ${
+          data.purchaseOrder.poNumber
+        } to ${recipients.join(', ')}`,
+      );
+
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send email for PO ${data.purchaseOrder.poNumber}`, error.stack);
+      this.logger.error(
+        `Failed to send email for PO ${data.purchaseOrder.poNumber}`,
+        error.stack,
+      );
       return false;
     }
   }
@@ -120,34 +140,43 @@ export class PurchaseOrderEmailService {
   /**
    * Generate email template based on type
    */
-  private async generateEmailTemplate(data: PurchaseOrderEmailData): Promise<EmailTemplate> {
+  private async generateEmailTemplate(
+    data: PurchaseOrderEmailData,
+  ): Promise<EmailTemplate> {
     const po = data.purchaseOrder;
     const companyName = 'StokCerdas';
-    
+
     switch (data.emailType) {
       case 'creation':
         return this.getCreationTemplate(po, companyName);
-      
+
       case 'approval':
         return this.getApprovalTemplate(po, companyName, data.additionalData);
-      
+
       case 'rejection':
         return this.getRejectionTemplate(po, companyName, data.additionalData);
-      
+
       case 'sent_to_supplier':
         return this.getSupplierTemplate(po, companyName);
-      
+
       case 'status_update':
-        return this.getStatusUpdateTemplate(po, companyName, data.additionalData);
-      
+        return this.getStatusUpdateTemplate(
+          po,
+          companyName,
+          data.additionalData,
+        );
+
       default:
         return this.getDefaultTemplate(po, companyName);
     }
   }
 
-  private getCreationTemplate(po: PurchaseOrder, companyName: string): EmailTemplate {
+  private getCreationTemplate(
+    po: PurchaseOrder,
+    companyName: string,
+  ): EmailTemplate {
     const subject = `Purchase Order Baru - ${po.poNumber}`;
-    
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #3b82f6; color: white; padding: 20px; text-align: center;">
@@ -161,33 +190,48 @@ export class PurchaseOrderEmailService {
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Nomor PO:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.poNumber}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.poNumber
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Supplier:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.supplier?.name || '-'}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.supplier?.name || '-'
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Status:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.getStatusText(po.status)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.getStatusText(
+                po.status,
+              )}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Total Nilai:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(po.totalAmount, po.currency)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(
+                po.totalAmount,
+                po.currency,
+              )}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Tanggal Order:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(po.orderDate)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(
+                po.orderDate,
+              )}</td>
             </tr>
           </table>
 
-          ${po.requiresApproval ? `
+          ${
+            po.requiresApproval
+              ? `
             <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
               <p style="margin: 0; color: #92400e;">
                 <strong>Perhatian:</strong> Purchase Order ini memerlukan approval sebelum dapat dikirim ke supplier.
               </p>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
           
           <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
             Email ini dikirim secara otomatis oleh sistem ${companyName}. 
@@ -206,7 +250,11 @@ Status: ${this.getStatusText(po.status)}
 Total Nilai: ${this.formatCurrency(po.totalAmount, po.currency)}
 Tanggal Order: ${this.formatDate(po.orderDate)}
 
-${po.requiresApproval ? 'PERHATIAN: Purchase Order ini memerlukan approval sebelum dapat dikirim ke supplier.' : ''}
+${
+  po.requiresApproval
+    ? 'PERHATIAN: Purchase Order ini memerlukan approval sebelum dapat dikirim ke supplier.'
+    : ''
+}
 
 Email ini dikirim secara otomatis oleh sistem ${companyName}.
     `;
@@ -214,11 +262,15 @@ Email ini dikirim secara otomatis oleh sistem ${companyName}.
     return { subject, htmlContent, textContent };
   }
 
-  private getApprovalTemplate(po: PurchaseOrder, companyName: string, additionalData?: any): EmailTemplate {
+  private getApprovalTemplate(
+    po: PurchaseOrder,
+    companyName: string,
+    additionalData?: any,
+  ): EmailTemplate {
     const subject = `Purchase Order Disetujui - ${po.poNumber}`;
     const approverName = additionalData?.approverName || 'System';
     const comments = additionalData?.comments || '';
-    
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #10b981; color: white; padding: 20px; text-align: center;">
@@ -229,7 +281,9 @@ Email ini dikirim secara otomatis oleh sistem ${companyName}.
         <div style="padding: 20px; background-color: #f8f9fa;">
           <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin-bottom: 20px;">
             <p style="margin: 0; color: #065f46;">
-              <strong>✅ Kabar Baik!</strong> Purchase Order ${po.poNumber} telah disetujui dan dapat dikirim ke supplier.
+              <strong>✅ Kabar Baik!</strong> Purchase Order ${
+                po.poNumber
+              } telah disetujui dan dapat dikirim ke supplier.
             </p>
           </div>
           
@@ -238,11 +292,15 @@ Email ini dikirim secara otomatis oleh sistem ${companyName}.
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Nomor PO:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.poNumber}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.poNumber
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Supplier:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.supplier?.name || '-'}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.supplier?.name || '-'
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Disetujui oleh:</td>
@@ -250,20 +308,29 @@ Email ini dikirim secara otomatis oleh sistem ${companyName}.
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Tanggal Approval:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(po.approvedAt)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(
+                po.approvedAt,
+              )}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Total Nilai:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(po.totalAmount, po.currency)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(
+                po.totalAmount,
+                po.currency,
+              )}</td>
             </tr>
           </table>
 
-          ${comments ? `
+          ${
+            comments
+              ? `
             <div style="background-color: #ffffff; border: 1px solid #e5e7eb; padding: 15px; margin: 20px 0;">
               <h3 style="margin: 0 0 10px 0; color: #1f2937;">Komentar Approval:</h3>
               <p style="margin: 0; color: #374151;">${comments}</p>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
           
           <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
             Purchase Order ini sekarang dapat dikirim ke supplier. 
@@ -292,12 +359,16 @@ Purchase Order ini sekarang dapat dikirim ke supplier.
     return { subject, htmlContent, textContent };
   }
 
-  private getRejectionTemplate(po: PurchaseOrder, companyName: string, additionalData?: any): EmailTemplate {
+  private getRejectionTemplate(
+    po: PurchaseOrder,
+    companyName: string,
+    additionalData?: any,
+  ): EmailTemplate {
     const subject = `Purchase Order Ditolak - ${po.poNumber}`;
     const rejectorName = additionalData?.rejectorName || 'System';
     const reason = additionalData?.reason || 'Tidak ada alasan yang diberikan';
     const comments = additionalData?.comments || '';
-    
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #ef4444; color: white; padding: 20px; text-align: center;">
@@ -308,7 +379,9 @@ Purchase Order ini sekarang dapat dikirim ke supplier.
         <div style="padding: 20px; background-color: #f8f9fa;">
           <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 20px;">
             <p style="margin: 0; color: #991b1b;">
-              <strong>❌ Purchase Order Ditolak</strong> Purchase Order ${po.poNumber} telah ditolak dan perlu diperbaiki.
+              <strong>❌ Purchase Order Ditolak</strong> Purchase Order ${
+                po.poNumber
+              } telah ditolak dan perlu diperbaiki.
             </p>
           </div>
           
@@ -317,11 +390,15 @@ Purchase Order ini sekarang dapat dikirim ke supplier.
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Nomor PO:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.poNumber}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.poNumber
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Supplier:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.supplier?.name || '-'}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.supplier?.name || '-'
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Ditolak oleh:</td>
@@ -329,21 +406,30 @@ Purchase Order ini sekarang dapat dikirim ke supplier.
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Tanggal Penolakan:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(po.rejectedAt)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(
+                po.rejectedAt,
+              )}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Total Nilai:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(po.totalAmount, po.currency)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(
+                po.totalAmount,
+                po.currency,
+              )}</td>
             </tr>
           </table>
 
           <div style="background-color: #ffffff; border: 1px solid #e5e7eb; padding: 15px; margin: 20px 0;">
             <h3 style="margin: 0 0 10px 0; color: #1f2937;">Alasan Penolakan:</h3>
             <p style="margin: 0; color: #374151; font-weight: bold;">${reason}</p>
-            ${comments ? `
+            ${
+              comments
+                ? `
               <h3 style="margin: 15px 0 10px 0; color: #1f2937;">Komentar Tambahan:</h3>
               <p style="margin: 0; color: #374151;">${comments}</p>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
           
           <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
@@ -374,9 +460,12 @@ Silakan lakukan perbaikan sesuai dengan alasan penolakan di atas.
     return { subject, htmlContent, textContent };
   }
 
-  private getSupplierTemplate(po: PurchaseOrder, companyName: string): EmailTemplate {
+  private getSupplierTemplate(
+    po: PurchaseOrder,
+    companyName: string,
+  ): EmailTemplate {
     const subject = `Purchase Order - ${po.poNumber}`;
-    
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #3b82f6; color: white; padding: 20px; text-align: center;">
@@ -392,32 +481,47 @@ Silakan lakukan perbaikan sesuai dengan alasan penolakan di atas.
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Nomor PO:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.poNumber}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.poNumber
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Tanggal Order:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(po.orderDate)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(
+                po.orderDate,
+              )}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Tanggal Pengiriman:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(po.expectedDeliveryDate)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatDate(
+                po.expectedDeliveryDate,
+              )}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Payment Terms:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.paymentTerms?.replace('_', ' ').toUpperCase()}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.paymentTerms
+                ?.replace('_', ' ')
+                .toUpperCase()}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Total Nilai:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>${this.formatCurrency(po.totalAmount, po.currency)}</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>${this.formatCurrency(
+                po.totalAmount,
+                po.currency,
+              )}</strong></td>
             </tr>
           </table>
 
-          ${po.supplierInstructions ? `
+          ${
+            po.supplierInstructions
+              ? `
             <div style="background-color: #ffffff; border: 1px solid #e5e7eb; padding: 15px; margin: 20px 0;">
               <h3 style="margin: 0 0 10px 0; color: #1f2937;">Instruksi Khusus:</h3>
               <p style="margin: 0; color: #374151;">${po.supplierInstructions}</p>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <p>Detail lengkap item yang dipesan terdapat dalam file PDF terlampir.</p>
           
@@ -462,11 +566,15 @@ ${companyName}
     return { subject, htmlContent, textContent };
   }
 
-  private getStatusUpdateTemplate(po: PurchaseOrder, companyName: string, additionalData?: any): EmailTemplate {
+  private getStatusUpdateTemplate(
+    po: PurchaseOrder,
+    companyName: string,
+    additionalData?: any,
+  ): EmailTemplate {
     const subject = `Update Status Purchase Order - ${po.poNumber}`;
     const previousStatus = additionalData?.previousStatus || '';
     const newStatus = this.getStatusText(po.status);
-    
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #6366f1; color: white; padding: 20px; text-align: center;">
@@ -482,18 +590,24 @@ ${companyName}
               Purchase Order <strong>${po.poNumber}</strong> telah diupdate:
             </p>
             <p style="margin: 10px 0 0 0; font-size: 18px; color: #1f2937;">
-              ${previousStatus ? `${this.getStatusText(previousStatus)} → ` : ''}<strong>${newStatus}</strong>
+              ${
+                previousStatus ? `${this.getStatusText(previousStatus)} → ` : ''
+              }<strong>${newStatus}</strong>
             </p>
           </div>
           
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Nomor PO:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.poNumber}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.poNumber
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Supplier:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${po.supplier?.name || '-'}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${
+                po.supplier?.name || '-'
+              }</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Status Saat Ini:</td>
@@ -501,7 +615,10 @@ ${companyName}
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold;">Total Nilai:</td>
-              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(po.totalAmount, po.currency)}</td>
+              <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${this.formatCurrency(
+                po.totalAmount,
+                po.currency,
+              )}</td>
             </tr>
           </table>
           
@@ -529,9 +646,12 @@ Silakan login ke dashboard untuk melihat detail lengkap.
     return { subject, htmlContent, textContent };
   }
 
-  private getDefaultTemplate(po: PurchaseOrder, companyName: string): EmailTemplate {
+  private getDefaultTemplate(
+    po: PurchaseOrder,
+    companyName: string,
+  ): EmailTemplate {
     const subject = `Purchase Order Notification - ${po.poNumber}`;
-    
+
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #6b7280; color: white; padding: 20px; text-align: center;">
@@ -566,7 +686,10 @@ Silakan login ke dashboard untuk melihat detail lengkap.
     }
 
     // For supplier emails, use supplier email
-    if (data.emailType === 'sent_to_supplier' && data.purchaseOrder.supplier?.email) {
+    if (
+      data.emailType === 'sent_to_supplier' &&
+      data.purchaseOrder.supplier?.email
+    ) {
       recipients.push(data.purchaseOrder.supplier.email);
     }
 
@@ -614,16 +737,16 @@ Silakan login ke dashboard untuk melihat detail lengkap.
 
   private getStatusText(status: string): string {
     const statusMap = {
-      'draft': 'Draft',
-      'pending_approval': 'Menunggu Approval',
-      'approved': 'Disetujui',
-      'rejected': 'Ditolak',
-      'sent_to_supplier': 'Dikirim ke Supplier',
-      'acknowledged': 'Dikonfirmasi Supplier',
-      'partially_received': 'Sebagian Diterima',
-      'received': 'Diterima',
-      'closed': 'Ditutup',
-      'cancelled': 'Dibatalkan',
+      draft: 'Draft',
+      pending_approval: 'Menunggu Approval',
+      approved: 'Disetujui',
+      rejected: 'Ditolak',
+      sent_to_supplier: 'Dikirim ke Supplier',
+      acknowledged: 'Dikonfirmasi Supplier',
+      partially_received: 'Sebagian Diterima',
+      received: 'Diterima',
+      closed: 'Ditutup',
+      cancelled: 'Dibatalkan',
     };
 
     return statusMap[status] || status;

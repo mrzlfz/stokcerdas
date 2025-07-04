@@ -41,14 +41,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Validate tenant ID if not skipped
     if (!skipTenantCheck) {
       const tenantId = request.headers['x-tenant-id'] as string;
-      
+
       if (!tenantId) {
         this.logger.warn('Missing tenant ID in request headers');
         throw new UnauthorizedException('Tenant ID diperlukan');
       }
 
       // Validate tenant ID format (UUID)
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(tenantId)) {
         this.logger.warn(`Invalid tenant ID format: ${tenantId}`);
         throw new UnauthorizedException('Format Tenant ID tidak valid');
@@ -62,9 +63,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (err || !user) {
       const request = context.switchToHttp().getRequest<Request>();
       const endpoint = `${request.method} ${request.url}`;
-      
-      this.logger.warn(`Authentication failed for ${endpoint}: ${err?.message || info?.message || 'Unknown error'}`);
-      
+
+      this.logger.warn(
+        `Authentication failed for ${endpoint}: ${
+          err?.message || info?.message || 'Unknown error'
+        }`,
+      );
+
       throw err || new UnauthorizedException('Token tidak valid');
     }
 

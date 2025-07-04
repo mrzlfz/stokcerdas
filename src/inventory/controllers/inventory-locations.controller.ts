@@ -30,19 +30,23 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { Tenant } from '../../common/decorators/tenant.decorator';
-import { PermissionAction, PermissionResource } from '../../auth/entities/permission.entity';
+import {
+  PermissionAction,
+  PermissionResource,
+} from '../../auth/entities/permission.entity';
 
 @ApiTags('Inventory Locations')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('inventory/locations')
 export class InventoryLocationsController {
-  constructor(
-    private readonly locationsService: InventoryLocationsService,
-  ) {}
+  constructor(private readonly locationsService: InventoryLocationsService) {}
 
   @Post()
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.CREATE,
+  })
   @ApiOperation({ summary: 'Buat lokasi inventori baru' })
   @ApiResponse({ status: 201, description: 'Lokasi berhasil dibuat' })
   @ApiResponse({ status: 400, description: 'Data tidak valid' })
@@ -52,8 +56,12 @@ export class InventoryLocationsController {
     @GetUser('id') userId: string,
     @Body() createLocationDto: CreateInventoryLocationDto,
   ) {
-    const location = await this.locationsService.create(tenantId, createLocationDto, userId);
-    
+    const location = await this.locationsService.create(
+      tenantId,
+      createLocationDto,
+      userId,
+    );
+
     return {
       success: true,
       message: 'Lokasi inventori berhasil dibuat',
@@ -62,18 +70,35 @@ export class InventoryLocationsController {
   }
 
   @Get()
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan daftar lokasi inventori' })
-  @ApiQuery({ name: 'includeInactive', required: false, description: 'Sertakan lokasi tidak aktif', type: Boolean })
-  @ApiQuery({ name: 'parentId', required: false, description: 'Filter berdasarkan parent ID (gunakan "null" untuk root locations)' })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    description: 'Sertakan lokasi tidak aktif',
+    type: Boolean,
+  })
+  @ApiQuery({
+    name: 'parentId',
+    required: false,
+    description:
+      'Filter berdasarkan parent ID (gunakan "null" untuk root locations)',
+  })
   @ApiResponse({ status: 200, description: 'Daftar lokasi berhasil didapat' })
   async findAll(
     @Tenant() tenantId: string,
     @Query('includeInactive') includeInactive?: boolean,
     @Query('parentId') parentId?: string,
   ) {
-    const locations = await this.locationsService.findAll(tenantId, includeInactive, parentId);
-    
+    const locations = await this.locationsService.findAll(
+      tenantId,
+      includeInactive,
+      parentId,
+    );
+
     return {
       success: true,
       message: 'Daftar lokasi inventori berhasil didapat',
@@ -82,16 +107,27 @@ export class InventoryLocationsController {
   }
 
   @Get('hierarchy')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan hierarki lokasi inventori' })
-  @ApiQuery({ name: 'includeInactive', required: false, description: 'Sertakan lokasi tidak aktif', type: Boolean })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    description: 'Sertakan lokasi tidak aktif',
+    type: Boolean,
+  })
   @ApiResponse({ status: 200, description: 'Hierarki lokasi berhasil didapat' })
   async findHierarchy(
     @Tenant() tenantId: string,
     @Query('includeInactive') includeInactive?: boolean,
   ) {
-    const hierarchy = await this.locationsService.findHierarchy(tenantId, includeInactive);
-    
+    const hierarchy = await this.locationsService.findHierarchy(
+      tenantId,
+      includeInactive,
+    );
+
     return {
       success: true,
       message: 'Hierarki lokasi inventori berhasil didapat',
@@ -100,16 +136,29 @@ export class InventoryLocationsController {
   }
 
   @Get('stats')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan statistik lokasi inventori' })
-  @ApiQuery({ name: 'locationId', required: false, description: 'Filter untuk lokasi spesifik' })
-  @ApiResponse({ status: 200, description: 'Statistik lokasi berhasil didapat' })
+  @ApiQuery({
+    name: 'locationId',
+    required: false,
+    description: 'Filter untuk lokasi spesifik',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Statistik lokasi berhasil didapat',
+  })
   async getStats(
     @Tenant() tenantId: string,
     @Query('locationId') locationId?: string,
   ) {
-    const stats = await this.locationsService.getLocationStats(tenantId, locationId);
-    
+    const stats = await this.locationsService.getLocationStats(
+      tenantId,
+      locationId,
+    );
+
     return {
       success: true,
       message: 'Statistik lokasi inventori berhasil didapat',
@@ -118,17 +167,17 @@ export class InventoryLocationsController {
   }
 
   @Get('search/code/:code')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Cari lokasi berdasarkan kode' })
   @ApiParam({ name: 'code', description: 'Kode lokasi' })
   @ApiResponse({ status: 200, description: 'Lokasi ditemukan' })
   @ApiResponse({ status: 404, description: 'Lokasi tidak ditemukan' })
-  async findByCode(
-    @Tenant() tenantId: string,
-    @Param('code') code: string,
-  ) {
+  async findByCode(@Tenant() tenantId: string, @Param('code') code: string) {
     const location = await this.locationsService.findByCode(tenantId, code);
-    
+
     return {
       success: true,
       message: 'Lokasi ditemukan',
@@ -137,16 +186,20 @@ export class InventoryLocationsController {
   }
 
   @Get('search/name')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Cari lokasi berdasarkan nama' })
-  @ApiQuery({ name: 'name', required: true, description: 'Nama lokasi yang dicari' })
+  @ApiQuery({
+    name: 'name',
+    required: true,
+    description: 'Nama lokasi yang dicari',
+  })
   @ApiResponse({ status: 200, description: 'Hasil pencarian lokasi' })
-  async findByName(
-    @Tenant() tenantId: string,
-    @Query('name') name: string,
-  ) {
+  async findByName(@Tenant() tenantId: string, @Query('name') name: string) {
     const locations = await this.locationsService.findByName(tenantId, name);
-    
+
     return {
       success: true,
       message: 'Hasil pencarian lokasi',
@@ -155,7 +208,10 @@ export class InventoryLocationsController {
   }
 
   @Get(':id')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan detail lokasi inventori' })
   @ApiParam({ name: 'id', description: 'ID lokasi' })
   @ApiResponse({ status: 200, description: 'Detail lokasi berhasil didapat' })
@@ -165,7 +221,7 @@ export class InventoryLocationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const location = await this.locationsService.findOne(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Detail lokasi inventori berhasil didapat',
@@ -174,7 +230,10 @@ export class InventoryLocationsController {
   }
 
   @Get(':id/path')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan path hierarki lokasi' })
   @ApiParam({ name: 'id', description: 'ID lokasi' })
   @ApiResponse({ status: 200, description: 'Path lokasi berhasil didapat' })
@@ -183,7 +242,7 @@ export class InventoryLocationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const path = await this.locationsService.getLocationPath(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Path lokasi berhasil didapat',
@@ -192,7 +251,10 @@ export class InventoryLocationsController {
   }
 
   @Patch(':id')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Update lokasi inventori' })
   @ApiParam({ name: 'id', description: 'ID lokasi' })
   @ApiResponse({ status: 200, description: 'Lokasi berhasil diupdate' })
@@ -204,8 +266,13 @@ export class InventoryLocationsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateLocationDto: UpdateInventoryLocationDto,
   ) {
-    const location = await this.locationsService.update(tenantId, id, updateLocationDto, userId);
-    
+    const location = await this.locationsService.update(
+      tenantId,
+      id,
+      updateLocationDto,
+      userId,
+    );
+
     return {
       success: true,
       message: 'Lokasi inventori berhasil diupdate',
@@ -214,11 +281,17 @@ export class InventoryLocationsController {
   }
 
   @Delete(':id')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.DELETE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.DELETE,
+  })
   @ApiOperation({ summary: 'Hapus lokasi inventori' })
   @ApiParam({ name: 'id', description: 'ID lokasi' })
   @ApiResponse({ status: 200, description: 'Lokasi berhasil dihapus' })
-  @ApiResponse({ status: 400, description: 'Lokasi masih memiliki inventori atau sub-lokasi' })
+  @ApiResponse({
+    status: 400,
+    description: 'Lokasi masih memiliki inventori atau sub-lokasi',
+  })
   @ApiResponse({ status: 404, description: 'Lokasi tidak ditemukan' })
   @HttpCode(HttpStatus.OK)
   async remove(
@@ -226,7 +299,7 @@ export class InventoryLocationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.locationsService.remove(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Lokasi inventori berhasil dihapus',
@@ -234,18 +307,26 @@ export class InventoryLocationsController {
   }
 
   @Patch('reorder')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Ubah urutan lokasi dalam parent yang sama' })
   @ApiResponse({ status: 200, description: 'Urutan lokasi berhasil diubah' })
   async reorder(
     @Tenant() tenantId: string,
-    @Body() reorderData: {
+    @Body()
+    reorderData: {
       parentId: string | null;
       locations: Array<{ id: string; sortOrder: number }>;
     },
   ) {
-    await this.locationsService.reorderLocations(tenantId, reorderData.parentId, reorderData.locations);
-    
+    await this.locationsService.reorderLocations(
+      tenantId,
+      reorderData.parentId,
+      reorderData.locations,
+    );
+
     return {
       success: true,
       message: 'Urutan lokasi berhasil diubah',
@@ -253,7 +334,10 @@ export class InventoryLocationsController {
   }
 
   @Patch(':id/move')
-  @Permissions({ resource: PermissionResource.INVENTORY, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.INVENTORY,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Pindahkan lokasi ke parent baru' })
   @ApiParam({ name: 'id', description: 'ID lokasi yang akan dipindahkan' })
   @ApiResponse({ status: 200, description: 'Lokasi berhasil dipindahkan' })
@@ -263,8 +347,13 @@ export class InventoryLocationsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() moveData: { newParentId: string | null },
   ) {
-    const location = await this.locationsService.moveLocation(tenantId, id, moveData.newParentId, userId);
-    
+    const location = await this.locationsService.moveLocation(
+      tenantId,
+      id,
+      moveData.newParentId,
+      userId,
+    );
+
     return {
       success: true,
       message: 'Lokasi berhasil dipindahkan',

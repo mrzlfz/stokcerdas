@@ -16,7 +16,7 @@ import { ApprovalInstance } from './approval-instance.entity';
 
 export enum ApprovalStepType {
   USER = 'user',
-  ROLE = 'role', 
+  ROLE = 'role',
   DEPARTMENT = 'department',
   EXTERNAL = 'external',
   AUTOMATIC = 'automatic',
@@ -169,13 +169,31 @@ export class ApprovalStep extends AuditableEntity {
   holidayApproval: boolean;
 
   // Performance tracking
-  @Column({ name: 'average_approval_time_hours', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'average_approval_time_hours',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   averageApprovalTimeHours: number;
 
-  @Column({ name: 'approval_success_rate', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({
+    name: 'approval_success_rate',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
   approvalSuccessRate: number;
 
-  @Column({ name: 'escalation_rate', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({
+    name: 'escalation_rate',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
   escalationRate: number;
 
   // Activity tracking
@@ -212,7 +230,11 @@ export class ApprovalStep extends AuditableEntity {
   instances: ApprovalInstance[];
 
   // Helper methods
-  isEligibleApprover(userId: string, userRoles: string[], userDepartments: string[]): boolean {
+  isEligibleApprover(
+    userId: string,
+    userRoles: string[],
+    userDepartments: string[],
+  ): boolean {
     switch (this.approverType) {
       case ApprovalStepType.USER:
         return this.approverUserId === userId;
@@ -229,13 +251,17 @@ export class ApprovalStep extends AuditableEntity {
 
   isTimeoutExpired(startTime: Date): boolean {
     if (!this.timeoutHours) return false;
-    const timeoutDate = new Date(startTime.getTime() + this.timeoutHours * 60 * 60 * 1000);
+    const timeoutDate = new Date(
+      startTime.getTime() + this.timeoutHours * 60 * 60 * 1000,
+    );
     return new Date() > timeoutDate;
   }
 
   isEscalationRequired(startTime: Date): boolean {
     if (!this.escalationHours) return false;
-    const escalationDate = new Date(startTime.getTime() + this.escalationHours * 60 * 60 * 1000);
+    const escalationDate = new Date(
+      startTime.getTime() + this.escalationHours * 60 * 60 * 1000,
+    );
     return new Date() > escalationDate;
   }
 
@@ -246,7 +272,9 @@ export class ApprovalStep extends AuditableEntity {
 
   getEscalationDeadline(startTime: Date): Date | null {
     if (!this.escalationHours) return null;
-    return new Date(startTime.getTime() + this.escalationHours * 60 * 60 * 1000);
+    return new Date(
+      startTime.getTime() + this.escalationHours * 60 * 60 * 1000,
+    );
   }
 
   shouldAutoApprove(startTime: Date): boolean {
@@ -255,7 +283,7 @@ export class ApprovalStep extends AuditableEntity {
 
   validateApprovalCriteria(requestData: any): boolean {
     if (!this.approvalCriteria) return true;
-    
+
     // Implementation for validating approval criteria against request data
     // This would contain business logic for checking if the request meets the criteria
     return true;
@@ -263,35 +291,42 @@ export class ApprovalStep extends AuditableEntity {
 
   getNotificationRecipients(): string[] {
     const recipients = [];
-    
+
     if (this.approverUserId) {
       recipients.push(this.approverUserId);
     }
-    
+
     // Add role-based recipients
     // Add department-based recipients
-    
+
     return recipients;
   }
 
-  updatePerformanceMetrics(isApproved: boolean, processingTimeHours: number, wasEscalated: boolean): void {
+  updatePerformanceMetrics(
+    isApproved: boolean,
+    processingTimeHours: number,
+    wasEscalated: boolean,
+  ): void {
     this.totalApprovals += isApproved ? 1 : 0;
     this.totalRejections += isApproved ? 0 : 1;
     this.totalEscalations += wasEscalated ? 1 : 0;
-    
+
     // Update average approval time
     const totalProcessedItems = this.totalApprovals + this.totalRejections;
     if (totalProcessedItems > 0) {
-      this.averageApprovalTimeHours = 
-        ((this.averageApprovalTimeHours || 0) * (totalProcessedItems - 1) + processingTimeHours) / totalProcessedItems;
+      this.averageApprovalTimeHours =
+        ((this.averageApprovalTimeHours || 0) * (totalProcessedItems - 1) +
+          processingTimeHours) /
+        totalProcessedItems;
     }
-    
+
     // Update success rate
-    this.approvalSuccessRate = (this.totalApprovals / totalProcessedItems) * 100;
-    
+    this.approvalSuccessRate =
+      (this.totalApprovals / totalProcessedItems) * 100;
+
     // Update escalation rate
     this.escalationRate = (this.totalEscalations / totalProcessedItems) * 100;
-    
+
     this.lastApprovalAt = new Date();
   }
 }

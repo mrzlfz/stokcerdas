@@ -1,11 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuickBooksApiService, QuickBooksCredentials, QuickBooksItem } from './quickbooks-api.service';
+import {
+  QuickBooksApiService,
+  QuickBooksCredentials,
+  QuickBooksItem,
+} from './quickbooks-api.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { Product, ProductType, ProductStatus } from '../../../products/entities/product.entity';
-import { AccountingAccount, AccountingDataType } from '../../entities/accounting-account.entity';
-import { SyncStatus, SyncEntityType, SyncDirection, SyncStatusEnum } from '../../entities/sync-status.entity';
+import {
+  Product,
+  ProductType,
+  ProductStatus,
+} from '../../../products/entities/product.entity';
+import {
+  AccountingAccount,
+  AccountingDataType,
+} from '../../entities/accounting-account.entity';
+import {
+  SyncStatus,
+  SyncEntityType,
+  SyncDirection,
+  SyncStatusEnum,
+} from '../../entities/sync-status.entity';
 
 export interface ItemSyncOptions {
   direction?: 'inbound' | 'outbound' | 'bidirectional';
@@ -82,7 +98,8 @@ export class QuickBooksItemSyncService {
         accessToken: accountingAccount.accessToken!,
         refreshToken: accountingAccount.refreshToken!,
         realmId: accountingAccount.platformConfig?.realmId!,
-        environment: accountingAccount.platformConfig?.environment || 'production',
+        environment:
+          accountingAccount.platformConfig?.environment || 'production',
         expiresAt: accountingAccount.tokenExpiresAt,
       };
 
@@ -103,15 +120,24 @@ export class QuickBooksItemSyncService {
       const batchSize = options.batchSize || 10;
       for (let i = 0; i < products.length; i += batchSize) {
         const batch = products.slice(i, i + batchSize);
-        
+
         for (const product of batch) {
           try {
-            await this.syncProductToQuickBooks(product, credentials, tenantId, accountingAccount.channelId!, options);
+            await this.syncProductToQuickBooks(
+              product,
+              credentials,
+              tenantId,
+              accountingAccount.channelId!,
+              options,
+            );
             result.syncedItems++;
-            
+
             // Update sync status progress
-            await this.updateSyncProgress(syncStatus.id, result.syncedItems, result.failedItems);
-            
+            await this.updateSyncProgress(
+              syncStatus.id,
+              result.syncedItems,
+              result.failedItems,
+            );
           } catch (error) {
             result.failedItems++;
             result.errors.push({
@@ -120,10 +146,16 @@ export class QuickBooksItemSyncService {
               details: error,
             });
 
-            this.logger.error(`Failed to sync product ${product.id}: ${error.message}`);
-            
+            this.logger.error(
+              `Failed to sync product ${product.id}: ${error.message}`,
+            );
+
             // Update sync status progress
-            await this.updateSyncProgress(syncStatus.id, result.syncedItems, result.failedItems);
+            await this.updateSyncProgress(
+              syncStatus.id,
+              result.syncedItems,
+              result.failedItems,
+            );
           }
         }
 
@@ -139,10 +171,11 @@ export class QuickBooksItemSyncService {
       result.success = result.failedItems === 0;
       result.duration = Date.now() - startTime;
 
-      this.logger.log(`QuickBooks item sync completed: ${result.syncedItems}/${result.totalItems} items synced`);
+      this.logger.log(
+        `QuickBooks item sync completed: ${result.syncedItems}/${result.totalItems} items synced`,
+      );
 
       return result;
-
     } catch (error) {
       result.duration = Date.now() - startTime;
       this.logger.error(`QuickBooks item sync failed: ${error.message}`);
@@ -186,20 +219,23 @@ export class QuickBooksItemSyncService {
         accessToken: accountingAccount.accessToken!,
         refreshToken: accountingAccount.refreshToken!,
         realmId: accountingAccount.platformConfig?.realmId!,
-        environment: accountingAccount.platformConfig?.environment || 'production',
+        environment:
+          accountingAccount.platformConfig?.environment || 'production',
         expiresAt: accountingAccount.tokenExpiresAt,
       };
 
       // Get items from QuickBooks
       const response = await this.quickBooksApiService.queryItems(
         credentials,
-        "SELECT * FROM Item WHERE Active = true",
+        'SELECT * FROM Item WHERE Active = true',
         tenantId,
         accountingAccount.channelId!,
       );
 
       if (!response.success) {
-        throw new Error(`Failed to fetch items from QuickBooks: ${response.error?.message}`);
+        throw new Error(
+          `Failed to fetch items from QuickBooks: ${response.error?.message}`,
+        );
       }
 
       const quickBooksItems = response.data?.QueryResponse?.Item || [];
@@ -219,10 +255,13 @@ export class QuickBooksItemSyncService {
         try {
           await this.syncItemFromQuickBooks(qbItem, tenantId, options);
           result.syncedItems++;
-          
+
           // Update sync status progress
-          await this.updateSyncProgress(syncStatus.id, result.syncedItems, result.failedItems);
-          
+          await this.updateSyncProgress(
+            syncStatus.id,
+            result.syncedItems,
+            result.failedItems,
+          );
         } catch (error) {
           result.failedItems++;
           result.errors.push({
@@ -231,10 +270,16 @@ export class QuickBooksItemSyncService {
             details: error,
           });
 
-          this.logger.error(`Failed to import QuickBooks item ${qbItem.Id}: ${error.message}`);
-          
+          this.logger.error(
+            `Failed to import QuickBooks item ${qbItem.Id}: ${error.message}`,
+          );
+
           // Update sync status progress
-          await this.updateSyncProgress(syncStatus.id, result.syncedItems, result.failedItems);
+          await this.updateSyncProgress(
+            syncStatus.id,
+            result.syncedItems,
+            result.failedItems,
+          );
         }
       }
 
@@ -244,10 +289,11 @@ export class QuickBooksItemSyncService {
       result.success = result.failedItems === 0;
       result.duration = Date.now() - startTime;
 
-      this.logger.log(`QuickBooks item import completed: ${result.syncedItems}/${result.totalItems} items imported`);
+      this.logger.log(
+        `QuickBooks item import completed: ${result.syncedItems}/${result.totalItems} items imported`,
+      );
 
       return result;
-
     } catch (error) {
       result.duration = Date.now() - startTime;
       this.logger.error(`QuickBooks item import failed: ${error.message}`);
@@ -269,16 +315,24 @@ export class QuickBooksItemSyncService {
     this.logger.log(`Starting bidirectional sync for tenant ${tenantId}`);
 
     // First sync outbound (StokCerdas -> QuickBooks)
-    const outbound = await this.syncToQuickBooks(accountingAccountId, tenantId, {
-      ...options,
-      direction: 'outbound',
-    });
+    const outbound = await this.syncToQuickBooks(
+      accountingAccountId,
+      tenantId,
+      {
+        ...options,
+        direction: 'outbound',
+      },
+    );
 
     // Then sync inbound (QuickBooks -> StokCerdas)
-    const inbound = await this.syncFromQuickBooks(accountingAccountId, tenantId, {
-      ...options,
-      direction: 'inbound',
-    });
+    const inbound = await this.syncFromQuickBooks(
+      accountingAccountId,
+      tenantId,
+      {
+        ...options,
+        direction: 'inbound',
+      },
+    );
 
     return { outbound, inbound };
   }
@@ -286,7 +340,10 @@ export class QuickBooksItemSyncService {
   /**
    * Get products that need to be synced
    */
-  private async getProductsToSync(tenantId: string, options: ItemSyncOptions): Promise<Product[]> {
+  private async getProductsToSync(
+    tenantId: string,
+    options: ItemSyncOptions,
+  ): Promise<Product[]> {
     const queryBuilder = this.productRepository
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -310,12 +367,19 @@ export class QuickBooksItemSyncService {
     options: ItemSyncOptions,
   ): Promise<void> {
     // Check if product already exists in QuickBooks
-    const existingMapping = await this.getQuickBooksMapping(product.id, tenantId);
+    const existingMapping = await this.getQuickBooksMapping(
+      product.id,
+      tenantId,
+    );
 
     // Always sync product as single item for now
     // TODO: Implement variant support when ProductVariant entity is available
-    const quickBooksItem = this.mapProductToQuickBooksItem(product, null, options);
-    
+    const quickBooksItem = this.mapProductToQuickBooksItem(
+      product,
+      null,
+      options,
+    );
+
     if (existingMapping?.externalId) {
       // Update existing item
       quickBooksItem.Id = existingMapping.externalId;
@@ -327,7 +391,9 @@ export class QuickBooksItemSyncService {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to update QuickBooks item: ${response.error?.message}`);
+        throw new Error(
+          `Failed to update QuickBooks item: ${response.error?.message}`,
+        );
       }
     } else {
       // Create new item
@@ -339,7 +405,9 @@ export class QuickBooksItemSyncService {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to create QuickBooks item: ${response.error?.message}`);
+        throw new Error(
+          `Failed to create QuickBooks item: ${response.error?.message}`,
+        );
       }
 
       // Save mapping
@@ -421,11 +489,18 @@ export class QuickBooksItemSyncService {
     options: ItemSyncOptions,
   ): Promise<void> {
     // Check if item already exists
-    const existingProduct = await this.findProductByQuickBooksId(qbItem.Id!, tenantId);
+    const existingProduct = await this.findProductByQuickBooksId(
+      qbItem.Id!,
+      tenantId,
+    );
 
     if (existingProduct) {
       // Update existing product
-      await this.updateProductFromQuickBooksItem(existingProduct, qbItem, options);
+      await this.updateProductFromQuickBooksItem(
+        existingProduct,
+        qbItem,
+        options,
+      );
     } else {
       // Create new product
       await this.createProductFromQuickBooksItem(qbItem, tenantId, options);
@@ -467,7 +542,12 @@ export class QuickBooksItemSyncService {
     const savedProduct = await this.productRepository.save(product);
 
     // Save mapping
-    await this.saveQuickBooksMapping(savedProduct.id, qbItem.Id!, tenantId, 'quickbooks');
+    await this.saveQuickBooksMapping(
+      savedProduct.id,
+      qbItem.Id!,
+      tenantId,
+      'quickbooks',
+    );
 
     return savedProduct;
   }
@@ -488,7 +568,9 @@ export class QuickBooksItemSyncService {
     if (qbItem.Sku) {
       product.sku = qbItem.Sku;
     }
-    product.status = qbItem.Active ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
+    product.status = qbItem.Active
+      ? ProductStatus.ACTIVE
+      : ProductStatus.INACTIVE;
 
     if (options.syncPrices && qbItem.UnitPrice !== undefined) {
       product.sellingPrice = qbItem.UnitPrice;
@@ -506,7 +588,10 @@ export class QuickBooksItemSyncService {
   }
 
   // Helper methods for mapping management
-  private async getQuickBooksMapping(entityId: string, tenantId: string): Promise<SyncStatus | null> {
+  private async getQuickBooksMapping(
+    entityId: string,
+    tenantId: string,
+  ): Promise<SyncStatus | null> {
     return this.syncStatusRepository.findOne({
       where: {
         tenantId,
@@ -539,7 +624,10 @@ export class QuickBooksItemSyncService {
     await this.syncStatusRepository.save(syncStatus);
   }
 
-  private async findProductByQuickBooksId(quickBooksId: string, tenantId: string): Promise<Product | null> {
+  private async findProductByQuickBooksId(
+    quickBooksId: string,
+    tenantId: string,
+  ): Promise<Product | null> {
     const syncStatus = await this.syncStatusRepository.findOne({
       where: {
         tenantId,
@@ -594,15 +682,22 @@ export class QuickBooksItemSyncService {
     });
   }
 
-  private async completeSyncStatus(syncStatusId: string, result: SyncResult): Promise<void> {
+  private async completeSyncStatus(
+    syncStatusId: string,
+    result: SyncResult,
+  ): Promise<void> {
     await this.syncStatusRepository.update(syncStatusId, {
-      status: result.success ? SyncStatusEnum.COMPLETED : SyncStatusEnum.PARTIAL,
+      status: result.success
+        ? SyncStatusEnum.COMPLETED
+        : SyncStatusEnum.PARTIAL,
       completedAt: new Date(),
       processedRecords: result.syncedItems + result.failedItems,
       successfulRecords: result.syncedItems,
       failedRecords: result.failedItems,
-      errorMessage: result.errors.length > 0 ? result.errors[0].error : undefined,
-      errorDetails: result.errors.length > 0 ? { errors: result.errors } : undefined,
+      errorMessage:
+        result.errors.length > 0 ? result.errors[0].error : undefined,
+      errorDetails:
+        result.errors.length > 0 ? { errors: result.errors } : undefined,
     });
   }
 }

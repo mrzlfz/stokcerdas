@@ -71,9 +71,13 @@ export class Permission {
   @Column({ type: 'boolean', default: false })
   isSystemPermission: boolean; // For super admin only permissions
 
-  @OneToMany(() => RolePermission, (rolePermission) => rolePermission.permission, {
-    cascade: true,
-  })
+  @OneToMany(
+    () => RolePermission,
+    rolePermission => rolePermission.permission,
+    {
+      cascade: true,
+    },
+  )
   @Exclude({ toPlainOnly: true })
   rolePermissions: RolePermission[];
 
@@ -95,7 +99,10 @@ export class Permission {
   }
 
   // Static method to get permission key
-  static getKey(resource: PermissionResource, action: PermissionAction): string {
+  static getKey(
+    resource: PermissionResource,
+    action: PermissionAction,
+  ): string {
     return `${resource}:${action}`;
   }
 }

@@ -12,18 +12,36 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../users/entities/user.entity';
 // import { Role } from '../../../auth/entities/role.entity'; // TODO: Create role entity
-import { AccurateApiService, AccurateCredentials } from '../services/accurate-api.service';
-import { AccurateTaxComplianceService, IndonesianTaxConfiguration } from '../services/accurate-tax-compliance.service';
-import { AccurateMultiCurrencyService, CurrencyConfiguration } from '../services/accurate-multi-currency.service';
+import {
+  AccurateApiService,
+  AccurateCredentials,
+} from '../services/accurate-api.service';
+import {
+  AccurateTaxComplianceService,
+  IndonesianTaxConfiguration,
+} from '../services/accurate-tax-compliance.service';
+import {
+  AccurateMultiCurrencyService,
+  CurrencyConfiguration,
+} from '../services/accurate-multi-currency.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AccountingAccount, AccountingPlatform, AccountingConnectionStatus } from '../../entities/accounting-account.entity';
+import {
+  AccountingAccount,
+  AccountingPlatform,
+  AccountingConnectionStatus,
+} from '../../entities/accounting-account.entity';
 
 @ApiTags('Accurate Online Integration')
 @Controller('api/v1/integrations/accurate')
@@ -45,7 +63,8 @@ export class AccurateController {
   @ApiOperation({ summary: 'Authenticate with Accurate Online' })
   @ApiResponse({ status: 200, description: 'Authentication successful' })
   async authenticate(
-    @Body() body: {
+    @Body()
+    body: {
       serverUrl: string;
       username: string;
       password: string;
@@ -67,7 +86,9 @@ export class AccurateController {
       );
 
       if (!authResponse.success) {
-        throw new Error(`Authentication failed: ${authResponse.error?.message}`);
+        throw new Error(
+          `Authentication failed: ${authResponse.error?.message}`,
+        );
       }
 
       const authData = authResponse.data!;
@@ -94,7 +115,10 @@ export class AccurateController {
           connected: true,
           session: authData.session,
           databases: authData.databases,
-          companyInfo: await this.getCompanyProfile(accountingAccount.id, tenantId),
+          companyInfo: await this.getCompanyProfile(
+            accountingAccount.id,
+            tenantId,
+          ),
         },
       };
     } catch (error) {
@@ -119,7 +143,10 @@ export class AccurateController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const result = await this.accurateApiService.testConnection(
@@ -151,14 +178,20 @@ export class AccurateController {
   @Get(':accountId/company-profile')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get Accurate company profile' })
-  @ApiResponse({ status: 200, description: 'Company profile retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company profile retrieved successfully',
+  })
   async getCompanyProfile(
     @Param('accountId') accountId: string,
     @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.getCompanyProfile(
@@ -168,7 +201,9 @@ export class AccurateController {
       );
 
       if (!response.success) {
-        throw new Error(`Failed to get company profile: ${response.error?.message}`);
+        throw new Error(
+          `Failed to get company profile: ${response.error?.message}`,
+        );
       }
 
       return {
@@ -201,7 +236,10 @@ export class AccurateController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.getItems(
@@ -242,7 +280,10 @@ export class AccurateController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.createItem(
@@ -287,7 +328,10 @@ export class AccurateController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.getInvoices(
@@ -328,7 +372,10 @@ export class AccurateController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.createInvoice(
@@ -371,7 +418,10 @@ export class AccurateController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.getCustomers(
@@ -404,14 +454,20 @@ export class AccurateController {
   @Get(':accountId/accounts')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get chart of accounts from Accurate' })
-  @ApiResponse({ status: 200, description: 'Chart of accounts retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chart of accounts retrieved successfully',
+  })
   async getAccounts(
     @Param('accountId') accountId: string,
     @Request() req: any,
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.getAccounts(
@@ -450,7 +506,10 @@ export class AccurateController {
   ) {
     try {
       const tenantId = req.user.tenantId;
-      const accountingAccount = await this.getAccountingAccount(accountId, tenantId);
+      const accountingAccount = await this.getAccountingAccount(
+        accountId,
+        tenantId,
+      );
       const credentials = this.getCredentials(accountingAccount);
 
       const response = await this.accurateApiService.getTaxRates(
@@ -484,7 +543,10 @@ export class AccurateController {
   @Post(':accountId/tax/configure')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Configure Indonesian tax settings' })
-  @ApiResponse({ status: 200, description: 'Tax settings configured successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tax settings configured successfully',
+  })
   async configureTaxSettings(
     @Param('accountId') accountId: string,
     @Body() config: IndonesianTaxConfiguration,
@@ -493,11 +555,12 @@ export class AccurateController {
     try {
       const tenantId = req.user.tenantId;
 
-      const result = await this.accurateTaxComplianceService.configureTaxSettings(
-        accountId,
-        tenantId,
-        config,
-      );
+      const result =
+        await this.accurateTaxComplianceService.configureTaxSettings(
+          accountId,
+          tenantId,
+          config,
+        );
 
       return {
         success: result.success,
@@ -521,7 +584,8 @@ export class AccurateController {
   @ApiResponse({ status: 200, description: 'Tax calculated successfully' })
   async calculateTax(
     @Param('accountId') accountId: string,
-    @Body() body: {
+    @Body()
+    body: {
       orderOrInvoiceId: string;
       type: 'order' | 'invoice';
     },
@@ -592,7 +656,10 @@ export class AccurateController {
   @Get(':accountId/tax/report')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Generate tax report' })
-  @ApiResponse({ status: 200, description: 'Tax report generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tax report generated successfully',
+  })
   async generateTaxReport(
     @Param('accountId') accountId: string,
     @Query('month') month: number,
@@ -628,7 +695,10 @@ export class AccurateController {
   @Get(':accountId/tax/compliance/check')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Check tax compliance status' })
-  @ApiResponse({ status: 200, description: 'Compliance status checked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Compliance status checked successfully',
+  })
   async checkCompliance(
     @Param('accountId') accountId: string,
     @Request() req: any,
@@ -662,7 +732,10 @@ export class AccurateController {
   @Post(':accountId/currency/configure')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Configure multi-currency settings' })
-  @ApiResponse({ status: 200, description: 'Currency settings configured successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Currency settings configured successfully',
+  })
   async configureCurrency(
     @Param('accountId') accountId: string,
     @Body() config: CurrencyConfiguration,
@@ -696,7 +769,10 @@ export class AccurateController {
   @Get(':accountId/currency/exchange-rate')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get exchange rate between currencies' })
-  @ApiResponse({ status: 200, description: 'Exchange rate retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Exchange rate retrieved successfully',
+  })
   async getExchangeRate(
     @Request() req: any,
     @Param('accountId') accountId: string,
@@ -737,7 +813,8 @@ export class AccurateController {
   @ApiResponse({ status: 200, description: 'Currency converted successfully' })
   async convertCurrency(
     @Param('accountId') accountId: string,
-    @Body() body: {
+    @Body()
+    body: {
       amount: number;
       fromCurrency: string;
       toCurrency: string;
@@ -777,7 +854,10 @@ export class AccurateController {
   @Post(':accountId/currency/revaluation')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Perform currency revaluation' })
-  @ApiResponse({ status: 200, description: 'Currency revaluation completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Currency revaluation completed successfully',
+  })
   async performRevaluation(
     @Param('accountId') accountId: string,
     @Body() body: { revaluationDate?: string },
@@ -812,7 +892,10 @@ export class AccurateController {
   @Get(':accountId/currency/report')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Generate currency report' })
-  @ApiResponse({ status: 200, description: 'Currency report generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Currency report generated successfully',
+  })
   async generateCurrencyReport(
     @Request() req: any,
     @Param('accountId') accountId: string,
@@ -821,11 +904,12 @@ export class AccurateController {
     try {
       const tenantId = req.user.tenantId;
 
-      const report = await this.accurateMultiCurrencyService.generateCurrencyReport(
-        accountId,
-        tenantId,
-        reportDate ? new Date(reportDate) : undefined,
-      );
+      const report =
+        await this.accurateMultiCurrencyService.generateCurrencyReport(
+          accountId,
+          tenantId,
+          reportDate ? new Date(reportDate) : undefined,
+        );
 
       return {
         success: true,
@@ -846,7 +930,10 @@ export class AccurateController {
   @Delete(':accountId/disconnect')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Disconnect Accurate account' })
-  @ApiResponse({ status: 200, description: 'Account disconnected successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account disconnected successfully',
+  })
   async disconnectAccount(
     @Param('accountId') accountId: string,
     @Request() req: any,
@@ -884,7 +971,10 @@ export class AccurateController {
 
   // Helper methods
 
-  private async getAccountingAccount(accountId: string, tenantId: string): Promise<AccountingAccount> {
+  private async getAccountingAccount(
+    accountId: string,
+    tenantId: string,
+  ): Promise<AccountingAccount> {
     const account = await this.accountingAccountRepository.findOne({
       where: { id: accountId, tenantId, platform: AccountingPlatform.ACCURATE },
     });
@@ -896,7 +986,9 @@ export class AccurateController {
     return account;
   }
 
-  private getCredentials(accountingAccount: AccountingAccount): AccurateCredentials {
+  private getCredentials(
+    accountingAccount: AccountingAccount,
+  ): AccurateCredentials {
     return {
       clientId: accountingAccount.clientId || '',
       clientSecret: accountingAccount.clientSecret || '',
@@ -934,13 +1026,18 @@ export class AccurateController {
         sessionId: credentials.sessionId,
         databaseId: credentials.databaseId,
         serverUrl: credentials.serverUrl,
-        environment: (credentials.environment === 'demo' ? 'sandbox' : 'production') as 'sandbox' | 'production',
+        environment: (credentials.environment === 'demo'
+          ? 'sandbox'
+          : 'production') as 'sandbox' | 'production',
       },
       updatedBy: userId,
     };
 
     if (existingAccount) {
-      await this.accountingAccountRepository.update(existingAccount.id, accountData);
+      await this.accountingAccountRepository.update(
+        existingAccount.id,
+        accountData,
+      );
       return this.accountingAccountRepository.findOne({
         where: { id: existingAccount.id, tenantId },
       });

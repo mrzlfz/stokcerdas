@@ -31,7 +31,10 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import { Tenant } from '../../common/decorators/tenant.decorator';
-import { PermissionAction, PermissionResource } from '../../auth/entities/permission.entity';
+import {
+  PermissionAction,
+  PermissionResource,
+} from '../../auth/entities/permission.entity';
 
 @ApiTags('Product Variants')
 @ApiBearerAuth('access-token')
@@ -44,18 +47,28 @@ export class ProductVariantsController {
   ) {}
 
   @Post()
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.CREATE,
+  })
   @ApiOperation({ summary: 'Buat variant produk baru' })
   @ApiResponse({ status: 201, description: 'Variant berhasil dibuat' })
   @ApiResponse({ status: 400, description: 'Data tidak valid' })
-  @ApiResponse({ status: 409, description: 'SKU atau kombinasi atribut sudah ada' })
+  @ApiResponse({
+    status: 409,
+    description: 'SKU atau kombinasi atribut sudah ada',
+  })
   async create(
     @Tenant() tenantId: string,
     @GetUser('id') userId: string,
     @Body() createVariantDto: CreateProductVariantDto,
   ) {
-    const variant = await this.variantsService.create(tenantId, createVariantDto, userId);
-    
+    const variant = await this.variantsService.create(
+      tenantId,
+      createVariantDto,
+      userId,
+    );
+
     return {
       success: true,
       message: 'Variant berhasil dibuat',
@@ -64,16 +77,23 @@ export class ProductVariantsController {
   }
 
   @Get()
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan daftar variant produk' })
-  @ApiQuery({ name: 'productId', required: false, description: 'Filter berdasarkan ID produk' })
+  @ApiQuery({
+    name: 'productId',
+    required: false,
+    description: 'Filter berdasarkan ID produk',
+  })
   @ApiResponse({ status: 200, description: 'Daftar variant berhasil didapat' })
   async findAll(
     @Tenant() tenantId: string,
     @Query('productId') productId?: string,
   ) {
     const variants = await this.variantsService.findAll(tenantId, productId);
-    
+
     return {
       success: true,
       message: 'Daftar variant berhasil didapat',
@@ -82,17 +102,17 @@ export class ProductVariantsController {
   }
 
   @Get('search/sku/:sku')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Cari variant berdasarkan SKU' })
   @ApiParam({ name: 'sku', description: 'SKU variant' })
   @ApiResponse({ status: 200, description: 'Variant ditemukan' })
   @ApiResponse({ status: 404, description: 'Variant tidak ditemukan' })
-  async findBySku(
-    @Tenant() tenantId: string,
-    @Param('sku') sku: string,
-  ) {
+  async findBySku(@Tenant() tenantId: string, @Param('sku') sku: string) {
     const variant = await this.variantsService.findBySku(tenantId, sku);
-    
+
     return {
       success: true,
       message: 'Variant ditemukan',
@@ -101,7 +121,10 @@ export class ProductVariantsController {
   }
 
   @Get('search/barcode/:barcode')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Cari variant berdasarkan barcode' })
   @ApiParam({ name: 'barcode', description: 'Barcode variant' })
   @ApiResponse({ status: 200, description: 'Variant ditemukan' })
@@ -111,7 +134,7 @@ export class ProductVariantsController {
     @Param('barcode') barcode: string,
   ) {
     const variant = await this.variantsService.findByBarcode(tenantId, barcode);
-    
+
     return {
       success: true,
       message: 'Variant ditemukan',
@@ -120,16 +143,25 @@ export class ProductVariantsController {
   }
 
   @Get('product/:productId')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan semua variant untuk produk tertentu' })
   @ApiParam({ name: 'productId', description: 'ID produk' })
-  @ApiResponse({ status: 200, description: 'Daftar variant produk berhasil didapat' })
+  @ApiResponse({
+    status: 200,
+    description: 'Daftar variant produk berhasil didapat',
+  })
   async getVariantsByProduct(
     @Tenant() tenantId: string,
     @Param('productId', ParseUUIDPipe) productId: string,
   ) {
-    const variants = await this.variantsService.getVariantsByProduct(tenantId, productId);
-    
+    const variants = await this.variantsService.getVariantsByProduct(
+      tenantId,
+      productId,
+    );
+
     return {
       success: true,
       message: 'Daftar variant produk berhasil didapat',
@@ -138,7 +170,10 @@ export class ProductVariantsController {
   }
 
   @Get('product/:productId/matrix')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan matriks variant untuk produk' })
   @ApiParam({ name: 'productId', description: 'ID produk' })
   @ApiResponse({ status: 200, description: 'Matriks variant berhasil didapat' })
@@ -146,8 +181,11 @@ export class ProductVariantsController {
     @Tenant() tenantId: string,
     @Param('productId', ParseUUIDPipe) productId: string,
   ) {
-    const matrix = await this.variantsService.getVariantMatrix(tenantId, productId);
-    
+    const matrix = await this.variantsService.getVariantMatrix(
+      tenantId,
+      productId,
+    );
+
     return {
       success: true,
       message: 'Matriks variant berhasil didapat',
@@ -156,7 +194,10 @@ export class ProductVariantsController {
   }
 
   @Get(':id')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.READ,
+  })
   @ApiOperation({ summary: 'Dapatkan detail variant produk' })
   @ApiParam({ name: 'id', description: 'ID variant' })
   @ApiResponse({ status: 200, description: 'Detail variant berhasil didapat' })
@@ -166,7 +207,7 @@ export class ProductVariantsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const variant = await this.variantsService.findOne(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Detail variant berhasil didapat',
@@ -175,20 +216,31 @@ export class ProductVariantsController {
   }
 
   @Patch(':id')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Update variant produk' })
   @ApiParam({ name: 'id', description: 'ID variant' })
   @ApiResponse({ status: 200, description: 'Variant berhasil diupdate' })
   @ApiResponse({ status: 404, description: 'Variant tidak ditemukan' })
-  @ApiResponse({ status: 409, description: 'SKU atau kombinasi atribut sudah ada' })
+  @ApiResponse({
+    status: 409,
+    description: 'SKU atau kombinasi atribut sudah ada',
+  })
   async update(
     @Tenant() tenantId: string,
     @GetUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateVariantDto: UpdateProductVariantDto,
   ) {
-    const variant = await this.variantsService.update(tenantId, id, updateVariantDto, userId);
-    
+    const variant = await this.variantsService.update(
+      tenantId,
+      id,
+      updateVariantDto,
+      userId,
+    );
+
     return {
       success: true,
       message: 'Variant berhasil diupdate',
@@ -197,7 +249,10 @@ export class ProductVariantsController {
   }
 
   @Delete(':id')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.DELETE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.DELETE,
+  })
   @ApiOperation({ summary: 'Hapus variant produk (soft delete)' })
   @ApiParam({ name: 'id', description: 'ID variant' })
   @ApiResponse({ status: 200, description: 'Variant berhasil dihapus' })
@@ -208,7 +263,7 @@ export class ProductVariantsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.variantsService.remove(tenantId, id);
-    
+
     return {
       success: true,
       message: 'Variant berhasil dihapus',
@@ -217,7 +272,10 @@ export class ProductVariantsController {
 
   // Bulk Operations
   @Patch('product/:productId/bulk-update-prices')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Update harga semua variant untuk produk tertentu' })
   @ApiParam({ name: 'productId', description: 'ID produk' })
   @ApiResponse({ status: 200, description: 'Bulk update harga berhasil' })
@@ -225,15 +283,21 @@ export class ProductVariantsController {
     @Tenant() tenantId: string,
     @GetUser('id') userId: string,
     @Param('productId', ParseUUIDPipe) productId: string,
-    @Body() priceUpdate: {
+    @Body()
+    priceUpdate: {
       costPrice?: number;
       sellingPrice?: number;
       adjustment?: number;
       adjustmentType?: 'amount' | 'percentage';
     },
   ) {
-    const result = await this.variantsService.bulkUpdatePrices(tenantId, productId, priceUpdate, userId);
-    
+    const result = await this.variantsService.bulkUpdatePrices(
+      tenantId,
+      productId,
+      priceUpdate,
+      userId,
+    );
+
     return {
       success: true,
       message: `Bulk update selesai. ${result.updated} variant berhasil diupdate`,
@@ -243,7 +307,10 @@ export class ProductVariantsController {
 
   // Barcode Operations
   @Post(':id/barcode/generate')
-  @Permissions({ resource: PermissionResource.PRODUCTS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.PRODUCTS,
+    action: PermissionAction.UPDATE,
+  })
   @ApiOperation({ summary: 'Generate barcode untuk variant' })
   @ApiParam({ name: 'id', description: 'ID variant' })
   @ApiResponse({ status: 200, description: 'Barcode berhasil digenerate' })
@@ -251,8 +318,11 @@ export class ProductVariantsController {
     @Tenant() tenantId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const barcode = await this.barcodeService.generateVariantBarcode(tenantId, id);
-    
+    const barcode = await this.barcodeService.generateVariantBarcode(
+      tenantId,
+      id,
+    );
+
     return {
       success: true,
       message: 'Barcode berhasil digenerate',

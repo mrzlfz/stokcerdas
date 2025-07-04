@@ -9,7 +9,10 @@ import * as moment from 'moment-timezone';
 import { ReorderRule, ReorderRuleType } from '../entities/reorder-rule.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
 import { Product } from '../../products/entities/product.entity';
-import { InventoryTransaction, TransactionType } from '../../inventory/entities/inventory-transaction.entity';
+import {
+  InventoryTransaction,
+  TransactionType,
+} from '../../inventory/entities/inventory-transaction.entity';
 import { ForecastingService } from '../../ml-forecasting/services/forecasting.service';
 
 export interface ReorderCalculationRequest {
@@ -61,39 +64,39 @@ export interface ReorderCalculationResult {
   // Input validation
   isValid: boolean;
   validationErrors: string[];
-  
+
   // Core calculations
   recommendedReorderPoint: number;
   recommendedOrderQuantity: number;
   currentStock: number;
   availableStock: number;
-  
+
   // Analysis components
   demandAnalysis: DemandAnalysis;
   eoqCalculation?: EOQCalculation;
   safetyStockCalculation: SafetyStockCalculation;
-  
+
   // Timing and urgency
   urgencyScore: number; // 0-10, higher = more urgent
   daysUntilStockout: number;
   shouldReorderNow: boolean;
-  
+
   // Financial impact
   estimatedOrderValue: number;
   budgetImpact: number;
   costPerDayOfStock: number;
-  
+
   // Risk assessment
   stockoutRisk: number;
   overstockRisk: number;
   riskMitigationSuggestions: string[];
-  
+
   // Metadata
   calculatedAt: Date;
   calculationMethod: string;
   confidenceLevel: number;
   dataQuality: number; // 0-1, higher = better data
-  
+
   // Additional insights
   insights: {
     message: string;
@@ -122,13 +125,15 @@ export class ReorderCalculationService {
    * Calculate reorder recommendations based on rule and current inventory
    */
   async calculateReorderRecommendation(
-    request: ReorderCalculationRequest
+    request: ReorderCalculationRequest,
   ): Promise<ReorderCalculationResult> {
     const startTime = Date.now();
-    
+
     try {
-      this.logger.debug(`Calculating reorder for product ${request.product.id}, rule ${request.reorderRule.id}`);
-      
+      this.logger.debug(
+        `Calculating reorder for product ${request.product.id}, rule ${request.reorderRule.id}`,
+      );
+
       // Validate inputs
       const validation = this.validateInputs(request);
       if (!validation.isValid) {
@@ -137,52 +142,54 @@ export class ReorderCalculationService {
 
       // Get demand analysis
       const demandAnalysis = await this.analyzeDemand(request);
-      
+
       // Calculate safety stock
       const safetyStock = this.calculateSafetyStock(request, demandAnalysis);
-      
+
       // Calculate EOQ if applicable
       let eoqCalculation: EOQCalculation | undefined;
       if (request.reorderRule.ruleType === ReorderRuleType.EOQ) {
         eoqCalculation = this.calculateEOQ(request, demandAnalysis);
       }
-      
+
       // Determine reorder point and quantity
       const { reorderPoint, orderQuantity } = this.determineReorderParameters(
         request,
         demandAnalysis,
         safetyStock,
-        eoqCalculation
+        eoqCalculation,
       );
-      
+
       // Calculate urgency and timing
       const urgencyAnalysis = this.calculateUrgency(request, reorderPoint);
-      
+
       // Financial impact analysis
       const financialImpact = this.calculateFinancialImpact(
         request,
         orderQuantity,
-        demandAnalysis
+        demandAnalysis,
       );
-      
+
       // Risk assessment
       const riskAssessment = this.assessRisks(
         request,
         reorderPoint,
         orderQuantity,
-        demandAnalysis
+        demandAnalysis,
       );
-      
+
       // Generate insights
       const insights = this.generateInsights(
         request,
         demandAnalysis,
         urgencyAnalysis,
-        riskAssessment
+        riskAssessment,
       );
 
       const calculationTime = Date.now() - startTime;
-      this.logger.debug(`Reorder calculation completed in ${calculationTime}ms`);
+      this.logger.debug(
+        `Reorder calculation completed in ${calculationTime}ms`,
+      );
 
       return {
         isValid: true,
@@ -209,9 +216,11 @@ export class ReorderCalculationService {
         dataQuality: this.calculateDataQuality(demandAnalysis),
         insights,
       };
-
     } catch (error) {
-      this.logger.error(`Error in reorder calculation: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error in reorder calculation: ${error.message}`,
+        error.stack,
+      );
       return this.createErrorResult(error.message);
     }
   }
@@ -219,14 +228,16 @@ export class ReorderCalculationService {
   /**
    * Analyze historical demand patterns
    */
-  private async analyzeDemand(request: ReorderCalculationRequest): Promise<DemandAnalysis> {
+  private async analyzeDemand(
+    request: ReorderCalculationRequest,
+  ): Promise<DemandAnalysis> {
     const { reorderRule, inventoryItem, product } = request;
     const lookbackDays = reorderRule.demandLookbackDays || 30;
-    
+
     // Get historical transactions
     const endDate = request.currentDate || new Date();
     const startDate = moment(endDate).subtract(lookbackDays, 'days').toDate();
-    
+
     const transactions = await this.inventoryTransactionRepository.find({
       where: {
         tenantId: reorderRule.tenantId,
@@ -238,35 +249,45 @@ export class ReorderCalculationService {
     });
 
     // Process demand data
-    const dailyDemand = this.aggregateDailyDemand(transactions, startDate, endDate);
+    const dailyDemand = this.aggregateDailyDemand(
+      transactions,
+      startDate,
+      endDate,
+    );
     const totalDemand = dailyDemand.reduce((sum, demand) => sum + demand, 0);
     const averageDailyDemand = totalDemand / lookbackDays;
-    
+
     // Calculate variance and standard deviation
-    const demandVariance = this.calculateVariance(dailyDemand, averageDailyDemand);
+    const demandVariance = this.calculateVariance(
+      dailyDemand,
+      averageDailyDemand,
+    );
     const demandStandardDeviation = Math.sqrt(demandVariance);
-    
+
     // Determine trend
     const demandTrend = this.calculateTrend(dailyDemand);
-    
+
     // Get seasonality factor
     const seasonalityFactor = reorderRule.getSeasonalFactor();
-    
+
     // Get forecast if enabled
     let forecastDemand: number | undefined;
     let forecastConfidence: number | undefined;
-    
+
     if (reorderRule.useForecastingData) {
       try {
-        const forecast = await this.forecastingService.generateDemandForecast(reorderRule.tenantId, {
-          productId: product.id,
-          forecastHorizonDays: reorderRule.forecastHorizonDays,
-          includeConfidenceInterval: true,
-          includeSeasonality: true,
-          includeTrendDecomposition: false,
-          granularity: 'daily',
-        });
-        
+        const forecast = await this.forecastingService.generateDemandForecast(
+          reorderRule.tenantId,
+          {
+            productId: product.id,
+            forecastHorizonDays: reorderRule.forecastHorizonDays,
+            includeConfidenceInterval: true,
+            includeSeasonality: true,
+            includeTrendDecomposition: false,
+            granularity: 'daily',
+          },
+        );
+
         if (forecast.success && forecast.timeSeries.length > 0) {
           // Sum up forecast for lead time period
           const leadTimeDays = reorderRule.leadTimeDays || 7;
@@ -287,7 +308,10 @@ export class ReorderCalculationService {
       totalDemand,
       demandTrend,
       seasonalityFactor,
-      confidenceLevel: this.calculateConfidenceLevel(dailyDemand.length, demandVariance),
+      confidenceLevel: this.calculateConfidenceLevel(
+        dailyDemand.length,
+        demandVariance,
+      ),
       dataPoints: dailyDemand.length,
       forecastDemand,
       forecastConfidence,
@@ -299,20 +323,23 @@ export class ReorderCalculationService {
    */
   private calculateEOQ(
     request: ReorderCalculationRequest,
-    demandAnalysis: DemandAnalysis
+    demandAnalysis: DemandAnalysis,
   ): EOQCalculation {
     const { reorderRule } = request;
-    
-    const annualDemand = reorderRule.annualDemand || (demandAnalysis.averageDailyDemand * 365);
+
+    const annualDemand =
+      reorderRule.annualDemand || demandAnalysis.averageDailyDemand * 365;
     const orderingCost = reorderRule.orderingCost || 50000; // Default IDR 50k per order
     const unitCost = reorderRule.unitCost || request.product.costPrice || 0;
     const holdingCostRate = (reorderRule.holdingCostRate || 25) / 100; // Convert percentage
-    
+
     const holdingCostPerUnit = unitCost * holdingCostRate;
-    
+
     // Classic EOQ formula: √(2DS/H)
-    const eoq = Math.sqrt((2 * annualDemand * orderingCost) / holdingCostPerUnit);
-    
+    const eoq = Math.sqrt(
+      (2 * annualDemand * orderingCost) / holdingCostPerUnit,
+    );
+
     // Calculate total costs
     const optimalOrderQuantity = Math.round(eoq);
     const numberOfOrders = annualDemand / optimalOrderQuantity;
@@ -320,7 +347,7 @@ export class ReorderCalculationService {
     const averageInventory = optimalOrderQuantity / 2;
     const totalHoldingCost = averageInventory * holdingCostPerUnit;
     const totalCost = totalOrderingCost + totalHoldingCost;
-    
+
     // Calculate cost savings vs current order quantity
     const currentOrderQuantity = reorderRule.reorderQuantity;
     const currentNumberOfOrders = annualDemand / currentOrderQuantity;
@@ -328,7 +355,7 @@ export class ReorderCalculationService {
     const currentAverageInventory = currentOrderQuantity / 2;
     const currentHoldingCost = currentAverageInventory * holdingCostPerUnit;
     const currentTotalCost = currentOrderingCost + currentHoldingCost;
-    
+
     const costSavings = currentTotalCost - totalCost;
 
     return {
@@ -346,24 +373,24 @@ export class ReorderCalculationService {
    */
   private calculateSafetyStock(
     request: ReorderCalculationRequest,
-    demandAnalysis: DemandAnalysis
+    demandAnalysis: DemandAnalysis,
   ): SafetyStockCalculation {
     const { reorderRule } = request;
-    
+
     const serviceLevel = reorderRule.effectiveServiceLevel;
     const leadTimeDays = reorderRule.leadTimeDays || 7;
     const zScore = this.getZScoreForServiceLevel(serviceLevel);
-    
+
     // Lead time demand
     const leadTimeDemand = demandAnalysis.averageDailyDemand * leadTimeDays;
-    
+
     // Lead time variance (assuming demand variance is independent each day)
     const leadTimeVariance = leadTimeDays * demandAnalysis.demandVariance;
     const leadTimeStandardDeviation = Math.sqrt(leadTimeVariance);
-    
+
     // Safety stock calculation
     const safetyStock = Math.round(zScore * leadTimeStandardDeviation);
-    
+
     // Calculate stockout risk
     const stockoutRisk = 1 - serviceLevel;
 
@@ -385,47 +412,49 @@ export class ReorderCalculationService {
     request: ReorderCalculationRequest,
     demandAnalysis: DemandAnalysis,
     safetyStock: SafetyStockCalculation,
-    eoqCalculation?: EOQCalculation
+    eoqCalculation?: EOQCalculation,
   ): { reorderPoint: number; orderQuantity: number } {
     const { reorderRule } = request;
-    
+
     let reorderPoint: number;
     let orderQuantity: number;
 
     // Calculate base reorder point
     reorderPoint = safetyStock.leadTimeDemand + safetyStock.safetyStock;
-    
+
     // Apply seasonal adjustment
     reorderPoint = Math.round(reorderPoint * demandAnalysis.seasonalityFactor);
-    
+
     // Determine order quantity based on rule type
     switch (reorderRule.ruleType) {
       case ReorderRuleType.EOQ:
-        orderQuantity = eoqCalculation?.economicOrderQuantity || reorderRule.reorderQuantity;
+        orderQuantity =
+          eoqCalculation?.economicOrderQuantity || reorderRule.reorderQuantity;
         break;
-        
+
       case ReorderRuleType.DEMAND_BASED:
         // Order for demand period * multiplier
         const demandPeriod = reorderRule.forecastHorizonDays || 30;
-        const baseDemand = demandAnalysis.forecastDemand || 
-                          (demandAnalysis.averageDailyDemand * demandPeriod);
+        const baseDemand =
+          demandAnalysis.forecastDemand ||
+          demandAnalysis.averageDailyDemand * demandPeriod;
         orderQuantity = Math.round(baseDemand * reorderRule.demandMultiplier);
         break;
-        
+
       case ReorderRuleType.MIN_MAX:
         // Order up to max level
-        const maxLevel = reorderRule.maxStockLevel || (reorderPoint * 2);
+        const maxLevel = reorderRule.maxStockLevel || reorderPoint * 2;
         const currentStock = request.inventoryItem.quantityOnHand;
         orderQuantity = Math.max(0, maxLevel - currentStock);
         break;
-        
+
       case ReorderRuleType.SEASONAL:
         // Seasonal adjustment to standard quantity
         orderQuantity = Math.round(
-          reorderRule.reorderQuantity * demandAnalysis.seasonalityFactor
+          reorderRule.reorderQuantity * demandAnalysis.seasonalityFactor,
         );
         break;
-        
+
       default:
         orderQuantity = reorderRule.reorderQuantity;
     }
@@ -434,7 +463,7 @@ export class ReorderCalculationService {
     if (reorderRule.minOrderQuantity) {
       orderQuantity = Math.max(orderQuantity, reorderRule.minOrderQuantity);
     }
-    
+
     if (reorderRule.maxOrderQuantity) {
       orderQuantity = Math.min(orderQuantity, reorderRule.maxOrderQuantity);
     }
@@ -442,7 +471,7 @@ export class ReorderCalculationService {
     // Budget constraint
     if (reorderRule.maxOrderValue && request.product.costPrice) {
       const maxQuantityByBudget = Math.floor(
-        reorderRule.maxOrderValue / request.product.costPrice
+        reorderRule.maxOrderValue / request.product.costPrice,
       );
       orderQuantity = Math.min(orderQuantity, maxQuantityByBudget);
     }
@@ -455,19 +484,24 @@ export class ReorderCalculationService {
    */
   private calculateUrgency(
     request: ReorderCalculationRequest,
-    reorderPoint: number
-  ): { urgencyScore: number; daysUntilStockout: number; shouldReorderNow: boolean } {
+    reorderPoint: number,
+  ): {
+    urgencyScore: number;
+    daysUntilStockout: number;
+    shouldReorderNow: boolean;
+  } {
     const currentStock = request.inventoryItem.quantityAvailable;
-    const dailyDemand = request.reorderRule.annualDemand 
+    const dailyDemand = request.reorderRule.annualDemand
       ? request.reorderRule.annualDemand / 365
       : 1; // Fallback to prevent division by zero
-    
-    const daysUntilStockout = dailyDemand > 0 ? currentStock / dailyDemand : Infinity;
+
+    const daysUntilStockout =
+      dailyDemand > 0 ? currentStock / dailyDemand : Infinity;
     const leadTimeDays = request.reorderRule.leadTimeDays || 7;
-    
+
     // Calculate urgency score (0-10)
     let urgencyScore = 0;
-    
+
     if (currentStock <= 0) {
       urgencyScore = 10; // Critical - stockout
     } else if (currentStock <= reorderPoint * 0.5) {
@@ -495,18 +529,25 @@ export class ReorderCalculationService {
   private calculateFinancialImpact(
     request: ReorderCalculationRequest,
     orderQuantity: number,
-    demandAnalysis: DemandAnalysis
-  ): { estimatedOrderValue: number; budgetImpact: number; costPerDayOfStock: number } {
+    demandAnalysis: DemandAnalysis,
+  ): {
+    estimatedOrderValue: number;
+    budgetImpact: number;
+    costPerDayOfStock: number;
+  } {
     const unitCost = request.product.costPrice || 0;
     const estimatedOrderValue = orderQuantity * unitCost;
-    
+
     // Budget impact as percentage of remaining budget
     const remainingBudget = request.reorderRule.remainingBudget;
-    const budgetImpact = remainingBudget === Infinity ? 0 : 
-                        (estimatedOrderValue / remainingBudget) * 100;
-    
+    const budgetImpact =
+      remainingBudget === Infinity
+        ? 0
+        : (estimatedOrderValue / remainingBudget) * 100;
+
     // Cost per day of stock
-    const holdingCostRate = (request.reorderRule.holdingCostRate || 25) / 100 / 365;
+    const holdingCostRate =
+      (request.reorderRule.holdingCostRate || 25) / 100 / 365;
     const costPerDayOfStock = unitCost * holdingCostRate;
 
     return { estimatedOrderValue, budgetImpact, costPerDayOfStock };
@@ -519,41 +560,54 @@ export class ReorderCalculationService {
     request: ReorderCalculationRequest,
     reorderPoint: number,
     orderQuantity: number,
-    demandAnalysis: DemandAnalysis
+    demandAnalysis: DemandAnalysis,
   ): { stockoutRisk: number; overstockRisk: number; suggestions: string[] } {
     const currentStock = request.inventoryItem.quantityAvailable;
     const leadTimeDays = request.reorderRule.leadTimeDays || 7;
     const avgDailyDemand = demandAnalysis.averageDailyDemand;
-    
+
     // Stockout risk
     const demandDuringLeadTime = avgDailyDemand * leadTimeDays;
-    const stockoutRisk = currentStock < demandDuringLeadTime ? 
-                        Math.max(0, (demandDuringLeadTime - currentStock) / demandDuringLeadTime) : 0;
-    
+    const stockoutRisk =
+      currentStock < demandDuringLeadTime
+        ? Math.max(
+            0,
+            (demandDuringLeadTime - currentStock) / demandDuringLeadTime,
+          )
+        : 0;
+
     // Overstock risk
     const futureStock = currentStock + orderQuantity;
-    const daysOfSupply = avgDailyDemand > 0 ? futureStock / avgDailyDemand : Infinity;
+    const daysOfSupply =
+      avgDailyDemand > 0 ? futureStock / avgDailyDemand : Infinity;
     const optimalDaysOfSupply = leadTimeDays + 30; // Lead time + 1 month buffer
-    const overstockRisk = daysOfSupply > optimalDaysOfSupply ? 
-                         Math.min(1, (daysOfSupply - optimalDaysOfSupply) / optimalDaysOfSupply) : 0;
+    const overstockRisk =
+      daysOfSupply > optimalDaysOfSupply
+        ? Math.min(
+            1,
+            (daysOfSupply - optimalDaysOfSupply) / optimalDaysOfSupply,
+          )
+        : 0;
 
     // Generate suggestions
     const suggestions: string[] = [];
-    
+
     if (stockoutRisk > 0.3) {
       suggestions.push('Consider expedited shipping or emergency purchase');
     }
-    
+
     if (overstockRisk > 0.3) {
       suggestions.push('Reduce order quantity to avoid excess inventory');
     }
-    
+
     if (demandAnalysis.confidenceLevel < 0.7) {
       suggestions.push('Improve demand data quality for better predictions');
     }
-    
+
     if (demandAnalysis.demandTrend === 'increasing') {
-      suggestions.push('Consider increasing reorder point due to growing demand');
+      suggestions.push(
+        'Consider increasing reorder point due to growing demand',
+      );
     } else if (demandAnalysis.demandTrend === 'decreasing') {
       suggestions.push('Review reorder rules - demand appears to be declining');
     }
@@ -568,14 +622,20 @@ export class ReorderCalculationService {
     request: ReorderCalculationRequest,
     demandAnalysis: DemandAnalysis,
     urgencyAnalysis: { urgencyScore: number; daysUntilStockout: number },
-    riskAssessment: { stockoutRisk: number; overstockRisk: number }
-  ): Array<{ message: string; type: 'info' | 'warning' | 'error' | 'success'; priority: number }> {
+    riskAssessment: { stockoutRisk: number; overstockRisk: number },
+  ): Array<{
+    message: string;
+    type: 'info' | 'warning' | 'error' | 'success';
+    priority: number;
+  }> {
     const insights = [];
 
     // Urgency insights
     if (urgencyAnalysis.urgencyScore >= 8) {
       insights.push({
-        message: `Critical: Only ${Math.round(urgencyAnalysis.daysUntilStockout)} days until stockout`,
+        message: `Critical: Only ${Math.round(
+          urgencyAnalysis.daysUntilStockout,
+        )} days until stockout`,
         type: 'error' as const,
         priority: 10,
       });
@@ -640,7 +700,10 @@ export class ReorderCalculationService {
   }
 
   // Helper methods
-  private validateInputs(request: ReorderCalculationRequest): { isValid: boolean; errors: string[] } {
+  private validateInputs(request: ReorderCalculationRequest): {
+    isValid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (!request.reorderRule) {
@@ -655,12 +718,18 @@ export class ReorderCalculationService {
       errors.push('Product is required');
     }
 
-    if (request.reorderRule?.leadTimeDays && request.reorderRule.leadTimeDays < 0) {
+    if (
+      request.reorderRule?.leadTimeDays &&
+      request.reorderRule.leadTimeDays < 0
+    ) {
       errors.push('Lead time cannot be negative');
     }
 
-    if (request.reorderRule?.serviceLevel && 
-        (request.reorderRule.serviceLevel < 0 || request.reorderRule.serviceLevel > 1)) {
+    if (
+      request.reorderRule?.serviceLevel &&
+      (request.reorderRule.serviceLevel < 0 ||
+        request.reorderRule.serviceLevel > 1)
+    ) {
       errors.push('Service level must be between 0 and 1');
     }
 
@@ -670,7 +739,7 @@ export class ReorderCalculationService {
   private aggregateDailyDemand(
     transactions: InventoryTransaction[],
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): number[] {
     const dailyDemand: { [date: string]: number } = {};
     const totalDays = moment(endDate).diff(moment(startDate), 'days') + 1;
@@ -694,19 +763,26 @@ export class ReorderCalculationService {
 
   private calculateVariance(values: number[], mean: number): number {
     if (values.length === 0) return 0;
-    
+
     const squaredDifferences = values.map(value => Math.pow(value - mean, 2));
-    return squaredDifferences.reduce((sum, sqDiff) => sum + sqDiff, 0) / values.length;
+    return (
+      squaredDifferences.reduce((sum, sqDiff) => sum + sqDiff, 0) /
+      values.length
+    );
   }
 
-  private calculateTrend(values: number[]): 'increasing' | 'decreasing' | 'stable' {
+  private calculateTrend(
+    values: number[],
+  ): 'increasing' | 'decreasing' | 'stable' {
     if (values.length < 7) return 'stable';
 
     const firstHalf = values.slice(0, Math.floor(values.length / 2));
     const secondHalf = values.slice(Math.floor(values.length / 2));
 
-    const firstHalfAvg = firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
-    const secondHalfAvg = secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
+    const firstHalfAvg =
+      firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
+    const secondHalfAvg =
+      secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
 
     const changePercent = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
 
@@ -715,15 +791,18 @@ export class ReorderCalculationService {
     return 'stable';
   }
 
-  private calculateConfidenceLevel(dataPoints: number, variance: number): number {
+  private calculateConfidenceLevel(
+    dataPoints: number,
+    variance: number,
+  ): number {
     // Simple confidence calculation based on data points and variance
     let confidence = Math.min(dataPoints / 30, 1); // More data = higher confidence
-    
+
     // Lower confidence for high variance
     if (variance > 0) {
       const cvThreshold = 0.5; // Coefficient of variation threshold
       const penaltyFactor = Math.min(variance / cvThreshold, 1);
-      confidence *= (1 - penaltyFactor * 0.3);
+      confidence *= 1 - penaltyFactor * 0.3;
     }
 
     return Math.max(0.1, confidence);
@@ -740,8 +819,9 @@ export class ReorderCalculationService {
     }
 
     // Penalize for high variance
-    const coefficientOfVariation = demandAnalysis.demandStandardDeviation / 
-                                  Math.max(demandAnalysis.averageDailyDemand, 0.1);
+    const coefficientOfVariation =
+      demandAnalysis.demandStandardDeviation /
+      Math.max(demandAnalysis.averageDailyDemand, 0.1);
     if (coefficientOfVariation > 1) {
       quality *= 0.8;
     } else if (coefficientOfVariation > 2) {
@@ -754,12 +834,12 @@ export class ReorderCalculationService {
   private getZScoreForServiceLevel(serviceLevel: number): number {
     // Z-score lookup table for service levels
     const zScores: { [key: number]: number } = {
-      0.50: 0.00,
-      0.60: 0.25,
-      0.70: 0.52,
-      0.80: 0.84,
+      0.5: 0.0,
+      0.6: 0.25,
+      0.7: 0.52,
+      0.8: 0.84,
       0.85: 1.04,
-      0.90: 1.28,
+      0.9: 1.28,
       0.95: 1.65,
       0.97: 1.88,
       0.98: 2.05,
@@ -838,7 +918,11 @@ export class ReorderCalculationService {
 
   // CRUD Methods for ReorderRule management
 
-  async createReorderRule(tenantId: string, createDto: any, userId: string): Promise<ReorderRule> {
+  async createReorderRule(
+    tenantId: string,
+    createDto: any,
+    userId: string,
+  ): Promise<ReorderRule> {
     const reorderRule = this.reorderRuleRepository.create({
       ...createDto,
       tenantId,
@@ -851,7 +935,7 @@ export class ReorderCalculationService {
 
   async findReorderRules(tenantId: string, query: any): Promise<ReorderRule[]> {
     const where: any = { tenantId, isDeleted: false };
-    
+
     if (query.productId) where.productId = query.productId;
     if (query.locationId) where.locationId = query.locationId;
     if (query.isActive !== undefined) where.isActive = query.isActive;
@@ -866,80 +950,106 @@ export class ReorderCalculationService {
     });
   }
 
-  async findReorderRuleById(tenantId: string, id: string): Promise<ReorderRule> {
+  async findReorderRuleById(
+    tenantId: string,
+    id: string,
+  ): Promise<ReorderRule> {
     return this.reorderRuleRepository.findOne({
       where: { id, tenantId, isDeleted: false },
       relations: ['product', 'location'],
     });
   }
 
-  async updateReorderRule(tenantId: string, id: string, updateDto: any, userId: string): Promise<ReorderRule> {
+  async updateReorderRule(
+    tenantId: string,
+    id: string,
+    updateDto: any,
+    userId: string,
+  ): Promise<ReorderRule> {
     await this.reorderRuleRepository.update(
       { id, tenantId },
-      { ...updateDto, updatedBy: userId, updatedAt: new Date() }
+      { ...updateDto, updatedBy: userId, updatedAt: new Date() },
     );
 
     return this.findReorderRuleById(tenantId, id);
   }
 
-  async deleteReorderRule(tenantId: string, id: string, userId: string): Promise<void> {
+  async deleteReorderRule(
+    tenantId: string,
+    id: string,
+    userId: string,
+  ): Promise<void> {
     await this.reorderRuleRepository.update(
       { id, tenantId },
-      { isDeleted: true, updatedBy: userId, updatedAt: new Date() }
+      { isDeleted: true, updatedBy: userId, updatedAt: new Date() },
     );
   }
 
-  async pauseReorderRule(tenantId: string, id: string, reason: string, userId: string): Promise<ReorderRule> {
+  async pauseReorderRule(
+    tenantId: string,
+    id: string,
+    reason: string,
+    userId: string,
+  ): Promise<ReorderRule> {
     await this.reorderRuleRepository.update(
       { id, tenantId },
-      { 
-        isActive: false, 
+      {
+        isActive: false,
         isPaused: true,
         pauseReason: reason,
-        updatedBy: userId, 
-        updatedAt: new Date() 
-      }
+        updatedBy: userId,
+        updatedAt: new Date(),
+      },
     );
 
     return this.findReorderRuleById(tenantId, id);
   }
 
-  async resumeReorderRule(tenantId: string, id: string, userId: string): Promise<ReorderRule> {
+  async resumeReorderRule(
+    tenantId: string,
+    id: string,
+    userId: string,
+  ): Promise<ReorderRule> {
     await this.reorderRuleRepository.update(
       { id, tenantId },
-      { 
-        isActive: true, 
+      {
+        isActive: true,
         isPaused: false,
         pauseReason: null,
         pausedUntil: null,
-        updatedBy: userId, 
-        updatedAt: new Date() 
-      }
+        updatedBy: userId,
+        updatedAt: new Date(),
+      },
     );
 
     return this.findReorderRuleById(tenantId, id);
   }
 
-  async bulkActionReorderRules(tenantId: string, action: string, ruleIds: string[], userId: string): Promise<any> {
+  async bulkActionReorderRules(
+    tenantId: string,
+    action: string,
+    ruleIds: string[],
+    userId: string,
+  ): Promise<any> {
     let result;
-    
+
     switch (action) {
       case 'activate':
         result = await this.reorderRuleRepository.update(
           { id: { $in: ruleIds } as any, tenantId },
-          { isActive: true, updatedBy: userId, updatedAt: new Date() }
+          { isActive: true, updatedBy: userId, updatedAt: new Date() },
         );
         break;
       case 'deactivate':
         result = await this.reorderRuleRepository.update(
           { id: { $in: ruleIds } as any, tenantId },
-          { isActive: false, updatedBy: userId, updatedAt: new Date() }
+          { isActive: false, updatedBy: userId, updatedAt: new Date() },
         );
         break;
       case 'delete':
         result = await this.reorderRuleRepository.update(
           { id: { $in: ruleIds } as any, tenantId },
-          { isDeleted: true, updatedBy: userId, updatedAt: new Date() }
+          { isDeleted: true, updatedBy: userId, updatedAt: new Date() },
         );
         break;
       default:
@@ -969,8 +1079,12 @@ export class ReorderCalculationService {
       failedExecutions: Math.floor(Math.random() * 10),
       averageExecutionTime: Math.floor(Math.random() * 5000) + 1000,
       totalValueGenerated: Math.floor(Math.random() * 1000000),
-      lastExecution: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-      nextScheduledExecution: new Date(Date.now() + Math.random() * 24 * 60 * 60 * 1000),
+      lastExecution: new Date(
+        Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000,
+      ),
+      nextScheduledExecution: new Date(
+        Date.now() + Math.random() * 24 * 60 * 60 * 1000,
+      ),
       efficiency: 0.85 + Math.random() * 0.1,
     };
   }
@@ -1011,7 +1125,11 @@ export class ReorderCalculationService {
   }
 
   // Simulate reorder rule execution
-  async simulateReorderRule(tenantId: string, ruleId: string, simulationParams: any): Promise<any> {
+  async simulateReorderRule(
+    tenantId: string,
+    ruleId: string,
+    simulationParams: any,
+  ): Promise<any> {
     const rule = await this.findReorderRuleById(tenantId, ruleId);
     if (!rule) {
       throw new Error(`Reorder rule not found: ${ruleId}`);
@@ -1025,7 +1143,9 @@ export class ReorderCalculationService {
         scenario: 'normal_conditions',
         wouldTrigger: true,
         estimatedQuantity: simulationParams.quantity || 100,
-        estimatedCost: (simulationParams.quantity || 100) * (simulationParams.unitCost || 50),
+        estimatedCost:
+          (simulationParams.quantity || 100) *
+          (simulationParams.unitCost || 50),
         estimatedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         riskFactors: [
           { factor: 'Supplier reliability', risk: 'low' },

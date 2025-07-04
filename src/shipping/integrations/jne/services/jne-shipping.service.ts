@@ -4,14 +4,23 @@ import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { ShippingLabel, ShippingLabelStatus } from '../../../entities/shipping-label.entity';
-import { ShippingTracking, TrackingStatus } from '../../../entities/shipping-tracking.entity';
+import {
+  ShippingLabel,
+  ShippingLabelStatus,
+} from '../../../entities/shipping-label.entity';
+import {
+  ShippingTracking,
+  TrackingStatus,
+} from '../../../entities/shipping-tracking.entity';
 import { ShippingRate } from '../../../entities/shipping-rate.entity';
 
 // Services
 import { JneApiService, JneCredentials } from './jne-api.service';
 import { IntegrationLogService } from '../../../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../../../integrations/entities/integration-log.entity';
 
 // Interfaces
 export interface JneShipmentRequest {
@@ -50,7 +59,10 @@ export class JneShippingService {
   /**
    * Create shipment with JNE
    */
-  async createShipment(tenantId: string, request: JneShipmentRequest): Promise<{
+  async createShipment(
+    tenantId: string,
+    request: JneShipmentRequest,
+  ): Promise<{
     success: boolean;
     trackingNumber?: string;
     airwayBill?: string;
@@ -59,7 +71,9 @@ export class JneShippingService {
     error?: string;
   }> {
     try {
-      this.logger.debug(`Creating JNE shipment for label ${request.shippingLabelId}`);
+      this.logger.debug(
+        `Creating JNE shipment for label ${request.shippingLabelId}`,
+      );
 
       // Get shipping label
       const shippingLabel = await this.shippingLabelRepository.findOne({
@@ -91,14 +105,18 @@ export class JneShippingService {
           address: shippingLabel.senderAddress.address,
           city: shippingLabel.senderAddress.city,
           postal_code: shippingLabel.senderAddress.postalCode,
-          phone: this.jneApiService.formatPhoneNumber(shippingLabel.senderAddress.phone),
+          phone: this.jneApiService.formatPhoneNumber(
+            shippingLabel.senderAddress.phone,
+          ),
         },
         to: {
           name: shippingLabel.recipientAddress.name,
           address: shippingLabel.recipientAddress.address,
           city: shippingLabel.recipientAddress.city,
           postal_code: shippingLabel.recipientAddress.postalCode,
-          phone: this.jneApiService.formatPhoneNumber(shippingLabel.recipientAddress.phone),
+          phone: this.jneApiService.formatPhoneNumber(
+            shippingLabel.recipientAddress.phone,
+          ),
         },
         package: {
           weight: shippingLabel.packageInfo.weight / 1000, // Convert grams to kg
@@ -124,20 +142,25 @@ export class JneShippingService {
         request.credentials,
         shipmentData,
         tenantId,
-        'jne-shipping'
+        'jne-shipping',
       );
 
       if (!response.success) {
         const errorInfo = this.jneApiService.handleJneError(response.error);
-        
-        await this.logService.logError(tenantId, 'jne-shipping', new Error(errorInfo.message), {
-          metadata: {
-            action: 'create_shipment',
-            shippingLabelId: request.shippingLabelId,
-            errorCode: errorInfo.code,
-            retryable: errorInfo.retryable,
+
+        await this.logService.logError(
+          tenantId,
+          'jne-shipping',
+          new Error(errorInfo.message),
+          {
+            metadata: {
+              action: 'create_shipment',
+              shippingLabelId: request.shippingLabelId,
+              errorCode: errorInfo.code,
+              retryable: errorInfo.retryable,
+            },
           },
-        });
+        );
 
         return {
           success: false,
@@ -216,10 +239,12 @@ export class JneShippingService {
         labelUrl: response.data.label_url,
         totalCost: response.data.total_cost,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to create JNE shipment: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Failed to create JNE shipment: ${error.message}`,
+        error.stack,
+      );
+
       await this.logService.logError(tenantId, 'jne-shipping', error, {
         metadata: {
           action: 'create_shipment',
@@ -237,7 +262,11 @@ export class JneShippingService {
   /**
    * Track shipment with JNE
    */
-  async trackShipment(tenantId: string, trackingNumber: string, credentials: JneCredentials): Promise<{
+  async trackShipment(
+    tenantId: string,
+    trackingNumber: string,
+    credentials: JneCredentials,
+  ): Promise<{
     success: boolean;
     trackingData?: any;
     error?: string;
@@ -250,7 +279,7 @@ export class JneShippingService {
         credentials,
         trackingNumber,
         tenantId,
-        'jne-shipping'
+        'jne-shipping',
       );
 
       if (!response.success) {
@@ -268,9 +297,11 @@ export class JneShippingService {
         success: true,
         trackingData,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to track JNE shipment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to track JNE shipment: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -281,9 +312,14 @@ export class JneShippingService {
   /**
    * Update tracking information from JNE webhook or polling
    */
-  async updateTracking(tenantId: string, trackingUpdates: JneTrackingUpdate[]): Promise<void> {
+  async updateTracking(
+    tenantId: string,
+    trackingUpdates: JneTrackingUpdate[],
+  ): Promise<void> {
     try {
-      this.logger.debug(`Updating JNE tracking for ${trackingUpdates.length} packages`);
+      this.logger.debug(
+        `Updating JNE tracking for ${trackingUpdates.length} packages`,
+      );
 
       for (const update of trackingUpdates) {
         // Find shipping label
@@ -292,12 +328,16 @@ export class JneShippingService {
         });
 
         if (!shippingLabel) {
-          this.logger.warn(`Shipping label not found for tracking number: ${update.trackingNumber}`);
+          this.logger.warn(
+            `Shipping label not found for tracking number: ${update.trackingNumber}`,
+          );
           continue;
         }
 
         // Convert JNE status to our tracking status
-        const trackingStatus = this.jneApiService.mapJneStatusToTrackingStatus(update.status);
+        const trackingStatus = this.jneApiService.mapJneStatusToTrackingStatus(
+          update.status,
+        );
 
         // Create tracking entry
         await this.createTrackingEntry(tenantId, {
@@ -314,7 +354,12 @@ export class JneShippingService {
         });
 
         // Update shipping label status if needed
-        await this.updateShippingLabelFromTracking(tenantId, shippingLabel, trackingStatus, update);
+        await this.updateShippingLabelFromTracking(
+          tenantId,
+          shippingLabel,
+          trackingStatus,
+          update,
+        );
 
         // Log tracking update
         await this.logService.log({
@@ -330,9 +375,11 @@ export class JneShippingService {
           },
         });
       }
-
     } catch (error) {
-      this.logger.error(`Failed to update JNE tracking: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update JNE tracking: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -340,7 +387,12 @@ export class JneShippingService {
   /**
    * Cancel shipment with JNE
    */
-  async cancelShipment(tenantId: string, trackingNumber: string, reason: string, credentials: JneCredentials): Promise<{
+  async cancelShipment(
+    tenantId: string,
+    trackingNumber: string,
+    reason: string,
+    credentials: JneCredentials,
+  ): Promise<{
     success: boolean;
     message?: string;
     error?: string;
@@ -358,7 +410,9 @@ export class JneShippingService {
       }
 
       if (!shippingLabel.canBeCancelled) {
-        throw new BadRequestException('Shipment cannot be cancelled in current status');
+        throw new BadRequestException(
+          'Shipment cannot be cancelled in current status',
+        );
       }
 
       // Call JNE API to cancel shipment
@@ -367,7 +421,7 @@ export class JneShippingService {
         trackingNumber,
         reason,
         tenantId,
-        'jne-shipping'
+        'jne-shipping',
       );
 
       if (!response.success) {
@@ -379,7 +433,11 @@ export class JneShippingService {
       }
 
       // Update shipping label status
-      shippingLabel.updateStatus(ShippingLabelStatus.CANCELLED, undefined, reason);
+      shippingLabel.updateStatus(
+        ShippingLabelStatus.CANCELLED,
+        undefined,
+        reason,
+      );
       await this.shippingLabelRepository.save(shippingLabel);
 
       // Create tracking entry for cancellation
@@ -418,9 +476,11 @@ export class JneShippingService {
         success: true,
         message: response.data.message,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to cancel JNE shipment: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel JNE shipment: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -431,20 +491,26 @@ export class JneShippingService {
   /**
    * Sync shipping rates from JNE
    */
-  async syncShippingRates(tenantId: string, credentials: JneCredentials, routes: Array<{
-    originCode: string;
-    destinationCode: string;
-    originCity: string;
-    destinationCity: string;
-    originState: string;
-    destinationState: string;
-  }>): Promise<{
+  async syncShippingRates(
+    tenantId: string,
+    credentials: JneCredentials,
+    routes: Array<{
+      originCode: string;
+      destinationCode: string;
+      originCity: string;
+      destinationCity: string;
+      originState: string;
+      destinationState: string;
+    }>,
+  ): Promise<{
     success: boolean;
     synced: number;
     errors: string[];
   }> {
     try {
-      this.logger.debug(`Syncing JNE shipping rates for ${routes.length} routes`);
+      this.logger.debug(
+        `Syncing JNE shipping rates for ${routes.length} routes`,
+      );
 
       let synced = 0;
       const errors: string[] = [];
@@ -453,7 +519,7 @@ export class JneShippingService {
       const servicesResponse = await this.jneApiService.getServices(
         credentials,
         tenantId,
-        'jne-shipping'
+        'jne-shipping',
       );
 
       if (!servicesResponse.success) {
@@ -476,11 +542,13 @@ export class JneShippingService {
                 weight,
               },
               tenantId,
-              'jne-shipping'
+              'jne-shipping',
             );
 
             if (!ratesResponse.success) {
-              errors.push(`Failed to get rates for ${route.originCity} -> ${route.destinationCity}, weight: ${weight}kg`);
+              errors.push(
+                `Failed to get rates for ${route.originCity} -> ${route.destinationCity}, weight: ${weight}kg`,
+              );
               continue;
             }
 
@@ -489,15 +557,16 @@ export class JneShippingService {
               for (const cost of rateData.costs) {
                 for (const service of cost.cost) {
                   // Create or update shipping rate
-                  const existingRate = await this.shippingRateRepository.findOne({
-                    where: {
-                      tenantId,
-                      carrierId: 'JNE',
-                      serviceCode: cost.service,
-                      originPostalCode: route.originCode,
-                      destinationPostalCode: route.destinationCode,
-                    },
-                  });
+                  const existingRate =
+                    await this.shippingRateRepository.findOne({
+                      where: {
+                        tenantId,
+                        carrierId: 'JNE',
+                        serviceCode: cost.service,
+                        originPostalCode: route.originCode,
+                        destinationPostalCode: route.destinationCode,
+                      },
+                    });
 
                   const shippingRate = existingRate || new ShippingRate();
                   shippingRate.tenantId = tenantId;
@@ -505,7 +574,10 @@ export class JneShippingService {
                   shippingRate.carrierName = 'JNE (Jalur Nugraha Ekakurir)';
                   shippingRate.serviceCode = cost.service;
                   shippingRate.serviceName = cost.description;
-                  shippingRate.rateType = this.jneApiService.mapJneServiceToServiceType(cost.service) as any;
+                  shippingRate.rateType =
+                    this.jneApiService.mapJneServiceToServiceType(
+                      cost.service,
+                    ) as any;
 
                   // Geographic info
                   shippingRate.originPostalCode = route.originCode;
@@ -516,9 +588,13 @@ export class JneShippingService {
                   shippingRate.destinationState = route.destinationState;
 
                   // Weight limits (get from service info)
-                  const serviceInfo = jneServices.find(s => s.service_code === cost.service);
+                  const serviceInfo = jneServices.find(
+                    s => s.service_code === cost.service,
+                  );
                   shippingRate.minWeight = 1000; // 1kg minimum in grams
-                  shippingRate.maxWeight = serviceInfo?.max_weight ? serviceInfo.max_weight * 1000 : 30000; // Convert to grams
+                  shippingRate.maxWeight = serviceInfo?.max_weight
+                    ? serviceInfo.max_weight * 1000
+                    : 30000; // Convert to grams
 
                   // Dimensions
                   if (serviceInfo?.max_dimension) {
@@ -539,8 +615,10 @@ export class JneShippingService {
                   }
 
                   // Features
-                  shippingRate.isCodAvailable = serviceInfo?.features?.cod || false;
-                  shippingRate.isInsuranceAvailable = serviceInfo?.features?.insurance || false;
+                  shippingRate.isCodAvailable =
+                    serviceInfo?.features?.cod || false;
+                  shippingRate.isInsuranceAvailable =
+                    serviceInfo?.features?.insurance || false;
 
                   // Rate metadata
                   shippingRate.rateDate = new Date();
@@ -570,22 +648,27 @@ export class JneShippingService {
               }
             }
           }
-
         } catch (error) {
-          errors.push(`Failed to sync rates for ${route.originCity} -> ${route.destinationCity}: ${error.message}`);
+          errors.push(
+            `Failed to sync rates for ${route.originCity} -> ${route.destinationCity}: ${error.message}`,
+          );
         }
       }
 
-      this.logger.debug(`JNE rate sync completed: ${synced} rates synced, ${errors.length} errors`);
+      this.logger.debug(
+        `JNE rate sync completed: ${synced} rates synced, ${errors.length} errors`,
+      );
 
       return {
         success: errors.length < routes.length,
         synced,
         errors,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to sync JNE shipping rates: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync JNE shipping rates: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         synced: 0,
@@ -596,15 +679,18 @@ export class JneShippingService {
 
   // Private helper methods
 
-  private async createTrackingEntry(tenantId: string, data: {
-    shippingLabelId: string;
-    trackingNumber: string;
-    status: TrackingStatus;
-    description: string;
-    location?: string;
-    eventTime: Date;
-    carrierData?: any;
-  }): Promise<ShippingTracking> {
+  private async createTrackingEntry(
+    tenantId: string,
+    data: {
+      shippingLabelId: string;
+      trackingNumber: string;
+      status: TrackingStatus;
+      description: string;
+      location?: string;
+      eventTime: Date;
+      carrierData?: any;
+    },
+  ): Promise<ShippingTracking> {
     // Get sequence number
     const lastTracking = await this.shippingTrackingRepository.findOne({
       where: { tenantId, trackingNumber: data.trackingNumber },
@@ -638,7 +724,7 @@ export class JneShippingService {
     tenantId: string,
     shippingLabel: ShippingLabel,
     trackingStatus: string,
-    update: JneTrackingUpdate
+    update: JneTrackingUpdate,
   ): Promise<void> {
     let statusChanged = false;
 

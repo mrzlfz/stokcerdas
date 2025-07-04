@@ -69,8 +69,15 @@ export class WebhookController {
   @ApiOperation({ summary: 'Generic webhook endpoint for any platform' })
   @ApiParam({ name: 'tenantId', description: 'Tenant ID' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
-  @ApiParam({ name: 'platform', description: 'Platform name (shopee, lazada, tokopedia, etc.)' })
-  @ApiHeader({ name: 'x-signature', description: 'Webhook signature', required: false })
+  @ApiParam({
+    name: 'platform',
+    description: 'Platform name (shopee, lazada, tokopedia, etc.)',
+  })
+  @ApiHeader({
+    name: 'x-signature',
+    description: 'Webhook signature',
+    required: false,
+  })
   @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid webhook data' })
   @ApiResponse({ status: 401, description: 'Invalid signature' })
@@ -173,10 +180,9 @@ export class WebhookController {
           processingTime,
         });
       }
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.error(`Generic webhook error: ${error.message}`, {
         tenantId,
         channelId,
@@ -225,7 +231,10 @@ export class WebhookController {
   @ApiQuery({ name: 'endDate', required: false })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Webhook events retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook events retrieved successfully',
+  })
   async getWebhookEvents(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,
@@ -250,7 +259,10 @@ export class WebhookController {
         message: 'Webhook events query endpoint - implementation pending',
       };
     } catch (error) {
-      this.logger.error(`Failed to get webhook events: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get webhook events: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -269,7 +281,10 @@ export class WebhookController {
   @ApiQuery({ name: 'channelId', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
-  @ApiResponse({ status: 200, description: 'Webhook statistics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook statistics retrieved successfully',
+  })
   async getWebhookStats(
     @CurrentUser() user: any,
     @Query('channelId') channelId?: string,
@@ -292,7 +307,10 @@ export class WebhookController {
         data: stats,
       };
     } catch (error) {
-      this.logger.error(`Failed to get webhook stats: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get webhook stats: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -308,7 +326,10 @@ export class WebhookController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Test webhook signature verification' })
-  @ApiResponse({ status: 201, description: 'Webhook signature tested successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Webhook signature tested successfully',
+  })
   async testWebhookSignature(
     @CurrentUser() user: any,
     @Body() dto: WebhookTestDto,
@@ -321,7 +342,7 @@ export class WebhookController {
         signatureAlgorithm: 'sha256' as const,
         signatureFormat: 'hex' as const,
       };
-      
+
       const verified = this.webhookHandler.verifyWebhookSignature(
         dto.payload ? JSON.stringify(dto.payload) : '',
         dto.signature,
@@ -346,7 +367,9 @@ export class WebhookController {
         data: {
           verified,
           platform: dto.platform,
-          message: verified ? 'Signature verification passed' : 'Signature verification failed',
+          message: verified
+            ? 'Signature verification passed'
+            : 'Signature verification failed',
         },
       };
     } catch (error) {
@@ -367,7 +390,10 @@ export class WebhookController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Retry failed webhook event' })
   @ApiParam({ name: 'webhookId', description: 'Webhook event ID' })
-  @ApiResponse({ status: 200, description: 'Webhook retry initiated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook retry initiated successfully',
+  })
   async retryWebhookEvent(
     @CurrentUser() user: any,
     @Param('webhookId') webhookId: string,
@@ -381,7 +407,10 @@ export class WebhookController {
         webhookId,
       };
     } catch (error) {
-      this.logger.error(`Failed to retry webhook: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to retry webhook: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -398,7 +427,10 @@ export class WebhookController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Clean up old webhook events' })
   @ApiQuery({ name: 'olderThanDays', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Webhook cleanup completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook cleanup completed successfully',
+  })
   async cleanupWebhookEvents(
     @CurrentUser() user: any,
     @Query('olderThanDays') olderThanDays?: number,
@@ -417,7 +449,10 @@ export class WebhookController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to cleanup webhooks: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cleanup webhooks: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -458,9 +493,11 @@ export class WebhookController {
     );
   }
 
-  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+  private sanitizeHeaders(
+    headers: Record<string, string>,
+  ): Record<string, string> {
     const sanitized = { ...headers };
-    
+
     // Remove sensitive headers for logging
     const sensitiveHeaders = [
       'authorization',
@@ -469,7 +506,7 @@ export class WebhookController {
       'cookie',
       'set-cookie',
     ];
-    
+
     sensitiveHeaders.forEach(header => {
       if (sanitized[header]) {
         sanitized[header] = '[REDACTED]';
@@ -478,38 +515,39 @@ export class WebhookController {
         sanitized[header.toLowerCase()] = '[REDACTED]';
       }
     });
-    
+
     return sanitized;
   }
 
   private determineEventType(platform: string, payload: any): any {
     // Basic event type determination based on payload structure
     // This would be enhanced based on each platform's webhook format
-    
+
     if (payload.order || payload.ordersn || payload.order_sn) {
       return 'order_updated';
     }
-    
+
     if (payload.item || payload.product || payload.item_id) {
       return 'product_updated';
     }
-    
+
     if (payload.stock || payload.inventory) {
       return 'inventory_updated';
     }
-    
+
     return 'system_notification';
   }
 
   private generateExternalEventId(platform: string, payload: any): string {
     // Generate unique ID based on payload content
     const timestamp = Date.now();
-    const identifier = payload.id || 
-                      payload.order_sn || 
-                      payload.item_id || 
-                      payload.event_id ||
-                      'unknown';
-    
+    const identifier =
+      payload.id ||
+      payload.order_sn ||
+      payload.item_id ||
+      payload.event_id ||
+      'unknown';
+
     return `${platform}_${identifier}_${timestamp}`;
   }
 }

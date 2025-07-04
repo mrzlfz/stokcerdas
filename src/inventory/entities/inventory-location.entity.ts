@@ -1,4 +1,11 @@
-import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 
 export enum LocationType {
@@ -141,7 +148,13 @@ export class InventoryLocation extends BaseEntity {
   }
 
   get fullAddress(): string {
-    const parts = [this.address, this.city, this.state, this.postalCode, this.country];
+    const parts = [
+      this.address,
+      this.city,
+      this.state,
+      this.postalCode,
+      this.country,
+    ];
     return parts.filter(Boolean).join(', ');
   }
 
@@ -153,14 +166,15 @@ export class InventoryLocation extends BaseEntity {
 
   isOperatingNow(): boolean {
     if (!this.operatingHours) return true;
-    
+
     const now = new Date();
     const dayName = now
-      .toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as keyof typeof this.operatingHours;
-    
+      .toLocaleDateString('en-US', { weekday: 'long' })
+      .toLowerCase() as keyof typeof this.operatingHours;
+
     const todayHours = this.operatingHours[dayName];
     if (!todayHours) return false;
-    
+
     const currentTime = now.toTimeString().slice(0, 5);
     return currentTime >= todayHours.open && currentTime <= todayHours.close;
   }

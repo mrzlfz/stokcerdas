@@ -11,7 +11,9 @@ import { ProductCategoriesService } from './services/product-categories.service'
 import { ProductVariantsService } from './services/product-variants.service';
 import { BarcodeService } from './services/barcode.service';
 
-import { Product, ProductCategory, ProductVariant } from './entities/product.entity';
+import { Product } from './entities/product.entity';
+import { ProductCategory } from './entities/product-category.entity';
+import { ProductVariant } from './entities/product-variant.entity';
 
 // Import Auth module for permission checking
 import { AuthModule } from '../auth/auth.module';

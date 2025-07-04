@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsBoolean, IsNotEmpty, IsNumber, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsNotEmpty,
+  IsNumber,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class MokaProductSyncDto {
@@ -22,7 +30,7 @@ export class MokaProductSyncDto {
   @IsOptional()
   batchSize?: number;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Sync direction',
     enum: ['inbound', 'outbound', 'bidirectional'],
   })
@@ -37,12 +45,16 @@ export class MokaSalesImportDto {
   @IsNotEmpty()
   channelId: string;
 
-  @ApiPropertyOptional({ description: 'Import sales from date (ISO date string)' })
+  @ApiPropertyOptional({
+    description: 'Import sales from date (ISO date string)',
+  })
   @IsDateString()
   @IsOptional()
   fromDate?: string;
 
-  @ApiPropertyOptional({ description: 'Import sales to date (ISO date string)' })
+  @ApiPropertyOptional({
+    description: 'Import sales to date (ISO date string)',
+  })
   @IsDateString()
   @IsOptional()
   toDate?: string;
@@ -69,7 +81,7 @@ export class MokaInventorySyncDto {
   @IsOptional()
   batchSize?: number;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Sync direction',
     enum: ['inbound', 'outbound', 'bidirectional'],
   })

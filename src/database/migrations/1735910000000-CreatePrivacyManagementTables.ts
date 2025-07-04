@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreatePrivacyManagementTables1735910000000 implements MigrationInterface {
+export class CreatePrivacyManagementTables1735910000000
+  implements MigrationInterface
+{
   name = 'CreatePrivacyManagementTables1735910000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -984,42 +986,74 @@ export class CreatePrivacyManagementTables1735910000000 implements MigrationInte
     );
 
     // Create indexes for Privacy Data Classification
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_classification_tenant_id_is_deleted" ON "privacy_data_classification" ("tenant_id", "is_deleted")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_classification_category_purpose" ON "privacy_data_classification" ("category", "processing_purposes")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_classification_tenant_id_is_deleted" ON "privacy_data_classification" ("tenant_id", "is_deleted")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_classification_category_purpose" ON "privacy_data_classification" ("category", "processing_purposes")`,
+    );
 
     // Create indexes for Privacy Consent
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_consent_tenant_id_user_id_is_deleted" ON "privacy_consent" ("tenant_id", "user_id", "is_deleted")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_consent_tenant_id_status_expiry_date" ON "privacy_consent" ("tenant_id", "status", "expiry_date")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_consent_tenant_id_purpose_status" ON "privacy_consent" ("tenant_id", "purpose", "status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_consent_tenant_id_user_id_is_deleted" ON "privacy_consent" ("tenant_id", "user_id", "is_deleted")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_consent_tenant_id_status_expiry_date" ON "privacy_consent" ("tenant_id", "status", "expiry_date")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_consent_tenant_id_purpose_status" ON "privacy_consent" ("tenant_id", "purpose", "status")`,
+    );
 
     // Create indexes for Data Retention Policy
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_retention_policy_tenant_id_is_active_is_deleted" ON "privacy_data_retention_policy" ("tenant_id", "is_active", "is_deleted")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_retention_policy_category_purpose" ON "privacy_data_retention_policy" ("data_category", "processing_purpose")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_retention_policy_tenant_id_is_active_is_deleted" ON "privacy_data_retention_policy" ("tenant_id", "is_active", "is_deleted")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_retention_policy_category_purpose" ON "privacy_data_retention_policy" ("data_category", "processing_purpose")`,
+    );
 
     // Create indexes for Data Subject Request
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_subject_request_tenant_id_user_id_status_is_deleted" ON "privacy_data_subject_request" ("tenant_id", "user_id", "status", "is_deleted")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_subject_request_tenant_id_request_type_created_at" ON "privacy_data_subject_request" ("tenant_id", "request_type", "created_at")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_subject_request_request_id" ON "privacy_data_subject_request" ("request_id")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_data_subject_request_due_date_status" ON "privacy_data_subject_request" ("due_date", "status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_subject_request_tenant_id_user_id_status_is_deleted" ON "privacy_data_subject_request" ("tenant_id", "user_id", "status", "is_deleted")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_subject_request_tenant_id_request_type_created_at" ON "privacy_data_subject_request" ("tenant_id", "request_type", "created_at")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_subject_request_request_id" ON "privacy_data_subject_request" ("request_id")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_data_subject_request_due_date_status" ON "privacy_data_subject_request" ("due_date", "status")`,
+    );
 
     // Create indexes for Privacy Breach Log
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_breach_log_tenant_id_severity_reported_at" ON "privacy_breach_log" ("tenant_id", "severity", "reported_at")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_breach_log_tenant_id_status_is_deleted" ON "privacy_breach_log" ("tenant_id", "status", "is_deleted")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_breach_log_breach_id" ON "privacy_breach_log" ("breach_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_breach_log_tenant_id_severity_reported_at" ON "privacy_breach_log" ("tenant_id", "severity", "reported_at")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_breach_log_tenant_id_status_is_deleted" ON "privacy_breach_log" ("tenant_id", "status", "is_deleted")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_breach_log_breach_id" ON "privacy_breach_log" ("breach_id")`,
+    );
 
     // Create indexes for Data Processing Activity
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_processing_activity_tenant_id_is_active_is_deleted" ON "privacy_processing_activity" ("tenant_id", "is_active", "is_deleted")`);
-    
-    await queryRunner.query(`CREATE INDEX "IDX_privacy_processing_activity_legal_basis_data_categories" ON "privacy_processing_activity" ("legal_basis", "data_categories")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_processing_activity_tenant_id_is_active_is_deleted" ON "privacy_processing_activity" ("tenant_id", "is_active", "is_deleted")`,
+    );
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_privacy_processing_activity_legal_basis_data_categories" ON "privacy_processing_activity" ("legal_basis", "data_categories")`,
+    );
 
     // Create foreign key constraints
     await queryRunner.query(`
@@ -1052,45 +1086,115 @@ export class CreatePrivacyManagementTables1735910000000 implements MigrationInte
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop foreign keys
     const consentTable = await queryRunner.getTable('privacy_consent');
-    const consentUserForeignKey = consentTable.foreignKeys.find(fk => fk.columnNames.indexOf('user_id') !== -1);
+    const consentUserForeignKey = consentTable.foreignKeys.find(
+      fk => fk.columnNames.indexOf('user_id') !== -1,
+    );
     if (consentUserForeignKey) {
-      await queryRunner.dropForeignKey('privacy_consent', consentUserForeignKey);
+      await queryRunner.dropForeignKey(
+        'privacy_consent',
+        consentUserForeignKey,
+      );
     }
 
-    const requestTable = await queryRunner.getTable('privacy_data_subject_request');
-    const requestUserForeignKey = requestTable.foreignKeys.find(fk => fk.columnNames.indexOf('user_id') !== -1);
+    const requestTable = await queryRunner.getTable(
+      'privacy_data_subject_request',
+    );
+    const requestUserForeignKey = requestTable.foreignKeys.find(
+      fk => fk.columnNames.indexOf('user_id') !== -1,
+    );
     if (requestUserForeignKey) {
-      await queryRunner.dropForeignKey('privacy_data_subject_request', requestUserForeignKey);
+      await queryRunner.dropForeignKey(
+        'privacy_data_subject_request',
+        requestUserForeignKey,
+      );
     }
 
-    const requestAssignedForeignKey = requestTable.foreignKeys.find(fk => fk.columnNames.indexOf('assigned_to') !== -1);
+    const requestAssignedForeignKey = requestTable.foreignKeys.find(
+      fk => fk.columnNames.indexOf('assigned_to') !== -1,
+    );
     if (requestAssignedForeignKey) {
-      await queryRunner.dropForeignKey('privacy_data_subject_request', requestAssignedForeignKey);
+      await queryRunner.dropForeignKey(
+        'privacy_data_subject_request',
+        requestAssignedForeignKey,
+      );
     }
 
     const breachTable = await queryRunner.getTable('privacy_breach_log');
-    const breachLeadForeignKey = breachTable.foreignKeys.find(fk => fk.columnNames.indexOf('investigation_lead') !== -1);
+    const breachLeadForeignKey = breachTable.foreignKeys.find(
+      fk => fk.columnNames.indexOf('investigation_lead') !== -1,
+    );
     if (breachLeadForeignKey) {
-      await queryRunner.dropForeignKey('privacy_breach_log', breachLeadForeignKey);
+      await queryRunner.dropForeignKey(
+        'privacy_breach_log',
+        breachLeadForeignKey,
+      );
     }
 
     // Drop indexes
-    await queryRunner.dropIndex('privacy_data_classification', 'IDX_privacy_data_classification_tenant_id_is_deleted');
-    await queryRunner.dropIndex('privacy_data_classification', 'IDX_privacy_data_classification_category_purpose');
-    await queryRunner.dropIndex('privacy_consent', 'IDX_privacy_consent_tenant_id_user_id_is_deleted');
-    await queryRunner.dropIndex('privacy_consent', 'IDX_privacy_consent_tenant_id_status_expiry_date');
-    await queryRunner.dropIndex('privacy_consent', 'IDX_privacy_consent_tenant_id_purpose_status');
-    await queryRunner.dropIndex('privacy_data_retention_policy', 'IDX_privacy_data_retention_policy_tenant_id_is_active_is_deleted');
-    await queryRunner.dropIndex('privacy_data_retention_policy', 'IDX_privacy_data_retention_policy_category_purpose');
-    await queryRunner.dropIndex('privacy_data_subject_request', 'IDX_privacy_data_subject_request_tenant_id_user_id_status_is_deleted');
-    await queryRunner.dropIndex('privacy_data_subject_request', 'IDX_privacy_data_subject_request_tenant_id_request_type_created_at');
-    await queryRunner.dropIndex('privacy_data_subject_request', 'IDX_privacy_data_subject_request_request_id');
-    await queryRunner.dropIndex('privacy_data_subject_request', 'IDX_privacy_data_subject_request_due_date_status');
-    await queryRunner.dropIndex('privacy_breach_log', 'IDX_privacy_breach_log_tenant_id_severity_reported_at');
-    await queryRunner.dropIndex('privacy_breach_log', 'IDX_privacy_breach_log_tenant_id_status_is_deleted');
-    await queryRunner.dropIndex('privacy_breach_log', 'IDX_privacy_breach_log_breach_id');
-    await queryRunner.dropIndex('privacy_processing_activity', 'IDX_privacy_processing_activity_tenant_id_is_active_is_deleted');
-    await queryRunner.dropIndex('privacy_processing_activity', 'IDX_privacy_processing_activity_legal_basis_data_categories');
+    await queryRunner.dropIndex(
+      'privacy_data_classification',
+      'IDX_privacy_data_classification_tenant_id_is_deleted',
+    );
+    await queryRunner.dropIndex(
+      'privacy_data_classification',
+      'IDX_privacy_data_classification_category_purpose',
+    );
+    await queryRunner.dropIndex(
+      'privacy_consent',
+      'IDX_privacy_consent_tenant_id_user_id_is_deleted',
+    );
+    await queryRunner.dropIndex(
+      'privacy_consent',
+      'IDX_privacy_consent_tenant_id_status_expiry_date',
+    );
+    await queryRunner.dropIndex(
+      'privacy_consent',
+      'IDX_privacy_consent_tenant_id_purpose_status',
+    );
+    await queryRunner.dropIndex(
+      'privacy_data_retention_policy',
+      'IDX_privacy_data_retention_policy_tenant_id_is_active_is_deleted',
+    );
+    await queryRunner.dropIndex(
+      'privacy_data_retention_policy',
+      'IDX_privacy_data_retention_policy_category_purpose',
+    );
+    await queryRunner.dropIndex(
+      'privacy_data_subject_request',
+      'IDX_privacy_data_subject_request_tenant_id_user_id_status_is_deleted',
+    );
+    await queryRunner.dropIndex(
+      'privacy_data_subject_request',
+      'IDX_privacy_data_subject_request_tenant_id_request_type_created_at',
+    );
+    await queryRunner.dropIndex(
+      'privacy_data_subject_request',
+      'IDX_privacy_data_subject_request_request_id',
+    );
+    await queryRunner.dropIndex(
+      'privacy_data_subject_request',
+      'IDX_privacy_data_subject_request_due_date_status',
+    );
+    await queryRunner.dropIndex(
+      'privacy_breach_log',
+      'IDX_privacy_breach_log_tenant_id_severity_reported_at',
+    );
+    await queryRunner.dropIndex(
+      'privacy_breach_log',
+      'IDX_privacy_breach_log_tenant_id_status_is_deleted',
+    );
+    await queryRunner.dropIndex(
+      'privacy_breach_log',
+      'IDX_privacy_breach_log_breach_id',
+    );
+    await queryRunner.dropIndex(
+      'privacy_processing_activity',
+      'IDX_privacy_processing_activity_tenant_id_is_active_is_deleted',
+    );
+    await queryRunner.dropIndex(
+      'privacy_processing_activity',
+      'IDX_privacy_processing_activity_legal_basis_data_categories',
+    );
 
     // Drop tables
     await queryRunner.dropTable('privacy_processing_activity');

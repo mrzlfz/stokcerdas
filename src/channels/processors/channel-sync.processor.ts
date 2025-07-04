@@ -1,4 +1,10 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import {
+  Processor,
+  Process,
+  OnQueueActive,
+  OnQueueCompleted,
+  OnQueueFailed,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -11,7 +17,10 @@ import { ChannelMappingService } from '../services/channel-mapping.service';
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../integrations/entities/integration-log.entity';
 
 // Job data interfaces
 export interface ChannelSyncJobData {
@@ -99,15 +108,18 @@ export class ChannelSyncProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job, err: Error) {
-    this.logger.error(`Channel sync job failed: ${job.name} [${job.id}] - ${err.message}`, {
-      jobId: job.id,
-      jobName: job.name,
-      error: err.message,
-      stack: err.stack,
-      data: job.data,
-      attemptsMade: job.attemptsMade,
-      attemptsLeft: job.opts.attempts - job.attemptsMade,
-    });
+    this.logger.error(
+      `Channel sync job failed: ${job.name} [${job.id}] - ${err.message}`,
+      {
+        jobId: job.id,
+        jobName: job.name,
+        error: err.message,
+        stack: err.stack,
+        data: job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsLeft: job.opts.attempts - job.attemptsMade,
+      },
+    );
   }
 
   /**
@@ -115,19 +127,29 @@ export class ChannelSyncProcessor {
    */
   @Process('channel-sync')
   async processChannelSync(job: Job<ChannelSyncJobData>) {
-    const { syncId, tenantId, channelId, syncType, direction, options } = job.data;
-    
+    const { syncId, tenantId, channelId, syncType, direction, options } =
+      job.data;
+
     try {
-      this.logger.debug(`Processing channel sync: ${syncType} for channel ${channelId}`, {
-        syncId,
-        tenantId,
-        channelId,
-        syncType,
-        direction,
-      });
+      this.logger.debug(
+        `Processing channel sync: ${syncType} for channel ${channelId}`,
+        {
+          syncId,
+          tenantId,
+          channelId,
+          syncType,
+          direction,
+        },
+      );
 
       // Update sync status
-      this.updateSyncProgress(syncId, channelId, 'running', 10, 'Starting sync');
+      this.updateSyncProgress(
+        syncId,
+        channelId,
+        'running',
+        10,
+        'Starting sync',
+      );
 
       // Perform the sync
       const result = await this.syncService.syncChannel(
@@ -139,14 +161,22 @@ export class ChannelSyncProcessor {
       );
 
       // Update sync status
-      this.updateSyncProgress(syncId, channelId, 'completed', 100, 'Sync completed');
+      this.updateSyncProgress(
+        syncId,
+        channelId,
+        'completed',
+        100,
+        'Sync completed',
+      );
 
       // Log sync completion
       await this.logService.log({
         tenantId,
         channelId,
         type: IntegrationLogType.SYNC,
-        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
+        level: result.success
+          ? IntegrationLogLevel.INFO
+          : IntegrationLogLevel.WARN,
         message: `Channel sync completed: ${syncType} (${direction})`,
         metadata: {
           syncId,
@@ -171,12 +201,17 @@ export class ChannelSyncProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Channel sync failed: ${error.message}`, error.stack);
 
       // Update sync status
-      this.updateSyncProgress(syncId, channelId, 'failed', 0, `Sync failed: ${error.message}`);
+      this.updateSyncProgress(
+        syncId,
+        channelId,
+        'failed',
+        0,
+        `Sync failed: ${error.message}`,
+      );
 
       // Log sync error
       await this.logService.logSync(
@@ -197,8 +232,9 @@ export class ChannelSyncProcessor {
    */
   @Process('cross-channel-sync')
   async processCrossChannelSync(job: Job<CrossChannelSyncJobData>) {
-    const { syncId, tenantId, sourceChannel, targetChannels, request } = job.data;
-    
+    const { syncId, tenantId, sourceChannel, targetChannels, request } =
+      job.data;
+
     try {
       this.logger.debug(`Processing cross-channel sync: ${syncId}`, {
         syncId,
@@ -241,9 +277,10 @@ export class ChannelSyncProcessor {
           }
 
           result.summary.successfulChannels++;
-
         } catch (error) {
-          this.logger.error(`Cross-channel sync failed for channel ${targetChannel.id}: ${error.message}`);
+          this.logger.error(
+            `Cross-channel sync failed for channel ${targetChannel.id}: ${error.message}`,
+          );
           result.summary.failedChannels++;
           result.success = false;
         }
@@ -255,7 +292,9 @@ export class ChannelSyncProcessor {
       await this.logService.log({
         tenantId,
         type: IntegrationLogType.SYNC,
-        level: result.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
+        level: result.success
+          ? IntegrationLogLevel.INFO
+          : IntegrationLogLevel.WARN,
         message: `Cross-channel sync completed: ${result.summary.successfulChannels}/${result.summary.totalChannels} successful`,
         metadata: {
           syncId,
@@ -272,9 +311,11 @@ export class ChannelSyncProcessor {
       });
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Cross-channel sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Cross-channel sync failed: ${error.message}`,
+        error.stack,
+      );
 
       // Log error
       await this.logService.logError(tenantId, null, error, {
@@ -290,8 +331,9 @@ export class ChannelSyncProcessor {
    */
   @Process('scheduled-sync')
   async processScheduledSync(job: Job<ScheduledSyncJobData>) {
-    const { tenantId, scheduleId, channelIds, syncTypes, direction, options } = job.data;
-    
+    const { tenantId, scheduleId, channelIds, syncTypes, direction, options } =
+      job.data;
+
     try {
       this.logger.debug(`Processing scheduled sync: ${scheduleId}`, {
         tenantId,
@@ -326,7 +368,6 @@ export class ChannelSyncProcessor {
       });
 
       return { success: true, syncId, scheduleId };
-
     } catch (error) {
       this.logger.error(`Scheduled sync failed: ${error.message}`, error.stack);
 
@@ -345,50 +386,64 @@ export class ChannelSyncProcessor {
   @Process('health-check')
   async processHealthCheck(job: Job<ChannelHealthCheckJobData>) {
     const { tenantId, channelId, checkType } = job.data;
-    
+
     try {
-      this.logger.debug(`Processing health check: ${checkType} for channel ${channelId}`, {
-        tenantId,
-        channelId,
-        checkType,
-      });
+      this.logger.debug(
+        `Processing health check: ${checkType} for channel ${channelId}`,
+        {
+          tenantId,
+          channelId,
+          checkType,
+        },
+      );
 
       const results = {};
 
       if (checkType === 'connection' || checkType === 'all') {
         // Test channel connection
-        const connectionResult = await this.channelsService.testChannelConnection(
-          tenantId,
-          channelId,
-        );
+        const connectionResult =
+          await this.channelsService.testChannelConnection(tenantId, channelId);
         results['connection'] = connectionResult;
       }
 
       if (checkType === 'sync_status' || checkType === 'all') {
         // Check sync status and history
-        const syncHistory = await this.syncService.getSyncHistory(tenantId, channelId, 5);
-        const recentErrors = syncHistory.filter(sync => sync.status === 'failed').length;
-        
+        const syncHistory = await this.syncService.getSyncHistory(
+          tenantId,
+          channelId,
+          5,
+        );
+        const recentErrors = syncHistory.filter(
+          sync => sync.status === 'failed',
+        ).length;
+
         results['sync_status'] = {
           recentSyncs: syncHistory.length,
           recentErrors,
-          errorRate: syncHistory.length > 0 ? (recentErrors / syncHistory.length) * 100 : 0,
+          errorRate:
+            syncHistory.length > 0
+              ? (recentErrors / syncHistory.length) * 100
+              : 0,
         };
       }
 
       if (checkType === 'performance' || checkType === 'all') {
         // Check inventory allocation performance
-        const { allocations } = await this.inventoryService.getChannelInventory(tenantId, {
-          channelId,
-          includeMetrics: true,
-          limit: 100,
-        });
+        const { allocations } = await this.inventoryService.getChannelInventory(
+          tenantId,
+          {
+            channelId,
+            includeMetrics: true,
+            limit: 100,
+          },
+        );
 
         const performanceMetrics = {
           totalAllocations: allocations.length,
           outOfStockCount: allocations.filter(a => a.isOutOfStock).length,
           lowStockCount: allocations.filter(a => a.isLowStock).length,
-          needsRebalancingCount: allocations.filter(a => a.needsRebalancing).length,
+          needsRebalancingCount: allocations.filter(a => a.needsRebalancing)
+            .length,
         };
 
         results['performance'] = performanceMetrics;
@@ -416,7 +471,6 @@ export class ChannelSyncProcessor {
       });
 
       return { success: true, checkType, results };
-
     } catch (error) {
       this.logger.error(`Health check failed: ${error.message}`, error.stack);
 
@@ -435,7 +489,7 @@ export class ChannelSyncProcessor {
   @Process('maintenance')
   async processChannelMaintenance(job: Job<ChannelMaintenanceJobData>) {
     const { tenantId, channelId, maintenanceType, options } = job.data;
-    
+
     try {
       this.logger.debug(`Processing maintenance: ${maintenanceType}`, {
         tenantId,
@@ -456,7 +510,11 @@ export class ChannelSyncProcessor {
           break;
 
         case 'reconcile':
-          result = await this.performReconciliation(tenantId, channelId, options);
+          result = await this.performReconciliation(
+            tenantId,
+            channelId,
+            options,
+          );
           break;
 
         case 'optimize':
@@ -489,7 +547,6 @@ export class ChannelSyncProcessor {
       });
 
       return result;
-
     } catch (error) {
       this.logger.error(`Maintenance failed: ${error.message}`, error.stack);
 
@@ -506,18 +563,23 @@ export class ChannelSyncProcessor {
    * Process batch inventory rebalancing
    */
   @Process('batch-rebalance')
-  async processBatchRebalance(job: Job<{
-    tenantId: string;
-    productIds: string[];
-    options?: any;
-  }>) {
+  async processBatchRebalance(
+    job: Job<{
+      tenantId: string;
+      productIds: string[];
+      options?: any;
+    }>,
+  ) {
     const { tenantId, productIds, options } = job.data;
-    
+
     try {
-      this.logger.debug(`Processing batch rebalance for ${productIds.length} products`, {
-        tenantId,
-        productCount: productIds.length,
-      });
+      this.logger.debug(
+        `Processing batch rebalance for ${productIds.length} products`,
+        {
+          tenantId,
+          productCount: productIds.length,
+        },
+      );
 
       const results = [];
       let successCount = 0;
@@ -532,16 +594,18 @@ export class ChannelSyncProcessor {
             forceRebalance: options?.forceRebalance || false,
           };
 
-          const result = await this.inventoryService.rebalanceProductAllocations(
-            tenantId,
-            rebalanceRequest,
-          );
+          const result =
+            await this.inventoryService.rebalanceProductAllocations(
+              tenantId,
+              rebalanceRequest,
+            );
 
           results.push({ productId, success: true, result });
           successCount++;
-
         } catch (error) {
-          this.logger.error(`Rebalance failed for product ${productId}: ${error.message}`);
+          this.logger.error(
+            `Rebalance failed for product ${productId}: ${error.message}`,
+          );
           results.push({ productId, success: false, error: error.message });
           errorCount++;
         }
@@ -559,7 +623,9 @@ export class ChannelSyncProcessor {
       await this.logService.log({
         tenantId,
         type: IntegrationLogType.SYSTEM,
-        level: batchResult.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.WARN,
+        level: batchResult.success
+          ? IntegrationLogLevel.INFO
+          : IntegrationLogLevel.WARN,
         message: `Batch rebalance completed: ${successCount}/${productIds.length} successful`,
         metadata: {
           productCount: productIds.length,
@@ -569,9 +635,11 @@ export class ChannelSyncProcessor {
       });
 
       return batchResult;
-
     } catch (error) {
-      this.logger.error(`Batch rebalance failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Batch rebalance failed: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -596,7 +664,11 @@ export class ChannelSyncProcessor {
     });
   }
 
-  private async performCleanup(tenantId: string, channelId?: string, options?: any) {
+  private async performCleanup(
+    tenantId: string,
+    channelId?: string,
+    options?: any,
+  ) {
     // Cleanup old sync logs, expired mappings, etc.
     const results = {
       logsDeleted: 0,
@@ -608,7 +680,11 @@ export class ChannelSyncProcessor {
     return results;
   }
 
-  private async performRebalancing(tenantId: string, channelId?: string, options?: any) {
+  private async performRebalancing(
+    tenantId: string,
+    channelId?: string,
+    options?: any,
+  ) {
     // Rebalance inventory allocations
     const results = {
       productsRebalanced: 0,
@@ -618,10 +694,13 @@ export class ChannelSyncProcessor {
 
     try {
       // Get allocations that need rebalancing
-      const { allocations } = await this.inventoryService.getChannelInventory(tenantId, {
-        channelId,
-        needsRebalancing: true,
-      });
+      const { allocations } = await this.inventoryService.getChannelInventory(
+        tenantId,
+        {
+          channelId,
+          needsRebalancing: true,
+        },
+      );
 
       for (const allocation of allocations) {
         try {
@@ -631,7 +710,6 @@ export class ChannelSyncProcessor {
           results.errors++;
         }
       }
-
     } catch (error) {
       this.logger.error(`Rebalancing failed: ${error.message}`);
       throw error;
@@ -640,7 +718,11 @@ export class ChannelSyncProcessor {
     return results;
   }
 
-  private async performReconciliation(tenantId: string, channelId?: string, options?: any) {
+  private async performReconciliation(
+    tenantId: string,
+    channelId?: string,
+    options?: any,
+  ) {
     // Reconcile data between internal and external systems
     const results = {
       productsReconciled: 0,
@@ -653,7 +735,11 @@ export class ChannelSyncProcessor {
     return results;
   }
 
-  private async performOptimization(tenantId: string, channelId?: string, options?: any) {
+  private async performOptimization(
+    tenantId: string,
+    channelId?: string,
+    options?: any,
+  ) {
     // Optimize channel performance and configurations
     const results = {
       allocationsOptimized: 0,

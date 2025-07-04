@@ -15,9 +15,9 @@ import { MokaSalesService } from './services/moka-sales.service';
 import { Channel } from '../../channels/entities/channel.entity';
 import { ChannelMapping } from '../../channels/entities/channel-mapping.entity';
 import { Product } from '../../products/entities/product.entity';
-import { Order } from '../../orders/entities/order.entity';
-import { OrderItem } from '../../orders/entities/order.entity';
+import { Order, OrderItem } from '../../orders/entities/order.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
+import { IntegrationLog } from '../entities/integration-log.entity';
 
 // Common services
 import { IntegrationLogService } from '../common/services/integration-log.service';
@@ -29,7 +29,7 @@ import { IntegrationLogService } from '../common/services/integration-log.servic
       timeout: 30000,
       maxRedirects: 5,
     }),
-    
+
     // TypeORM entities
     TypeOrmModule.forFeature([
       Channel,
@@ -38,20 +38,19 @@ import { IntegrationLogService } from '../common/services/integration-log.servic
       Order,
       OrderItem,
       InventoryItem,
+      IntegrationLog,
     ]),
   ],
-  controllers: [
-    MokaController,
-  ],
+  controllers: [MokaController],
   providers: [
     // API services
     MokaApiService,
-    
+
     // Business logic services
     MokaAuthService,
     MokaProductService,
     MokaSalesService,
-    
+
     // Common services
     IntegrationLogService,
   ],

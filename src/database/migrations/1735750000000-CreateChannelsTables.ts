@@ -359,17 +359,29 @@ export class CreateChannelsTables1735750000000 implements MigrationInterface {
     // Drop indexes for channel_mappings
     await queryRunner.query(`DROP INDEX "IDX_channel_mappings_active"`);
     await queryRunner.query(`DROP INDEX "IDX_channel_mappings_sync_status"`);
-    await queryRunner.query(`DROP INDEX "IDX_channel_mappings_tenant_channel_external"`);
-    await queryRunner.query(`DROP INDEX "IDX_channel_mappings_tenant_channel_internal"`);
-    await queryRunner.query(`DROP INDEX "IDX_channel_mappings_tenant_channel_type"`);
+    await queryRunner.query(
+      `DROP INDEX "IDX_channel_mappings_tenant_channel_external"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "IDX_channel_mappings_tenant_channel_internal"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "IDX_channel_mappings_tenant_channel_type"`,
+    );
 
     // Drop indexes for channel_inventory
     await queryRunner.query(`DROP INDEX "IDX_channel_inventory_auto_sync"`);
     await queryRunner.query(`DROP INDEX "IDX_channel_inventory_sync_status"`);
     await queryRunner.query(`DROP INDEX "IDX_channel_inventory_tenant_status"`);
-    await queryRunner.query(`DROP INDEX "IDX_channel_inventory_tenant_channel"`);
-    await queryRunner.query(`DROP INDEX "IDX_channel_inventory_tenant_product"`);
-    await queryRunner.query(`DROP INDEX "IDX_channel_inventory_tenant_channel_product"`);
+    await queryRunner.query(
+      `DROP INDEX "IDX_channel_inventory_tenant_channel"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "IDX_channel_inventory_tenant_product"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "IDX_channel_inventory_tenant_channel_product"`,
+    );
 
     // Drop indexes for channel_configs
     await queryRunner.query(`DROP INDEX "IDX_channel_configs_channel_id"`);

@@ -8,12 +8,20 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Observable, of, throwError } from 'rxjs';
 import { tap, catchError, switchMap } from 'rxjs/operators';
-import { PerformanceCacheService, CacheOptions } from '../services/performance-cache.service';
-import { CACHEABLE_KEY, CACHE_EVICT_KEY, CacheableOptions, CacheEvictOptions } from '../decorators/cacheable.decorator';
+import {
+  PerformanceCacheService,
+  CacheOptions,
+} from '../services/performance-cache.service';
+import {
+  CACHEABLE_KEY,
+  CACHE_EVICT_KEY,
+  CacheableOptions,
+  CacheEvictOptions,
+} from '../decorators/cacheable.decorator';
 
 /**
  * Cache Interceptor
- * 
+ *
  * Automatically handles caching logic for methods decorated with cache decorators.
  * Supports:
  * - Intelligent cache key generation
@@ -21,7 +29,7 @@ import { CACHEABLE_KEY, CACHE_EVICT_KEY, CacheableOptions, CacheEvictOptions } f
  * - Cache invalidation
  * - Performance metrics
  * - Error handling and fallback
- * 
+ *
  * Integration with StokCerdas business logic:
  * - Multi-tenant aware caching
  * - Indonesian business context
@@ -38,7 +46,10 @@ export class CacheInterceptor implements NestInterceptor {
     private readonly reflector: Reflector,
   ) {}
 
-  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
+  async intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
     const handler = context.getHandler();
     const controller = context.getClass();
@@ -49,7 +60,10 @@ export class CacheInterceptor implements NestInterceptor {
       options: CacheableOptions;
     }>(CACHEABLE_KEY, handler);
 
-    const cacheEvictMetadata = this.reflector.get<CacheEvictOptions>(CACHE_EVICT_KEY, handler);
+    const cacheEvictMetadata = this.reflector.get<CacheEvictOptions>(
+      CACHE_EVICT_KEY,
+      handler,
+    );
 
     // Handle cache eviction before method execution
     if (cacheEvictMetadata && cacheEvictMetadata.timing === 'before') {
@@ -58,18 +72,26 @@ export class CacheInterceptor implements NestInterceptor {
 
     // Handle cacheable operations
     if (cacheableMetadata) {
-      return this.handleCacheableOperation(cacheableMetadata, context, next, request);
+      return this.handleCacheableOperation(
+        cacheableMetadata,
+        context,
+        next,
+        request,
+      );
     }
 
     // Execute method and handle cache eviction after
     return next.handle().pipe(
-      tap(async (result) => {
+      tap(async result => {
         if (cacheEvictMetadata && cacheEvictMetadata.timing === 'after') {
           await this.handleCacheEviction(cacheEvictMetadata, context, result);
         }
       }),
-      catchError((error) => {
-        this.logger.error(`Method execution error in ${controller.name}.${handler.name}:`, error);
+      catchError(error => {
+        this.logger.error(
+          `Method execution error in ${controller.name}.${handler.name}:`,
+          error,
+        );
         return throwError(() => error);
       }),
     );
@@ -84,10 +106,10 @@ export class CacheInterceptor implements NestInterceptor {
     try {
       const { pattern, options } = metadata;
       const args = context.getArgs();
-      
+
       // Generate cache parameters
       const cacheParams = this.generateCacheParams(args, options, request);
-      
+
       // Check condition if specified
       if (options.condition && !options.condition(...args)) {
         return next.handle();
@@ -119,12 +141,14 @@ export class CacheInterceptor implements NestInterceptor {
             observer.complete();
           })
           .catch(error => {
-            this.logger.error(`Cache operation error for pattern ${pattern}:`, error);
+            this.logger.error(
+              `Cache operation error for pattern ${pattern}:`,
+              error,
+            );
             // Fallback to executing the method without cache
             next.handle().subscribe(observer);
           });
       });
-
     } catch (error) {
       this.logger.error('Cache interceptor error:', error);
       // Fallback to normal execution
@@ -140,7 +164,7 @@ export class CacheInterceptor implements NestInterceptor {
     try {
       const args = context.getArgs();
       const request = context.switchToHttp().getRequest();
-      
+
       // Check condition if specified
       if (metadata.condition && !metadata.condition(...args)) {
         return;
@@ -151,26 +175,31 @@ export class CacheInterceptor implements NestInterceptor {
       // Handle pattern-based invalidation
       if (metadata.patterns && metadata.patterns.length > 0) {
         await this.cacheService.invalidate(metadata.patterns, tenantId);
-        this.logger.debug(`Cache invalidated by patterns: ${metadata.patterns.join(', ')}`);
+        this.logger.debug(
+          `Cache invalidated by patterns: ${metadata.patterns.join(', ')}`,
+        );
       }
 
       // Handle tag-based invalidation
       if (metadata.tags && metadata.tags.length > 0) {
         // Add tenant-specific tags if tenantId is available
-        const tagsToInvalidate = tenantId 
+        const tagsToInvalidate = tenantId
           ? [...metadata.tags, `tenant:${tenantId}`]
           : metadata.tags;
-          
+
         await this.cacheService.invalidateByTags(tagsToInvalidate);
-        this.logger.debug(`Cache invalidated by tags: ${tagsToInvalidate.join(', ')}`);
+        this.logger.debug(
+          `Cache invalidated by tags: ${tagsToInvalidate.join(', ')}`,
+        );
       }
 
       // Handle all entries eviction for tenant
       if (metadata.allEntries && tenantId) {
         await this.cacheService.invalidateByTags([`tenant:${tenantId}`]);
-        this.logger.debug(`All cache entries invalidated for tenant: ${tenantId}`);
+        this.logger.debug(
+          `All cache entries invalidated for tenant: ${tenantId}`,
+        );
       }
-
     } catch (error) {
       this.logger.error('Cache eviction error:', error);
       // Don't throw error - eviction failure shouldn't break the application
@@ -202,7 +231,11 @@ export class CacheInterceptor implements NestInterceptor {
       // Process method arguments
       args.forEach((arg, index) => {
         if (arg !== null && arg !== undefined) {
-          if (typeof arg === 'string' || typeof arg === 'number' || typeof arg === 'boolean') {
+          if (
+            typeof arg === 'string' ||
+            typeof arg === 'number' ||
+            typeof arg === 'boolean'
+          ) {
             params[`arg${index}`] = arg;
           } else if (typeof arg === 'object') {
             // For complex objects, create a hash or include key properties
@@ -210,7 +243,7 @@ export class CacheInterceptor implements NestInterceptor {
             if (arg.tenantId) params[`arg${index}_tenantId`] = arg.tenantId;
             if (arg.limit) params[`arg${index}_limit`] = arg.limit;
             if (arg.offset) params[`arg${index}_offset`] = arg.offset;
-            
+
             // Include filters or query parameters
             if (arg.filters) {
               params[`arg${index}_filters`] = JSON.stringify(arg.filters);
@@ -231,10 +264,9 @@ export class CacheInterceptor implements NestInterceptor {
       }
 
       return params;
-
     } catch (error) {
       this.logger.warn('Error generating cache params, using fallback:', error);
-      
+
       // Fallback: use a simple hash of all arguments
       return {
         argsHash: this.createArgumentsHash(args),
@@ -245,7 +277,7 @@ export class CacheInterceptor implements NestInterceptor {
 
   private extractTenantId(args: any[], request: any): string | undefined {
     // Try to extract tenant ID from various sources
-    
+
     // 1. From request user context (most common)
     if (request?.user?.tenantId) {
       return request.user.tenantId;
@@ -269,7 +301,8 @@ export class CacheInterceptor implements NestInterceptor {
   }
 
   private isUUID(str: string): boolean {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
   }
 
@@ -286,10 +319,10 @@ export class CacheInterceptor implements NestInterceptor {
       let hash = 0;
       for (let i = 0; i < argsString.length; i++) {
         const char = argsString.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
+        hash = (hash << 5) - hash + char;
         hash = hash & hash; // Convert to 32-bit integer
       }
-      
+
       return Math.abs(hash).toString(16);
     } catch (error) {
       // Ultimate fallback
@@ -300,7 +333,7 @@ export class CacheInterceptor implements NestInterceptor {
 
 /**
  * Cache Warming Service
- * 
+ *
  * Proactively warms up cache for critical operations during off-peak hours.
  * Particularly useful for Indonesian SMB context where business hours are predictable.
  */
@@ -321,19 +354,19 @@ export class CacheWarmingService {
       const warmupOperations = [
         // Product-related caches
         this.warmupProductCache(tenantId),
-        
+
         // Inventory-related caches
         this.warmupInventoryCache(tenantId),
-        
+
         // Analytics caches
         this.warmupAnalyticsCache(tenantId),
-        
+
         // Configuration caches
         this.warmupConfigCache(tenantId),
       ];
 
       await Promise.allSettled(warmupOperations);
-      
+
       this.logger.log(`Cache warmup completed for tenant: ${tenantId}`);
     } catch (error) {
       this.logger.error(`Cache warmup failed for tenant ${tenantId}:`, error);
@@ -343,7 +376,7 @@ export class CacheWarmingService {
   private async warmupProductCache(tenantId: string): Promise<void> {
     // This would typically call the actual service methods to populate cache
     // For now, we'll create placeholder cache entries
-    
+
     const commonProductQueries = [
       { pattern: 'products:list', params: { tenantId, limit: 50, offset: 0 } },
       { pattern: 'products:active', params: { tenantId, status: 'active' } },
@@ -390,7 +423,10 @@ export class CacheWarmingService {
     const commonAnalyticsQueries = [
       { pattern: 'analytics:dashboard', params: { tenantId } },
       { pattern: 'analytics:inventory:summary', params: { tenantId } },
-      { pattern: 'analytics:sales:daily', params: { tenantId, date: new Date().toISOString().split('T')[0] } },
+      {
+        pattern: 'analytics:sales:daily',
+        params: { tenantId, date: new Date().toISOString().split('T')[0] },
+      },
     ];
 
     for (const query of commonAnalyticsQueries) {
@@ -434,7 +470,7 @@ export class CacheWarmingService {
   scheduleWarmup(): void {
     // Schedule warmup at 3 AM WIB (Indonesian time)
     const warmupHour = 3;
-    
+
     setInterval(() => {
       const now = new Date();
       const jakartaTime = new Intl.DateTimeFormat('en-US', {
@@ -442,7 +478,7 @@ export class CacheWarmingService {
         hour: 'numeric',
         hour12: false,
       }).format(now);
-      
+
       if (parseInt(jakartaTime) === warmupHour) {
         this.logger.log('Starting scheduled cache warmup...');
         // In real implementation, this would get all active tenants and warm their caches

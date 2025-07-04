@@ -11,12 +11,12 @@ import { AuditableEntity } from '../../common/entities/base.entity';
 import { Permission } from './permission.entity';
 
 export enum PermissionSetType {
-  SYSTEM = 'system',        // Built-in system permission sets
-  TEMPLATE = 'template',    // Reusable permission templates
-  CUSTOM = 'custom',        // Custom permission sets
+  SYSTEM = 'system', // Built-in system permission sets
+  TEMPLATE = 'template', // Reusable permission templates
+  CUSTOM = 'custom', // Custom permission sets
   DEPARTMENT = 'department', // Department-specific permission sets
-  FUNCTION = 'function',    // Function-specific permission sets (Sales, IT, etc.)
-  PROJECT = 'project',      // Project-based permission sets
+  FUNCTION = 'function', // Function-specific permission sets (Sales, IT, etc.)
+  PROJECT = 'project', // Project-based permission sets
 }
 
 export enum PermissionSetStatus {
@@ -27,11 +27,11 @@ export enum PermissionSetStatus {
 }
 
 export enum PermissionSetScope {
-  GLOBAL = 'global',        // Available to all tenants
-  TENANT = 'tenant',        // Tenant-specific
+  GLOBAL = 'global', // Available to all tenants
+  TENANT = 'tenant', // Tenant-specific
   DEPARTMENT = 'department', // Department-specific
-  TEAM = 'team',           // Team-specific
-  USER = 'user',           // User-specific
+  TEAM = 'team', // Team-specific
+  USER = 'user', // User-specific
 }
 
 @Entity('permission_sets')
@@ -79,7 +79,7 @@ export class PermissionSet extends AuditableEntity {
       referencedColumnName: 'id',
     },
     inverseJoinColumn: {
-      name: 'permission_id', 
+      name: 'permission_id',
       referencedColumnName: 'id',
     },
   })
@@ -134,7 +134,7 @@ export class PermissionSet extends AuditableEntity {
     timeRestriction?: {
       validFrom?: string;
       validUntil?: string;
-      allowedHours?: Record<string, { start: string; end: string; }>;
+      allowedHours?: Record<string, { start: string; end: string }>;
     };
     ipRestriction?: {
       allowedIps?: string[];
@@ -214,17 +214,17 @@ export class PermissionSet extends AuditableEntity {
 
   get isValidNow(): boolean {
     if (this.isExpired) return false;
-    
+
     const validFrom = this.conditions?.timeRestriction?.validFrom;
     if (validFrom && new Date() < new Date(validFrom)) return false;
-    
+
     return this.isActive;
   }
 
   // Methods
   addPermission(permission: Permission): void {
     if (!this.permissions) this.permissions = [];
-    
+
     const exists = this.permissions.some(p => p.id === permission.id);
     if (!exists) {
       this.permissions.push(permission);
@@ -233,25 +233,27 @@ export class PermissionSet extends AuditableEntity {
 
   removePermission(permissionId: string): void {
     if (!this.permissions) return;
-    
+
     this.permissions = this.permissions.filter(p => p.id !== permissionId);
   }
 
   hasPermission(permissionId: string): boolean {
     if (!this.permissions) return false;
-    
+
     return this.permissions.some(p => p.id === permissionId);
   }
 
   hasPermissionByKey(resource: string, action: string): boolean {
     if (!this.permissions) return false;
-    
-    return this.permissions.some(p => p.resource === resource && p.action === action);
+
+    return this.permissions.some(
+      p => p.resource === resource && p.action === action,
+    );
   }
 
   getPermissionKeys(): string[] {
     if (!this.permissions) return [];
-    
+
     return this.permissions.map(p => `${p.resource}:${p.action}`);
   }
 
@@ -283,13 +285,15 @@ export class PermissionSet extends AuditableEntity {
   isWithinAllowedHours(): boolean {
     const allowedHours = this.conditions?.timeRestriction?.allowedHours;
     if (!allowedHours) return true;
-    
+
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase();
+    const dayOfWeek = now
+      .toLocaleDateString('en', { weekday: 'long' })
+      .toLowerCase();
     const schedule = allowedHours[dayOfWeek];
-    
+
     if (!schedule) return false;
-    
+
     const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
     return currentTime >= schedule.start && currentTime <= schedule.end;
   }
@@ -298,10 +302,14 @@ export class PermissionSet extends AuditableEntity {
   isIpAllowed(ip: string): boolean {
     const ipRestriction = this.conditions?.ipRestriction;
     if (!ipRestriction) return true;
-    
+
     if (ipRestriction.blockedIps?.includes(ip)) return false;
-    if (ipRestriction.allowedIps?.length && !ipRestriction.allowedIps.includes(ip)) return false;
-    
+    if (
+      ipRestriction.allowedIps?.length &&
+      !ipRestriction.allowedIps.includes(ip)
+    )
+      return false;
+
     return true;
   }
 }

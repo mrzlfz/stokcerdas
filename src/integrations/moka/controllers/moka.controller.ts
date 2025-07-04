@@ -28,8 +28,16 @@ import { TenantGuard } from '../../../auth/guards/tenant.guard';
 import { UserRole } from '../../../users/entities/user.entity';
 
 import { MokaAuthService } from '../services/moka-auth.service';
-import { MokaAuthDto, MokaOAuthUrlDto, MokaOAuthCallbackDto } from '../dto/moka-auth.dto';
-import { MokaProductSyncDto, MokaSalesImportDto, MokaInventorySyncDto } from '../dto/moka-sync.dto';
+import {
+  MokaAuthDto,
+  MokaOAuthUrlDto,
+  MokaOAuthCallbackDto,
+} from '../dto/moka-auth.dto';
+import {
+  MokaProductSyncDto,
+  MokaSalesImportDto,
+  MokaInventorySyncDto,
+} from '../dto/moka-sync.dto';
 import { MokaProductService } from '../services/moka-product.service';
 import { MokaSalesService } from '../services/moka-sales.service';
 
@@ -73,7 +81,10 @@ export class MokaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to generate OAuth URL: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to generate OAuth URL: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -87,7 +98,10 @@ export class MokaController {
   @Post('auth/oauth/callback')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Complete OAuth flow with authorization code' })
-  @ApiResponse({ status: 201, description: 'OAuth flow completed successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'OAuth flow completed successfully',
+  })
   async handleOAuthCallback(
     @CurrentUser() user: any,
     @Body() dto: MokaOAuthCallbackDto,
@@ -171,7 +185,10 @@ export class MokaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to setup authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to setup authentication: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -202,7 +219,10 @@ export class MokaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Authentication test failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Authentication test failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -233,7 +253,10 @@ export class MokaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to get auth status: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get auth status: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -247,7 +270,10 @@ export class MokaController {
   @Put('auth/config')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update Moka store configuration' })
-  @ApiResponse({ status: 200, description: 'Configuration updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Configuration updated successfully',
+  })
   async updateConfig(
     @CurrentUser() user: any,
     @Body() dto: Partial<MokaAuthDto>,
@@ -268,7 +294,10 @@ export class MokaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to update config: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update config: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -283,23 +312,26 @@ export class MokaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Revoke Moka authentication' })
   @ApiQuery({ name: 'channelId', required: true })
-  @ApiResponse({ status: 200, description: 'Authentication revoked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Authentication revoked successfully',
+  })
   async revokeAuthentication(
     @CurrentUser() user: any,
     @Query('channelId') channelId: string,
   ) {
     try {
-      await this.authService.revokeAuthentication(
-        user.tenantId,
-        channelId,
-      );
+      await this.authService.revokeAuthentication(user.tenantId, channelId);
 
       return {
         success: true,
         message: 'Authentication revoked successfully',
       };
     } catch (error) {
-      this.logger.error(`Failed to revoke authentication: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to revoke authentication: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -371,7 +403,10 @@ export class MokaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Single product sync failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Single product sync failed: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -405,7 +440,10 @@ export class MokaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get product details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get product details: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -439,7 +477,10 @@ export class MokaController {
         data: result,
       };
     } catch (error) {
-      this.logger.error(`Failed to delete product: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete product: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -456,10 +497,7 @@ export class MokaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Import sales data from Moka POS' })
   @ApiResponse({ status: 201, description: 'Sales import started' })
-  async importSales(
-    @CurrentUser() user: any,
-    @Body() dto: MokaSalesImportDto,
-  ) {
+  async importSales(@CurrentUser() user: any, @Body() dto: MokaSalesImportDto) {
     try {
       const options: any = {
         batchSize: dto.batchSize,
@@ -499,8 +537,16 @@ export class MokaController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Get sales report from Moka POS' })
   @ApiQuery({ name: 'channelId', required: true })
-  @ApiQuery({ name: 'fromDate', required: true, description: 'Start date (ISO string)' })
-  @ApiQuery({ name: 'toDate', required: true, description: 'End date (ISO string)' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: true,
+    description: 'Start date (ISO string)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: true,
+    description: 'End date (ISO string)',
+  })
   @ApiResponse({ status: 200, description: 'Sales report retrieved' })
   async getSalesReport(
     @CurrentUser() user: any,
@@ -521,7 +567,10 @@ export class MokaController {
         data: result.data,
       };
     } catch (error) {
-      this.logger.error(`Failed to get sales report: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get sales report: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -543,7 +592,9 @@ export class MokaController {
     @Body() dto: MokaInventorySyncDto,
   ) {
     try {
-      const fromDate = dto.fromDate ? new Date(dto.fromDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const fromDate = dto.fromDate
+        ? new Date(dto.fromDate)
+        : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const toDate = dto.toDate ? new Date(dto.toDate) : new Date();
 
       const result = await this.salesService.syncInventoryDeductions(
@@ -607,7 +658,10 @@ export class MokaController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to get store info: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get store info: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,
@@ -625,14 +679,18 @@ export class MokaController {
   async getPaymentMethods() {
     try {
       // This is static data from the API service
-      const paymentMethods = this.salesService['mokaApiService'].getPaymentMethods();
+      const paymentMethods =
+        this.salesService['mokaApiService'].getPaymentMethods();
 
       return {
         success: true,
         data: paymentMethods,
       };
     } catch (error) {
-      this.logger.error(`Failed to get payment methods: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get payment methods: ${error.message}`,
+        error.stack,
+      );
       throw new HttpException(
         {
           success: false,

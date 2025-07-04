@@ -168,7 +168,14 @@ export class InventoryQueryDto {
   @ApiPropertyOptional({
     description: 'Urutkan berdasarkan field',
     example: 'quantityOnHand',
-    enum: ['quantityOnHand', 'quantityAvailable', 'totalValue', 'lastMovementAt', 'product.name', 'location.name'],
+    enum: [
+      'quantityOnHand',
+      'quantityAvailable',
+      'totalValue',
+      'lastMovementAt',
+      'product.name',
+      'location.name',
+    ],
   })
   @IsOptional()
   @IsString()

@@ -13,20 +13,20 @@ import { Exclude } from 'class-transformer';
 import { AuditableEntity } from '../../common/entities/base.entity';
 
 export enum RoleType {
-  SYSTEM = 'system',        // Built-in system roles (Super Admin, Admin)
+  SYSTEM = 'system', // Built-in system roles (Super Admin, Admin)
   ORGANIZATIONAL = 'organizational', // Organization-level roles (CEO, VP)
-  DEPARTMENTAL = 'departmental',     // Department-specific roles (Manager, Lead)
-  FUNCTIONAL = 'functional',         // Function-specific roles (Analyst, Specialist)
-  CUSTOM = 'custom',        // Custom user-defined roles
+  DEPARTMENTAL = 'departmental', // Department-specific roles (Manager, Lead)
+  FUNCTIONAL = 'functional', // Function-specific roles (Analyst, Specialist)
+  CUSTOM = 'custom', // Custom user-defined roles
 }
 
 export enum RoleLevel {
-  EXECUTIVE = 1,    // C-level, VP level
-  SENIOR = 2,       // Senior management
-  MIDDLE = 3,       // Middle management  
-  JUNIOR = 4,       // Junior management
-  STAFF = 5,        // Individual contributors
-  INTERN = 6,       // Interns, trainees
+  EXECUTIVE = 1, // C-level, VP level
+  SENIOR = 2, // Senior management
+  MIDDLE = 3, // Middle management
+  JUNIOR = 4, // Junior management
+  STAFF = 5, // Individual contributors
+  INTERN = 6, // Interns, trainees
 }
 
 export enum RoleStatus {
@@ -96,54 +96,54 @@ export class HierarchicalRole extends AuditableEntity {
   inheritsPermissions: boolean; // Inherit from parent roles
 
   @Column({ type: 'boolean', default: false })
-  grantsPermissions: boolean;   // Can grant permissions to child roles
+  grantsPermissions: boolean; // Can grant permissions to child roles
 
   // Administrative settings
   @Column({ type: 'boolean', default: false })
-  isSystemRole: boolean;        // System-defined, cannot be deleted
+  isSystemRole: boolean; // System-defined, cannot be deleted
 
   @Column({ type: 'boolean', default: false })
-  isExecutiveRole: boolean;     // Executive/leadership role
+  isExecutiveRole: boolean; // Executive/leadership role
 
   @Column({ type: 'boolean', default: false })
-  requiresApproval: boolean;    // Role assignments require approval
+  requiresApproval: boolean; // Role assignments require approval
 
   // Scope and limitations
   @Column({ type: 'varchar', length: 100, nullable: true })
-  scope?: string;               // Global, Department, Team, etc.
+  scope?: string; // Global, Department, Team, etc.
 
   @Column({ type: 'int', nullable: true })
-  maxUsers?: number;            // Maximum users that can have this role
+  maxUsers?: number; // Maximum users that can have this role
 
   @Column({ type: 'int', default: 0 })
-  currentUsers: number;         // Current number of users with this role
+  currentUsers: number; // Current number of users with this role
 
   // Security settings
   @Column({ type: 'boolean', default: false })
-  requiresMfa: boolean;         // MFA required for this role
+  requiresMfa: boolean; // MFA required for this role
 
   @Column({ type: 'boolean', default: false })
   requiresIpWhitelist: boolean; // IP whitelist required
 
   @Column({ type: 'jsonb', nullable: true })
-  ipWhitelist?: string[];       // Allowed IP addresses
+  ipWhitelist?: string[]; // Allowed IP addresses
 
   // Business context
   @Column({ type: 'varchar', length: 100, nullable: true })
-  department?: string;          // Associated department
+  department?: string; // Associated department
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  function?: string;            // Business function (Sales, IT, Finance)
+  function?: string; // Business function (Sales, IT, Finance)
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  location?: string;            // Geographic location restriction
+  location?: string; // Geographic location restriction
 
   // Approval workflow
   @Column({ type: 'uuid', name: 'approval_role_id', nullable: true })
-  approvalRoleId?: string;      // Role that can approve assignments
+  approvalRoleId?: string; // Role that can approve assignments
 
   @Column({ type: 'int', nullable: true })
-  approvalTimeout?: number;     // Hours until auto-approval
+  approvalTimeout?: number; // Hours until auto-approval
 
   // IP restrictions
   @Column({ type: 'jsonb', nullable: true })
@@ -174,13 +174,13 @@ export class HierarchicalRole extends AuditableEntity {
   // Business hours restriction
   @Column({ type: 'jsonb', nullable: true })
   allowedHours?: {
-    monday?: { start: string; end: string; };
-    tuesday?: { start: string; end: string; };
-    wednesday?: { start: string; end: string; };
-    thursday?: { start: string; end: string; };
-    friday?: { start: string; end: string; };
-    saturday?: { start: string; end: string; };
-    sunday?: { start: string; end: string; };
+    monday?: { start: string; end: string };
+    tuesday?: { start: string; end: string };
+    wednesday?: { start: string; end: string };
+    thursday?: { start: string; end: string };
+    friday?: { start: string; end: string };
+    saturday?: { start: string; end: string };
+    sunday?: { start: string; end: string };
   };
 
   // Methods
@@ -243,7 +243,7 @@ export class HierarchicalRole extends AuditableEntity {
   // Check if role inherits from another role
   inheritsFrom(sourceRole: HierarchicalRole): boolean {
     if (!this.inheritsPermissions) return false;
-    
+
     // Check if sourceRole is an ancestor
     let current = this.parent;
     while (current) {
@@ -256,13 +256,15 @@ export class HierarchicalRole extends AuditableEntity {
   // Check if current time is within allowed hours
   isWithinAllowedHours(): boolean {
     if (!this.allowedHours) return true;
-    
+
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en', { weekday: 'long' }).toLowerCase() as keyof typeof this.allowedHours;
+    const dayOfWeek = now
+      .toLocaleDateString('en', { weekday: 'long' })
+      .toLowerCase() as keyof typeof this.allowedHours;
     const schedule = this.allowedHours[dayOfWeek];
-    
+
     if (!schedule) return false;
-    
+
     const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
     return currentTime >= schedule.start && currentTime <= schedule.end;
   }
@@ -270,12 +272,12 @@ export class HierarchicalRole extends AuditableEntity {
   // Check if IP address is allowed for this role
   isIpAllowed(ipAddress: string): boolean {
     if (!this.ipRestrictions) return true;
-    
+
     // Check if IP is in blocked list
     if (this.ipRestrictions.blockedIps?.includes(ipAddress)) {
       return false;
     }
-    
+
     // Check if IP is in allowed list (if specified)
     if (this.ipRestrictions.allowedIps?.length > 0) {
       return this.ipRestrictions.allowedIps.some(allowedIp => {
@@ -283,14 +285,14 @@ export class HierarchicalRole extends AuditableEntity {
         return ipAddress.startsWith(allowedIp.split('/')[0]);
       });
     }
-    
+
     return true;
   }
 
   // Check if role has direct permission
   hasDirectPermission(permissionKey: string): boolean {
     if (!this.permissions) return false;
-    
+
     return this.permissions.some(permission => {
       const key = `${permission.resource}:${permission.action}`;
       return key === permissionKey;
@@ -300,19 +302,19 @@ export class HierarchicalRole extends AuditableEntity {
   // Get effective permissions including inherited ones
   getEffectivePermissions(): string[] {
     const permissions: string[] = [];
-    
+
     // Add direct permissions
     if (this.permissions) {
       this.permissions.forEach(permission => {
         permissions.push(`${permission.resource}:${permission.action}`);
       });
     }
-    
+
     // Add inherited permissions from parent
     if (this.inheritsPermissions && this.parent) {
       permissions.push(...this.parent.getEffectivePermissions());
     }
-    
+
     // Remove duplicates
     return [...new Set(permissions)];
   }

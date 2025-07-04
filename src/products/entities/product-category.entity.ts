@@ -1,6 +1,16 @@
-import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn, Tree, TreeParent, TreeChildren } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+  Tree,
+  TreeParent,
+  TreeChildren,
+} from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
-import { Product } from './product.entity';
+import type { Product } from './product.entity';
 
 @Entity('product_categories')
 @Tree('closure-table')
@@ -29,16 +39,18 @@ export class ProductCategory extends BaseEntity {
 
   // Tree relationships for nested categories
   @TreeParent()
-  @ManyToOne(() => ProductCategory, (category) => category.children, { nullable: true })
+  @ManyToOne(() => ProductCategory, category => category.children, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'parentId' })
   parent?: ProductCategory;
 
   @TreeChildren()
-  @OneToMany(() => ProductCategory, (category) => category.parent)
+  @OneToMany(() => ProductCategory, category => category.parent)
   children?: ProductCategory[];
 
   // Products in this category
-  @OneToMany(() => Product, (product) => product.category)
+  @OneToMany('Product', 'category')
   products?: Product[];
 
   // Virtual fields for convenience
@@ -65,13 +77,13 @@ export class ProductCategory extends BaseEntity {
   // Get all descendant categories (recursive)
   getDescendantIds(): string[] {
     const ids: string[] = [this.id];
-    
+
     if (this.children) {
       this.children.forEach(child => {
         ids.push(...child.getDescendantIds());
       });
     }
-    
+
     return ids;
   }
 

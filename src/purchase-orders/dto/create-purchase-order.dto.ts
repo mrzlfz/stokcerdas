@@ -90,10 +90,13 @@ export class CreatePurchaseOrderItemDto {
 
   @ApiProperty({
     description: 'Harga satuan dalam mata uang yang dipilih',
-    example: 15000000.00,
+    example: 15000000.0,
     minimum: 0,
   })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Harga satuan harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Harga satuan harus berupa angka dengan maksimal 2 desimal' },
+  )
   @Min(0, { message: 'Harga satuan tidak boleh negatif' })
   unitPrice: number;
 
@@ -104,7 +107,12 @@ export class CreatePurchaseOrderItemDto {
     maximum: 100,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Persentase diskon harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    {
+      message: 'Persentase diskon harus berupa angka dengan maksimal 2 desimal',
+    },
+  )
   @Min(0, { message: 'Persentase diskon tidak boleh negatif' })
   @Max(100, { message: 'Persentase diskon maksimal 100%' })
   discountPercentage?: number;
@@ -116,7 +124,12 @@ export class CreatePurchaseOrderItemDto {
     maximum: 100,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Persentase pajak harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    {
+      message: 'Persentase pajak harus berupa angka dengan maksimal 2 desimal',
+    },
+  )
   @Min(0, { message: 'Persentase pajak tidak boleh negatif' })
   @Max(100, { message: 'Persentase pajak maksimal 100%' })
   taxRate?: number;
@@ -126,7 +139,10 @@ export class CreatePurchaseOrderItemDto {
     example: '2025-07-15T00:00:00.000Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Expected delivery date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Expected delivery date harus berupa tanggal yang valid' },
+  )
   expectedDeliveryDate?: string;
 
   @ApiPropertyOptional({
@@ -289,7 +305,10 @@ export class CreatePurchaseOrderDto {
     example: '2025-07-15T00:00:00.000Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Expected delivery date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Expected delivery date harus berupa tanggal yang valid' },
+  )
   expectedDeliveryDate?: string;
 
   @ApiPropertyOptional({
@@ -297,26 +316,37 @@ export class CreatePurchaseOrderDto {
     example: '2025-07-10T00:00:00.000Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Requested delivery date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Requested delivery date harus berupa tanggal yang valid' },
+  )
   requestedDeliveryDate?: string;
 
   @ApiPropertyOptional({
     description: 'Biaya pengiriman',
-    example: 150000.00,
+    example: 150000.0,
     minimum: 0,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Biaya pengiriman harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    {
+      message: 'Biaya pengiriman harus berupa angka dengan maksimal 2 desimal',
+    },
+  )
   @Min(0, { message: 'Biaya pengiriman tidak boleh negatif' })
   shippingAmount?: number;
 
   @ApiPropertyOptional({
     description: 'Total diskon dalam nilai rupiah',
-    example: 500000.00,
+    example: 500000.0,
     minimum: 0,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Diskon harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Diskon harus berupa angka dengan maksimal 2 desimal' },
+  )
   @Min(0, { message: 'Diskon tidak boleh negatif' })
   discountAmount?: number;
 
@@ -327,7 +357,12 @@ export class CreatePurchaseOrderDto {
     maximum: 100,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Persentase pajak harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    {
+      message: 'Persentase pajak harus berupa angka dengan maksimal 2 desimal',
+    },
+  )
   @Min(0, { message: 'Persentase pajak tidak boleh negatif' })
   @Max(100, { message: 'Persentase pajak maksimal 100%' })
   taxRate?: number;
@@ -390,12 +425,19 @@ export class CreatePurchaseOrderDto {
   shippingMethod?: string;
 
   @ApiPropertyOptional({
-    description: 'Batas nilai untuk otomatis approval (dalam mata uang yang dipilih)',
-    example: 10000000.00,
+    description:
+      'Batas nilai untuk otomatis approval (dalam mata uang yang dipilih)',
+    example: 10000000.0,
     minimum: 0,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Approval threshold harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    {
+      message:
+        'Approval threshold harus berupa angka dengan maksimal 2 desimal',
+    },
+  )
   @Min(0, { message: 'Approval threshold tidak boleh negatif' })
   approvalThreshold?: number;
 

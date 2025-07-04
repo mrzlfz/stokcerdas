@@ -15,7 +15,7 @@ import { DataPipelineService } from './data-pipeline.service';
 export interface AccuracyMetrics {
   mape: number; // Mean Absolute Percentage Error
   rmse: number; // Root Mean Square Error
-  mae: number;  // Mean Absolute Error
+  mae: number; // Mean Absolute Error
   bias: number; // Forecast bias
   accuracy: number; // Overall accuracy percentage
   r2: number; // R-squared coefficient
@@ -55,7 +55,10 @@ export interface ModelPerformanceReport {
   confidenceAnalysis: {
     withinConfidenceInterval: number;
     averageConfidenceLevel: number;
-    confidenceCalibration: 'well_calibrated' | 'overconfident' | 'underconfident';
+    confidenceCalibration:
+      | 'well_calibrated'
+      | 'overconfident'
+      | 'underconfident';
     confidenceAccuracy: number;
   };
   performanceDegradation: {
@@ -75,7 +78,12 @@ export interface ModelPerformanceReport {
 
 export interface RetrainingTrigger {
   modelId: string;
-  triggerType: 'accuracy_degradation' | 'bias_drift' | 'data_drift' | 'time_based' | 'manual';
+  triggerType:
+    | 'accuracy_degradation'
+    | 'bias_drift'
+    | 'data_drift'
+    | 'time_based'
+    | 'manual';
   triggerValue: number;
   threshold: number;
   description: string;
@@ -90,16 +98,16 @@ export class AccuracyTrackingService {
   constructor(
     @InjectRepository(MLModel)
     private mlModelRepo: Repository<MLModel>,
-    
+
     @InjectRepository(Prediction)
     private predictionRepo: Repository<Prediction>,
-    
+
     @InjectRepository(TrainingJob)
     private trainingJobRepo: Repository<TrainingJob>,
-    
+
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
-    
+
     private dataPipelineService: DataPipelineService,
     private eventEmitter: EventEmitter2,
   ) {}
@@ -111,7 +119,7 @@ export class AccuracyTrackingService {
     tenantId: string,
     modelId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<AccuracyMetrics> {
     this.logger.debug(`Calculating accuracy metrics for model ${modelId}`);
 
@@ -127,7 +135,9 @@ export class AccuracyTrackingService {
     });
 
     if (predictions.length === 0) {
-      throw new Error('No actualized predictions found for the specified period');
+      throw new Error(
+        'No actualized predictions found for the specified period',
+      );
     }
 
     const actualValues = predictions.map(p => p.actualValue!);
@@ -172,7 +182,7 @@ export class AccuracyTrackingService {
     tenantId: string,
     modelId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<BiasAnalysis> {
     this.logger.debug(`Performing bias analysis for model ${modelId}`);
 
@@ -192,13 +202,16 @@ export class AccuracyTrackingService {
     }
 
     const errors = predictions.map(p => p.predictedValue - p.actualValue!);
-    const percentageErrors = predictions.map(p => 
-      ((p.predictedValue - p.actualValue!) / p.actualValue!) * 100
+    const percentageErrors = predictions.map(
+      p => ((p.predictedValue - p.actualValue!) / p.actualValue!) * 100,
     );
 
     // Calculate overall bias
-    const overallBias = errors.reduce((sum, error) => sum + error, 0) / errors.length;
-    const meanBias = percentageErrors.reduce((sum, error) => sum + error, 0) / percentageErrors.length;
+    const overallBias =
+      errors.reduce((sum, error) => sum + error, 0) / errors.length;
+    const meanBias =
+      percentageErrors.reduce((sum, error) => sum + error, 0) /
+      percentageErrors.length;
     const medianBias = this.calculateMedian(percentageErrors);
 
     // Determine bias direction
@@ -243,7 +256,7 @@ export class AccuracyTrackingService {
   async generateModelPerformanceReport(
     tenantId: string,
     modelId: string,
-    evaluationDays: number = 30
+    evaluationDays: number = 30,
   ): Promise<ModelPerformanceReport> {
     this.logger.debug(`Generating performance report for model ${modelId}`);
 
@@ -277,11 +290,34 @@ export class AccuracyTrackingService {
     });
 
     // Calculate metrics
-    const accuracyMetrics = await this.calculateAccuracyMetrics(tenantId, modelId, startDate, endDate);
-    const biasAnalysis = await this.performBiasAnalysis(tenantId, modelId, startDate, endDate);
-    const trendAnalysis = await this.analyzeTrendAccuracy(tenantId, modelId, startDate, endDate);
-    const confidenceAnalysis = await this.analyzeConfidenceAccuracy(tenantId, modelId, startDate, endDate);
-    const performanceDegradation = await this.detectPerformanceDegradation(tenantId, modelId);
+    const accuracyMetrics = await this.calculateAccuracyMetrics(
+      tenantId,
+      modelId,
+      startDate,
+      endDate,
+    );
+    const biasAnalysis = await this.performBiasAnalysis(
+      tenantId,
+      modelId,
+      startDate,
+      endDate,
+    );
+    const trendAnalysis = await this.analyzeTrendAccuracy(
+      tenantId,
+      modelId,
+      startDate,
+      endDate,
+    );
+    const confidenceAnalysis = await this.analyzeConfidenceAccuracy(
+      tenantId,
+      modelId,
+      startDate,
+      endDate,
+    );
+    const performanceDegradation = await this.detectPerformanceDegradation(
+      tenantId,
+      modelId,
+    );
 
     // Generate recommendations and alerts
     const { recommendations, alerts } = this.generateRecommendationsAndAlerts(
@@ -289,7 +325,7 @@ export class AccuracyTrackingService {
       biasAnalysis,
       trendAnalysis,
       confidenceAnalysis,
-      performanceDegradation
+      performanceDegradation,
     );
 
     return {
@@ -316,7 +352,7 @@ export class AccuracyTrackingService {
    */
   async detectPerformanceDegradation(
     tenantId: string,
-    modelId: string
+    modelId: string,
   ): Promise<{
     isDetected: boolean;
     severity: 'low' | 'medium' | 'high';
@@ -338,17 +374,33 @@ export class AccuracyTrackingService {
     const baselineDays = 30;
 
     const recentEndDate = new Date();
-    const recentStartDate = moment(recentEndDate).subtract(recentDays, 'days').toDate();
-    
+    const recentStartDate = moment(recentEndDate)
+      .subtract(recentDays, 'days')
+      .toDate();
+
     const baselineEndDate = moment(recentStartDate).subtract(1, 'day').toDate();
-    const baselineStartDate = moment(baselineEndDate).subtract(baselineDays, 'days').toDate();
+    const baselineStartDate = moment(baselineEndDate)
+      .subtract(baselineDays, 'days')
+      .toDate();
 
     try {
-      const recentMetrics = await this.calculateAccuracyMetrics(tenantId, modelId, recentStartDate, recentEndDate);
-      const baselineMetrics = await this.calculateAccuracyMetrics(tenantId, modelId, baselineStartDate, baselineEndDate);
+      const recentMetrics = await this.calculateAccuracyMetrics(
+        tenantId,
+        modelId,
+        recentStartDate,
+        recentEndDate,
+      );
+      const baselineMetrics = await this.calculateAccuracyMetrics(
+        tenantId,
+        modelId,
+        baselineStartDate,
+        baselineEndDate,
+      );
 
       // Calculate degradation rate based on MAPE increase
-      const degradationRate = ((recentMetrics.mape - baselineMetrics.mape) / baselineMetrics.mape) * 100;
+      const degradationRate =
+        ((recentMetrics.mape - baselineMetrics.mape) / baselineMetrics.mape) *
+        100;
 
       let isDetected = false;
       let severity: 'low' | 'medium' | 'high' = 'low';
@@ -375,7 +427,9 @@ export class AccuracyTrackingService {
           triggerType: 'accuracy_degradation',
           triggerValue: degradationRate,
           threshold: 20,
-          description: `Model accuracy degraded by ${degradationRate.toFixed(1)}%`,
+          description: `Model accuracy degraded by ${degradationRate.toFixed(
+            1,
+          )}%`,
           priority: severity === 'high' ? 'critical' : 'high',
           recommendedAction: 'Immediate model retraining recommended',
         };
@@ -389,9 +443,10 @@ export class AccuracyTrackingService {
         degradationRate: Math.round(degradationRate * 100) / 100,
         triggersRetraining,
       };
-
     } catch (error) {
-      this.logger.warn(`Performance degradation detection failed: ${error.message}`);
+      this.logger.warn(
+        `Performance degradation detection failed: ${error.message}`,
+      );
       return {
         isDetected: false,
         severity: 'low',
@@ -404,8 +459,13 @@ export class AccuracyTrackingService {
   /**
    * Emit retraining trigger event
    */
-  private async emitRetrainingTrigger(tenantId: string, trigger: RetrainingTrigger): Promise<void> {
-    this.logger.warn(`Retraining trigger for model ${trigger.modelId}: ${trigger.description}`);
+  private async emitRetrainingTrigger(
+    tenantId: string,
+    trigger: RetrainingTrigger,
+  ): Promise<void> {
+    this.logger.warn(
+      `Retraining trigger for model ${trigger.modelId}: ${trigger.description}`,
+    );
 
     // Emit event for automated retraining
     this.eventEmitter.emit('ml.retraining.trigger', {
@@ -415,7 +475,9 @@ export class AccuracyTrackingService {
     });
 
     // Update model status to indicate retraining needed
-    const model = await this.mlModelRepo.findOne({ where: { id: trigger.modelId, tenantId } });
+    const model = await this.mlModelRepo.findOne({
+      where: { id: trigger.modelId, tenantId },
+    });
     if (model) {
       model.metadata = {
         ...model.metadata,
@@ -439,7 +501,8 @@ export class AccuracyTrackingService {
     let count = 0;
 
     for (let i = 0; i < actual.length; i++) {
-      if (actual[i] !== 0) { // Avoid division by zero
+      if (actual[i] !== 0) {
+        // Avoid division by zero
         sum += Math.abs((actual[i] - predicted[i]) / actual[i]);
         count++;
       }
@@ -449,118 +512,137 @@ export class AccuracyTrackingService {
   }
 
   private calculateRMSE(actual: number[], predicted: number[]): number {
-    const mse = actual.reduce((sum, val, i) => 
-      sum + Math.pow(val - predicted[i], 2), 0) / actual.length;
+    const mse =
+      actual.reduce((sum, val, i) => sum + Math.pow(val - predicted[i], 2), 0) /
+      actual.length;
     return Math.sqrt(mse);
   }
 
   private calculateMAE(actual: number[], predicted: number[]): number {
-    return actual.reduce((sum, val, i) => 
-      sum + Math.abs(val - predicted[i]), 0) / actual.length;
+    return (
+      actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) /
+      actual.length
+    );
   }
 
   private calculateBias(actual: number[], predicted: number[]): number {
-    return predicted.reduce((sum, val, i) => 
-      sum + (val - actual[i]), 0) / actual.length;
+    return (
+      predicted.reduce((sum, val, i) => sum + (val - actual[i]), 0) /
+      actual.length
+    );
   }
 
   private calculateRSquared(actual: number[], predicted: number[]): number {
-    const actualMean = actual.reduce((sum, val) => sum + val, 0) / actual.length;
-    
-    const totalSumSquares = actual.reduce((sum, val) => 
-      sum + Math.pow(val - actualMean, 2), 0);
-    
-    const residualSumSquares = actual.reduce((sum, val, i) => 
-      sum + Math.pow(val - predicted[i], 2), 0);
-    
-    return totalSumSquares === 0 ? 1 : 1 - (residualSumSquares / totalSumSquares);
+    const actualMean =
+      actual.reduce((sum, val) => sum + val, 0) / actual.length;
+
+    const totalSumSquares = actual.reduce(
+      (sum, val) => sum + Math.pow(val - actualMean, 2),
+      0,
+    );
+
+    const residualSumSquares = actual.reduce(
+      (sum, val, i) => sum + Math.pow(val - predicted[i], 2),
+      0,
+    );
+
+    return totalSumSquares === 0 ? 1 : 1 - residualSumSquares / totalSumSquares;
   }
 
   private calculateTheilU(actual: number[], predicted: number[]): number {
     const numerator = Math.sqrt(
-      actual.reduce((sum, val, i) => 
-        sum + Math.pow(val - predicted[i], 2), 0) / actual.length
+      actual.reduce((sum, val, i) => sum + Math.pow(val - predicted[i], 2), 0) /
+        actual.length,
     );
-    
-    const denominator = Math.sqrt(
-      actual.reduce((sum, val) => sum + Math.pow(val, 2), 0) / actual.length
-    ) + Math.sqrt(
-      predicted.reduce((sum, val) => sum + Math.pow(val, 2), 0) / predicted.length
-    );
-    
+
+    const denominator =
+      Math.sqrt(
+        actual.reduce((sum, val) => sum + Math.pow(val, 2), 0) / actual.length,
+      ) +
+      Math.sqrt(
+        predicted.reduce((sum, val) => sum + Math.pow(val, 2), 0) /
+          predicted.length,
+      );
+
     return denominator === 0 ? 0 : numerator / denominator;
   }
 
   private calculateMedian(values: number[]): number {
     const sorted = [...values].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 
-      ? (sorted[mid - 1] + sorted[mid]) / 2 
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
       : sorted[mid];
   }
 
   private analyzeBiasPattern(
-    predictions: Prediction[], 
-    errors: number[]
+    predictions: Prediction[],
+    errors: number[],
   ): 'systematic' | 'random' | 'seasonal' {
     // Calculate correlation between error and prediction order (time)
     const timeIndices = predictions.map((_, i) => i);
     const correlation = this.calculateCorrelation(timeIndices, errors);
-    
+
     if (Math.abs(correlation) > 0.3) {
       return 'systematic';
     }
-    
+
     // Check for seasonal patterns (simplified)
     const weeklyErrors = new Array(7).fill(0).map(() => [] as number[]);
     predictions.forEach((pred, i) => {
       const dayOfWeek = moment(pred.predictionDate).day();
       weeklyErrors[dayOfWeek].push(errors[i]);
     });
-    
-    const weeklyMeans = weeklyErrors.map(dayErrors => 
-      dayErrors.length > 0 ? dayErrors.reduce((sum, e) => sum + e, 0) / dayErrors.length : 0
+
+    const weeklyMeans = weeklyErrors.map(dayErrors =>
+      dayErrors.length > 0
+        ? dayErrors.reduce((sum, e) => sum + e, 0) / dayErrors.length
+        : 0,
     );
-    
+
     const weeklyVariance = this.calculateVariance(weeklyMeans);
-    
+
     return weeklyVariance > 1 ? 'seasonal' : 'random';
   }
 
   private calculateBiasTrend(
-    predictions: Prediction[], 
-    errors: number[]
+    predictions: Prediction[],
+    errors: number[],
   ): 'increasing' | 'decreasing' | 'stable' {
     if (predictions.length < 5) return 'stable';
-    
+
     const timeIndices = predictions.map((_, i) => i);
     const correlation = this.calculateCorrelation(timeIndices, errors);
-    
+
     if (correlation > 0.2) return 'increasing';
     if (correlation < -0.2) return 'decreasing';
     return 'stable';
   }
 
-  private calculateSeasonalBias(predictions: Prediction[]): Record<string, number> {
+  private calculateSeasonalBias(
+    predictions: Prediction[],
+  ): Record<string, number> {
     const monthlyBias: Record<string, number[]> = {};
-    
+
     predictions.forEach(pred => {
       if (pred.actualValue !== null && pred.actualValue !== undefined) {
         const month = moment(pred.predictionDate).format('MMMM');
-        const bias = ((pred.predictedValue - pred.actualValue) / pred.actualValue) * 100;
-        
+        const bias =
+          ((pred.predictedValue - pred.actualValue) / pred.actualValue) * 100;
+
         if (!monthlyBias[month]) {
           monthlyBias[month] = [];
         }
         monthlyBias[month].push(bias);
       }
     });
-    
+
     const result: Record<string, number> = {};
     Object.entries(monthlyBias).forEach(([month, biases]) => {
-      result[month] = biases.reduce((sum, bias) => sum + bias, 0) / biases.length;
+      result[month] =
+        biases.reduce((sum, bias) => sum + bias, 0) / biases.length;
     });
-    
+
     return result;
   }
 
@@ -571,23 +653,28 @@ export class AccuracyTrackingService {
     const sumXY = x.reduce((sum, val, i) => sum + val * y[i], 0);
     const sumXX = x.reduce((sum, val) => sum + val * val, 0);
     const sumYY = y.reduce((sum, val) => sum + val * val, 0);
-    
+
     const numerator = n * sumXY - sumX * sumY;
-    const denominator = Math.sqrt((n * sumXX - sumX * sumX) * (n * sumYY - sumY * sumY));
-    
+    const denominator = Math.sqrt(
+      (n * sumXX - sumX * sumX) * (n * sumYY - sumY * sumY),
+    );
+
     return denominator === 0 ? 0 : numerator / denominator;
   }
 
   private calculateVariance(values: number[]): number {
     const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-    return values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    return (
+      values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+      values.length
+    );
   }
 
   private async analyzeTrendAccuracy(
     tenantId: string,
     modelId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<any> {
     // Simplified trend analysis - would be more complex in real implementation
     return {
@@ -602,7 +689,7 @@ export class AccuracyTrackingService {
     tenantId: string,
     modelId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<any> {
     const predictions = await this.predictionRepo.find({
       where: {
@@ -625,16 +712,25 @@ export class AccuracyTrackingService {
 
     // Calculate how many predictions fall within confidence intervals
     const withinInterval = predictions.filter(p => {
-      if (p.lowerBound !== null && p.upperBound !== null && p.actualValue !== null) {
+      if (
+        p.lowerBound !== null &&
+        p.upperBound !== null &&
+        p.actualValue !== null
+      ) {
         return p.actualValue >= p.lowerBound && p.actualValue <= p.upperBound;
       }
       return false;
     }).length;
 
     const withinConfidenceInterval = withinInterval / predictions.length;
-    const averageConfidenceLevel = predictions.reduce((sum, p) => sum + p.confidence, 0) / predictions.length;
+    const averageConfidenceLevel =
+      predictions.reduce((sum, p) => sum + p.confidence, 0) /
+      predictions.length;
 
-    let confidenceCalibration: 'well_calibrated' | 'overconfident' | 'underconfident';
+    let confidenceCalibration:
+      | 'well_calibrated'
+      | 'overconfident'
+      | 'underconfident';
     if (Math.abs(withinConfidenceInterval - averageConfidenceLevel) < 0.1) {
       confidenceCalibration = 'well_calibrated';
     } else if (withinConfidenceInterval < averageConfidenceLevel) {
@@ -644,10 +740,15 @@ export class AccuracyTrackingService {
     }
 
     return {
-      withinConfidenceInterval: Math.round(withinConfidenceInterval * 100) / 100,
+      withinConfidenceInterval:
+        Math.round(withinConfidenceInterval * 100) / 100,
       averageConfidenceLevel: Math.round(averageConfidenceLevel * 100) / 100,
       confidenceCalibration,
-      confidenceAccuracy: Math.round((1 - Math.abs(withinConfidenceInterval - averageConfidenceLevel)) * 100) / 100,
+      confidenceAccuracy:
+        Math.round(
+          (1 - Math.abs(withinConfidenceInterval - averageConfidenceLevel)) *
+            100,
+        ) / 100,
     };
   }
 
@@ -656,14 +757,16 @@ export class AccuracyTrackingService {
     biasAnalysis: BiasAnalysis,
     trendAnalysis: any,
     confidenceAnalysis: any,
-    performanceDegradation: any
+    performanceDegradation: any,
   ): { recommendations: string[]; alerts: any[] } {
     const recommendations: string[] = [];
     const alerts: any[] = [];
 
     // Accuracy-based recommendations
     if (accuracyMetrics.mape > 20) {
-      recommendations.push('MAPE tinggi (>20%) - pertimbangkan untuk retraining model dengan data lebih banyak');
+      recommendations.push(
+        'MAPE tinggi (>20%) - pertimbangkan untuk retraining model dengan data lebih banyak',
+      );
       alerts.push({
         type: 'high_mape',
         severity: 'high',
@@ -671,12 +774,16 @@ export class AccuracyTrackingService {
         actionRequired: 'Model retraining diperlukan',
       });
     } else if (accuracyMetrics.mape > 10) {
-      recommendations.push('MAPE cukup tinggi (>10%) - monitor performa model secara berkala');
+      recommendations.push(
+        'MAPE cukup tinggi (>10%) - monitor performa model secara berkala',
+      );
     }
 
     // Bias-based recommendations
     if (biasAnalysis.significantBias) {
-      recommendations.push(`Bias signifikan terdeteksi (${biasAnalysis.biasDirection}) - review feature engineering atau model configuration`);
+      recommendations.push(
+        `Bias signifikan terdeteksi (${biasAnalysis.biasDirection}) - review feature engineering atau model configuration`,
+      );
       alerts.push({
         type: 'significant_bias',
         severity: 'medium',
@@ -687,9 +794,13 @@ export class AccuracyTrackingService {
 
     // Confidence-based recommendations
     if (confidenceAnalysis.confidenceCalibration === 'overconfident') {
-      recommendations.push('Model overconfident - confidence interval terlalu sempit dibanding akurasi aktual');
+      recommendations.push(
+        'Model overconfident - confidence interval terlalu sempit dibanding akurasi aktual',
+      );
     } else if (confidenceAnalysis.confidenceCalibration === 'underconfident') {
-      recommendations.push('Model underconfident - confidence interval terlalu lebar, bisa dipersempit');
+      recommendations.push(
+        'Model underconfident - confidence interval terlalu lebar, bisa dipersempit',
+      );
     }
 
     // Performance degradation alerts
@@ -697,8 +808,12 @@ export class AccuracyTrackingService {
       alerts.push({
         type: 'performance_degradation',
         severity: performanceDegradation.severity,
-        message: `Degradasi performa terdeteksi: ${performanceDegradation.degradationRate.toFixed(1)}%`,
-        actionRequired: performanceDegradation.triggersRetraining ? 'Model retraining diperlukan' : 'Monitor lebih ketat',
+        message: `Degradasi performa terdeteksi: ${performanceDegradation.degradationRate.toFixed(
+          1,
+        )}%`,
+        actionRequired: performanceDegradation.triggersRetraining
+          ? 'Model retraining diperlukan'
+          : 'Monitor lebih ketat',
       });
     }
 

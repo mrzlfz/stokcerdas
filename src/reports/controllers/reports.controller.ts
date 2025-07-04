@@ -69,7 +69,8 @@ export class ReportsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Inventory Valuation Report',
-    description: 'Generate a detailed report showing current inventory values, costs, and potential profits',
+    description:
+      'Generate a detailed report showing current inventory values, costs, and potential profits',
   })
   @ApiResponse({
     status: 200,
@@ -97,7 +98,11 @@ export class ReportsController {
     this.validateDateRange(query.startDate, query.endDate);
 
     // Generate the report data
-    const reportData = await this.reportGenerationService.generateInventoryValuationReport(tenantId, query);
+    const reportData =
+      await this.reportGenerationService.generateInventoryValuationReport(
+        tenantId,
+        query,
+      );
 
     // If JSON format or no format specified, return JSON
     if (!query.format || query.format === ReportFormat.JSON) {
@@ -108,17 +113,33 @@ export class ReportsController {
     try {
       const exportOptions = {
         format: query.format,
-        filename: `inventory-valuation-${new Date().toISOString().split('T')[0]}`,
+        filename: `inventory-valuation-${
+          new Date().toISOString().split('T')[0]
+        }`,
         email: userEmail,
         tenantName: 'StokCerdas',
       };
 
-      const exportedData = await this.reportExportService.exportInventoryValuationReport(reportData, exportOptions);
-      
+      const exportedData =
+        await this.reportExportService.exportInventoryValuationReport(
+          reportData,
+          exportOptions,
+        );
+
       if (Buffer.isBuffer(exportedData)) {
-        this.sendFileResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendFileResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       } else {
-        this.sendTextResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendTextResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       }
     } catch (error) {
       throw new BadRequestException(`Export failed: ${error.message}`);
@@ -130,7 +151,8 @@ export class ReportsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Stock Movement Report',
-    description: 'Generate a detailed report showing all inventory transactions and movements',
+    description:
+      'Generate a detailed report showing all inventory transactions and movements',
   })
   @ApiResponse({
     status: 200,
@@ -164,7 +186,8 @@ export class ReportsController {
   @ApiQuery({
     name: 'movementType',
     required: false,
-    description: 'Filter by movement type (all, receipts, issues, transfers, adjustments)',
+    description:
+      'Filter by movement type (all, receipts, issues, transfers, adjustments)',
     example: 'all',
   })
   @ApiQuery({
@@ -186,7 +209,11 @@ export class ReportsController {
     this.validateDateRange(query.startDate, query.endDate);
 
     // Generate the report data
-    const reportData = await this.reportGenerationService.generateStockMovementReport(tenantId, query);
+    const reportData =
+      await this.reportGenerationService.generateStockMovementReport(
+        tenantId,
+        query,
+      );
 
     // If JSON format or no format specified, return JSON
     if (!query.format || query.format === ReportFormat.JSON) {
@@ -202,12 +229,26 @@ export class ReportsController {
         tenantName: 'StokCerdas',
       };
 
-      const exportedData = await this.reportExportService.exportStockMovementReport(reportData, exportOptions);
-      
+      const exportedData =
+        await this.reportExportService.exportStockMovementReport(
+          reportData,
+          exportOptions,
+        );
+
       if (Buffer.isBuffer(exportedData)) {
-        this.sendFileResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendFileResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       } else {
-        this.sendTextResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendTextResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       }
     } catch (error) {
       throw new BadRequestException(`Export failed: ${error.message}`);
@@ -219,7 +260,8 @@ export class ReportsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Low Stock Report',
-    description: 'Generate a report showing products with low stock levels that need attention',
+    description:
+      'Generate a report showing products with low stock levels that need attention',
   })
   @ApiResponse({
     status: 200,
@@ -267,7 +309,11 @@ export class ReportsController {
     @Headers('user-email') userEmail?: string,
   ): Promise<LowStockResponseDto | void> {
     // Generate the report data
-    const reportData = await this.reportGenerationService.generateLowStockReport(tenantId, query);
+    const reportData =
+      await this.reportGenerationService.generateLowStockReport(
+        tenantId,
+        query,
+      );
 
     // If JSON format or no format specified, return JSON
     if (!query.format || query.format === ReportFormat.JSON) {
@@ -283,12 +329,25 @@ export class ReportsController {
         tenantName: 'StokCerdas',
       };
 
-      const exportedData = await this.reportExportService.exportLowStockReport(reportData, exportOptions);
-      
+      const exportedData = await this.reportExportService.exportLowStockReport(
+        reportData,
+        exportOptions,
+      );
+
       if (Buffer.isBuffer(exportedData)) {
-        this.sendFileResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendFileResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       } else {
-        this.sendTextResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendTextResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       }
     } catch (error) {
       throw new BadRequestException(`Export failed: ${error.message}`);
@@ -300,7 +359,8 @@ export class ReportsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Generate Product Performance Report',
-    description: 'Generate a comprehensive report analyzing product sales performance, profitability, and inventory turnover',
+    description:
+      'Generate a comprehensive report analyzing product sales performance, profitability, and inventory turnover',
   })
   @ApiResponse({
     status: 200,
@@ -360,15 +420,23 @@ export class ReportsController {
     if (query.startDate && query.endDate) {
       const startDate = new Date(query.startDate);
       const endDate = new Date(query.endDate);
-      const daysDifference = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+      const daysDifference = Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
       if (daysDifference < 7) {
-        throw new BadRequestException('Analysis period must be at least 7 days for meaningful performance data');
+        throw new BadRequestException(
+          'Analysis period must be at least 7 days for meaningful performance data',
+        );
       }
     }
 
     // Generate the report data
-    const reportData = await this.reportGenerationService.generateProductPerformanceReport(tenantId, query);
+    const reportData =
+      await this.reportGenerationService.generateProductPerformanceReport(
+        tenantId,
+        query,
+      );
 
     // If JSON format or no format specified, return JSON
     if (!query.format || query.format === ReportFormat.JSON) {
@@ -379,17 +447,33 @@ export class ReportsController {
     try {
       const exportOptions = {
         format: query.format,
-        filename: `product-performance-${new Date().toISOString().split('T')[0]}`,
+        filename: `product-performance-${
+          new Date().toISOString().split('T')[0]
+        }`,
         email: userEmail,
         tenantName: 'StokCerdas',
       };
 
-      const exportedData = await this.reportExportService.exportProductPerformanceReport(reportData, exportOptions);
-      
+      const exportedData =
+        await this.reportExportService.exportProductPerformanceReport(
+          reportData,
+          exportOptions,
+        );
+
       if (Buffer.isBuffer(exportedData)) {
-        this.sendFileResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendFileResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       } else {
-        this.sendTextResponse(res, exportedData, exportOptions.filename, query.format);
+        this.sendTextResponse(
+          res,
+          exportedData,
+          exportOptions.filename,
+          query.format,
+        );
       }
     } catch (error) {
       throw new BadRequestException(`Export failed: ${error.message}`);
@@ -415,9 +499,7 @@ export class ReportsController {
     status: 403,
     description: 'Forbidden - Insufficient permissions (admin/manager only)',
   })
-  async getReportsSummary(
-    @GetTenant() tenantId: string,
-  ): Promise<{
+  async getReportsSummary(@GetTenant() tenantId: string): Promise<{
     lastGenerated: string;
     availableReports: string[];
     quickStats: {
@@ -428,31 +510,27 @@ export class ReportsController {
     };
   }> {
     // Get quick stats for dashboard
-    const [
-      totalProducts,
-      lowStockCount,
-      inventoryValue,
-      recentMovements,
-    ] = await Promise.all([
-      this.reportGenerationService['productRepository'].count({
-        where: { tenantId, status: ProductStatus.ACTIVE, isDeleted: false },
-      }),
-      this.reportGenerationService['inventoryItemRepository'].count({
-        where: { tenantId, isActive: true },
-      }),
-      this.reportGenerationService['inventoryItemRepository']
-        .createQueryBuilder('item')
-        .select('SUM(item.totalValue)', 'total')
-        .where('item.tenantId = :tenantId', { tenantId })
-        .andWhere('item.isActive = true')
-        .getRawOne(),
-      this.reportGenerationService['transactionRepository'].count({
-        where: {
-          tenantId,
-          transactionDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
-        },
-      }),
-    ]);
+    const [totalProducts, lowStockCount, inventoryValue, recentMovements] =
+      await Promise.all([
+        this.reportGenerationService['productRepository'].count({
+          where: { tenantId, status: ProductStatus.ACTIVE, isDeleted: false },
+        }),
+        this.reportGenerationService['inventoryItemRepository'].count({
+          where: { tenantId, isActive: true },
+        }),
+        this.reportGenerationService['inventoryItemRepository']
+          .createQueryBuilder('item')
+          .select('SUM(item.totalValue)', 'total')
+          .where('item.tenantId = :tenantId', { tenantId })
+          .andWhere('item.isActive = true')
+          .getRawOne(),
+        this.reportGenerationService['transactionRepository'].count({
+          where: {
+            tenantId,
+            transactionDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+          },
+        }),
+      ]);
 
     return {
       lastGenerated: new Date().toISOString(),
@@ -516,34 +594,50 @@ export class ReportsController {
 
       switch (emailRequest.reportType) {
         case EmailReportType.INVENTORY_VALUATION:
-          reportData = await this.reportGenerationService.generateInventoryValuationReport(
-            tenantId,
-            { ...queryParams, format: emailRequest.format } as InventoryValuationQueryDto,
-          );
+          reportData =
+            await this.reportGenerationService.generateInventoryValuationReport(
+              tenantId,
+              {
+                ...queryParams,
+                format: emailRequest.format,
+              } as InventoryValuationQueryDto,
+            );
           reportTypeName = 'Laporan Valuasi Inventori';
           break;
 
         case EmailReportType.STOCK_MOVEMENT:
-          reportData = await this.reportGenerationService.generateStockMovementReport(
-            tenantId,
-            { ...queryParams, format: emailRequest.format } as StockMovementQueryDto,
-          );
+          reportData =
+            await this.reportGenerationService.generateStockMovementReport(
+              tenantId,
+              {
+                ...queryParams,
+                format: emailRequest.format,
+              } as StockMovementQueryDto,
+            );
           reportTypeName = 'Laporan Pergerakan Stok';
           break;
 
         case EmailReportType.LOW_STOCK:
-          reportData = await this.reportGenerationService.generateLowStockReport(
-            tenantId,
-            { ...queryParams, format: emailRequest.format } as LowStockQueryDto,
-          );
+          reportData =
+            await this.reportGenerationService.generateLowStockReport(
+              tenantId,
+              {
+                ...queryParams,
+                format: emailRequest.format,
+              } as LowStockQueryDto,
+            );
           reportTypeName = 'Laporan Stok Rendah';
           break;
 
         case EmailReportType.PRODUCT_PERFORMANCE:
-          reportData = await this.reportGenerationService.generateProductPerformanceReport(
-            tenantId,
-            { ...queryParams, format: emailRequest.format } as ProductPerformanceQueryDto,
-          );
+          reportData =
+            await this.reportGenerationService.generateProductPerformanceReport(
+              tenantId,
+              {
+                ...queryParams,
+                format: emailRequest.format,
+              } as ProductPerformanceQueryDto,
+            );
           reportTypeName = 'Laporan Performa Produk';
           break;
 
@@ -554,7 +648,11 @@ export class ReportsController {
       // Create export options
       const exportOptions = {
         format: emailRequest.format,
-        filename: emailRequest.filename || `${emailRequest.reportType}-${new Date().toISOString().split('T')[0]}`,
+        filename:
+          emailRequest.filename ||
+          `${emailRequest.reportType}-${
+            new Date().toISOString().split('T')[0]
+          }`,
         email: emailRequest.email,
         subject: emailRequest.subject || `${reportTypeName} - StokCerdas`,
         tenantName: 'StokCerdas',
@@ -564,22 +662,37 @@ export class ReportsController {
       let exportedData: Buffer | string;
       switch (emailRequest.reportType) {
         case EmailReportType.INVENTORY_VALUATION:
-          exportedData = await this.reportExportService.exportInventoryValuationReport(reportData, exportOptions);
+          exportedData =
+            await this.reportExportService.exportInventoryValuationReport(
+              reportData,
+              exportOptions,
+            );
           break;
         case EmailReportType.STOCK_MOVEMENT:
-          exportedData = await this.reportExportService.exportStockMovementReport(reportData, exportOptions);
+          exportedData =
+            await this.reportExportService.exportStockMovementReport(
+              reportData,
+              exportOptions,
+            );
           break;
         case EmailReportType.LOW_STOCK:
-          exportedData = await this.reportExportService.exportLowStockReport(reportData, exportOptions);
+          exportedData = await this.reportExportService.exportLowStockReport(
+            reportData,
+            exportOptions,
+          );
           break;
         case EmailReportType.PRODUCT_PERFORMANCE:
-          exportedData = await this.reportExportService.exportProductPerformanceReport(reportData, exportOptions);
+          exportedData =
+            await this.reportExportService.exportProductPerformanceReport(
+              reportData,
+              exportOptions,
+            );
           break;
       }
 
       // Convert to buffer if it's a string
-      const reportBuffer = Buffer.isBuffer(exportedData) 
-        ? exportedData 
+      const reportBuffer = Buffer.isBuffer(exportedData)
+        ? exportedData
         : Buffer.from(exportedData, 'utf8');
 
       // Send email
@@ -601,7 +714,6 @@ export class ReportsController {
         format: emailRequest.format.toUpperCase(),
         sentAt: new Date().toISOString(),
       };
-
     } catch (error) {
       this.logger.error(`Email report error: ${error.message}`, error.stack);
       throw new BadRequestException(`Failed to send report: ${error.message}`);
@@ -614,17 +726,21 @@ export class ReportsController {
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      
+
       if (start > end) {
         throw new BadRequestException('Start date must be before end date');
       }
-      
+
       // Prevent very large date ranges that could impact performance
       const maxDays = 365; // 1 year maximum
-      const daysDifference = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      
+      const daysDifference = Math.ceil(
+        (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
       if (daysDifference > maxDays) {
-        throw new BadRequestException(`Date range cannot exceed ${maxDays} days`);
+        throw new BadRequestException(
+          `Date range cannot exceed ${maxDays} days`,
+        );
       }
     }
 
@@ -651,13 +767,13 @@ export class ReportsController {
   ): void {
     const contentType = this.getContentType(format);
     const fileExtension = this.getFileExtension(format);
-    
+
     res.set({
       'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${filename}.${fileExtension}"`,
       'Content-Length': fileBuffer.length.toString(),
     });
-    
+
     res.send(fileBuffer);
   }
 
@@ -669,31 +785,39 @@ export class ReportsController {
   ): void {
     const contentType = this.getContentType(format);
     const fileExtension = this.getFileExtension(format);
-    
+
     res.set({
       'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${filename}.${fileExtension}"`,
       'Content-Length': Buffer.byteLength(content, 'utf8').toString(),
     });
-    
+
     res.send(content);
   }
 
   private getContentType(format: ReportFormat): string {
     switch (format) {
-      case ReportFormat.CSV: return 'text/csv';
-      case ReportFormat.EXCEL: return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      case ReportFormat.PDF: return 'application/pdf';
-      default: return 'application/json';
+      case ReportFormat.CSV:
+        return 'text/csv';
+      case ReportFormat.EXCEL:
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case ReportFormat.PDF:
+        return 'application/pdf';
+      default:
+        return 'application/json';
     }
   }
 
   private getFileExtension(format: ReportFormat): string {
     switch (format) {
-      case ReportFormat.CSV: return 'csv';
-      case ReportFormat.EXCEL: return 'xlsx';
-      case ReportFormat.PDF: return 'pdf';
-      default: return 'json';
+      case ReportFormat.CSV:
+        return 'csv';
+      case ReportFormat.EXCEL:
+        return 'xlsx';
+      case ReportFormat.PDF:
+        return 'pdf';
+      default:
+        return 'json';
     }
   }
 }

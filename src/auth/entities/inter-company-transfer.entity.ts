@@ -217,16 +217,34 @@ export class InterCompanyTransfer extends AuditableEntity {
   responsiblePersonTo: User;
 
   // Financial information
-  @Column({ name: 'total_value', type: 'decimal', precision: 20, scale: 2, nullable: true })
+  @Column({
+    name: 'total_value',
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    nullable: true,
+  })
   totalValue: number;
 
   @Column({ name: 'currency', length: 3, default: 'IDR' })
   currency: string;
 
-  @Column({ name: 'exchange_rate', type: 'decimal', precision: 10, scale: 6, nullable: true })
+  @Column({
+    name: 'exchange_rate',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    nullable: true,
+  })
   exchangeRate: number;
 
-  @Column({ name: 'total_value_base_currency', type: 'decimal', precision: 20, scale: 2, nullable: true })
+  @Column({
+    name: 'total_value_base_currency',
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    nullable: true,
+  })
   totalValueBaseCurrency: number;
 
   @Column({
@@ -277,10 +295,22 @@ export class InterCompanyTransfer extends AuditableEntity {
   @Column({ name: 'tracking_number', length: 100, nullable: true })
   trackingNumber: string;
 
-  @Column({ name: 'shipping_cost', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'shipping_cost',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   shippingCost: number;
 
-  @Column({ name: 'insurance_cost', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'insurance_cost',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   insuranceCost: number;
 
   @Column({ name: 'estimated_delivery_date', type: 'date', nullable: true })
@@ -329,7 +359,12 @@ export class InterCompanyTransfer extends AuditableEntity {
   @Column({ name: 'inspection_notes', type: 'text', nullable: true })
   inspectionNotes: string;
 
-  @Column({ name: 'quality_rating', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'quality_rating',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   qualityRating: 'excellent' | 'good' | 'acceptable' | 'poor' | 'rejected';
 
   // Documentation
@@ -374,10 +409,22 @@ export class InterCompanyTransfer extends AuditableEntity {
   };
 
   // Performance tracking
-  @Column({ name: 'processing_time_hours', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'processing_time_hours',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   processingTimeHours: number;
 
-  @Column({ name: 'delivery_time_hours', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'delivery_time_hours',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   deliveryTimeHours: number;
 
   @Column({ name: 'is_on_time', type: 'boolean', nullable: true })
@@ -460,7 +507,9 @@ export class InterCompanyTransfer extends AuditableEntity {
   }
 
   canBeModified(): boolean {
-    return [TransferStatus.DRAFT, TransferStatus.PENDING_APPROVAL].includes(this.status);
+    return [TransferStatus.DRAFT, TransferStatus.PENDING_APPROVAL].includes(
+      this.status,
+    );
   }
 
   canBeApproved(): boolean {
@@ -481,7 +530,11 @@ export class InterCompanyTransfer extends AuditableEntity {
   }
 
   isHighPriority(): boolean {
-    return [TransferPriority.HIGH, TransferPriority.URGENT, TransferPriority.CRITICAL].includes(this.priority);
+    return [
+      TransferPriority.HIGH,
+      TransferPriority.URGENT,
+      TransferPriority.CRITICAL,
+    ].includes(this.priority);
   }
 
   calculateTotalValue(): number {
@@ -502,14 +555,16 @@ export class InterCompanyTransfer extends AuditableEntity {
 
   calculateProcessingTime(): void {
     if ((this as any).createdAt && this.completedDate) {
-      const diffMs = this.completedDate.getTime() - (this as any).createdAt.getTime();
+      const diffMs =
+        this.completedDate.getTime() - (this as any).createdAt.getTime();
       this.processingTimeHours = diffMs / (1000 * 60 * 60);
     }
   }
 
   calculateDeliveryTime(): void {
     if (this.shippedDate && this.actualDeliveryDate) {
-      const diffMs = this.actualDeliveryDate.getTime() - this.shippedDate.getTime();
+      const diffMs =
+        this.actualDeliveryDate.getTime() - this.shippedDate.getTime();
       this.deliveryTimeHours = diffMs / (1000 * 60 * 60);
     }
   }
@@ -537,7 +592,10 @@ export class InterCompanyTransfer extends AuditableEntity {
     }
   }
 
-  updateTransferItem(index: number, item: Partial<InterCompanyTransfer['transferItems'][0]>): void {
+  updateTransferItem(
+    index: number,
+    item: Partial<InterCompanyTransfer['transferItems'][0]>,
+  ): void {
     if (this.transferItems && index >= 0 && index < this.transferItems.length) {
       this.transferItems[index] = { ...this.transferItems[index], ...item };
       this.updateTotalValue();
@@ -581,7 +639,9 @@ export class InterCompanyTransfer extends AuditableEntity {
 
   removeDocument(documentUrl: string): void {
     if (this.attachedDocuments) {
-      this.attachedDocuments = this.attachedDocuments.filter(doc => doc !== documentUrl);
+      this.attachedDocuments = this.attachedDocuments.filter(
+        doc => doc !== documentUrl,
+      );
     }
   }
 
@@ -624,7 +684,10 @@ export class InterCompanyTransfer extends AuditableEntity {
     }
   }
 
-  receive(receivedBy: string, qualityRating?: InterCompanyTransfer['qualityRating']): void {
+  receive(
+    receivedBy: string,
+    qualityRating?: InterCompanyTransfer['qualityRating'],
+  ): void {
     if (this.status === TransferStatus.IN_TRANSIT) {
       this.status = TransferStatus.RECEIVED;
       this.receivedById = receivedBy;
@@ -665,7 +728,10 @@ export class InterCompanyTransfer extends AuditableEntity {
   }
 
   returnToSender(returnReason: string): void {
-    if (this.status === TransferStatus.IN_TRANSIT || this.status === TransferStatus.RECEIVED) {
+    if (
+      this.status === TransferStatus.IN_TRANSIT ||
+      this.status === TransferStatus.RECEIVED
+    ) {
       this.status = TransferStatus.RETURNED;
       this.addCustomField('returned_at', new Date());
       this.addCustomField('return_reason', returnReason);
@@ -694,16 +760,16 @@ export class InterCompanyTransfer extends AuditableEntity {
     if (this.fromCompanyId === this.toCompanyId) return false;
     if (!this.transferItems || this.transferItems.length === 0) return false;
     if (!this.transferDate) return false;
-    
+
     // Financial validation
     if (this.totalValue && this.totalValue <= 0) return false;
-    
+
     // Item validation
     for (const item of this.transferItems) {
       if (!item.itemName) return false;
       if (item.quantity && item.quantity <= 0) return false;
     }
-    
+
     return true;
   }
 }

@@ -12,16 +12,16 @@ import { HierarchicalRole } from './hierarchical-role.entity';
 import { Department } from './department.entity';
 
 export enum ApprovalType {
-  ROLE_ASSIGNMENT = 'role_assignment',      // Role assignment approvals
-  PERMISSION_GRANT = 'permission_grant',    // Permission granting approvals
-  ACCESS_REQUEST = 'access_request',        // Access request approvals
+  ROLE_ASSIGNMENT = 'role_assignment', // Role assignment approvals
+  PERMISSION_GRANT = 'permission_grant', // Permission granting approvals
+  ACCESS_REQUEST = 'access_request', // Access request approvals
   DEPARTMENT_TRANSFER = 'department_transfer', // Department transfer approvals
-  SYSTEM_ACCESS = 'system_access',          // System access approvals
-  DATA_ACCESS = 'data_access',              // Data access approvals
-  BUDGET_APPROVAL = 'budget_approval',      // Budget-related approvals
-  PURCHASE_ORDER = 'purchase_order',        // Purchase order approvals
-  EXPENSE_APPROVAL = 'expense_approval',    // Expense approvals
-  CUSTOM = 'custom',                        // Custom approval workflows
+  SYSTEM_ACCESS = 'system_access', // System access approvals
+  DATA_ACCESS = 'data_access', // Data access approvals
+  BUDGET_APPROVAL = 'budget_approval', // Budget-related approvals
+  PURCHASE_ORDER = 'purchase_order', // Purchase order approvals
+  EXPENSE_APPROVAL = 'expense_approval', // Expense approvals
+  CUSTOM = 'custom', // Custom approval workflows
 }
 
 export enum ApprovalStatus {
@@ -32,16 +32,16 @@ export enum ApprovalStatus {
 }
 
 export enum ApprovalMode {
-  SEQUENTIAL = 'sequential',    // One after another
-  PARALLEL = 'parallel',       // All at the same time
-  MAJORITY = 'majority',       // Majority consensus
-  UNANIMOUS = 'unanimous',     // All must approve
+  SEQUENTIAL = 'sequential', // One after another
+  PARALLEL = 'parallel', // All at the same time
+  MAJORITY = 'majority', // Majority consensus
+  UNANIMOUS = 'unanimous', // All must approve
   FIRST_RESPONSE = 'first_response', // First approval wins
 }
 
 export enum EscalationTrigger {
-  TIMEOUT = 'timeout',         // Time-based escalation
-  REJECTION = 'rejection',     // Escalate on rejection
+  TIMEOUT = 'timeout', // Time-based escalation
+  REJECTION = 'rejection', // Escalate on rejection
   MULTIPLE_REJECTIONS = 'multiple_rejections', // Multiple rejections
   CUSTOM_CONDITION = 'custom_condition', // Custom business logic
 }
@@ -92,7 +92,7 @@ export class ApprovalChain extends AuditableEntity {
   department?: Department;
 
   // Chain steps
-  @OneToMany(() => ApprovalStep, (step) => step.approvalChain, {
+  @OneToMany(() => ApprovalStep, step => step.approvalChain, {
     cascade: true,
     eager: true,
   })
@@ -220,7 +220,9 @@ export class ApprovalChain extends AuditableEntity {
 
   // Methods
   get isActiveChain(): boolean {
-    return this.status === ApprovalStatus.ACTIVE && this.isActive && !this.isDeleted;
+    return (
+      this.status === ApprovalStatus.ACTIVE && this.isActive && !this.isDeleted
+    );
   }
 
   get canBeDeleted(): boolean {
@@ -243,20 +245,20 @@ export class ApprovalChain extends AuditableEntity {
   // Check if chain is configured correctly
   isValidConfiguration(): boolean {
     if (!this.steps || this.steps.length === 0) return false;
-    
+
     // Check for valid step orders
     const orders = this.steps.map(s => s.stepOrder);
     const uniqueOrders = [...new Set(orders)];
-    
+
     // Must have at least one step
     if (uniqueOrders.length === 0) return false;
-    
+
     // Check for gaps in step orders
     uniqueOrders.sort((a, b) => a - b);
     for (let i = 1; i < uniqueOrders.length; i++) {
-      if (uniqueOrders[i] !== uniqueOrders[i-1] + 1) return false;
+      if (uniqueOrders[i] !== uniqueOrders[i - 1] + 1) return false;
     }
-    
+
     return true;
   }
 
@@ -271,19 +273,20 @@ export class ApprovalChain extends AuditableEntity {
         escalationCount: 0,
       };
     }
-    
+
     if (approved) {
       this.usageStats.totalApprovals += 1;
     } else {
       this.usageStats.totalRejections += 1;
     }
-    
+
     // Update average approval time
-    const totalRequests = this.usageStats.totalApprovals + this.usageStats.totalRejections;
+    const totalRequests =
+      this.usageStats.totalApprovals + this.usageStats.totalRejections;
     const currentAvg = this.usageStats.averageApprovalTime || 0;
-    this.usageStats.averageApprovalTime = 
-      ((currentAvg * (totalRequests - 1)) + processingTimeHours) / totalRequests;
-    
+    this.usageStats.averageApprovalTime =
+      (currentAvg * (totalRequests - 1) + processingTimeHours) / totalRequests;
+
     this.usageCount += 1;
     this.lastUsedAt = new Date();
   }
@@ -297,7 +300,8 @@ export class ApprovalChain extends AuditableEntity {
   // Record escalation
   recordEscalation(): void {
     if (!this.usageStats) this.usageStats = {};
-    this.usageStats.escalationCount = (this.usageStats.escalationCount || 0) + 1;
+    this.usageStats.escalationCount =
+      (this.usageStats.escalationCount || 0) + 1;
   }
 }
 
@@ -310,7 +314,7 @@ export class ApprovalStep extends AuditableEntity {
   @Exclude({ toPlainOnly: true })
   approvalChainId: string;
 
-  @ManyToOne(() => ApprovalChain, (chain) => chain.steps, {
+  @ManyToOne(() => ApprovalChain, chain => chain.steps, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'approval_chain_id' })
@@ -394,39 +398,50 @@ export class ApprovalStep extends AuditableEntity {
 
   // Methods
   get isValid(): boolean {
-    return (this.approverRoleId || this.approverUserId || this.approverDepartment) !== null;
+    return (
+      (this.approverRoleId ||
+        this.approverUserId ||
+        this.approverDepartment) !== null
+    );
   }
 
   shouldSkip(context: any): boolean {
     if (!this.isRequired) return true;
     if (!this.conditions?.skipIf) return false;
-    
+
     const skipIf = this.conditions.skipIf;
-    
+
     // Check amount condition
     if (skipIf.amountBelow && context.amount < skipIf.amountBelow) return true;
-    
+
     // Check department condition
-    if (skipIf.departmentMatches && skipIf.departmentMatches.includes(context.department)) return true;
-    
+    if (
+      skipIf.departmentMatches &&
+      skipIf.departmentMatches.includes(context.department)
+    )
+      return true;
+
     // Check role condition
-    if (skipIf.roleMatches && skipIf.roleMatches.includes(context.role)) return true;
-    
+    if (skipIf.roleMatches && skipIf.roleMatches.includes(context.role))
+      return true;
+
     return false;
   }
 
   shouldAutoApprove(context: any): boolean {
     if (!this.autoApprove) return false;
     if (!this.conditions?.autoApproveIf) return false;
-    
+
     const autoApproveIf = this.conditions.autoApproveIf;
-    
+
     // Check amount condition
-    if (autoApproveIf.amountBelow && context.amount < autoApproveIf.amountBelow) return true;
-    
+    if (autoApproveIf.amountBelow && context.amount < autoApproveIf.amountBelow)
+      return true;
+
     // Check previous approval condition
-    if (autoApproveIf.previouslyApproved && context.previouslyApproved) return true;
-    
+    if (autoApproveIf.previouslyApproved && context.previouslyApproved)
+      return true;
+
     return false;
   }
 }

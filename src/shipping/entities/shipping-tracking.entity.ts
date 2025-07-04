@@ -104,10 +104,17 @@ export class ShippingTracking extends BaseEntity {
   }
 
   get isFailed(): boolean {
-    return [TrackingStatus.FAILED, TrackingStatus.RETURNED, TrackingStatus.CANCELLED].includes(this.status);
+    return [
+      TrackingStatus.FAILED,
+      TrackingStatus.RETURNED,
+      TrackingStatus.CANCELLED,
+    ].includes(this.status);
   }
 
   get isInTransit(): boolean {
-    return [TrackingStatus.IN_TRANSIT, TrackingStatus.OUT_FOR_DELIVERY].includes(this.status);
+    return [
+      TrackingStatus.IN_TRANSIT,
+      TrackingStatus.OUT_FOR_DELIVERY,
+    ].includes(this.status);
   }
 }

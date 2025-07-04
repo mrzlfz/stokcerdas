@@ -1,7 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TreeRepository } from 'typeorm';
-import { Department, DepartmentType, DepartmentStatus } from '../entities/department.entity';
+import {
+  Department,
+  DepartmentType,
+  DepartmentStatus,
+} from '../entities/department.entity';
 
 @Injectable()
 export class DepartmentService {
@@ -40,7 +49,10 @@ export class DepartmentService {
 
     // Set parent if provided
     if (parentId) {
-      const parent = await this.findById(parentId, tenantId) as unknown as Department;
+      const parent = (await this.findById(
+        parentId,
+        tenantId,
+      )) as unknown as Department;
       department.parent = parent;
       department.level = parent.level + 1;
       department.path = parent.buildPath(parent.path);
@@ -77,7 +89,10 @@ export class DepartmentService {
   }
 
   // Find all departments for a tenant
-  async findAll(tenantId: string, includeInactive = false): Promise<Department[]> {
+  async findAll(
+    tenantId: string,
+    includeInactive = false,
+  ): Promise<Department[]> {
     const queryBuilder = this.departmentRepository
       .createQueryBuilder('department')
       .leftJoinAndSelect('department.parent', 'parent')
@@ -86,12 +101,13 @@ export class DepartmentService {
       .andWhere('department.isDeleted = false');
 
     if (!includeInactive) {
-      queryBuilder.andWhere('department.status = :status', { 
-        status: DepartmentStatus.ACTIVE 
+      queryBuilder.andWhere('department.status = :status', {
+        status: DepartmentStatus.ACTIVE,
       });
     }
 
-    queryBuilder.orderBy('department.level', 'ASC')
+    queryBuilder
+      .orderBy('department.level', 'ASC')
       .addOrderBy('department.name', 'ASC');
 
     return queryBuilder.getMany();
@@ -100,8 +116,8 @@ export class DepartmentService {
   // Get department tree structure
   async getDepartmentTree(tenantId: string): Promise<Department[]> {
     const roots = await this.departmentRepository.findRoots();
-    const filteredRoots = roots.filter(root => 
-      root.tenantId === tenantId && !root.isDeleted
+    const filteredRoots = roots.filter(
+      root => root.tenantId === tenantId && !root.isDeleted,
     );
 
     const result = [];
@@ -114,25 +130,37 @@ export class DepartmentService {
   }
 
   // Get department with all ancestors
-  async getDepartmentWithAncestors(id: string, tenantId: string): Promise<Department> {
+  async getDepartmentWithAncestors(
+    id: string,
+    tenantId: string,
+  ): Promise<Department> {
     const department = await this.findById(id, tenantId);
     return this.departmentRepository.findAncestorsTree(department);
   }
 
   // Get department with all descendants
-  async getDepartmentWithDescendants(id: string, tenantId: string): Promise<Department> {
+  async getDepartmentWithDescendants(
+    id: string,
+    tenantId: string,
+  ): Promise<Department> {
     const department = await this.findById(id, tenantId);
     return this.departmentRepository.findDescendantsTree(department);
   }
 
   // Get all child departments (flat list)
-  async getChildDepartments(id: string, tenantId: string): Promise<Department[]> {
+  async getChildDepartments(
+    id: string,
+    tenantId: string,
+  ): Promise<Department[]> {
     const department = await this.findById(id, tenantId);
     return this.departmentRepository.findDescendants(department);
   }
 
   // Get all parent departments (flat list)
-  async getParentDepartments(id: string, tenantId: string): Promise<Department[]> {
+  async getParentDepartments(
+    id: string,
+    tenantId: string,
+  ): Promise<Department[]> {
     const department = await this.findById(id, tenantId);
     return this.departmentRepository.findAncestors(department);
   }
@@ -172,11 +200,13 @@ export class DepartmentService {
       } else {
         // Moving to new parent
         const newParent = await this.findById(parentId, tenantId);
-        
+
         // Prevent circular references
         const descendants = await this.getChildDepartments(id, tenantId);
         if (descendants.some(desc => desc.id === parentId)) {
-          throw new BadRequestException('Tidak dapat memindahkan departemen ke anak departemennya sendiri');
+          throw new BadRequestException(
+            'Tidak dapat memindahkan departemen ke anak departemennya sendiri',
+          );
         }
 
         department.parent = newParent;
@@ -206,12 +236,14 @@ export class DepartmentService {
 
     // Check if department has active children
     const children = await this.getChildDepartments(id, tenantId);
-    const activeChildren = children.filter(child => 
-      child.status === DepartmentStatus.ACTIVE && !child.isDeleted
+    const activeChildren = children.filter(
+      child => child.status === DepartmentStatus.ACTIVE && !child.isDeleted,
     );
 
     if (activeChildren.length > 0) {
-      throw new BadRequestException('Tidak dapat menghapus departemen yang memiliki sub-departemen aktif');
+      throw new BadRequestException(
+        'Tidak dapat menghapus departemen yang memiliki sub-departemen aktif',
+      );
     }
 
     // TODO: Check if department has active users
@@ -225,7 +257,11 @@ export class DepartmentService {
   }
 
   // Restore soft deleted department
-  async restore(id: string, tenantId: string, userId: string): Promise<Department> {
+  async restore(
+    id: string,
+    tenantId: string,
+    userId: string,
+  ): Promise<Department> {
     const department = await this.departmentRepository.findOne({
       where: {
         id,
@@ -240,7 +276,7 @@ export class DepartmentService {
 
     department.restore();
     department.updatedBy = userId;
-    
+
     return this.departmentRepository.save(department);
   }
 
@@ -252,10 +288,10 @@ export class DepartmentService {
     userId: string,
   ): Promise<Department> {
     const department = await this.findById(id, tenantId);
-    
+
     department.status = status;
     department.updatedBy = userId;
-    
+
     return this.departmentRepository.save(department);
   }
 
@@ -305,10 +341,15 @@ export class DepartmentService {
       .createQueryBuilder('department')
       .where('department.tenantId = :tenantId', { tenantId })
       .andWhere('department.isDeleted = false')
-      .andWhere('department.status = :status', { status: DepartmentStatus.ACTIVE })
-      .andWhere('(department.name ILIKE :query OR department.code ILIKE :query)', {
-        query: `%${query}%`,
+      .andWhere('department.status = :status', {
+        status: DepartmentStatus.ACTIVE,
       })
+      .andWhere(
+        '(department.name ILIKE :query OR department.code ILIKE :query)',
+        {
+          query: `%${query}%`,
+        },
+      )
       .orderBy('department.name', 'ASC')
       .limit(limit)
       .getMany();
@@ -351,7 +392,7 @@ export class DepartmentService {
   ): Promise<boolean> {
     const ancestor = await this.findById(ancestorId, tenantId);
     const descendant = await this.findById(descendantId, tenantId);
-    
+
     const ancestors = await this.departmentRepository.findAncestors(descendant);
     return ancestors.some(dept => dept.id === ancestorId);
   }
@@ -368,16 +409,22 @@ export class DepartmentService {
   // Get department statistics
   async getDepartmentStats(tenantId: string): Promise<any> {
     const departments = await this.findAll(tenantId, true);
-    
+
     const stats = {
       total: departments.length,
-      active: departments.filter(d => d.status === DepartmentStatus.ACTIVE).length,
-      inactive: departments.filter(d => d.status === DepartmentStatus.INACTIVE).length,
-      archived: departments.filter(d => d.status === DepartmentStatus.ARCHIVED).length,
+      active: departments.filter(d => d.status === DepartmentStatus.ACTIVE)
+        .length,
+      inactive: departments.filter(d => d.status === DepartmentStatus.INACTIVE)
+        .length,
+      archived: departments.filter(d => d.status === DepartmentStatus.ARCHIVED)
+        .length,
       byType: {
         root: departments.filter(d => d.type === DepartmentType.ROOT).length,
-        division: departments.filter(d => d.type === DepartmentType.DIVISION).length,
-        department: departments.filter(d => d.type === DepartmentType.DEPARTMENT).length,
+        division: departments.filter(d => d.type === DepartmentType.DIVISION)
+          .length,
+        department: departments.filter(
+          d => d.type === DepartmentType.DEPARTMENT,
+        ).length,
         team: departments.filter(d => d.type === DepartmentType.TEAM).length,
         group: departments.filter(d => d.type === DepartmentType.GROUP).length,
       },
@@ -415,7 +462,7 @@ export class DepartmentService {
     await this.departmentRepository
       .createQueryBuilder()
       .update(Department)
-      .set({ 
+      .set({
         status,
         updatedBy: userId,
         updatedAt: new Date(),
@@ -428,19 +475,23 @@ export class DepartmentService {
 
   // Private helper methods
   private async updateDescendantPaths(department: Department): Promise<void> {
-    const descendants = await this.departmentRepository.findDescendants(department);
-    
+    const descendants = await this.departmentRepository.findDescendants(
+      department,
+    );
+
     for (const descendant of descendants) {
       if (descendant.id !== department.id) {
         // Find the path from root to this descendant
-        const ancestors = await this.departmentRepository.findAncestors(descendant);
+        const ancestors = await this.departmentRepository.findAncestors(
+          descendant,
+        );
         const sortedAncestors = ancestors
           .filter(a => a.id !== descendant.id)
           .sort((a, b) => a.level - b.level);
-        
+
         const pathComponents = sortedAncestors.map(a => a.code);
         pathComponents.push(descendant.code);
-        
+
         descendant.path = pathComponents.join('/');
         await this.departmentRepository.save(descendant);
       }
@@ -453,11 +504,18 @@ export class DepartmentService {
     userId: string,
     tenantId: string,
   ): Promise<T[]> {
-    const accessibleDepartments = await this.getUserAccessibleDepartments(userId, tenantId);
-    const accessibleDepartmentIds = new Set(accessibleDepartments.map(d => d.id));
+    const accessibleDepartments = await this.getUserAccessibleDepartments(
+      userId,
+      tenantId,
+    );
+    const accessibleDepartmentIds = new Set(
+      accessibleDepartments.map(d => d.id),
+    );
 
-    return entities.filter(entity => 
-      !entity.departmentId || accessibleDepartmentIds.has(entity.departmentId)
+    return entities.filter(
+      entity =>
+        !entity.departmentId ||
+        accessibleDepartmentIds.has(entity.departmentId),
     );
   }
 
@@ -466,7 +524,11 @@ export class DepartmentService {
     userId: string,
     tenantId: string,
   ): Promise<void> {
-    const hasAccess = await this.checkDepartmentAccess(userId, departmentId, tenantId);
+    const hasAccess = await this.checkDepartmentAccess(
+      userId,
+      departmentId,
+      tenantId,
+    );
     if (!hasAccess) {
       throw new ForbiddenException('Akses ke departemen ini tidak diizinkan');
     }

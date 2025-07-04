@@ -9,7 +9,7 @@ import * as v8 from 'v8';
 
 /**
  * Performance Monitoring Service for StokCerdas
- * 
+ *
  * Comprehensive system performance tracking and analysis:
  * 1. Database query performance monitoring
  * 2. Cache hit ratio tracking
@@ -18,7 +18,7 @@ import * as v8 from 'v8';
  * 5. Business metrics tracking
  * 6. Indonesian business context awareness
  * 7. Real-time alerting for performance issues
- * 
+ *
  * Key Features:
  * - Automatic slow query detection
  * - Performance regression analysis
@@ -30,7 +30,7 @@ import * as v8 from 'v8';
 export interface PerformanceMetrics {
   timestamp: Date;
   tenantId?: string;
-  
+
   // Database Performance
   database: {
     slowQueries: number;
@@ -40,7 +40,7 @@ export interface PerformanceMetrics {
     queryCount: number;
     topSlowQueries: SlowQueryInfo[];
   };
-  
+
   // Cache Performance
   cache: {
     hitRatio: number;
@@ -50,7 +50,7 @@ export interface PerformanceMetrics {
     memoryUsage: number;
     evictionCount: number;
   };
-  
+
   // API Performance
   api: {
     averageResponseTime: number;
@@ -60,7 +60,7 @@ export interface PerformanceMetrics {
     errorRate: number;
     slowEndpoints: EndpointPerformance[];
   };
-  
+
   // System Performance
   system: {
     cpuUsage: number;
@@ -70,7 +70,7 @@ export interface PerformanceMetrics {
     diskUsage: number;
     networkUsage: number;
   };
-  
+
   // Business Metrics
   business: {
     activeUsers: number;
@@ -194,17 +194,17 @@ export class PerformanceMonitoringService {
       }
 
       this.currentMetrics.database.queryCount++;
-      
+
       // Update average query time (running average)
       const currentAvg = this.currentMetrics.database.averageQueryTime;
       const count = this.currentMetrics.database.queryCount;
-      this.currentMetrics.database.averageQueryTime = 
-        ((currentAvg * (count - 1)) + event.duration) / count;
+      this.currentMetrics.database.averageQueryTime =
+        (currentAvg * (count - 1) + event.duration) / count;
 
       // Track slow queries
       if (event.duration > this.alertThresholds.slowQueryThreshold) {
         this.currentMetrics.database.slowQueries++;
-        
+
         const slowQueryInfo: SlowQueryInfo = {
           sql: event.sql.substring(0, 500), // Limit SQL length
           duration: event.duration,
@@ -214,9 +214,9 @@ export class PerformanceMonitoringService {
         };
 
         this.currentMetrics.database.topSlowQueries.push(slowQueryInfo);
-        
+
         // Keep only top 10 slow queries
-        this.currentMetrics.database.topSlowQueries = 
+        this.currentMetrics.database.topSlowQueries =
           this.currentMetrics.database.topSlowQueries
             .sort((a, b) => b.duration - a.duration)
             .slice(0, 10);
@@ -234,12 +234,11 @@ export class PerformanceMonitoringService {
               'Review query execution plan',
               'Check if proper indexes are in place',
               'Consider query optimization',
-              'Monitor database load'
+              'Monitor database load',
             ],
           });
         }
       }
-
     } catch (error) {
       this.logger.error('Error recording query performance:', error);
     }
@@ -269,16 +268,17 @@ export class PerformanceMonitoringService {
       }
 
       this.currentMetrics.api.requestCount++;
-      
+
       // Update average response time
       const currentAvg = this.currentMetrics.api.averageResponseTime;
       const count = this.currentMetrics.api.requestCount;
-      this.currentMetrics.api.averageResponseTime = 
-        ((currentAvg * (count - 1)) + event.responseTime) / count;
+      this.currentMetrics.api.averageResponseTime =
+        (currentAvg * (count - 1) + event.responseTime) / count;
 
       // Track error rate
       if (event.statusCode >= 400) {
-        const errorCount = (this.currentMetrics.api.errorRate / 100) * (count - 1) + 1;
+        const errorCount =
+          (this.currentMetrics.api.errorRate / 100) * (count - 1) + 1;
         this.currentMetrics.api.errorRate = (errorCount / count) * 100;
       }
 
@@ -286,7 +286,7 @@ export class PerformanceMonitoringService {
       if (event.responseTime > this.alertThresholds.apiResponseThreshold) {
         const endpoint = `${event.method} ${event.path}`;
         let endpointMetrics = this.currentMetrics.api.slowEndpoints.find(
-          e => e.path === event.path && e.method === event.method
+          e => e.path === event.path && e.method === event.method,
         );
 
         if (!endpointMetrics) {
@@ -301,17 +301,26 @@ export class PerformanceMonitoringService {
           this.currentMetrics.api.slowEndpoints.push(endpointMetrics);
         } else {
           const reqCount = endpointMetrics.requestCount + 1;
-          endpointMetrics.averageResponseTime = 
-            ((endpointMetrics.averageResponseTime * endpointMetrics.requestCount) + event.responseTime) / reqCount;
+          endpointMetrics.averageResponseTime =
+            (endpointMetrics.averageResponseTime *
+              endpointMetrics.requestCount +
+              event.responseTime) /
+            reqCount;
           endpointMetrics.requestCount = reqCount;
-          endpointMetrics.slowestResponse = Math.max(endpointMetrics.slowestResponse, event.responseTime);
+          endpointMetrics.slowestResponse = Math.max(
+            endpointMetrics.slowestResponse,
+            event.responseTime,
+          );
           if (event.statusCode >= 400) {
             endpointMetrics.errorCount++;
           }
         }
 
         // Alert for very slow API responses
-        if (event.responseTime > this.alertThresholds.apiResponseThreshold * 2) {
+        if (
+          event.responseTime >
+          this.alertThresholds.apiResponseThreshold * 2
+        ) {
           await this.emitPerformanceAlert({
             type: 'warning',
             category: 'api',
@@ -323,12 +332,11 @@ export class PerformanceMonitoringService {
               'Check database query performance',
               'Review caching strategies',
               'Optimize business logic',
-              'Consider async processing'
+              'Consider async processing',
             ],
           });
         }
       }
-
     } catch (error) {
       this.logger.error('Error recording API performance:', error);
     }
@@ -358,18 +366,22 @@ export class PerformanceMonitoringService {
 
       if (event.operation === 'hit' || event.operation === 'miss') {
         this.currentMetrics.cache.totalRequests++;
-        
-        const hits = (this.currentMetrics.cache.hitRatio / 100) * (this.currentMetrics.cache.totalRequests - 1);
+
+        const hits =
+          (this.currentMetrics.cache.hitRatio / 100) *
+          (this.currentMetrics.cache.totalRequests - 1);
         const newHits = event.operation === 'hit' ? hits + 1 : hits;
-        
-        this.currentMetrics.cache.hitRatio = (newHits / this.currentMetrics.cache.totalRequests) * 100;
-        this.currentMetrics.cache.missRatio = 100 - this.currentMetrics.cache.hitRatio;
+
+        this.currentMetrics.cache.hitRatio =
+          (newHits / this.currentMetrics.cache.totalRequests) * 100;
+        this.currentMetrics.cache.missRatio =
+          100 - this.currentMetrics.cache.hitRatio;
 
         // Update average response time
         const currentAvg = this.currentMetrics.cache.averageResponseTime;
         const count = this.currentMetrics.cache.totalRequests;
-        this.currentMetrics.cache.averageResponseTime = 
-          ((currentAvg * (count - 1)) + event.responseTime) / count;
+        this.currentMetrics.cache.averageResponseTime =
+          (currentAvg * (count - 1) + event.responseTime) / count;
       }
 
       if (event.operation === 'evict') {
@@ -377,12 +389,17 @@ export class PerformanceMonitoringService {
       }
 
       // Alert for low cache hit ratio
-      if (this.currentMetrics.cache.totalRequests > 100 && 
-          this.currentMetrics.cache.hitRatio < this.alertThresholds.cacheHitRatioThreshold) {
+      if (
+        this.currentMetrics.cache.totalRequests > 100 &&
+        this.currentMetrics.cache.hitRatio <
+          this.alertThresholds.cacheHitRatioThreshold
+      ) {
         await this.emitPerformanceAlert({
           type: 'warning',
           category: 'cache',
-          message: `Low cache hit ratio: ${this.currentMetrics.cache.hitRatio.toFixed(1)}%`,
+          message: `Low cache hit ratio: ${this.currentMetrics.cache.hitRatio.toFixed(
+            1,
+          )}%`,
           metrics: { hitRatio: this.currentMetrics.cache.hitRatio },
           timestamp: new Date(),
           tenantId: event.tenantId,
@@ -390,11 +407,10 @@ export class PerformanceMonitoringService {
             'Review cache TTL settings',
             'Optimize cache key strategies',
             'Increase cache memory allocation',
-            'Review cache invalidation patterns'
+            'Review cache invalidation patterns',
           ],
         });
       }
-
     } catch (error) {
       this.logger.error('Error recording cache performance:', error);
     }
@@ -407,7 +423,8 @@ export class PerformanceMonitoringService {
     return {
       timestamp: new Date(),
       tenantId,
-      database: this.currentMetrics.database || this.getDefaultDatabaseMetrics(),
+      database:
+        this.currentMetrics.database || this.getDefaultDatabaseMetrics(),
       cache: this.currentMetrics.cache || this.getDefaultCacheMetrics(),
       api: this.currentMetrics.api || this.getDefaultAPIMetrics(),
       system: this.collectSystemMetrics(),
@@ -423,23 +440,28 @@ export class PerformanceMonitoringService {
     period: { start: Date; end: Date } = {
       start: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
       end: new Date(),
-    }
+    },
   ): Promise<PerformanceReport> {
     try {
       const key = tenantId || 'global';
       const metricsHistory = this.performanceData.get(key) || [];
-      
+
       const periodMetrics = metricsHistory.filter(
-        m => m.timestamp >= period.start && m.timestamp <= period.end
+        m => m.timestamp >= period.start && m.timestamp <= period.end,
       );
 
       if (periodMetrics.length === 0) {
-        throw new Error('No performance data available for the specified period');
+        throw new Error(
+          'No performance data available for the specified period',
+        );
       }
 
       const summary = this.calculatePerformanceSummary(periodMetrics);
       const trends = this.calculatePerformanceTrends(periodMetrics);
-      const recommendations = this.generateRecommendations(periodMetrics, summary);
+      const recommendations = this.generateRecommendations(
+        periodMetrics,
+        summary,
+      );
 
       return {
         period,
@@ -448,7 +470,6 @@ export class PerformanceMonitoringService {
         trends,
         recommendations,
       };
-
     } catch (error) {
       this.logger.error('Error generating performance report:', error);
       throw error;
@@ -460,50 +481,83 @@ export class PerformanceMonitoringService {
    */
   getSystemHealth(): {
     status: 'healthy' | 'warning' | 'critical';
-    checks: Record<string, { status: 'pass' | 'warning' | 'fail'; message: string; value?: number }>;
+    checks: Record<
+      string,
+      { status: 'pass' | 'warning' | 'fail'; message: string; value?: number }
+    >;
     lastChecked: Date;
   } {
     const currentMetrics = this.getCurrentMetrics();
-    const checks: Record<string, { status: 'pass' | 'warning' | 'fail'; message: string; value?: number }> = {};
+    const checks: Record<
+      string,
+      { status: 'pass' | 'warning' | 'fail'; message: string; value?: number }
+    > = {};
 
     // Database health
     checks.database = {
-      status: currentMetrics.database.averageQueryTime < this.alertThresholds.slowQueryThreshold ? 'pass' : 'warning',
-      message: `Average query time: ${currentMetrics.database.averageQueryTime.toFixed(2)}ms`,
+      status:
+        currentMetrics.database.averageQueryTime <
+        this.alertThresholds.slowQueryThreshold
+          ? 'pass'
+          : 'warning',
+      message: `Average query time: ${currentMetrics.database.averageQueryTime.toFixed(
+        2,
+      )}ms`,
       value: currentMetrics.database.averageQueryTime,
     };
 
     // Cache health
     checks.cache = {
-      status: currentMetrics.cache.hitRatio > this.alertThresholds.cacheHitRatioThreshold ? 'pass' : 'warning',
+      status:
+        currentMetrics.cache.hitRatio >
+        this.alertThresholds.cacheHitRatioThreshold
+          ? 'pass'
+          : 'warning',
       message: `Cache hit ratio: ${currentMetrics.cache.hitRatio.toFixed(1)}%`,
       value: currentMetrics.cache.hitRatio,
     };
 
     // API health
     checks.api = {
-      status: currentMetrics.api.averageResponseTime < this.alertThresholds.apiResponseThreshold ? 'pass' : 'warning',
-      message: `Average response time: ${currentMetrics.api.averageResponseTime.toFixed(2)}ms`,
+      status:
+        currentMetrics.api.averageResponseTime <
+        this.alertThresholds.apiResponseThreshold
+          ? 'pass'
+          : 'warning',
+      message: `Average response time: ${currentMetrics.api.averageResponseTime.toFixed(
+        2,
+      )}ms`,
       value: currentMetrics.api.averageResponseTime,
     };
 
     // System health
     checks.system = {
-      status: currentMetrics.system.cpuUsage < this.alertThresholds.cpuUsageThreshold ? 'pass' : 'warning',
+      status:
+        currentMetrics.system.cpuUsage < this.alertThresholds.cpuUsageThreshold
+          ? 'pass'
+          : 'warning',
       message: `CPU usage: ${currentMetrics.system.cpuUsage.toFixed(1)}%`,
       value: currentMetrics.system.cpuUsage,
     };
 
     // Memory health
     checks.memory = {
-      status: currentMetrics.system.memoryUsage < this.alertThresholds.memoryUsageThreshold ? 'pass' : 'warning',
+      status:
+        currentMetrics.system.memoryUsage <
+        this.alertThresholds.memoryUsageThreshold
+          ? 'pass'
+          : 'warning',
       message: `Memory usage: ${currentMetrics.system.memoryUsage.toFixed(1)}%`,
       value: currentMetrics.system.memoryUsage,
     };
 
     // Determine overall status
-    const failedChecks = Object.values(checks).filter(check => check.status === 'fail').length;
-    const warningChecks = Object.values(checks).filter(check => check.status === 'warning').length;
+    const failedChecks = Object.values(checks).filter(
+      check => check.status === 'fail',
+    ).length;
+    const warningChecks = Object.values(checks).filter(
+      check => check.status === 'warning',
+    ).length;
 
     let overallStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
     if (failedChecks > 0) {
@@ -532,7 +586,15 @@ export class PerformanceMonitoringService {
    */
   compareWithBaseline(): {
     comparison: 'better' | 'similar' | 'worse';
-    differences: Record<string, { current: number; baseline: number; change: number; changePercent: number }>;
+    differences: Record<
+      string,
+      {
+        current: number;
+        baseline: number;
+        change: number;
+        changePercent: number;
+      }
+    >;
   } | null {
     if (!this.performanceBaseline) {
       return null;
@@ -541,22 +603,50 @@ export class PerformanceMonitoringService {
     const current = this.getCurrentMetrics();
     const baseline = this.performanceBaseline;
 
-    const differences: Record<string, { current: number; baseline: number; change: number; changePercent: number }> = {};
+    const differences: Record<
+      string,
+      {
+        current: number;
+        baseline: number;
+        change: number;
+        changePercent: number;
+      }
+    > = {};
 
     // Compare key metrics
     const metrics = [
-      { key: 'databaseQueryTime', current: current.database.averageQueryTime, baseline: baseline.database.averageQueryTime },
-      { key: 'apiResponseTime', current: current.api.averageResponseTime, baseline: baseline.api.averageResponseTime },
-      { key: 'cacheHitRatio', current: current.cache.hitRatio, baseline: baseline.cache.hitRatio },
-      { key: 'cpuUsage', current: current.system.cpuUsage, baseline: baseline.system.cpuUsage },
-      { key: 'memoryUsage', current: current.system.memoryUsage, baseline: baseline.system.memoryUsage },
+      {
+        key: 'databaseQueryTime',
+        current: current.database.averageQueryTime,
+        baseline: baseline.database.averageQueryTime,
+      },
+      {
+        key: 'apiResponseTime',
+        current: current.api.averageResponseTime,
+        baseline: baseline.api.averageResponseTime,
+      },
+      {
+        key: 'cacheHitRatio',
+        current: current.cache.hitRatio,
+        baseline: baseline.cache.hitRatio,
+      },
+      {
+        key: 'cpuUsage',
+        current: current.system.cpuUsage,
+        baseline: baseline.system.cpuUsage,
+      },
+      {
+        key: 'memoryUsage',
+        current: current.system.memoryUsage,
+        baseline: baseline.system.memoryUsage,
+      },
     ];
 
     let totalChangePercent = 0;
     metrics.forEach(metric => {
       const change = metric.current - metric.baseline;
       const changePercent = (change / metric.baseline) * 100;
-      
+
       differences[metric.key] = {
         current: metric.current,
         baseline: metric.baseline,
@@ -574,7 +664,7 @@ export class PerformanceMonitoringService {
 
     const avgChangePercent = totalChangePercent / metrics.length;
     let comparison: 'better' | 'similar' | 'worse' = 'similar';
-    
+
     if (avgChangePercent > 5) {
       comparison = 'better';
     } else if (avgChangePercent < -5) {
@@ -593,26 +683,25 @@ export class PerformanceMonitoringService {
   async collectPerformanceMetrics(): Promise<void> {
     try {
       const metrics = this.getCurrentMetrics();
-      
+
       // Store in global metrics
       const globalKey = 'global';
       if (!this.performanceData.has(globalKey)) {
         this.performanceData.set(globalKey, []);
       }
-      
+
       const globalMetrics = this.performanceData.get(globalKey)!;
       globalMetrics.push(metrics);
-      
+
       // Keep only last 24 hours of data
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       this.performanceData.set(
         globalKey,
-        globalMetrics.filter(m => m.timestamp > oneDayAgo)
+        globalMetrics.filter(m => m.timestamp > oneDayAgo),
       );
 
       // Reset current metrics for next collection
       this.resetCurrentMetrics();
-
     } catch (error) {
       this.logger.error('Error collecting performance metrics:', error);
     }
@@ -627,7 +716,7 @@ export class PerformanceMonitoringService {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       yesterday.setHours(0, 0, 0, 0);
-      
+
       const endOfYesterday = new Date(yesterday);
       endOfYesterday.setHours(23, 59, 59, 999);
 
@@ -642,8 +731,9 @@ export class PerformanceMonitoringService {
         date: yesterday,
       });
 
-      this.logger.log(`Daily performance report generated for ${yesterday.toDateString()}`);
-
+      this.logger.log(
+        `Daily performance report generated for ${yesterday.toDateString()}`,
+      );
     } catch (error) {
       this.logger.error('Error generating daily performance report:', error);
     }
@@ -653,7 +743,7 @@ export class PerformanceMonitoringService {
 
   private initializeMonitoring(): void {
     this.logger.log('Performance monitoring service initialized');
-    
+
     // Set initial baseline after 5 minutes of operation
     setTimeout(() => {
       this.setPerformanceBaseline();
@@ -705,7 +795,7 @@ export class PerformanceMonitoringService {
 
   private async emitPerformanceAlert(alert: PerformanceAlert): Promise<void> {
     this.alertHistory.push(alert);
-    
+
     // Keep only last 100 alerts
     if (this.alertHistory.length > 100) {
       this.alertHistory = this.alertHistory.slice(-100);
@@ -713,7 +803,7 @@ export class PerformanceMonitoringService {
 
     // Emit event for external handling (email, Slack, etc.)
     this.eventEmitter.emit('performance.alert', alert);
-    
+
     this.logger.warn(`Performance alert: ${alert.message}`, {
       type: alert.type,
       category: alert.category,
@@ -721,7 +811,9 @@ export class PerformanceMonitoringService {
     });
   }
 
-  private calculatePerformanceSummary(metrics: PerformanceMetrics[]): PerformanceReport['summary'] {
+  private calculatePerformanceSummary(
+    metrics: PerformanceMetrics[],
+  ): PerformanceReport['summary'] {
     if (metrics.length === 0) {
       return {
         overallHealth: 'poor',
@@ -732,17 +824,25 @@ export class PerformanceMonitoringService {
     }
 
     // Calculate averages
-    const avgDbQueryTime = metrics.reduce((sum, m) => sum + m.database.averageQueryTime, 0) / metrics.length;
-    const avgApiResponseTime = metrics.reduce((sum, m) => sum + m.api.averageResponseTime, 0) / metrics.length;
-    const avgCacheHitRatio = metrics.reduce((sum, m) => sum + m.cache.hitRatio, 0) / metrics.length;
-    const avgCpuUsage = metrics.reduce((sum, m) => sum + m.system.cpuUsage, 0) / metrics.length;
+    const avgDbQueryTime =
+      metrics.reduce((sum, m) => sum + m.database.averageQueryTime, 0) /
+      metrics.length;
+    const avgApiResponseTime =
+      metrics.reduce((sum, m) => sum + m.api.averageResponseTime, 0) /
+      metrics.length;
+    const avgCacheHitRatio =
+      metrics.reduce((sum, m) => sum + m.cache.hitRatio, 0) / metrics.length;
+    const avgCpuUsage =
+      metrics.reduce((sum, m) => sum + m.system.cpuUsage, 0) / metrics.length;
 
     // Calculate performance score (0-100)
     let score = 100;
-    
+
     if (avgDbQueryTime > this.alertThresholds.slowQueryThreshold) score -= 20;
-    if (avgApiResponseTime > this.alertThresholds.apiResponseThreshold) score -= 20;
-    if (avgCacheHitRatio < this.alertThresholds.cacheHitRatioThreshold) score -= 15;
+    if (avgApiResponseTime > this.alertThresholds.apiResponseThreshold)
+      score -= 20;
+    if (avgCacheHitRatio < this.alertThresholds.cacheHitRatioThreshold)
+      score -= 15;
     if (avgCpuUsage > this.alertThresholds.cpuUsageThreshold) score -= 15;
 
     const keyIssues: string[] = [];
@@ -771,7 +871,9 @@ export class PerformanceMonitoringService {
     };
   }
 
-  private calculatePerformanceTrends(metrics: PerformanceMetrics[]): PerformanceReport['trends'] {
+  private calculatePerformanceTrends(
+    metrics: PerformanceMetrics[],
+  ): PerformanceReport['trends'] {
     if (metrics.length < 2) {
       return {
         responseTimetrend: 'stable',
@@ -783,25 +885,45 @@ export class PerformanceMonitoringService {
     const firstHalf = metrics.slice(0, Math.floor(metrics.length / 2));
     const secondHalf = metrics.slice(Math.floor(metrics.length / 2));
 
-    const firstHalfAvgResponse = firstHalf.reduce((sum, m) => sum + m.api.averageResponseTime, 0) / firstHalf.length;
-    const secondHalfAvgResponse = secondHalf.reduce((sum, m) => sum + m.api.averageResponseTime, 0) / secondHalf.length;
+    const firstHalfAvgResponse =
+      firstHalf.reduce((sum, m) => sum + m.api.averageResponseTime, 0) /
+      firstHalf.length;
+    const secondHalfAvgResponse =
+      secondHalf.reduce((sum, m) => sum + m.api.averageResponseTime, 0) /
+      secondHalf.length;
 
-    const firstHalfCacheHit = firstHalf.reduce((sum, m) => sum + m.cache.hitRatio, 0) / firstHalf.length;
-    const secondHalfCacheHit = secondHalf.reduce((sum, m) => sum + m.cache.hitRatio, 0) / secondHalf.length;
+    const firstHalfCacheHit =
+      firstHalf.reduce((sum, m) => sum + m.cache.hitRatio, 0) /
+      firstHalf.length;
+    const secondHalfCacheHit =
+      secondHalf.reduce((sum, m) => sum + m.cache.hitRatio, 0) /
+      secondHalf.length;
 
     return {
-      responseTimetrend: this.calculateTrend(firstHalfAvgResponse, secondHalfAvgResponse, true),
-      cacheEfficiency: this.calculateTrend(firstHalfCacheHit, secondHalfCacheHit, false),
+      responseTimetrend: this.calculateTrend(
+        firstHalfAvgResponse,
+        secondHalfAvgResponse,
+        true,
+      ),
+      cacheEfficiency: this.calculateTrend(
+        firstHalfCacheHit,
+        secondHalfCacheHit,
+        false,
+      ),
       errorRatetrend: 'stable', // Simplified for now
     };
   }
 
-  private calculateTrend(firstValue: number, secondValue: number, lowerIsBetter: boolean): 'improving' | 'stable' | 'degrading' {
+  private calculateTrend(
+    firstValue: number,
+    secondValue: number,
+    lowerIsBetter: boolean,
+  ): 'improving' | 'stable' | 'degrading' {
     const changePercent = ((secondValue - firstValue) / firstValue) * 100;
     const threshold = 5; // 5% change threshold
 
     if (Math.abs(changePercent) < threshold) return 'stable';
-    
+
     if (lowerIsBetter) {
       return changePercent < 0 ? 'improving' : 'degrading';
     } else {
@@ -809,7 +931,10 @@ export class PerformanceMonitoringService {
     }
   }
 
-  private generateRecommendations(metrics: PerformanceMetrics[], summary: PerformanceReport['summary']): PerformanceReport['recommendations'] {
+  private generateRecommendations(
+    metrics: PerformanceMetrics[],
+    summary: PerformanceReport['summary'],
+  ): PerformanceReport['recommendations'] {
     const immediate: string[] = [];
     const shortTerm: string[] = [];
     const longTerm: string[] = [];

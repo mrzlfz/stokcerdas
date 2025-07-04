@@ -1,4 +1,11 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { AuditableEntity } from '../../common/entities/base.entity';
 import { Workflow } from './workflow.entity';
 import { WorkflowStep } from './workflow-step.entity';
@@ -52,14 +59,21 @@ export class WorkflowExecution extends AuditableEntity {
   @Column({ type: 'varchar', length: 50 })
   executionId: string; // Unique identifier for this execution
 
-  @Column({ type: 'enum', enum: WorkflowExecutionStatus, default: WorkflowExecutionStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: WorkflowExecutionStatus,
+    default: WorkflowExecutionStatus.PENDING,
+  })
   status: WorkflowExecutionStatus;
 
   @Column({ type: 'enum', enum: ExecutionTrigger })
   trigger: ExecutionTrigger;
 
   // Execution Details
-  @Column({ type: 'timestamp with time zone', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    type: 'timestamp with time zone',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   startedAt: Date;
 
   @Column({ type: 'timestamp with time zone', nullable: true })
@@ -94,7 +108,7 @@ export class WorkflowExecution extends AuditableEntity {
       memoryUsage?: number;
       cpuUsage?: number;
     };
-    
+
     // Request context (if API triggered)
     requestInfo?: {
       ipAddress?: string;
@@ -102,14 +116,14 @@ export class WorkflowExecution extends AuditableEntity {
       requestId?: string;
       correlationId?: string;
     };
-    
+
     // Trigger context
     triggerInfo?: {
       source?: string;
       metadata?: Record<string, any>;
       timestamp?: string;
     };
-    
+
     // Execution settings
     settings?: {
       retryOnFailure?: boolean;
@@ -217,7 +231,9 @@ export class WorkflowExecution extends AuditableEntity {
   };
 
   // Relationships
-  @ManyToOne(() => Workflow, (workflow) => workflow.executions, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Workflow, workflow => workflow.executions, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workflowId' })
   workflow: Workflow;
 
@@ -229,7 +245,11 @@ export class WorkflowExecution extends AuditableEntity {
   @JoinColumn({ name: 'parentExecutionId' })
   parentExecution?: WorkflowExecution;
 
-  @OneToMany(() => WorkflowStepExecution, (stepExecution) => stepExecution.workflowExecution, { cascade: true })
+  @OneToMany(
+    () => WorkflowStepExecution,
+    stepExecution => stepExecution.workflowExecution,
+    { cascade: true },
+  )
   stepExecutions: WorkflowStepExecution[];
 
   // Business Logic Methods
@@ -309,11 +329,15 @@ export class WorkflowExecution extends AuditableEntity {
     this.canResume = false;
   }
 
-  addAuditEntry(action: string, details: Record<string, any>, userId?: string): void {
+  addAuditEntry(
+    action: string,
+    details: Record<string, any>,
+    userId?: string,
+  ): void {
     if (!this.auditLog) {
       this.auditLog = [];
     }
-    
+
     this.auditLog.push({
       timestamp: new Date().toISOString(),
       action,
@@ -360,13 +384,18 @@ export class WorkflowExecution extends AuditableEntity {
       summary: {
         successful: this.status === WorkflowExecutionStatus.COMPLETED,
         totalExecutionTime: this.durationMs,
-        stepsSuccessRate: this.totalSteps > 0 ? (this.completedSteps / this.totalSteps) * 100 : 0,
+        stepsSuccessRate:
+          this.totalSteps > 0
+            ? (this.completedSteps / this.totalSteps) * 100
+            : 0,
         resourceEfficiency: this.calculateResourceEfficiency(),
-        errorSummary: this.errorMessage ? {
-          message: this.errorMessage,
-          code: this.errorCode,
-          failedStep: this.failedStepId,
-        } : null,
+        errorSummary: this.errorMessage
+          ? {
+              message: this.errorMessage,
+              code: this.errorCode,
+              failedStep: this.failedStepId,
+            }
+          : null,
       },
     };
   }
@@ -374,13 +403,16 @@ export class WorkflowExecution extends AuditableEntity {
   private calculateResourceEfficiency(): number {
     // Simple efficiency calculation based on resource usage vs duration
     if (!this.durationMs || !this.peakMemoryUsageMB) return 1;
-    
+
     const baselineMemory = 50; // MB
     const baselineTime = 30000; // 30 seconds
-    
-    const memoryEfficiency = Math.min(baselineMemory / (this.peakMemoryUsageMB || baselineMemory), 1);
+
+    const memoryEfficiency = Math.min(
+      baselineMemory / (this.peakMemoryUsageMB || baselineMemory),
+      1,
+    );
     const timeEfficiency = Math.min(baselineTime / this.durationMs, 1);
-    
+
     return (memoryEfficiency + timeEfficiency) / 2;
   }
 }
@@ -403,14 +435,21 @@ export class WorkflowStepExecution extends AuditableEntity {
   @Column({ type: 'varchar', length: 50 })
   stepType: string;
 
-  @Column({ type: 'enum', enum: WorkflowStepExecutionStatus, default: WorkflowStepExecutionStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: WorkflowStepExecutionStatus,
+    default: WorkflowStepExecutionStatus.PENDING,
+  })
   status: WorkflowStepExecutionStatus;
 
   @Column({ type: 'integer' })
   executionOrder: number;
 
   // Execution Details
-  @Column({ type: 'timestamp with time zone', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    type: 'timestamp with time zone',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   startedAt: Date;
 
   @Column({ type: 'timestamp with time zone', nullable: true })
@@ -482,16 +521,21 @@ export class WorkflowStepExecution extends AuditableEntity {
   skipReason?: string;
 
   // Relationships
-  @ManyToOne(() => WorkflowExecution, (execution) => execution.stepExecutions, { onDelete: 'CASCADE' })
+  @ManyToOne(() => WorkflowExecution, execution => execution.stepExecutions, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'workflowExecutionId' })
   workflowExecution: WorkflowExecution;
 
-  @ManyToOne(() => WorkflowStep, (step) => step.executions)
+  @ManyToOne(() => WorkflowStep, step => step.executions)
   @JoinColumn({ name: 'stepId' })
   step: WorkflowStep;
 
   // Business Logic Methods
-  markCompleted(outputData?: Record<string, any>, recordsProcessed?: number): void {
+  markCompleted(
+    outputData?: Record<string, any>,
+    recordsProcessed?: number,
+  ): void {
     this.status = WorkflowStepExecutionStatus.COMPLETED;
     this.completedAt = new Date();
     this.durationMs = this.completedAt.getTime() - this.startedAt.getTime();
@@ -541,10 +585,12 @@ export class WorkflowStepExecution extends AuditableEntity {
         dbQueriesCount: this.dbQueriesCount,
         dataSize: this.dataSize,
       },
-      error: this.errorMessage ? {
-        message: this.errorMessage,
-        code: this.errorCode,
-      } : null,
+      error: this.errorMessage
+        ? {
+            message: this.errorMessage,
+            code: this.errorCode,
+          }
+        : null,
     };
   }
 }

@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryRunner, DataSource } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -7,17 +13,17 @@ import { Cache } from 'cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as moment from 'moment-timezone';
 
-import { 
-  Workflow, 
-  WorkflowStatus, 
-  WorkflowTriggerType, 
-  WorkflowCategory, 
-  WorkflowPriority 
+import {
+  Workflow,
+  WorkflowStatus,
+  WorkflowTriggerType,
+  WorkflowCategory,
+  WorkflowPriority,
 } from '../entities/workflow.entity';
-import { 
-  WorkflowStep, 
-  WorkflowStepType, 
-  WorkflowStepStatus 
+import {
+  WorkflowStep,
+  WorkflowStepType,
+  WorkflowStepStatus,
 } from '../entities/workflow-step.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -126,7 +132,9 @@ export class WorkflowBuilderService {
     createdBy?: string,
   ): Promise<Workflow> {
     try {
-      this.logger.log(`Creating workflow ${request.name} for tenant ${tenantId}`);
+      this.logger.log(
+        `Creating workflow ${request.name} for tenant ${tenantId}`,
+      );
 
       // Validate request
       await this.validateWorkflowRequest(tenantId, request);
@@ -188,18 +196,21 @@ export class WorkflowBuilderService {
           createdBy,
         });
 
-        this.logger.log(`Workflow ${savedWorkflow.name} created successfully with ID ${savedWorkflow.id}`);
+        this.logger.log(
+          `Workflow ${savedWorkflow.name} created successfully with ID ${savedWorkflow.id}`,
+        );
         return savedWorkflow;
-
       } catch (error) {
         await queryRunner.rollbackTransaction();
         throw error;
       } finally {
         await queryRunner.release();
       }
-
     } catch (error) {
-      this.logger.error(`Failed to create workflow: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create workflow: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -216,8 +227,13 @@ export class WorkflowBuilderService {
       const workflow = await this.getWorkflowById(tenantId, workflowId);
 
       // Check if workflow can be edited
-      if (workflow.status === WorkflowStatus.ACTIVE && workflow.totalExecutions > 0) {
-        throw new BadRequestException('Tidak dapat mengubah workflow yang sedang aktif dan memiliki riwayat eksekusi');
+      if (
+        workflow.status === WorkflowStatus.ACTIVE &&
+        workflow.totalExecutions > 0
+      ) {
+        throw new BadRequestException(
+          'Tidak dapat mengubah workflow yang sedang aktif dan memiliki riwayat eksekusi',
+        );
       }
 
       // Validate name conflict if name is being changed
@@ -248,9 +264,11 @@ export class WorkflowBuilderService {
 
       this.logger.log(`Workflow ${workflowId} updated successfully`);
       return updatedWorkflow;
-
     } catch (error) {
-      this.logger.error(`Failed to update workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -267,7 +285,9 @@ export class WorkflowBuilderService {
 
       // Check if workflow can be deleted
       if (workflow.status === WorkflowStatus.ACTIVE) {
-        throw new BadRequestException('Tidak dapat menghapus workflow yang sedang aktif');
+        throw new BadRequestException(
+          'Tidak dapat menghapus workflow yang sedang aktif',
+        );
       }
 
       // Soft delete
@@ -287,9 +307,11 @@ export class WorkflowBuilderService {
       });
 
       this.logger.log(`Workflow ${workflowId} deleted successfully`);
-
     } catch (error) {
-      this.logger.error(`Failed to delete workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -305,7 +327,9 @@ export class WorkflowBuilderService {
     createdBy?: string,
   ): Promise<WorkflowStep> {
     try {
-      this.logger.log(`Adding step ${stepRequest.name} to workflow ${workflowId}`);
+      this.logger.log(
+        `Adding step ${stepRequest.name} to workflow ${workflowId}`,
+      );
 
       const workflow = await this.getWorkflowById(tenantId, workflowId);
 
@@ -348,9 +372,11 @@ export class WorkflowBuilderService {
 
       this.logger.log(`Step ${savedStep.name} added to workflow ${workflowId}`);
       return savedStep;
-
     } catch (error) {
-      this.logger.error(`Failed to add step to workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to add step to workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -381,9 +407,11 @@ export class WorkflowBuilderService {
 
       this.logger.log(`Step ${stepId} updated successfully`);
       return updatedStep;
-
     } catch (error) {
-      this.logger.error(`Failed to update step ${stepId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update step ${stepId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -411,9 +439,11 @@ export class WorkflowBuilderService {
       await this.clearWorkflowCache(tenantId, workflowId);
 
       this.logger.log(`Step ${stepId} deleted successfully`);
-
     } catch (error) {
-      this.logger.error(`Failed to delete step ${stepId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete step ${stepId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -436,9 +466,10 @@ export class WorkflowBuilderService {
 
       try {
         for (const { stepId, order } of stepOrders) {
-          await queryRunner.manager.update(WorkflowStep, 
+          await queryRunner.manager.update(
+            WorkflowStep,
             { id: stepId, tenantId, workflowId },
-            { executionOrder: order, updatedBy, updatedAt: new Date() }
+            { executionOrder: order, updatedBy, updatedAt: new Date() },
           );
         }
 
@@ -447,17 +478,20 @@ export class WorkflowBuilderService {
         // Clear cache
         await this.clearWorkflowCache(tenantId, workflowId);
 
-        this.logger.log(`Steps reordered successfully in workflow ${workflowId}`);
-
+        this.logger.log(
+          `Steps reordered successfully in workflow ${workflowId}`,
+        );
       } catch (error) {
         await queryRunner.rollbackTransaction();
         throw error;
       } finally {
         await queryRunner.release();
       }
-
     } catch (error) {
-      this.logger.error(`Failed to reorder steps in workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to reorder steps in workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -466,7 +500,10 @@ export class WorkflowBuilderService {
   // WORKFLOW VALIDATION AND TESTING
   // =============================================
 
-  async validateWorkflow(tenantId: string, workflowId: string): Promise<WorkflowValidationResult> {
+  async validateWorkflow(
+    tenantId: string,
+    workflowId: string,
+  ): Promise<WorkflowValidationResult> {
     try {
       const workflow = await this.getWorkflowWithSteps(tenantId, workflowId);
       const errors: string[] = [];
@@ -483,14 +520,22 @@ export class WorkflowBuilderService {
       } else {
         for (const step of workflow.steps) {
           const stepValidation = step.validateConfiguration();
-          errors.push(...stepValidation.errors.map(err => `Step "${step.name}": ${err}`));
+          errors.push(
+            ...stepValidation.errors.map(err => `Step "${step.name}": ${err}`),
+          );
         }
 
         // Check step order continuity
-        const orders = workflow.steps.map(s => s.executionOrder).sort((a, b) => a - b);
+        const orders = workflow.steps
+          .map(s => s.executionOrder)
+          .sort((a, b) => a - b);
         for (let i = 0; i < orders.length - 1; i++) {
           if (orders[i + 1] - orders[i] > 1) {
-            warnings.push(`Gap dalam execution order antara step ${orders[i]} dan ${orders[i + 1]}`);
+            warnings.push(
+              `Gap dalam execution order antara step ${orders[i]} dan ${
+                orders[i + 1]
+              }`,
+            );
           }
         }
 
@@ -510,9 +555,11 @@ export class WorkflowBuilderService {
         warnings,
         suggestions,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to validate workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to validate workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -527,7 +574,9 @@ export class WorkflowBuilderService {
 
       const validation = await this.validateWorkflow(tenantId, workflowId);
       if (!validation.isValid) {
-        throw new BadRequestException(`Workflow tidak valid: ${validation.errors.join(', ')}`);
+        throw new BadRequestException(
+          `Workflow tidak valid: ${validation.errors.join(', ')}`,
+        );
       }
 
       // This would integrate with WorkflowExecutionService for dry-run execution
@@ -535,12 +584,20 @@ export class WorkflowBuilderService {
       return {
         validationResult: validation,
         testScenarios: this.generateTestScenarios(tenantId, workflowId),
-        estimatedExecutionTime: await this.estimateExecutionTime(tenantId, workflowId),
-        resourceRequirements: await this.estimateResourceRequirements(tenantId, workflowId),
+        estimatedExecutionTime: await this.estimateExecutionTime(
+          tenantId,
+          workflowId,
+        ),
+        resourceRequirements: await this.estimateResourceRequirements(
+          tenantId,
+          workflowId,
+        ),
       };
-
     } catch (error) {
-      this.logger.error(`Failed to test workflow ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to test workflow ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -556,7 +613,9 @@ export class WorkflowBuilderService {
     createdBy?: string,
   ): Promise<Workflow> {
     try {
-      this.logger.log(`Creating workflow from template ${templateId} for tenant ${tenantId}`);
+      this.logger.log(
+        `Creating workflow from template ${templateId} for tenant ${tenantId}`,
+      );
 
       const template = await this.getWorkflowTemplate(templateId);
       if (!template) {
@@ -577,9 +636,11 @@ export class WorkflowBuilderService {
       })) as CreateWorkflowStepRequest[];
 
       return await this.createWorkflow(tenantId, workflowRequest, createdBy);
-
     } catch (error) {
-      this.logger.error(`Failed to create workflow from template ${templateId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create workflow from template ${templateId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -591,9 +652,14 @@ export class WorkflowBuilderService {
     createdBy?: string,
   ): Promise<Workflow> {
     try {
-      this.logger.log(`Cloning workflow ${sourceWorkflowId} for tenant ${tenantId}`);
+      this.logger.log(
+        `Cloning workflow ${sourceWorkflowId} for tenant ${tenantId}`,
+      );
 
-      const sourceWorkflow = await this.getWorkflowWithSteps(tenantId, sourceWorkflowId);
+      const sourceWorkflow = await this.getWorkflowWithSteps(
+        tenantId,
+        sourceWorkflowId,
+      );
 
       const cloneRequest: CreateWorkflowRequest = {
         name: newName || `${sourceWorkflow.name} - Copy`,
@@ -602,20 +668,28 @@ export class WorkflowBuilderService {
         triggerType: sourceWorkflow.triggerType,
         priority: sourceWorkflow.priority,
         triggerConfig: JSON.parse(JSON.stringify(sourceWorkflow.triggerConfig)),
-        workflowConfig: JSON.parse(JSON.stringify(sourceWorkflow.workflowConfig)),
-        notificationConfig: JSON.parse(JSON.stringify(sourceWorkflow.notificationConfig)),
+        workflowConfig: JSON.parse(
+          JSON.stringify(sourceWorkflow.workflowConfig),
+        ),
+        notificationConfig: JSON.parse(
+          JSON.stringify(sourceWorkflow.notificationConfig),
+        ),
         variables: JSON.parse(JSON.stringify(sourceWorkflow.variables)),
         tags: [...(sourceWorkflow.tags || [])],
         metadata: JSON.parse(JSON.stringify(sourceWorkflow.metadata)),
         ownerId: sourceWorkflow.ownerId,
         permissions: JSON.parse(JSON.stringify(sourceWorkflow.permissions)),
-        steps: sourceWorkflow.steps?.map(step => step.clone()) as CreateWorkflowStepRequest[],
+        steps: sourceWorkflow.steps?.map(step =>
+          step.clone(),
+        ) as CreateWorkflowStepRequest[],
       };
 
       return await this.createWorkflow(tenantId, cloneRequest, createdBy);
-
     } catch (error) {
-      this.logger.error(`Failed to clone workflow ${sourceWorkflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to clone workflow ${sourceWorkflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -628,18 +702,25 @@ export class WorkflowBuilderService {
     try {
       this.logger.log(`Creating new version of workflow ${workflowId}`);
 
-      const currentWorkflow = await this.getWorkflowWithSteps(tenantId, workflowId);
+      const currentWorkflow = await this.getWorkflowWithSteps(
+        tenantId,
+        workflowId,
+      );
       const newVersionData = currentWorkflow.createNewVersion();
 
       const newVersionRequest: CreateWorkflowRequest = {
         ...newVersionData,
-        steps: currentWorkflow.steps?.map(step => step.clone()) as CreateWorkflowStepRequest[],
+        steps: currentWorkflow.steps?.map(step =>
+          step.clone(),
+        ) as CreateWorkflowStepRequest[],
       } as CreateWorkflowRequest;
 
       return await this.createWorkflow(tenantId, newVersionRequest, createdBy);
-
     } catch (error) {
-      this.logger.error(`Failed to create workflow version for ${workflowId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create workflow version for ${workflowId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -648,9 +729,12 @@ export class WorkflowBuilderService {
   // QUERY AND RETRIEVAL METHODS
   // =============================================
 
-  async getWorkflowById(tenantId: string, workflowId: string): Promise<Workflow> {
+  async getWorkflowById(
+    tenantId: string,
+    workflowId: string,
+  ): Promise<Workflow> {
     const cacheKey = `${this.cachePrefix}:workflow:${tenantId}:${workflowId}`;
-    
+
     let workflow = await this.cacheManager.get<Workflow>(cacheKey);
     if (!workflow) {
       workflow = await this.workflowRepository.findOne({
@@ -668,7 +752,10 @@ export class WorkflowBuilderService {
     return workflow;
   }
 
-  async getWorkflowWithSteps(tenantId: string, workflowId: string): Promise<Workflow> {
+  async getWorkflowWithSteps(
+    tenantId: string,
+    workflowId: string,
+  ): Promise<Workflow> {
     const workflow = await this.workflowRepository.findOne({
       where: { id: workflowId, tenantId, deletedAt: null },
       relations: ['steps', 'owner'],
@@ -688,11 +775,11 @@ export class WorkflowBuilderService {
     stepId: string,
   ): Promise<WorkflowStep> {
     const step = await this.workflowStepRepository.findOne({
-      where: { 
-        id: stepId, 
-        tenantId, 
-        workflowId, 
-        deletedAt: null 
+      where: {
+        id: stepId,
+        tenantId,
+        workflowId,
+        deletedAt: null,
       },
     });
 
@@ -720,20 +807,21 @@ export class WorkflowBuilderService {
     } = query;
 
     const where: any = { tenantId, deletedAt: null };
-    
+
     if (category) where.category = category;
     if (status) where.status = status;
     if (triggerType) where.triggerType = triggerType;
     if (ownerId) where.ownerId = ownerId;
-    
-    const queryBuilder = this.workflowRepository.createQueryBuilder('workflow')
+
+    const queryBuilder = this.workflowRepository
+      .createQueryBuilder('workflow')
       .leftJoinAndSelect('workflow.owner', 'owner')
       .where(where);
 
     if (search) {
       queryBuilder.andWhere(
         '(workflow.name ILIKE :search OR workflow.description ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -742,7 +830,7 @@ export class WorkflowBuilderService {
     }
 
     const total = await queryBuilder.getCount();
-    
+
     const workflows = await queryBuilder
       .orderBy(`workflow.${sortBy}`, sortOrder as 'ASC' | 'DESC')
       .skip((page - 1) * limit)
@@ -789,7 +877,9 @@ export class WorkflowBuilderService {
     }
 
     if (request.name.length > 100) {
-      throw new BadRequestException('Nama workflow tidak boleh lebih dari 100 karakter');
+      throw new BadRequestException(
+        'Nama workflow tidak boleh lebih dari 100 karakter',
+      );
     }
 
     // Validate owner exists if specified
@@ -823,9 +913,9 @@ export class WorkflowBuilderService {
     excludeId?: string,
   ): Promise<void> {
     const existingWorkflow = await this.workflowRepository.findOne({
-      where: { 
-        tenantId, 
-        name, 
+      where: {
+        tenantId,
+        name,
         deletedAt: null,
         ...(excludeId && { id: { $ne: excludeId } as any }),
       },
@@ -836,54 +926,86 @@ export class WorkflowBuilderService {
     }
   }
 
-  private checkUnreachableSteps(steps: WorkflowStep[], warnings: string[]): void {
+  private checkUnreachableSteps(
+    steps: WorkflowStep[],
+    warnings: string[],
+  ): void {
     // Simple reachability check - in a full implementation this would be more sophisticated
     const stepIds = new Set(steps.map(s => s.id));
     const reachableSteps = new Set<string>();
 
     // First step is always reachable
     if (steps.length > 0) {
-      const firstStep = steps.sort((a, b) => a.executionOrder - b.executionOrder)[0];
+      const firstStep = steps.sort(
+        (a, b) => a.executionOrder - b.executionOrder,
+      )[0];
       reachableSteps.add(firstStep.id);
     }
 
     // Check for condition steps that might make other steps unreachable
     for (const step of steps) {
-      if (step.stepType === WorkflowStepType.CONDITION && step.stepConfig?.condition) {
+      if (
+        step.stepType === WorkflowStepType.CONDITION &&
+        step.stepConfig?.condition
+      ) {
         const trueStepId = step.stepConfig.condition.trueStepId;
         const falseStepId = step.stepConfig.condition.falseStepId;
-        
+
         if (trueStepId && !stepIds.has(trueStepId)) {
-          warnings.push(`Step "${step.name}" merujuk ke true step ID yang tidak ada: ${trueStepId}`);
+          warnings.push(
+            `Step "${step.name}" merujuk ke true step ID yang tidak ada: ${trueStepId}`,
+          );
         }
-        
+
         if (falseStepId && !stepIds.has(falseStepId)) {
-          warnings.push(`Step "${step.name}" merujuk ke false step ID yang tidak ada: ${falseStepId}`);
+          warnings.push(
+            `Step "${step.name}" merujuk ke false step ID yang tidak ada: ${falseStepId}`,
+          );
         }
       }
     }
   }
 
-  private generatePerformanceSuggestions(workflow: Workflow, suggestions: string[]): void {
+  private generatePerformanceSuggestions(
+    workflow: Workflow,
+    suggestions: string[],
+  ): void {
     if (workflow.steps && workflow.steps.length > 10) {
-      suggestions.push('Workflow dengan banyak step mungkin memerlukan optimasi untuk performa yang lebih baik');
+      suggestions.push(
+        'Workflow dengan banyak step mungkin memerlukan optimasi untuk performa yang lebih baik',
+      );
     }
 
-    const apiSteps = workflow.steps?.filter(s => s.stepType === WorkflowStepType.API_CALL) || [];
+    const apiSteps =
+      workflow.steps?.filter(s => s.stepType === WorkflowStepType.API_CALL) ||
+      [];
     if (apiSteps.length > 5) {
-      suggestions.push('Pertimbangkan untuk menggabungkan beberapa API call untuk mengurangi latency');
+      suggestions.push(
+        'Pertimbangkan untuk menggabungkan beberapa API call untuk mengurangi latency',
+      );
     }
 
-    const parallelizableSteps = workflow.steps?.filter(s => 
-      [WorkflowStepType.SEND_EMAIL, WorkflowStepType.SEND_SMS, WorkflowStepType.API_CALL].includes(s.stepType)
-    ) || [];
-    
+    const parallelizableSteps =
+      workflow.steps?.filter(s =>
+        [
+          WorkflowStepType.SEND_EMAIL,
+          WorkflowStepType.SEND_SMS,
+          WorkflowStepType.API_CALL,
+        ].includes(s.stepType),
+      ) || [];
+
     if (parallelizableSteps.length > 2) {
-      suggestions.push('Beberapa step bisa dijalankan secara parallel untuk meningkatkan performa');
+      suggestions.push(
+        'Beberapa step bisa dijalankan secara parallel untuk meningkatkan performa',
+      );
     }
   }
 
-  private validateTriggerConfiguration(workflow: Workflow, errors: string[], warnings: string[]): void {
+  private validateTriggerConfiguration(
+    workflow: Workflow,
+    errors: string[],
+    warnings: string[],
+  ): void {
     if (workflow.triggerType === WorkflowTriggerType.SCHEDULED) {
       if (!workflow.triggerConfig?.cronExpression) {
         errors.push('Cron expression diperlukan untuk scheduled trigger');
@@ -918,12 +1040,15 @@ export class WorkflowBuilderService {
     ];
   }
 
-  private async estimateExecutionTime(tenantId: string, workflowId: string): Promise<number> {
+  private async estimateExecutionTime(
+    tenantId: string,
+    workflowId: string,
+  ): Promise<number> {
     const workflow = await this.getWorkflowWithSteps(tenantId, workflowId);
-    
+
     // Simple estimation based on step types and historical data
     let estimatedMs = 0;
-    
+
     for (const step of workflow.steps || []) {
       switch (step.stepType) {
         case WorkflowStepType.API_CALL:
@@ -947,20 +1072,28 @@ export class WorkflowBuilderService {
           estimatedMs += 100; // 0.1 seconds for other steps
       }
     }
-    
+
     return estimatedMs;
   }
 
-  private async estimateResourceRequirements(tenantId: string, workflowId: string): Promise<any> {
+  private async estimateResourceRequirements(
+    tenantId: string,
+    workflowId: string,
+  ): Promise<any> {
     const workflow = await this.getWorkflowWithSteps(tenantId, workflowId);
-    
+
     return {
       estimatedMemoryMB: (workflow.steps?.length || 0) * 10 + 50, // Base + per step
       estimatedCpuPercent: Math.min((workflow.steps?.length || 0) * 5 + 10, 80),
       estimatedDiskSpaceMB: (workflow.steps?.length || 0) * 5 + 10,
       networkRequirements: {
-        apiCalls: workflow.steps?.filter(s => s.stepType === WorkflowStepType.API_CALL).length || 0,
-        webhooks: workflow.steps?.filter(s => s.stepType === WorkflowStepType.SEND_WEBHOOK).length || 0,
+        apiCalls:
+          workflow.steps?.filter(s => s.stepType === WorkflowStepType.API_CALL)
+            .length || 0,
+        webhooks:
+          workflow.steps?.filter(
+            s => s.stepType === WorkflowStepType.SEND_WEBHOOK,
+          ).length || 0,
       },
     };
   }
@@ -975,17 +1108,24 @@ export class WorkflowBuilderService {
     });
   }
 
-  private async getWorkflowTemplate(templateId: string): Promise<WorkflowTemplate | null> {
+  private async getWorkflowTemplate(
+    templateId: string,
+  ): Promise<WorkflowTemplate | null> {
     // This would fetch from a templates repository or predefined templates
     // For now, return null to indicate template not found
     return null;
   }
 
-  private async clearWorkflowCache(tenantId: string, workflowId?: string): Promise<void> {
+  private async clearWorkflowCache(
+    tenantId: string,
+    workflowId?: string,
+  ): Promise<void> {
     if (workflowId) {
-      await this.cacheManager.del(`${this.cachePrefix}:workflow:${tenantId}:${workflowId}`);
+      await this.cacheManager.del(
+        `${this.cachePrefix}:workflow:${tenantId}:${workflowId}`,
+      );
     }
-    
+
     // Clear list caches
     await this.cacheManager.del(`${this.cachePrefix}:workflows:${tenantId}`);
   }

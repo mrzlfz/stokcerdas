@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 
+// External modules
+import { AuthModule } from '../auth/auth.module';
+
 // Entities
 import {
   PurchaseOrder,
@@ -26,6 +29,9 @@ import { PurchaseOrderProcessor } from './processors/purchase-order.processor';
 
 @Module({
   imports: [
+    // External modules
+    AuthModule,
+
     // TypeORM entities
     TypeOrmModule.forFeature([
       PurchaseOrder,
@@ -56,9 +62,7 @@ import { PurchaseOrderProcessor } from './processors/purchase-order.processor';
       },
     }),
   ],
-  controllers: [
-    PurchaseOrdersController,
-  ],
+  controllers: [PurchaseOrdersController],
   providers: [
     PurchaseOrdersService,
     PurchaseOrderPdfService,

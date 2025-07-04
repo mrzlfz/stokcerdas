@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, Index, ForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  Index,
+  ForeignKey,
+} from 'typeorm';
 
 export class CreateAutomationTables1735594000000 implements MigrationInterface {
   name = 'CreateAutomationTables1735594000000';
@@ -38,7 +44,7 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
             type: 'uuid',
             isNullable: true,
           },
-          
+
           // Basic Configuration
           {
             name: 'name',
@@ -60,7 +66,13 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
           {
             name: 'trigger',
             type: 'enum',
-            enum: ['STOCK_LEVEL', 'DAYS_OF_SUPPLY', 'SCHEDULED', 'DEMAND_FORECAST', 'COMBINED'],
+            enum: [
+              'STOCK_LEVEL',
+              'DAYS_OF_SUPPLY',
+              'SCHEDULED',
+              'DEMAND_FORECAST',
+              'COMBINED',
+            ],
             default: "'STOCK_LEVEL'",
           },
           {
@@ -184,7 +196,13 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
           {
             name: 'supplier_selection_method',
             type: 'enum',
-            enum: ['COST_OPTIMAL', 'QUALITY_OPTIMAL', 'DELIVERY_OPTIMAL', 'BALANCED', 'RELIABILITY_OPTIMAL'],
+            enum: [
+              'COST_OPTIMAL',
+              'QUALITY_OPTIMAL',
+              'DELIVERY_OPTIMAL',
+              'BALANCED',
+              'RELIABILITY_OPTIMAL',
+            ],
             default: "'BALANCED'",
           },
           {
@@ -440,17 +458,39 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     );
 
     // Create indexes for reorder_rules table
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_reorder_rules_tenant_product_location" ON "reorder_rules" ("tenant_id", "product_id", "location_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_tenant_active" ON "reorder_rules" ("tenant_id", "is_active")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_status" ON "reorder_rules" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_trigger" ON "reorder_rules" ("trigger")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_next_review" ON "reorder_rules" ("next_review_date")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_urgency" ON "reorder_rules" ("urgency_score")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_priority" ON "reorder_rules" ("priority")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_created_at" ON "reorder_rules" ("created_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_product" ON "reorder_rules" ("product_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_location" ON "reorder_rules" ("location_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_rules_supplier" ON "reorder_rules" ("primary_supplier_id")`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_reorder_rules_tenant_product_location" ON "reorder_rules" ("tenant_id", "product_id", "location_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_tenant_active" ON "reorder_rules" ("tenant_id", "is_active")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_status" ON "reorder_rules" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_trigger" ON "reorder_rules" ("trigger")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_next_review" ON "reorder_rules" ("next_review_date")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_urgency" ON "reorder_rules" ("urgency_score")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_priority" ON "reorder_rules" ("priority")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_created_at" ON "reorder_rules" ("created_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_product" ON "reorder_rules" ("product_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_location" ON "reorder_rules" ("location_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_rules_supplier" ON "reorder_rules" ("primary_supplier_id")`,
+    );
 
     // Create foreign key constraints for reorder_rules table
     await queryRunner.query(`
@@ -608,12 +648,24 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     );
 
     // Create indexes for reorder_executions table
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_tenant" ON "reorder_executions" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_rule" ON "reorder_executions" ("reorder_rule_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_executed_at" ON "reorder_executions" ("executed_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_success" ON "reorder_executions" ("success")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_purchase_order" ON "reorder_executions" ("purchase_order_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_reorder_executions_supplier" ON "reorder_executions" ("supplier_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_executions_tenant" ON "reorder_executions" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_executions_rule" ON "reorder_executions" ("reorder_rule_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_executions_executed_at" ON "reorder_executions" ("executed_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_executions_success" ON "reorder_executions" ("success")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_executions_purchase_order" ON "reorder_executions" ("purchase_order_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_reorder_executions_supplier" ON "reorder_executions" ("supplier_id")`,
+    );
 
     // Create foreign key constraints for reorder_executions table
     await queryRunner.query(`
@@ -667,7 +719,13 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
           {
             name: 'type',
             type: 'enum',
-            enum: ['REORDER_CHECK', 'INVENTORY_REVIEW', 'DEMAND_FORECAST', 'SUPPLIER_EVALUATION', 'SYSTEM_MAINTENANCE'],
+            enum: [
+              'REORDER_CHECK',
+              'INVENTORY_REVIEW',
+              'DEMAND_FORECAST',
+              'SUPPLIER_EVALUATION',
+              'SYSTEM_MAINTENANCE',
+            ],
             default: "'REORDER_CHECK'",
           },
           {
@@ -932,14 +990,30 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     );
 
     // Create indexes for automation_schedules table
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_tenant" ON "automation_schedules" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_type" ON "automation_schedules" ("type")`);
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_status" ON "automation_schedules" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_active" ON "automation_schedules" ("is_active")`);
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_next_execution" ON "automation_schedules" ("next_execution")`);
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_priority" ON "automation_schedules" ("priority")`);
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_resource_group" ON "automation_schedules" ("resource_group")`);
-    await queryRunner.query(`CREATE INDEX "IDX_automation_schedules_created_at" ON "automation_schedules" ("created_at")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_tenant" ON "automation_schedules" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_type" ON "automation_schedules" ("type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_status" ON "automation_schedules" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_active" ON "automation_schedules" ("is_active")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_next_execution" ON "automation_schedules" ("next_execution")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_priority" ON "automation_schedules" ("priority")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_resource_group" ON "automation_schedules" ("resource_group")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_automation_schedules_created_at" ON "automation_schedules" ("created_at")`,
+    );
 
     // =============================================
     // CREATE SCHEDULE_EXECUTIONS TABLE
@@ -1084,12 +1158,24 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     );
 
     // Create indexes for schedule_executions table
-    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_tenant" ON "schedule_executions" ("tenant_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_schedule" ON "schedule_executions" ("schedule_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_started_at" ON "schedule_executions" ("started_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_status" ON "schedule_executions" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_job_id" ON "schedule_executions" ("job_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_schedule_executions_completed_at" ON "schedule_executions" ("completed_at")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_schedule_executions_tenant" ON "schedule_executions" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_schedule_executions_schedule" ON "schedule_executions" ("schedule_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_schedule_executions_started_at" ON "schedule_executions" ("started_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_schedule_executions_status" ON "schedule_executions" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_schedule_executions_job_id" ON "schedule_executions" ("job_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_schedule_executions_completed_at" ON "schedule_executions" ("completed_at")`,
+    );
 
     // Create foreign key constraints for schedule_executions table
     await queryRunner.query(`
@@ -1129,7 +1215,7 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     // =============================================
     // CREATE COMPUTED FIELDS FUNCTIONS
     // =============================================
-    
+
     // Function to check if reorder rule is eligible for execution
     await queryRunner.query(`
       CREATE OR REPLACE FUNCTION is_reorder_rule_eligible(rule_row reorder_rules)
@@ -1202,7 +1288,7 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     // =============================================
     // CREATE AUTOMATION-SPECIFIC INDEXES
     // =============================================
-    
+
     // Composite indexes for performance
     await queryRunner.query(`
       CREATE INDEX IDX_reorder_rules_eligibility 
@@ -1236,7 +1322,7 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
     // =============================================
     // INSERT DEFAULT DATA
     // =============================================
-    
+
     // Create default automation schedule types (if needed)
     await queryRunner.query(`
       COMMENT ON TABLE reorder_rules IS 'Stores automated reorder rules configuration for products and locations';
@@ -1257,15 +1343,29 @@ export class CreateAutomationTables1735594000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop computed field functions
-    await queryRunner.query(`DROP FUNCTION IF EXISTS can_schedule_execute(automation_schedules);`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS should_schedule_execute(automation_schedules);`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS is_reorder_rule_due(reorder_rules);`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS is_reorder_rule_eligible(reorder_rules);`);
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS can_schedule_execute(automation_schedules);`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS should_schedule_execute(automation_schedules);`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS is_reorder_rule_due(reorder_rules);`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS is_reorder_rule_eligible(reorder_rules);`,
+    );
 
     // Drop updated_at trigger function
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_automation_schedules_updated_at ON automation_schedules;`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_reorder_rules_updated_at ON reorder_rules;`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS update_updated_at_column();`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_automation_schedules_updated_at ON automation_schedules;`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_reorder_rules_updated_at ON reorder_rules;`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS update_updated_at_column();`,
+    );
 
     // Drop tables in reverse order (respecting foreign key constraints)
     await queryRunner.dropTable('schedule_executions');

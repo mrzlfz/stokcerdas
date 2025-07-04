@@ -15,7 +15,12 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { ApprovalType, ApprovalStatus, ApprovalMode, EscalationTrigger } from '../entities/approval-chain.entity';
+import {
+  ApprovalType,
+  ApprovalStatus,
+  ApprovalMode,
+  EscalationTrigger,
+} from '../entities/approval-chain.entity';
 
 // Base approval step DTO
 export class BaseApprovalStepDto {
@@ -140,12 +145,12 @@ export class BaseApprovalStepDto {
     example: {
       skipIf: {
         amountBelow: 1000000,
-        departmentMatches: ['SALES']
+        departmentMatches: ['SALES'],
       },
       autoApproveIf: {
         amountBelow: 500000,
-        previouslyApproved: true
-      }
+        previouslyApproved: true,
+      },
     },
   })
   @IsOptional()
@@ -204,7 +209,8 @@ export class BaseApprovalChainDto {
 
   @ApiPropertyOptional({
     description: 'Deskripsi approval chain',
-    example: 'Chain approval untuk purchase order berdasarkan amount dan departemen',
+    example:
+      'Chain approval untuk purchase order berdasarkan amount dan departemen',
   })
   @IsOptional()
   @IsString({ message: 'Deskripsi harus berupa teks' })
@@ -335,18 +341,18 @@ export class CreateApprovalChainDto extends BaseApprovalChainDto {
       amountThresholds: {
         step1: 1000000,
         step2: 5000000,
-        step3: 10000000
+        step3: 10000000,
       },
       departmentRules: {
-        'SALES': {
+        SALES: {
           skipSteps: [1],
-          additionalApprovers: ['user-id-1']
-        }
+          additionalApprovers: ['user-id-1'],
+        },
       },
       timeBasedRules: {
         businessHoursOnly: true,
-        weekdaysOnly: false
-      }
+        weekdaysOnly: false,
+      },
     },
   })
   @IsOptional()
@@ -382,13 +388,13 @@ export class CreateApprovalChainDto extends BaseApprovalChainDto {
       onSubmission: {
         email: true,
         sms: false,
-        inApp: true
+        inApp: true,
       },
       onApproval: {
         email: true,
         sms: false,
-        inApp: true
-      }
+        inApp: true,
+      },
     },
   })
   @IsOptional()
@@ -430,7 +436,9 @@ export class CreateApprovalChainDto extends BaseApprovalChainDto {
 }
 
 // Update approval chain DTO
-export class UpdateApprovalChainDto extends PartialType(CreateApprovalChainDto) {
+export class UpdateApprovalChainDto extends PartialType(
+  CreateApprovalChainDto,
+) {
   @ApiPropertyOptional({
     description: 'Status approval chain',
     enum: ApprovalStatus,
@@ -539,10 +547,16 @@ export class CloneApprovalChainDto {
 export class BulkUpdateApprovalChainStatusDto {
   @ApiProperty({
     description: 'Array ID approval chain',
-    example: ['123e4567-e89b-12d3-a456-426614174000', '987fcdeb-51a2-43d1-9f4e-123456789abc'],
+    example: [
+      '123e4567-e89b-12d3-a456-426614174000',
+      '987fcdeb-51a2-43d1-9f4e-123456789abc',
+    ],
   })
   @IsArray({ message: 'Chain IDs harus berupa array' })
-  @IsUUID('4', { each: true, message: 'Setiap ID harus berupa UUID yang valid' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Setiap ID harus berupa UUID yang valid',
+  })
   chainIds: string[];
 
   @ApiProperty({
@@ -571,7 +585,7 @@ export class TestApprovalChainDto {
       type: 'purchase_order',
       amount: 5000000,
       department: 'SALES',
-      requesterId: 'user-123'
+      requesterId: 'user-123',
     },
   })
   @IsObject({ message: 'Test request harus berupa objek' })
@@ -610,7 +624,7 @@ export class ApprovalExecutionDto {
     example: {
       purchaseOrderId: 'po-12345',
       amount: 5000000,
-      vendor: 'PT ABC'
+      vendor: 'PT ABC',
     },
   })
   @IsObject({ message: 'Request data harus berupa objek' })
@@ -621,7 +635,7 @@ export class ApprovalExecutionDto {
     example: {
       amount: 5000000,
       department: 'SALES',
-      role: 'MANAGER'
+      role: 'MANAGER',
     },
   })
   @IsObject({ message: 'Context harus berupa objek' })
@@ -774,7 +788,10 @@ export class ApprovalChainResponseDto {
   @ApiPropertyOptional({ description: 'Statistik penggunaan' })
   usageStats?: Record<string, any>;
 
-  @ApiPropertyOptional({ description: 'Array step', type: [ApprovalStepResponseDto] })
+  @ApiPropertyOptional({
+    description: 'Array step',
+    type: [ApprovalStepResponseDto],
+  })
   steps?: ApprovalStepResponseDto[];
 
   @ApiProperty({ description: 'Tanggal dibuat' })

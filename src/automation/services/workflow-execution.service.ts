@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryRunner, DataSource } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -7,22 +12,19 @@ import { Cache } from 'cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as moment from 'moment-timezone';
 
-import { 
-  Workflow, 
-  WorkflowStatus 
-} from '../entities/workflow.entity';
-import { 
-  WorkflowStep, 
-  WorkflowStepType, 
+import { Workflow, WorkflowStatus } from '../entities/workflow.entity';
+import {
+  WorkflowStep,
+  WorkflowStepType,
   WorkflowStepStatus,
-  ConditionOperator 
+  ConditionOperator,
 } from '../entities/workflow-step.entity';
-import { 
-  WorkflowExecution, 
+import {
+  WorkflowExecution,
   WorkflowExecutionStatus,
   WorkflowStepExecution,
   WorkflowStepExecutionStatus,
-  ExecutionTrigger 
+  ExecutionTrigger,
 } from '../entities/workflow-execution.entity';
 
 // External Services
@@ -31,9 +33,15 @@ import { ProductsService } from '../../products/services/products.service';
 import { PurchaseOrdersService } from '../../purchase-orders/services/purchase-orders.service';
 import { SuppliersService } from '../../suppliers/services/suppliers.service';
 import { AlertManagementService } from '../../alerts/services/alert-management.service';
-import { AlertType, AlertSeverity } from '../../alerts/entities/alert-configuration.entity';
+import {
+  AlertType,
+  AlertSeverity,
+} from '../../alerts/entities/alert-configuration.entity';
 import { EmailService } from '../../notifications/services/email.service';
-import { AdjustmentType, AdjustmentReason } from '../../inventory/dto/stock-adjustment.dto';
+import {
+  AdjustmentType,
+  AdjustmentReason,
+} from '../../inventory/dto/stock-adjustment.dto';
 
 export interface WorkflowExecutionContext {
   tenantId: string;
@@ -95,7 +103,10 @@ export interface WorkflowExecutionResult {
 export class WorkflowExecutionService {
   private readonly logger = new Logger(WorkflowExecutionService.name);
   private readonly cachePrefix = 'workflow_execution';
-  private readonly activeExecutions = new Map<string, WorkflowExecutionContext>();
+  private readonly activeExecutions = new Map<
+    string,
+    WorkflowExecutionContext
+  >();
 
   constructor(
     @InjectRepository(Workflow)
@@ -136,28 +147,36 @@ export class WorkflowExecutionService {
     },
   ): Promise<WorkflowExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      this.logger.log(`Starting workflow execution ${executionId} for workflow ${workflowId}`);
+      this.logger.log(
+        `Starting workflow execution ${executionId} for workflow ${workflowId}`,
+      );
 
       // Get workflow with steps
       const workflow = await this.getWorkflowWithSteps(tenantId, workflowId);
-      
+
       // Validate workflow can be executed
       this.validateWorkflowExecution(workflow);
 
       // Get or create execution record
       let execution = await this.getWorkflowExecution(tenantId, executionId);
       if (!execution) {
-        execution = await this.createWorkflowExecution(tenantId, workflowId, executionId, inputData, options);
+        execution = await this.createWorkflowExecution(
+          tenantId,
+          workflowId,
+          executionId,
+          inputData,
+          options,
+        );
       }
 
       // Setup execution context
       const context = await this.setupExecutionContext(
-        workflow, 
-        execution, 
-        inputData, 
-        options
+        workflow,
+        execution,
+        inputData,
+        options,
       );
 
       // Register active execution
@@ -165,27 +184,34 @@ export class WorkflowExecutionService {
 
       try {
         // Mark execution as running
-        await this.updateExecutionStatus(execution, WorkflowExecutionStatus.RUNNING);
+        await this.updateExecutionStatus(
+          execution,
+          WorkflowExecutionStatus.RUNNING,
+        );
 
         // Execute workflow steps
         const result = await this.executeWorkflowSteps(context, workflow.steps);
 
         // Mark execution as completed or failed
-        const finalStatus = result.success ? 
-          WorkflowExecutionStatus.COMPLETED : 
-          WorkflowExecutionStatus.FAILED;
-        
+        const finalStatus = result.success
+          ? WorkflowExecutionStatus.COMPLETED
+          : WorkflowExecutionStatus.FAILED;
+
         await this.updateExecutionStatus(execution, finalStatus, result.error);
 
         // Update workflow statistics
-        await this.updateWorkflowStatistics(workflow, result.success, Date.now() - startTime);
+        await this.updateWorkflowStatistics(
+          workflow,
+          result.success,
+          Date.now() - startTime,
+        );
 
         // Generate final result
         const executionResult = await this.generateExecutionResult(
-          execution, 
-          context, 
-          result, 
-          startTime
+          execution,
+          context,
+          result,
+          startTime,
         );
 
         // Emit completion event
@@ -199,28 +225,39 @@ export class WorkflowExecutionService {
         });
 
         this.logger.log(
-          `Workflow execution ${executionId} ${result.success ? 'completed' : 'failed'} ` +
-          `in ${executionResult.duration}ms`
+          `Workflow execution ${executionId} ${
+            result.success ? 'completed' : 'failed'
+          } ` + `in ${executionResult.duration}ms`,
         );
 
         return executionResult;
-
       } finally {
         // Cleanup active execution
         this.activeExecutions.delete(executionId);
       }
-
     } catch (error) {
-      this.logger.error(`Workflow execution ${executionId} failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Workflow execution ${executionId} failed: ${error.message}`,
+        error.stack,
+      );
+
       // Update execution with error
       try {
-        const execution = await this.getWorkflowExecution(tenantId, executionId);
+        const execution = await this.getWorkflowExecution(
+          tenantId,
+          executionId,
+        );
         if (execution) {
-          await this.updateExecutionStatus(execution, WorkflowExecutionStatus.FAILED, error.message);
+          await this.updateExecutionStatus(
+            execution,
+            WorkflowExecutionStatus.FAILED,
+            error.message,
+          );
         }
       } catch (updateError) {
-        this.logger.error(`Failed to update execution status: ${updateError.message}`);
+        this.logger.error(
+          `Failed to update execution status: ${updateError.message}`,
+        );
       }
 
       // Emit error event
@@ -263,9 +300,11 @@ export class WorkflowExecutionService {
       });
 
       this.logger.log(`Workflow execution ${executionId} paused: ${reason}`);
-
     } catch (error) {
-      this.logger.error(`Failed to pause execution ${executionId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to pause execution ${executionId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -289,9 +328,11 @@ export class WorkflowExecutionService {
       });
 
       this.logger.log(`Workflow execution ${executionId} resumed`);
-
     } catch (error) {
-      this.logger.error(`Failed to resume execution ${executionId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to resume execution ${executionId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -320,9 +361,11 @@ export class WorkflowExecutionService {
       });
 
       this.logger.log(`Workflow execution ${executionId} cancelled: ${reason}`);
-
     } catch (error) {
-      this.logger.error(`Failed to cancel execution ${executionId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel execution ${executionId}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -335,12 +378,14 @@ export class WorkflowExecutionService {
     context: WorkflowExecutionContext,
     steps: WorkflowStep[],
   ): Promise<StepExecutionResult> {
-    const sortedSteps = steps.sort((a, b) => a.executionOrder - b.executionOrder);
+    const sortedSteps = steps.sort(
+      (a, b) => a.executionOrder - b.executionOrder,
+    );
     let currentStepIndex = 0;
     let totalExecutionTime = 0;
     let peakMemoryUsage = 0;
     let totalApiCalls = 0;
-    let totalDbQueries = 0;
+    const totalDbQueries = 0;
 
     for (let i = 0; i < sortedSteps.length; i++) {
       const step = sortedSteps[i];
@@ -362,25 +407,33 @@ export class WorkflowExecutionService {
         // Execute step
         this.logger.log(`Executing step ${step.name} (${step.stepType})`);
         const stepStartTime = Date.now();
-        
+
         const stepResult = await this.executeStep(step, context);
-        
+
         const stepExecutionTime = Date.now() - stepStartTime;
         totalExecutionTime += stepExecutionTime;
 
         // Update resource usage metrics
         if (stepResult.resourceUsage) {
-          peakMemoryUsage = Math.max(peakMemoryUsage, stepResult.resourceUsage.memoryMB || 0);
+          peakMemoryUsage = Math.max(
+            peakMemoryUsage,
+            stepResult.resourceUsage.memoryMB || 0,
+          );
           totalApiCalls += stepResult.resourceUsage.executionTime ? 1 : 0; // Simple heuristic
         }
 
         // Record step execution
-        await this.recordStepExecution(context, step, stepResult, stepExecutionTime);
+        await this.recordStepExecution(
+          context,
+          step,
+          stepResult,
+          stepExecutionTime,
+        );
 
         // Handle step result
         if (!stepResult.success) {
           const errorAction = step.errorHandling?.onError || 'stop';
-          
+
           switch (errorAction) {
             case 'stop':
               return {
@@ -388,13 +441,19 @@ export class WorkflowExecutionService {
                 error: stepResult.error,
                 data: context.executionData,
               };
-            
+
             case 'continue':
-              this.logger.warn(`Step ${step.name} failed but continuing: ${stepResult.error}`);
+              this.logger.warn(
+                `Step ${step.name} failed but continuing: ${stepResult.error}`,
+              );
               continue;
-            
+
             case 'retry':
-              const retryResult = await this.retryStep(step, context, stepResult);
+              const retryResult = await this.retryStep(
+                step,
+                context,
+                stepResult,
+              );
               if (!retryResult.success) {
                 return {
                   success: false,
@@ -403,11 +462,13 @@ export class WorkflowExecutionService {
                 };
               }
               break;
-            
+
             case 'skip':
-              this.logger.warn(`Skipping failed step ${step.name}: ${stepResult.error}`);
+              this.logger.warn(
+                `Skipping failed step ${step.name}: ${stepResult.error}`,
+              );
               continue;
-            
+
             case 'goto_step':
               const gotoStepId = step.errorHandling?.fallbackStepId;
               if (gotoStepId) {
@@ -437,15 +498,22 @@ export class WorkflowExecutionService {
 
         // Update execution progress
         await this.updateExecutionProgress(context, i + 1, steps.length);
-
       } catch (error) {
-        this.logger.error(`Step ${step.name} execution failed: ${error.message}`, error.stack);
-        
+        this.logger.error(
+          `Step ${step.name} execution failed: ${error.message}`,
+          error.stack,
+        );
+
         // Record failed step execution
-        await this.recordStepExecution(context, step, {
-          success: false,
-          error: error.message,
-        }, 0);
+        await this.recordStepExecution(
+          context,
+          step,
+          {
+            success: false,
+            error: error.message,
+          },
+          0,
+        );
 
         // Handle step error based on configuration
         if (step.isCritical) {
@@ -474,51 +542,67 @@ export class WorkflowExecutionService {
     try {
       // Prepare step input data
       const inputData = await this.prepareStepInputData(step, context);
-      
+
       // Execute based on step type
       let result: StepExecutionResult;
-      
+
       switch (step.stepType) {
         case WorkflowStepType.CONDITION:
           result = await this.executeConditionStep(step, inputData, context);
           break;
-        
+
         case WorkflowStepType.DELAY:
           result = await this.executeDelayStep(step, inputData, context);
           break;
-        
+
         case WorkflowStepType.CHECK_STOCK_LEVEL:
           result = await this.executeCheckStockStep(step, inputData, context);
           break;
-        
+
         case WorkflowStepType.CREATE_ADJUSTMENT:
-          result = await this.executeCreateAdjustmentStep(step, inputData, context);
+          result = await this.executeCreateAdjustmentStep(
+            step,
+            inputData,
+            context,
+          );
           break;
-        
+
         case WorkflowStepType.CREATE_PURCHASE_ORDER:
-          result = await this.executeCreatePurchaseOrderStep(step, inputData, context);
+          result = await this.executeCreatePurchaseOrderStep(
+            step,
+            inputData,
+            context,
+          );
           break;
-        
+
         case WorkflowStepType.SEND_EMAIL:
           result = await this.executeSendEmailStep(step, inputData, context);
           break;
-        
+
         case WorkflowStepType.SEND_ALERT:
           result = await this.executeSendAlertStep(step, inputData, context);
           break;
-        
+
         case WorkflowStepType.API_CALL:
           result = await this.executeApiCallStep(step, inputData, context);
           break;
-        
+
         case WorkflowStepType.DATA_TRANSFORM:
-          result = await this.executeDataTransformStep(step, inputData, context);
+          result = await this.executeDataTransformStep(
+            step,
+            inputData,
+            context,
+          );
           break;
-        
+
         case WorkflowStepType.DATA_VALIDATION:
-          result = await this.executeDataValidationStep(step, inputData, context);
+          result = await this.executeDataValidationStep(
+            step,
+            inputData,
+            context,
+          );
           break;
-        
+
         default:
           throw new Error(`Unsupported step type: ${step.stepType}`);
       }
@@ -527,7 +611,6 @@ export class WorkflowExecutionService {
       await this.processStepOutputData(step, result, context);
 
       return result;
-
     } catch (error) {
       this.logger.error(`Step execution failed: ${error.message}`, error.stack);
       return {
@@ -557,19 +640,18 @@ export class WorkflowExecutionService {
         conditionConfig.operator,
         conditionConfig.value,
         inputData,
-        context
+        context,
       );
 
-      const nextStepId = conditionResult ? 
-        conditionConfig.trueStepId : 
-        conditionConfig.falseStepId;
+      const nextStepId = conditionResult
+        ? conditionConfig.trueStepId
+        : conditionConfig.falseStepId;
 
       return {
         success: true,
         data: { conditionResult },
         nextStepId,
       };
-
     } catch (error) {
       return {
         success: false,
@@ -590,7 +672,7 @@ export class WorkflowExecutionService {
 
     try {
       let delayMs = delayConfig.duration;
-      
+
       // Convert to milliseconds based on unit
       switch (delayConfig.unit) {
         case 'seconds':
@@ -623,7 +705,6 @@ export class WorkflowExecutionService {
         success: true,
         data: { delayMs },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -647,7 +728,7 @@ export class WorkflowExecutionService {
       const inventory = await this.inventoryService.getInventoryByProduct(
         context.tenantId,
         inventoryConfig.productId,
-        inventoryConfig.locationId
+        inventoryConfig.locationId,
       );
 
       const currentStock = inventory?.quantity || 0;
@@ -663,7 +744,6 @@ export class WorkflowExecutionService {
           locationId: inventoryConfig.locationId,
         },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -679,12 +759,16 @@ export class WorkflowExecutionService {
   ): Promise<StepExecutionResult> {
     const inventoryConfig = step.stepConfig?.inventoryOperation;
     if (!inventoryConfig?.productId || !inventoryConfig?.quantity) {
-      throw new Error('Product ID dan quantity diperlukan untuk create adjustment step');
+      throw new Error(
+        'Product ID dan quantity diperlukan untuk create adjustment step',
+      );
     }
 
     try {
       if (context.systemContext.dryRun) {
-        this.logger.log(`Dry run: Would create adjustment for ${inventoryConfig.productId}`);
+        this.logger.log(
+          `Dry run: Would create adjustment for ${inventoryConfig.productId}`,
+        );
         return {
           success: true,
           data: { dryRun: true, adjustment: inventoryConfig },
@@ -698,17 +782,20 @@ export class WorkflowExecutionService {
           productId: inventoryConfig.productId,
           locationId: inventoryConfig.locationId,
           quantity: inventoryConfig.quantity,
-          adjustmentType: (inventoryConfig.adjustmentType as AdjustmentType) || AdjustmentType.POSITIVE,
-          reason: (inventoryConfig.reason as AdjustmentReason) || AdjustmentReason.SYSTEM_CORRECTION,
+          adjustmentType:
+            (inventoryConfig.adjustmentType as AdjustmentType) ||
+            AdjustmentType.POSITIVE,
+          reason:
+            (inventoryConfig.reason as AdjustmentReason) ||
+            AdjustmentReason.SYSTEM_CORRECTION,
         },
-        context.userContext?.userId || 'system'
+        context.userContext?.userId || 'system',
       );
 
       return {
         success: true,
         data: { adjustmentId: adjustment.id, adjustment },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -724,7 +811,9 @@ export class WorkflowExecutionService {
   ): Promise<StepExecutionResult> {
     const poConfig = step.stepConfig?.purchaseOrderOperation;
     if (!poConfig?.supplierId || !poConfig?.productId || !poConfig?.quantity) {
-      throw new Error('Supplier ID, Product ID, dan quantity diperlukan untuk create PO step');
+      throw new Error(
+        'Supplier ID, Product ID, dan quantity diperlukan untuk create PO step',
+      );
     }
 
     try {
@@ -741,26 +830,28 @@ export class WorkflowExecutionService {
         context.tenantId,
         {
           supplierId: poConfig.supplierId,
-          items: [{
-            productId: poConfig.productId,
-            sku: (poConfig as any).sku || 'AUTO-GENERATED',
-            productName: (poConfig as any).productName || 'Automated Purchase Item',
-            orderedQuantity: poConfig.quantity,
-            unitPrice: poConfig.unitPrice,
-          }],
+          items: [
+            {
+              productId: poConfig.productId,
+              sku: (poConfig as any).sku || 'AUTO-GENERATED',
+              productName:
+                (poConfig as any).productName || 'Automated Purchase Item',
+              orderedQuantity: poConfig.quantity,
+              unitPrice: poConfig.unitPrice,
+            },
+          ],
           requestedDeliveryDate: poConfig.deliveryDate || undefined,
-        }
+        },
       );
 
       return {
         success: true,
-        data: { 
-          purchaseOrderId: purchaseOrder.id, 
+        data: {
+          purchaseOrderId: purchaseOrder.id,
           purchaseOrder,
           totalAmount: purchaseOrder.totalAmount,
         },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -775,13 +866,20 @@ export class WorkflowExecutionService {
     context: WorkflowExecutionContext,
   ): Promise<StepExecutionResult> {
     const notificationConfig = step.stepConfig?.notification;
-    if (!notificationConfig?.recipients?.length || !notificationConfig?.message) {
-      throw new Error('Recipients dan message diperlukan untuk send email step');
+    if (
+      !notificationConfig?.recipients?.length ||
+      !notificationConfig?.message
+    ) {
+      throw new Error(
+        'Recipients dan message diperlukan untuk send email step',
+      );
     }
 
     try {
       if (context.systemContext.dryRun) {
-        this.logger.log(`Dry run: Would send email to ${notificationConfig.recipients.length} recipients`);
+        this.logger.log(
+          `Dry run: Would send email to ${notificationConfig.recipients.length} recipients`,
+        );
         return {
           success: true,
           data: { dryRun: true, notification: notificationConfig },
@@ -797,12 +895,11 @@ export class WorkflowExecutionService {
 
       return {
         success: true,
-        data: { 
+        data: {
           emailSent: true,
           recipients: notificationConfig.recipients.length,
         },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -841,14 +938,13 @@ export class WorkflowExecutionService {
           workflowId: context.workflowId,
           executionId: context.executionId,
           stepName: step.name,
-        }
+        },
       );
 
       return {
         success: true,
         data: { alertId: alert.id, alert },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -869,7 +965,9 @@ export class WorkflowExecutionService {
 
     try {
       if (context.systemContext.dryRun) {
-        this.logger.log(`Dry run: Would make ${apiConfig.method} request to ${apiConfig.url}`);
+        this.logger.log(
+          `Dry run: Would make ${apiConfig.method} request to ${apiConfig.url}`,
+        );
         return {
           success: true,
           data: { dryRun: true, apiCall: apiConfig },
@@ -878,10 +976,10 @@ export class WorkflowExecutionService {
 
       // Make API call (simplified implementation)
       const startTime = Date.now();
-      
+
       // This would be a proper HTTP client implementation
       const response = await this.makeHttpRequest(apiConfig);
-      
+
       const responseTime = Date.now() - startTime;
 
       return {
@@ -895,7 +993,6 @@ export class WorkflowExecutionService {
           executionTime: responseTime,
         },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -916,29 +1013,33 @@ export class WorkflowExecutionService {
 
     try {
       let transformedData: any;
-      const sourceData = transformConfig.sourceField ? 
-        this.getNestedValue(inputData, transformConfig.sourceField) : 
-        inputData;
+      const sourceData = transformConfig.sourceField
+        ? this.getNestedValue(inputData, transformConfig.sourceField)
+        : inputData;
 
       switch (transformConfig.operation) {
         case 'map':
           transformedData = this.transformDataMap(sourceData, transformConfig);
           break;
         case 'filter':
-          transformedData = this.transformDataFilter(sourceData, transformConfig);
+          transformedData = this.transformDataFilter(
+            sourceData,
+            transformConfig,
+          );
           break;
         case 'sort':
           transformedData = this.transformDataSort(sourceData, transformConfig);
           break;
         default:
-          throw new Error(`Unsupported transform operation: ${transformConfig.operation}`);
+          throw new Error(
+            `Unsupported transform operation: ${transformConfig.operation}`,
+          );
       }
 
       return {
         success: true,
         data: { transformedData },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -959,34 +1060,47 @@ export class WorkflowExecutionService {
       // Simple validation implementation
       for (const [field, rules] of Object.entries(validationRules)) {
         const value = this.getNestedValue(inputData, field);
-        
-        if ((rules as any).required && (value === undefined || value === null)) {
+
+        if (
+          (rules as any).required &&
+          (value === undefined || value === null)
+        ) {
           errors.push(`Field ${field} is required`);
         }
-        
+
         if ((rules as any).type && typeof value !== (rules as any).type) {
           errors.push(`Field ${field} must be of type ${(rules as any).type}`);
         }
-        
-        if ((rules as any).min && typeof value === 'number' && value < (rules as any).min) {
+
+        if (
+          (rules as any).min &&
+          typeof value === 'number' &&
+          value < (rules as any).min
+        ) {
           errors.push(`Field ${field} must be at least ${(rules as any).min}`);
         }
-        
-        if ((rules as any).max && typeof value === 'number' && value > (rules as any).max) {
+
+        if (
+          (rules as any).max &&
+          typeof value === 'number' &&
+          value > (rules as any).max
+        ) {
           errors.push(`Field ${field} must be at most ${(rules as any).max}`);
         }
       }
 
       return {
         success: errors.length === 0,
-        data: { 
+        data: {
           isValid: errors.length === 0,
           errors,
           validatedData: inputData,
         },
-        error: errors.length > 0 ? `Validation failed: ${errors.join(', ')}` : undefined,
+        error:
+          errors.length > 0
+            ? `Validation failed: ${errors.join(', ')}`
+            : undefined,
       };
-
     } catch (error) {
       return {
         success: false,
@@ -999,7 +1113,10 @@ export class WorkflowExecutionService {
   // HELPER METHODS
   // =============================================
 
-  private async getWorkflowWithSteps(tenantId: string, workflowId: string): Promise<Workflow> {
+  private async getWorkflowWithSteps(
+    tenantId: string,
+    workflowId: string,
+  ): Promise<Workflow> {
     const workflow = await this.workflowRepository.findOne({
       where: { id: workflowId, tenantId, deletedAt: null },
       relations: ['steps'],
@@ -1013,7 +1130,10 @@ export class WorkflowExecutionService {
     return workflow;
   }
 
-  private async getWorkflowExecution(tenantId: string, executionId: string): Promise<WorkflowExecution | null> {
+  private async getWorkflowExecution(
+    tenantId: string,
+    executionId: string,
+  ): Promise<WorkflowExecution | null> {
     return await this.workflowExecutionRepository.findOne({
       where: { executionId, tenantId },
     });
@@ -1083,7 +1203,10 @@ export class WorkflowExecutionService {
     };
   }
 
-  private shouldExecuteStep(step: WorkflowStep, context: WorkflowExecutionContext): boolean {
+  private shouldExecuteStep(
+    step: WorkflowStep,
+    context: WorkflowExecutionContext,
+  ): boolean {
     // Check if step is active
     if (!step.isActive) {
       return false;
@@ -1097,11 +1220,25 @@ export class WorkflowExecutionService {
     return true;
   }
 
-  private evaluateStepConditions(conditions: any[], context: WorkflowExecutionContext): boolean {
+  private evaluateStepConditions(
+    conditions: any[],
+    context: WorkflowExecutionContext,
+  ): boolean {
     // Simple condition evaluation - would be more sophisticated in production
     for (const condition of conditions) {
-      const fieldValue = this.getNestedValue(context.variables, condition.field);
-      if (!this.evaluateCondition(condition.field, condition.operator, condition.value, { [condition.field]: fieldValue }, context)) {
+      const fieldValue = this.getNestedValue(
+        context.variables,
+        condition.field,
+      );
+      if (
+        !this.evaluateCondition(
+          condition.field,
+          condition.operator,
+          condition.value,
+          { [condition.field]: fieldValue },
+          context,
+        )
+      ) {
         return false;
       }
     }
@@ -1116,7 +1253,7 @@ export class WorkflowExecutionService {
     context: WorkflowExecutionContext,
   ): boolean {
     const fieldValue = this.getNestedValue(data, field);
-    
+
     switch (operator) {
       case ConditionOperator.EQUALS:
         return fieldValue === expectedValue;
@@ -1133,7 +1270,9 @@ export class WorkflowExecutionService {
       case ConditionOperator.CONTAINS:
         return String(fieldValue).includes(String(expectedValue));
       case ConditionOperator.IN:
-        return Array.isArray(expectedValue) && expectedValue.includes(fieldValue);
+        return (
+          Array.isArray(expectedValue) && expectedValue.includes(fieldValue)
+        );
       default:
         return false;
     }
@@ -1155,12 +1294,15 @@ export class WorkflowExecutionService {
 
   private isExecutionTimedOut(context: WorkflowExecutionContext): boolean {
     if (!context.systemContext.timeout) return false;
-    
+
     const elapsed = Date.now() - context.systemContext.startTime.getTime();
     return elapsed > context.systemContext.timeout * 1000;
   }
 
-  private async prepareStepInputData(step: WorkflowStep, context: WorkflowExecutionContext): Promise<any> {
+  private async prepareStepInputData(
+    step: WorkflowStep,
+    context: WorkflowExecutionContext,
+  ): Promise<any> {
     const inputData: any = {};
 
     if (step.inputMapping) {
@@ -1169,13 +1311,19 @@ export class WorkflowExecutionService {
 
         switch (mapping.source) {
           case 'workflow_variable':
-            value = this.getNestedValue(context.variables, mapping.path || targetField);
+            value = this.getNestedValue(
+              context.variables,
+              mapping.path || targetField,
+            );
             break;
           case 'static_value':
             value = mapping.defaultValue;
             break;
           case 'previous_step':
-            value = this.getNestedValue(context.executionData, mapping.path || targetField);
+            value = this.getNestedValue(
+              context.executionData,
+              mapping.path || targetField,
+            );
             break;
           default:
             value = mapping.defaultValue;
@@ -1202,10 +1350,18 @@ export class WorkflowExecutionService {
 
         switch (mapping.target) {
           case 'workflow_variable':
-            this.setNestedValue(context.variables, mapping.path || sourceField, value);
+            this.setNestedValue(
+              context.variables,
+              mapping.path || sourceField,
+              value,
+            );
             break;
           case 'workflow_output':
-            this.setNestedValue(context.executionData, mapping.path || sourceField, value);
+            this.setNestedValue(
+              context.executionData,
+              mapping.path || sourceField,
+              value,
+            );
             break;
         }
       }
@@ -1221,28 +1377,30 @@ export class WorkflowExecutionService {
     lastResult: StepExecutionResult,
   ): Promise<StepExecutionResult> {
     const maxRetries = step.errorHandling?.maxRetries || step.maxRetries || 3;
-    const retryDelay = step.errorHandling?.retryDelay || step.retryDelayMs || 5000;
+    const retryDelay =
+      step.errorHandling?.retryDelay || step.retryDelayMs || 5000;
 
     for (let retry = 1; retry <= maxRetries; retry++) {
-      this.logger.log(`Retrying step ${step.name} (attempt ${retry}/${maxRetries})`);
-      
+      this.logger.log(
+        `Retrying step ${step.name} (attempt ${retry}/${maxRetries})`,
+      );
+
       // Wait before retry
       await new Promise(resolve => setTimeout(resolve, retryDelay));
-      
+
       try {
         const result = await this.executeStep(step, context);
         if (result.success) {
           this.logger.log(`Step ${step.name} succeeded on retry ${retry}`);
           return result;
         }
-        
+
         if (retry === maxRetries) {
           return {
             success: false,
             error: `Step failed after ${maxRetries} retries. Last error: ${result.error}`,
           };
         }
-        
       } catch (error) {
         if (retry === maxRetries) {
           return {
@@ -1256,19 +1414,28 @@ export class WorkflowExecutionService {
     return lastResult;
   }
 
-  private interpolateTemplate(template: string, context: WorkflowExecutionContext): string {
+  private interpolateTemplate(
+    template: string,
+    context: WorkflowExecutionContext,
+  ): string {
     let result = template;
-    
+
     // Replace workflow variables
     for (const [key, value] of Object.entries(context.variables)) {
-      result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), String(value));
+      result = result.replace(
+        new RegExp(`\\$\\{${key}\\}`, 'g'),
+        String(value),
+      );
     }
-    
+
     // Replace execution data
     for (const [key, value] of Object.entries(context.executionData)) {
-      result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), String(value));
+      result = result.replace(
+        new RegExp(`\\$\\{${key}\\}`, 'g'),
+        String(value),
+      );
     }
-    
+
     return result;
   }
 
@@ -1288,7 +1455,10 @@ export class WorkflowExecutionService {
         // Apply transformation function if provided
         if (config.transformFunction) {
           try {
-            const fn = new Function('value', `return ${config.transformFunction}`);
+            const fn = new Function(
+              'value',
+              `return ${config.transformFunction}`,
+            );
             return fn(item);
           } catch (error) {
             return item;
@@ -1317,7 +1487,7 @@ export class WorkflowExecutionService {
       return [...data].sort((a, b) => {
         const aVal = config.sortField ? a[config.sortField] : a;
         const bVal = config.sortField ? b[config.sortField] : b;
-        
+
         if (config.sortOrder === 'desc') {
           return bVal > aVal ? 1 : -1;
         }
@@ -1340,9 +1510,9 @@ export class WorkflowExecutionService {
         stepId: step.id,
         stepName: step.name,
         stepType: step.stepType,
-        status: result.success ? 
-          WorkflowStepExecutionStatus.COMPLETED : 
-          WorkflowStepExecutionStatus.FAILED,
+        status: result.success
+          ? WorkflowStepExecutionStatus.COMPLETED
+          : WorkflowStepExecutionStatus.FAILED,
         executionOrder: step.executionOrder,
         startedAt: new Date(Date.now() - executionTime),
         completedAt: new Date(),
@@ -1355,9 +1525,11 @@ export class WorkflowExecutionService {
       });
 
       await this.workflowStepExecutionRepository.save(stepExecution);
-
     } catch (error) {
-      this.logger.error(`Failed to record step execution: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to record step execution: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -1367,12 +1539,16 @@ export class WorkflowExecutionService {
     error?: string,
   ): Promise<void> {
     execution.status = status;
-    
-    if (status === WorkflowExecutionStatus.COMPLETED || status === WorkflowExecutionStatus.FAILED) {
+
+    if (
+      status === WorkflowExecutionStatus.COMPLETED ||
+      status === WorkflowExecutionStatus.FAILED
+    ) {
       execution.completedAt = new Date();
-      execution.durationMs = execution.completedAt.getTime() - execution.startedAt.getTime();
+      execution.durationMs =
+        execution.completedAt.getTime() - execution.startedAt.getTime();
     }
-    
+
     if (error) {
       execution.errorMessage = error;
     }
@@ -1386,7 +1562,10 @@ export class WorkflowExecutionService {
     totalSteps: number,
   ): Promise<void> {
     try {
-      const execution = await this.getWorkflowExecution(context.tenantId, context.executionId);
+      const execution = await this.getWorkflowExecution(
+        context.tenantId,
+        context.executionId,
+      );
       if (execution) {
         execution.completedSteps = completedSteps;
         execution.totalSteps = totalSteps;
@@ -1394,7 +1573,9 @@ export class WorkflowExecutionService {
         await this.workflowExecutionRepository.save(execution);
       }
     } catch (error) {
-      this.logger.error(`Failed to update execution progress: ${error.message}`);
+      this.logger.error(
+        `Failed to update execution progress: ${error.message}`,
+      );
     }
   }
 
@@ -1405,7 +1586,7 @@ export class WorkflowExecutionService {
   ): Promise<void> {
     try {
       workflow.totalExecutions += 1;
-      
+
       if (success) {
         workflow.successfulExecutions += 1;
         workflow.consecutiveFailures = 0;
@@ -1415,18 +1596,23 @@ export class WorkflowExecutionService {
       }
 
       workflow.lastExecutionAt = new Date();
-      workflow.successRate = workflow.totalExecutions > 0 ? 
-        (workflow.successfulExecutions / workflow.totalExecutions) : 0;
+      workflow.successRate =
+        workflow.totalExecutions > 0
+          ? workflow.successfulExecutions / workflow.totalExecutions
+          : 0;
 
       // Update average execution time
       workflow.totalProcessingTime += duration / 1000;
-      workflow.averageExecutionTime = workflow.totalExecutions > 0 ? 
-        workflow.totalProcessingTime / workflow.totalExecutions : 0;
+      workflow.averageExecutionTime =
+        workflow.totalExecutions > 0
+          ? workflow.totalProcessingTime / workflow.totalExecutions
+          : 0;
 
       await this.workflowRepository.save(workflow);
-
     } catch (error) {
-      this.logger.error(`Failed to update workflow statistics: ${error.message}`);
+      this.logger.error(
+        `Failed to update workflow statistics: ${error.message}`,
+      );
     }
   }
 
@@ -1454,7 +1640,8 @@ export class WorkflowExecutionService {
       error: stepResult.error,
       metrics: {
         totalExecutionTime: duration,
-        averageStepTime: execution.totalSteps > 0 ? duration / execution.totalSteps : 0,
+        averageStepTime:
+          execution.totalSteps > 0 ? duration / execution.totalSteps : 0,
         peakMemoryUsage: execution.peakMemoryUsageMB || 0,
         totalApiCalls: execution.totalApiCalls || 0,
         totalDbQueries: execution.totalDbQueries || 0,
@@ -1463,7 +1650,11 @@ export class WorkflowExecutionService {
   }
 
   // Get workflow executions with pagination
-  async getWorkflowExecutions(tenantId: string, workflowId: string, query: any): Promise<any[]> {
+  async getWorkflowExecutions(
+    tenantId: string,
+    workflowId: string,
+    query: any,
+  ): Promise<any[]> {
     // Mock implementation - in a real system, this would query the database
     const mockExecutions = [
       {
@@ -1507,7 +1698,11 @@ export class WorkflowExecutionService {
   }
 
   // Get execution details by ID
-  async getExecutionDetails(tenantId: string, workflowId: string, executionId: string): Promise<any> {
+  async getExecutionDetails(
+    tenantId: string,
+    workflowId: string,
+    executionId: string,
+  ): Promise<any> {
     // Mock implementation
     return {
       id: executionId,
@@ -1571,18 +1766,46 @@ export class WorkflowExecutionService {
         variables: { currentUser: 'system', department: 'operations' },
       },
       logs: [
-        { timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), level: 'INFO', message: 'Workflow execution started' },
-        { timestamp: new Date(Date.now() - 119 * 60 * 1000), level: 'INFO', message: 'Step 1 completed successfully' },
-        { timestamp: new Date(Date.now() - 110 * 60 * 1000), level: 'INFO', message: 'Step 2 completed successfully' },
-        { timestamp: new Date(Date.now() - 105 * 60 * 1000), level: 'INFO', message: 'Step 3 completed successfully' },
-        { timestamp: new Date(Date.now() - 95 * 60 * 1000), level: 'INFO', message: 'Step 4 completed successfully' },
-        { timestamp: new Date(Date.now() - 90 * 60 * 1000), level: 'INFO', message: 'Workflow execution completed successfully' },
+        {
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          level: 'INFO',
+          message: 'Workflow execution started',
+        },
+        {
+          timestamp: new Date(Date.now() - 119 * 60 * 1000),
+          level: 'INFO',
+          message: 'Step 1 completed successfully',
+        },
+        {
+          timestamp: new Date(Date.now() - 110 * 60 * 1000),
+          level: 'INFO',
+          message: 'Step 2 completed successfully',
+        },
+        {
+          timestamp: new Date(Date.now() - 105 * 60 * 1000),
+          level: 'INFO',
+          message: 'Step 3 completed successfully',
+        },
+        {
+          timestamp: new Date(Date.now() - 95 * 60 * 1000),
+          level: 'INFO',
+          message: 'Step 4 completed successfully',
+        },
+        {
+          timestamp: new Date(Date.now() - 90 * 60 * 1000),
+          level: 'INFO',
+          message: 'Workflow execution completed successfully',
+        },
       ],
     };
   }
 
   // Get workflow analytics
-  async getWorkflowAnalytics(tenantId: string, workflowId: string, dateRange: any): Promise<any> {
+  async getWorkflowAnalytics(
+    tenantId: string,
+    workflowId: string,
+    dateRange: any,
+  ): Promise<any> {
     // Mock analytics data
     return {
       workflowId,
@@ -1593,11 +1816,36 @@ export class WorkflowExecutionService {
       averageExecutionTime: 25 * 60 * 1000, // 25 minutes
       successRate: 91.03,
       performanceTrend: [
-        { date: '2024-01-01', executions: 12, averageTime: 28 * 60 * 1000, successRate: 91.7 },
-        { date: '2024-01-02', executions: 15, averageTime: 26 * 60 * 1000, successRate: 93.3 },
-        { date: '2024-01-03', executions: 18, averageTime: 23 * 60 * 1000, successRate: 88.9 },
-        { date: '2024-01-04', executions: 14, averageTime: 25 * 60 * 1000, successRate: 92.9 },
-        { date: '2024-01-05', executions: 16, averageTime: 22 * 60 * 1000, successRate: 93.8 },
+        {
+          date: '2024-01-01',
+          executions: 12,
+          averageTime: 28 * 60 * 1000,
+          successRate: 91.7,
+        },
+        {
+          date: '2024-01-02',
+          executions: 15,
+          averageTime: 26 * 60 * 1000,
+          successRate: 93.3,
+        },
+        {
+          date: '2024-01-03',
+          executions: 18,
+          averageTime: 23 * 60 * 1000,
+          successRate: 88.9,
+        },
+        {
+          date: '2024-01-04',
+          executions: 14,
+          averageTime: 25 * 60 * 1000,
+          successRate: 92.9,
+        },
+        {
+          date: '2024-01-05',
+          executions: 16,
+          averageTime: 22 * 60 * 1000,
+          successRate: 93.8,
+        },
       ],
       errorAnalysis: {
         timeoutErrors: 8,
@@ -1606,11 +1854,31 @@ export class WorkflowExecutionService {
         systemErrors: 0,
       },
       stepPerformance: [
-        { stepName: 'Check Inventory', averageTime: 2 * 60 * 1000, failureRate: 2.1 },
-        { stepName: 'Generate POs', averageTime: 8 * 60 * 1000, failureRate: 5.8 },
-        { stepName: 'Send Notifications', averageTime: 3 * 60 * 1000, failureRate: 1.2 },
-        { stepName: 'Update Records', averageTime: 7 * 60 * 1000, failureRate: 3.4 },
-        { stepName: 'Generate Report', averageTime: 5 * 60 * 1000, failureRate: 0.8 },
+        {
+          stepName: 'Check Inventory',
+          averageTime: 2 * 60 * 1000,
+          failureRate: 2.1,
+        },
+        {
+          stepName: 'Generate POs',
+          averageTime: 8 * 60 * 1000,
+          failureRate: 5.8,
+        },
+        {
+          stepName: 'Send Notifications',
+          averageTime: 3 * 60 * 1000,
+          failureRate: 1.2,
+        },
+        {
+          stepName: 'Update Records',
+          averageTime: 7 * 60 * 1000,
+          failureRate: 3.4,
+        },
+        {
+          stepName: 'Generate Report',
+          averageTime: 5 * 60 * 1000,
+          failureRate: 0.8,
+        },
       ],
     };
   }

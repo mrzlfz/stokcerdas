@@ -78,10 +78,13 @@ export class AddPurchaseOrderItemDto {
 
   @ApiProperty({
     description: 'Harga satuan dalam mata uang yang dipilih',
-    example: 15000000.00,
+    example: 15000000.0,
     minimum: 0,
   })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Harga satuan harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Harga satuan harus berupa angka dengan maksimal 2 desimal' },
+  )
   @Min(0, { message: 'Harga satuan tidak boleh negatif' })
   unitPrice: number;
 
@@ -92,7 +95,12 @@ export class AddPurchaseOrderItemDto {
     maximum: 100,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Persentase diskon harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    {
+      message: 'Persentase diskon harus berupa angka dengan maksimal 2 desimal',
+    },
+  )
   @Min(0, { message: 'Persentase diskon tidak boleh negatif' })
   @Max(100, { message: 'Persentase diskon maksimal 100%' })
   discountPercentage?: number;
@@ -104,7 +112,12 @@ export class AddPurchaseOrderItemDto {
     maximum: 100,
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Persentase pajak harus berupa angka dengan maksimal 2 desimal' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    {
+      message: 'Persentase pajak harus berupa angka dengan maksimal 2 desimal',
+    },
+  )
   @Min(0, { message: 'Persentase pajak tidak boleh negatif' })
   @Max(100, { message: 'Persentase pajak maksimal 100%' })
   taxRate?: number;
@@ -114,7 +127,10 @@ export class AddPurchaseOrderItemDto {
     example: '2025-07-15T00:00:00.000Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Expected delivery date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Expected delivery date harus berupa tanggal yang valid' },
+  )
   expectedDeliveryDate?: string;
 
   @ApiPropertyOptional({
@@ -135,9 +151,11 @@ export class AddPurchaseOrderItemDto {
   customFields?: Record<string, any>;
 }
 
-export class UpdatePurchaseOrderItemDto extends PartialType(AddPurchaseOrderItemDto) {
+export class UpdatePurchaseOrderItemDto extends PartialType(
+  AddPurchaseOrderItemDto,
+) {
   // All fields from AddPurchaseOrderItemDto are optional for updates
-  
+
   @IsOptional()
   @IsString()
   updatedBy?: string;
@@ -178,7 +196,10 @@ export class ReceiveItemDto {
     example: '2025-07-10T14:30:00.000Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Received date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Received date harus berupa tanggal yang valid' },
+  )
   receivedDate?: string;
 }
 
@@ -191,8 +212,8 @@ export class BulkReceiveItemsDto {
         itemId: '123e4567-e89b-12d3-a456-426614174000',
         receivedQuantity: 8,
         rejectedQuantity: 2,
-        notes: 'Beberapa unit packaging rusak'
-      }
+        notes: 'Beberapa unit packaging rusak',
+      },
     ],
   })
   items: Array<{
@@ -216,7 +237,10 @@ export class BulkReceiveItemsDto {
     example: '2025-07-10T14:30:00.000Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Received date harus berupa tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Received date harus berupa tanggal yang valid' },
+  )
   receivedDate?: string;
 }
 
@@ -314,7 +338,10 @@ export class BulkItemActionResponseDto {
   @ApiProperty({ description: 'Jumlah item yang gagal diproses' })
   failed: number;
 
-  @ApiProperty({ description: 'Daftar ID item yang berhasil diproses', type: [String] })
+  @ApiProperty({
+    description: 'Daftar ID item yang berhasil diproses',
+    type: [String],
+  })
   successfulIds: string[];
 
   @ApiProperty({ description: 'Daftar error yang terjadi', type: [Object] })

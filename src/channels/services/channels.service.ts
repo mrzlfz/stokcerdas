@@ -1,10 +1,20 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Entities
-import { Channel, ChannelStatus, ChannelType, SyncStrategy } from '../entities/channel.entity';
+import {
+  Channel,
+  ChannelStatus,
+  ChannelType,
+  SyncStrategy,
+} from '../entities/channel.entity';
 import { ChannelConfig } from '../entities/channel-config.entity';
 
 // Integration services
@@ -19,7 +29,10 @@ import { WhatsAppAuthService } from '../../integrations/whatsapp/services/whatsa
 
 // Common services
 import { IntegrationLogService } from '../../integrations/common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../integrations/entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../integrations/entities/integration-log.entity';
 
 export interface CreateChannelDto {
   name: string;
@@ -91,7 +104,7 @@ export class ChannelsService {
     private readonly channelRepository: Repository<Channel>,
     @InjectRepository(ChannelConfig)
     private readonly configRepository: Repository<ChannelConfig>,
-    
+
     // Integration services
     private readonly shopeeApiService: ShopeeApiService,
     private readonly shopeeAuthService: ShopeeAuthService,
@@ -101,7 +114,7 @@ export class ChannelsService {
     private readonly tokopediaAuthService: TokopediaAuthService,
     private readonly whatsappApiService: WhatsAppApiService,
     private readonly whatsappAuthService: WhatsAppAuthService,
-    
+
     // Common services
     private readonly logService: IntegrationLogService,
     private readonly eventEmitter: EventEmitter2,
@@ -110,15 +123,24 @@ export class ChannelsService {
   /**
    * Create a new channel
    */
-  async createChannel(tenantId: string, createDto: CreateChannelDto): Promise<Channel> {
+  async createChannel(
+    tenantId: string,
+    createDto: CreateChannelDto,
+  ): Promise<Channel> {
     try {
-      this.logger.debug(`Creating channel for tenant ${tenantId}`, { createDto });
+      this.logger.debug(`Creating channel for tenant ${tenantId}`, {
+        createDto,
+      });
 
       // Validate platform support
       await this.validatePlatformSupport(createDto.platformId);
 
       // Check for duplicate platform connection
-      await this.checkDuplicateConnection(tenantId, createDto.platformId, createDto.storeId);
+      await this.checkDuplicateConnection(
+        tenantId,
+        createDto.platformId,
+        createDto.storeId,
+      );
 
       // Create channel entity
       const channel = this.channelRepository.create({
@@ -146,7 +168,10 @@ export class ChannelsService {
         type: IntegrationLogType.SYSTEM,
         level: IntegrationLogLevel.INFO,
         message: `Channel created: ${createDto.name} (${createDto.platformId})`,
-        metadata: { channelId: savedChannel.id, platformId: createDto.platformId },
+        metadata: {
+          channelId: savedChannel.id,
+          platformId: createDto.platformId,
+        },
       });
 
       // Emit event
@@ -156,9 +181,11 @@ export class ChannelsService {
       });
 
       return savedChannel;
-
     } catch (error) {
-      this.logger.error(`Failed to create channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create channel: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, null, error, {
         metadata: { action: 'create_channel', createDto },
       });
@@ -169,7 +196,10 @@ export class ChannelsService {
   /**
    * Get all channels for a tenant
    */
-  async getChannels(tenantId: string, query: ChannelListQuery = {}): Promise<{
+  async getChannels(
+    tenantId: string,
+    query: ChannelListQuery = {},
+  ): Promise<{
     channels: Channel[];
     total: number;
   }> {
@@ -188,14 +218,15 @@ export class ChannelsService {
         where.platformId = query.platformId;
       }
 
-      const queryBuilder = this.channelRepository.createQueryBuilder('channel')
+      const queryBuilder = this.channelRepository
+        .createQueryBuilder('channel')
         .where(where);
 
       // Search filter
       if (query.search) {
         queryBuilder.andWhere(
           '(channel.name ILIKE :search OR channel.description ILIKE :search OR channel.storeName ILIKE :search)',
-          { search: `%${query.search}%` }
+          { search: `%${query.search}%` },
         );
       }
 
@@ -208,7 +239,10 @@ export class ChannelsService {
       queryBuilder.leftJoinAndSelect('channel.config', 'config');
 
       if (query.includeMetrics) {
-        queryBuilder.leftJoinAndSelect('channel.inventoryAllocations', 'inventory');
+        queryBuilder.leftJoinAndSelect(
+          'channel.inventoryAllocations',
+          'inventory',
+        );
         queryBuilder.leftJoinAndSelect('channel.mappings', 'mappings');
       }
 
@@ -221,15 +255,18 @@ export class ChannelsService {
       }
 
       // Ordering
-      queryBuilder.orderBy('channel.sortOrder', 'ASC')
+      queryBuilder
+        .orderBy('channel.sortOrder', 'ASC')
         .addOrderBy('channel.createdAt', 'DESC');
 
       const [channels, total] = await queryBuilder.getManyAndCount();
 
       return { channels, total };
-
     } catch (error) {
-      this.logger.error(`Failed to get channels: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get channels: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -249,7 +286,6 @@ export class ChannelsService {
       }
 
       return channel;
-
     } catch (error) {
       this.logger.error(`Failed to get channel: ${error.message}`, error.stack);
       throw error;
@@ -259,7 +295,11 @@ export class ChannelsService {
   /**
    * Update a channel
    */
-  async updateChannel(tenantId: string, channelId: string, updateDto: UpdateChannelDto): Promise<Channel> {
+  async updateChannel(
+    tenantId: string,
+    channelId: string,
+    updateDto: UpdateChannelDto,
+  ): Promise<Channel> {
     try {
       const channel = await this.getChannelById(tenantId, channelId);
 
@@ -292,9 +332,11 @@ export class ChannelsService {
       });
 
       return updatedChannel;
-
     } catch (error) {
-      this.logger.error(`Failed to update channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update channel: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, channelId, error, {
         metadata: { action: 'update_channel', updateDto },
       });
@@ -312,7 +354,7 @@ export class ChannelsService {
       // Soft delete by disabling
       channel.updateStatus(ChannelStatus.INACTIVE, 'Channel deleted');
       channel.isEnabled = false;
-      
+
       await this.channelRepository.save(channel);
 
       // Log deletion
@@ -331,9 +373,11 @@ export class ChannelsService {
         channelId,
         channel,
       });
-
     } catch (error) {
-      this.logger.error(`Failed to delete channel: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete channel: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, channelId, error, {
         metadata: { action: 'delete_channel' },
       });
@@ -344,11 +388,16 @@ export class ChannelsService {
   /**
    * Test channel connection
    */
-  async testChannelConnection(tenantId: string, channelId: string): Promise<ChannelConnectionResult> {
+  async testChannelConnection(
+    tenantId: string,
+    channelId: string,
+  ): Promise<ChannelConnectionResult> {
     try {
       const channel = await this.getChannelById(tenantId, channelId);
 
-      this.logger.debug(`Testing connection for channel ${channelId} (${channel.platformId})`);
+      this.logger.debug(
+        `Testing connection for channel ${channelId} (${channel.platformId})`,
+      );
 
       let connectionResult: ChannelConnectionResult = {
         success: false,
@@ -358,23 +407,41 @@ export class ChannelsService {
       // Test connection based on platform
       switch (channel.platformId.toLowerCase()) {
         case 'shopee':
-          connectionResult = await this.testShopeeConnection(tenantId, channelId, channel);
+          connectionResult = await this.testShopeeConnection(
+            tenantId,
+            channelId,
+            channel,
+          );
           break;
 
         case 'lazada':
-          connectionResult = await this.testLazadaConnection(tenantId, channelId, channel);
+          connectionResult = await this.testLazadaConnection(
+            tenantId,
+            channelId,
+            channel,
+          );
           break;
 
         case 'tokopedia':
-          connectionResult = await this.testTokopediaConnection(tenantId, channelId, channel);
+          connectionResult = await this.testTokopediaConnection(
+            tenantId,
+            channelId,
+            channel,
+          );
           break;
 
         case 'whatsapp':
-          connectionResult = await this.testWhatsAppConnection(tenantId, channelId, channel);
+          connectionResult = await this.testWhatsAppConnection(
+            tenantId,
+            channelId,
+            channel,
+          );
           break;
 
         default:
-          throw new BadRequestException(`Platform ${channel.platformId} is not supported`);
+          throw new BadRequestException(
+            `Platform ${channel.platformId} is not supported`,
+          );
       }
 
       // Update channel status based on connection result
@@ -394,9 +461,13 @@ export class ChannelsService {
         tenantId,
         channelId,
         type: IntegrationLogType.SYSTEM,
-        level: connectionResult.success ? IntegrationLogLevel.INFO : IntegrationLogLevel.ERROR,
-        message: `Connection test ${connectionResult.success ? 'passed' : 'failed'}: ${channel.platformId}`,
-        metadata: { 
+        level: connectionResult.success
+          ? IntegrationLogLevel.INFO
+          : IntegrationLogLevel.ERROR,
+        message: `Connection test ${
+          connectionResult.success ? 'passed' : 'failed'
+        }: ${channel.platformId}`,
+        metadata: {
           platformId: channel.platformId,
           connectionData: connectionResult.connectionData,
           error: connectionResult.error,
@@ -404,13 +475,15 @@ export class ChannelsService {
       });
 
       return connectionResult;
-
     } catch (error) {
-      this.logger.error(`Failed to test channel connection: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to test channel connection: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, channelId, error, {
         metadata: { action: 'test_connection' },
       });
-      
+
       return {
         success: false,
         error: error.message,
@@ -453,9 +526,11 @@ export class ChannelsService {
         success: true,
         channel,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to update credentials: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update credentials: ${error.message}`,
+        error.stack,
+      );
       await this.logService.logError(tenantId, channelId, error, {
         metadata: { action: 'update_credentials' },
       });
@@ -466,7 +541,10 @@ export class ChannelsService {
   /**
    * Get channels by platform
    */
-  async getChannelsByPlatform(tenantId: string, platformId: string): Promise<Channel[]> {
+  async getChannelsByPlatform(
+    tenantId: string,
+    platformId: string,
+  ): Promise<Channel[]> {
     return this.channelRepository.find({
       where: {
         tenantId,
@@ -496,7 +574,10 @@ export class ChannelsService {
   /**
    * Update channel sync timestamp
    */
-  async updateSyncTimestamp(tenantId: string, channelId: string): Promise<void> {
+  async updateSyncTimestamp(
+    tenantId: string,
+    channelId: string,
+  ): Promise<void> {
     const channel = await this.getChannelById(tenantId, channelId);
     channel.updateSyncTimestamp();
     await this.channelRepository.save(channel);
@@ -505,7 +586,11 @@ export class ChannelsService {
   /**
    * Update channel metrics
    */
-  async updateChannelMetrics(tenantId: string, channelId: string, metrics: any): Promise<void> {
+  async updateChannelMetrics(
+    tenantId: string,
+    channelId: string,
+    metrics: any,
+  ): Promise<void> {
     const channel = await this.getChannelById(tenantId, channelId);
     channel.updateMetrics(metrics);
     await this.channelRepository.save(channel);
@@ -536,7 +621,9 @@ export class ChannelsService {
 
     if (existingChannel) {
       throw new BadRequestException(
-        `Channel for ${platformId}${storeId ? ` (Store: ${storeId})` : ''} already exists`
+        `Channel for ${platformId}${
+          storeId ? ` (Store: ${storeId})` : ''
+        } already exists`,
       );
     }
   }
@@ -578,7 +665,10 @@ export class ChannelsService {
   ): Promise<ChannelConnectionResult> {
     try {
       // Test authentication
-      const authResult = await this.shopeeAuthService.testAuthentication(tenantId, channelId);
+      const authResult = await this.shopeeAuthService.testAuthentication(
+        tenantId,
+        channelId,
+      );
       if (!authResult.valid) {
         return {
           success: false,
@@ -603,7 +693,6 @@ export class ChannelsService {
           lastConnectionTest: new Date(),
         },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -619,7 +708,10 @@ export class ChannelsService {
   ): Promise<ChannelConnectionResult> {
     try {
       // Test authentication
-      const authResult = await this.lazadaAuthService.testAuthentication(tenantId, channelId);
+      const authResult = await this.lazadaAuthService.testAuthentication(
+        tenantId,
+        channelId,
+      );
       if (!authResult.valid) {
         return {
           success: false,
@@ -644,7 +736,6 @@ export class ChannelsService {
           lastConnectionTest: new Date(),
         },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -660,7 +751,10 @@ export class ChannelsService {
   ): Promise<ChannelConnectionResult> {
     try {
       // Test authentication
-      const authResult = await this.tokopediaAuthService.testAuthentication(tenantId, channelId);
+      const authResult = await this.tokopediaAuthService.testAuthentication(
+        tenantId,
+        channelId,
+      );
       if (!authResult.isValid) {
         return {
           success: false,
@@ -685,7 +779,6 @@ export class ChannelsService {
           lastConnectionTest: new Date(),
         },
       };
-
     } catch (error) {
       return {
         success: false,
@@ -701,7 +794,10 @@ export class ChannelsService {
   ): Promise<ChannelConnectionResult> {
     try {
       // Test authentication
-      const authResult = await this.whatsappAuthService.testAuthentication(tenantId, channelId);
+      const authResult = await this.whatsappAuthService.testAuthentication(
+        tenantId,
+        channelId,
+      );
       if (!authResult.success) {
         return {
           success: false,
@@ -726,7 +822,6 @@ export class ChannelsService {
           lastConnectionTest: new Date(),
         },
       };
-
     } catch (error) {
       return {
         success: false,

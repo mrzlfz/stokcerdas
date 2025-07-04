@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, TreeRepository, Not } from 'typeorm';
 
-import { ProductCategory } from '../entities/product.entity';
+import { ProductCategory } from '../entities/product-category.entity';
 import { CreateProductCategoryDto } from '../dto/create-product-category.dto';
 import { UpdateProductCategoryDto } from '../dto/update-product-category.dto';
 
@@ -13,9 +18,17 @@ export class ProductCategoriesService {
     private readonly categoryRepository: Repository<ProductCategory>,
   ) {}
 
-  async create(tenantId: string, createCategoryDto: CreateProductCategoryDto, userId?: string): Promise<ProductCategory> {
+  async create(
+    tenantId: string,
+    createCategoryDto: CreateProductCategoryDto,
+    userId?: string,
+  ): Promise<ProductCategory> {
     // Validasi nama kategori unik per tenant dan parent
-    await this.validateNameUnique(tenantId, createCategoryDto.name, createCategoryDto.parentId);
+    await this.validateNameUnique(
+      tenantId,
+      createCategoryDto.name,
+      createCategoryDto.parentId,
+    );
 
     // Validasi parent category jika ada
     if (createCategoryDto.parentId) {
@@ -32,9 +45,12 @@ export class ProductCategoriesService {
     return this.categoryRepository.save(category);
   }
 
-  async findAll(tenantId: string, includeInactive: boolean = false): Promise<ProductCategory[]> {
+  async findAll(
+    tenantId: string,
+    includeInactive: boolean = false,
+  ): Promise<ProductCategory[]> {
     const whereCondition: any = { tenantId };
-    
+
     if (!includeInactive) {
       whereCondition.isActive = true;
     }
@@ -46,22 +62,31 @@ export class ProductCategoriesService {
     });
   }
 
-  async findTree(tenantId: string, includeInactive: boolean = false): Promise<ProductCategory[]> {
+  async findTree(
+    tenantId: string,
+    includeInactive: boolean = false,
+  ): Promise<ProductCategory[]> {
     const categories = await this.findAll(tenantId, includeInactive);
-    
+
     // Build tree structure
     const categoryMap = new Map<string, ProductCategory>();
     const rootCategories: ProductCategory[] = [];
 
     // First pass: create map of all categories
     categories.forEach(category => {
-      categoryMap.set(category.id, { ...category, children: [] });
+      // Create a proper category instance with all required methods
+      const categoryWithChildren = Object.assign(
+        new ProductCategory(),
+        category,
+        { children: [] },
+      );
+      categoryMap.set(category.id, categoryWithChildren);
     });
 
     // Second pass: build tree
     categories.forEach(category => {
       const categoryWithChildren = categoryMap.get(category.id);
-      
+
       if (category.parentId) {
         const parent = categoryMap.get(category.parentId);
         if (parent) {
@@ -101,17 +126,33 @@ export class ProductCategoriesService {
     });
   }
 
-  async update(tenantId: string, id: string, updateCategoryDto: UpdateProductCategoryDto, userId?: string): Promise<ProductCategory> {
+  async update(
+    tenantId: string,
+    id: string,
+    updateCategoryDto: UpdateProductCategoryDto,
+    userId?: string,
+  ): Promise<ProductCategory> {
     const category = await this.findOne(tenantId, id);
 
     // Validasi nama jika berubah
     if (updateCategoryDto.name && updateCategoryDto.name !== category.name) {
-      const parentId = updateCategoryDto.parentId !== undefined ? updateCategoryDto.parentId : category.parentId;
-      await this.validateNameUnique(tenantId, updateCategoryDto.name, parentId, id);
+      const parentId =
+        updateCategoryDto.parentId !== undefined
+          ? updateCategoryDto.parentId
+          : category.parentId;
+      await this.validateNameUnique(
+        tenantId,
+        updateCategoryDto.name,
+        parentId,
+        id,
+      );
     }
 
     // Validasi parent category jika berubah
-    if (updateCategoryDto.parentId !== undefined && updateCategoryDto.parentId !== category.parentId) {
+    if (
+      updateCategoryDto.parentId !== undefined &&
+      updateCategoryDto.parentId !== category.parentId
+    ) {
       if (updateCategoryDto.parentId) {
         await this.validateParentCategory(tenantId, updateCategoryDto.parentId);
         // Pastikan tidak membuat circular reference
@@ -138,7 +179,9 @@ export class ProductCategoriesService {
       .getCount();
 
     if (productCount > 0) {
-      throw new BadRequestException('Tidak dapat menghapus kategori yang masih memiliki produk');
+      throw new BadRequestException(
+        'Tidak dapat menghapus kategori yang masih memiliki produk',
+      );
     }
 
     // Check if category has children
@@ -147,16 +190,25 @@ export class ProductCategoriesService {
     });
 
     if (childrenCount > 0) {
-      throw new BadRequestException('Tidak dapat menghapus kategori yang masih memiliki sub-kategori');
+      throw new BadRequestException(
+        'Tidak dapat menghapus kategori yang masih memiliki sub-kategori',
+      );
     }
 
     await this.categoryRepository.delete(id);
   }
 
-  async getCategoryWithProductCount(tenantId: string): Promise<Array<ProductCategory & { productCount: number }>> {
+  async getCategoryWithProductCount(
+    tenantId: string,
+  ): Promise<Array<ProductCategory & { productCount: number }>> {
     const result = await this.categoryRepository
       .createQueryBuilder('category')
-      .leftJoin('category.products', 'product', 'product.isDeleted = :isDeleted', { isDeleted: false })
+      .leftJoin(
+        'category.products',
+        'product',
+        'product.isDeleted = :isDeleted',
+        { isDeleted: false },
+      )
       .select([
         'category.id',
         'category.name',
@@ -185,16 +237,21 @@ export class ProductCategoriesService {
     })) as Array<ProductCategory & { productCount: number }>;
   }
 
-  async reorderCategories(tenantId: string, categoryOrders: Array<{ id: string; sortOrder: number }>): Promise<void> {
-    const queryRunner = this.categoryRepository.manager.connection.createQueryRunner();
+  async reorderCategories(
+    tenantId: string,
+    categoryOrders: Array<{ id: string; sortOrder: number }>,
+  ): Promise<void> {
+    const queryRunner =
+      this.categoryRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       for (const { id, sortOrder } of categoryOrders) {
-        await queryRunner.manager.update(ProductCategory, 
-          { id, tenantId }, 
-          { sortOrder }
+        await queryRunner.manager.update(
+          ProductCategory,
+          { id, tenantId },
+          { sortOrder },
         );
       }
 
@@ -208,9 +265,14 @@ export class ProductCategoriesService {
   }
 
   // Private helper methods
-  private async validateNameUnique(tenantId: string, name: string, parentId?: string, excludeId?: string): Promise<void> {
+  private async validateNameUnique(
+    tenantId: string,
+    name: string,
+    parentId?: string,
+    excludeId?: string,
+  ): Promise<void> {
     const whereCondition: any = { tenantId, name };
-    
+
     if (parentId) {
       whereCondition.parentId = parentId;
     } else {
@@ -226,12 +288,19 @@ export class ProductCategoriesService {
     });
 
     if (existingCategory) {
-      const location = parentId ? 'dalam kategori parent yang sama' : 'di level root';
-      throw new ConflictException(`Nama kategori "${name}" sudah ada ${location}`);
+      const location = parentId
+        ? 'dalam kategori parent yang sama'
+        : 'di level root';
+      throw new ConflictException(
+        `Nama kategori "${name}" sudah ada ${location}`,
+      );
     }
   }
 
-  private async validateParentCategory(tenantId: string, parentId: string): Promise<void> {
+  private async validateParentCategory(
+    tenantId: string,
+    parentId: string,
+  ): Promise<void> {
     const parentCategory = await this.categoryRepository.findOne({
       where: { id: parentId, tenantId },
     });
@@ -245,19 +314,29 @@ export class ProductCategoriesService {
     }
   }
 
-  private async validateCircularReference(categoryId: string, parentId: string): Promise<void> {
+  private async validateCircularReference(
+    categoryId: string,
+    parentId: string,
+  ): Promise<void> {
     if (categoryId === parentId) {
-      throw new BadRequestException('Kategori tidak dapat menjadi parent dari dirinya sendiri');
+      throw new BadRequestException(
+        'Kategori tidak dapat menjadi parent dari dirinya sendiri',
+      );
     }
 
     // Check if parentId is a descendant of categoryId
     const isDescendant = await this.isDescendant(categoryId, parentId);
     if (isDescendant) {
-      throw new BadRequestException('Circular reference terdeteksi: kategori tidak dapat menjadi parent dari ancestor-nya');
+      throw new BadRequestException(
+        'Circular reference terdeteksi: kategori tidak dapat menjadi parent dari ancestor-nya',
+      );
     }
   }
 
-  private async isDescendant(ancestorId: string, categoryId: string): Promise<boolean> {
+  private async isDescendant(
+    ancestorId: string,
+    categoryId: string,
+  ): Promise<boolean> {
     const category = await this.categoryRepository.findOne({
       where: { id: categoryId },
       select: ['parentId'],

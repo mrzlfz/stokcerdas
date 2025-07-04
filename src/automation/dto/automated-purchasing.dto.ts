@@ -1,15 +1,15 @@
-import { 
-  IsString, 
-  IsOptional, 
-  IsEnum, 
-  IsNumber, 
-  IsBoolean, 
-  IsUUID, 
-  IsArray, 
-  ValidateNested, 
-  Min, 
-  Max, 
-  ArrayMaxSize
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsUUID,
+  IsArray,
+  ValidateNested,
+  Min,
+  Max,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -132,7 +132,10 @@ export class BulkAutomatedPurchaseFiltersDto {
   })
   @IsOptional()
   @IsArray({ message: 'Supplier IDs harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap supplier ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap supplier ID harus berupa UUID yang valid',
+  })
   @ArrayMaxSize(20, { message: 'Maksimal 20 supplier IDs' })
   supplierIds?: string[];
 }
@@ -191,7 +194,10 @@ export class ExecuteBulkAutomatedPurchaseDto {
   })
   @IsOptional()
   @IsArray({ message: 'Reorder rule IDs harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap reorder rule ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap reorder rule ID harus berupa UUID yang valid',
+  })
   @ArrayMaxSize(100, { message: 'Maksimal 100 reorder rules per batch' })
   reorderRuleIds?: string[];
 
@@ -202,7 +208,10 @@ export class ExecuteBulkAutomatedPurchaseDto {
   })
   @IsOptional()
   @IsArray({ message: 'Product IDs harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap product ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap product ID harus berupa UUID yang valid',
+  })
   @ArrayMaxSize(200, { message: 'Maksimal 200 products per batch' })
   productIds?: string[];
 
@@ -213,7 +222,10 @@ export class ExecuteBulkAutomatedPurchaseDto {
   })
   @IsOptional()
   @IsArray({ message: 'Location IDs harus berupa array' })
-  @IsUUID(4, { each: true, message: 'Setiap location ID harus berupa UUID yang valid' })
+  @IsUUID(4, {
+    each: true,
+    message: 'Setiap location ID harus berupa UUID yang valid',
+  })
   @ArrayMaxSize(50, { message: 'Maksimal 50 locations per batch' })
   locationIds?: string[];
 
@@ -527,7 +539,10 @@ export class BulkAutomatedPurchaseResultDto {
   @ApiProperty({ description: 'Jumlah order yang di-skip' })
   skippedOrders: number;
 
-  @ApiProperty({ description: 'Hasil detail', type: [AutomatedPurchaseResultDto] })
+  @ApiProperty({
+    description: 'Hasil detail',
+    type: [AutomatedPurchaseResultDto],
+  })
   results: AutomatedPurchaseResultDto[];
 
   @ApiProperty({ description: 'Ringkasan eksekusi' })

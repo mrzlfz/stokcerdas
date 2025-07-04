@@ -5,14 +5,21 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
-import { WebhookEvent, WebhookEventType, WebhookProcessingStatus } from '../../entities/webhook-event.entity';
+import {
+  WebhookEvent,
+  WebhookEventType,
+  WebhookProcessingStatus,
+} from '../../entities/webhook-event.entity';
 import { Channel } from '../../../channels/entities/channel.entity';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
 import { WebhookHandlerService } from '../../common/services/webhook-handler.service';
 import { TokopediaApiService } from './tokopedia-api.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
 
-export type TokopediaWebhookEventType = 
+export type TokopediaWebhookEventType =
   | 'order_created'
   | 'order_updated'
   | 'order_cancelled'
@@ -138,7 +145,8 @@ export class TokopediaWebhookService {
         throw new Error(`Channel ${channelId} not found`);
       }
 
-      const signature = headers['x-tokopedia-signature'] || headers['x-signature'];
+      const signature =
+        headers['x-tokopedia-signature'] || headers['x-signature'];
       if (signature) {
         const isValid = this.apiService.verifyWebhookSignature(
           payload,
@@ -202,16 +210,18 @@ export class TokopediaWebhookService {
         success: true,
         webhookId: webhookEvent.id,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
 
-      this.logger.error(`Tokopedia webhook processing failed: ${error.message}`, {
-        tenantId,
-        channelId,
-        error: error.message,
-        processingTime,
-      });
+      this.logger.error(
+        `Tokopedia webhook processing failed: ${error.message}`,
+        {
+          tenantId,
+          channelId,
+          error: error.message,
+          processingTime,
+        },
+      );
 
       await this.logService.logWebhook(
         tenantId,
@@ -266,7 +276,11 @@ export class TokopediaWebhookService {
           break;
 
         case 'order_cancelled':
-          result = await this.handleOrderCancelled(tenantId, channelId, payload);
+          result = await this.handleOrderCancelled(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
 
         case 'order_shipped':
@@ -274,15 +288,27 @@ export class TokopediaWebhookService {
           break;
 
         case 'order_delivered':
-          result = await this.handleOrderDelivered(tenantId, channelId, payload);
+          result = await this.handleOrderDelivered(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
 
         case 'product_updated':
-          result = await this.handleProductUpdated(tenantId, channelId, payload);
+          result = await this.handleProductUpdated(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
 
         case 'inventory_updated':
-          result = await this.handleInventoryUpdated(tenantId, channelId, payload);
+          result = await this.handleInventoryUpdated(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
 
         case 'price_updated':
@@ -290,11 +316,19 @@ export class TokopediaWebhookService {
           break;
 
         case 'payment_confirmed':
-          result = await this.handlePaymentConfirmed(tenantId, channelId, payload);
+          result = await this.handlePaymentConfirmed(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
 
         case 'system_notification':
-          result = await this.handleSystemNotification(tenantId, channelId, payload);
+          result = await this.handleSystemNotification(
+            tenantId,
+            channelId,
+            payload,
+          );
           break;
 
         default:
@@ -322,7 +356,6 @@ export class TokopediaWebhookService {
       }
 
       return result;
-
     } catch (error) {
       this.logger.error(`Webhook event handling failed: ${error.message}`, {
         webhookId,
@@ -343,8 +376,16 @@ export class TokopediaWebhookService {
   /**
    * Verify webhook signature
    */
-  verifySignature(payload: string, signature: string, clientSecret: string): boolean {
-    return this.apiService.verifyWebhookSignature(payload, signature, clientSecret);
+  verifySignature(
+    payload: string,
+    signature: string,
+    clientSecret: string,
+  ): boolean {
+    return this.apiService.verifyWebhookSignature(
+      payload,
+      signature,
+      clientSecret,
+    );
   }
 
   // Private event handlers
@@ -361,13 +402,16 @@ export class TokopediaWebhookService {
 
       const orderData = payload.data.order;
 
-      this.logger.log(`New Tokopedia order created: ${orderData.invoice_number}`, {
-        tenantId,
-        channelId,
-        orderId: orderData.order_id,
-        invoiceNumber: orderData.invoice_number,
-        totalAmount: orderData.total_amount,
-      });
+      this.logger.log(
+        `New Tokopedia order created: ${orderData.invoice_number}`,
+        {
+          tenantId,
+          channelId,
+          orderId: orderData.order_id,
+          invoiceNumber: orderData.invoice_number,
+          totalAmount: orderData.total_amount,
+        },
+      );
 
       // Queue order sync job
       await this.tokopediaQueue.add(
@@ -399,7 +443,6 @@ export class TokopediaWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -452,7 +495,6 @@ export class TokopediaWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -470,11 +512,14 @@ export class TokopediaWebhookService {
 
       const orderData = payload.data.order;
 
-      this.logger.log(`Tokopedia order cancelled: ${orderData.invoice_number}`, {
-        tenantId,
-        channelId,
-        orderId: orderData.order_id,
-      });
+      this.logger.log(
+        `Tokopedia order cancelled: ${orderData.invoice_number}`,
+        {
+          tenantId,
+          channelId,
+          orderId: orderData.order_id,
+        },
+      );
 
       // Queue order sync job to update status
       await this.tokopediaQueue.add(
@@ -501,7 +546,6 @@ export class TokopediaWebhookService {
       );
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -526,18 +570,14 @@ export class TokopediaWebhookService {
       });
 
       // Queue order sync job
-      await this.tokopediaQueue.add(
-        'order-sync',
-        {
-          tenantId,
-          channelId,
-          orderId: orderData.order_id.toString(),
-          syncDirection: 'inbound',
-        },
-      );
+      await this.tokopediaQueue.add('order-sync', {
+        tenantId,
+        channelId,
+        orderId: orderData.order_id.toString(),
+        syncDirection: 'inbound',
+      });
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -555,25 +595,24 @@ export class TokopediaWebhookService {
 
       const orderData = payload.data.order;
 
-      this.logger.log(`Tokopedia order delivered: ${orderData.invoice_number}`, {
-        tenantId,
-        channelId,
-        orderId: orderData.order_id,
-      });
-
-      // Queue order sync job
-      await this.tokopediaQueue.add(
-        'order-sync',
+      this.logger.log(
+        `Tokopedia order delivered: ${orderData.invoice_number}`,
         {
           tenantId,
           channelId,
-          orderId: orderData.order_id.toString(),
-          syncDirection: 'inbound',
+          orderId: orderData.order_id,
         },
       );
 
-      return { success: true };
+      // Queue order sync job
+      await this.tokopediaQueue.add('order-sync', {
+        tenantId,
+        channelId,
+        orderId: orderData.order_id.toString(),
+        syncDirection: 'inbound',
+      });
 
+      return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -599,18 +638,14 @@ export class TokopediaWebhookService {
       });
 
       // Queue product sync job
-      await this.tokopediaQueue.add(
-        'product-sync',
-        {
-          tenantId,
-          channelId,
-          productId: productData.product_id.toString(),
-          syncDirection: 'inbound',
-        },
-      );
+      await this.tokopediaQueue.add('product-sync', {
+        tenantId,
+        channelId,
+        productId: productData.product_id.toString(),
+        syncDirection: 'inbound',
+      });
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -637,18 +672,14 @@ export class TokopediaWebhookService {
       });
 
       // Queue inventory sync job
-      await this.tokopediaQueue.add(
-        'inventory-sync',
-        {
-          tenantId,
-          channelId,
-          productId: inventoryData.product_id.toString(),
-          syncType: 'stock',
-        },
-      );
+      await this.tokopediaQueue.add('inventory-sync', {
+        tenantId,
+        channelId,
+        productId: inventoryData.product_id.toString(),
+        syncType: 'stock',
+      });
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -675,18 +706,14 @@ export class TokopediaWebhookService {
       });
 
       // Queue inventory sync job for price update
-      await this.tokopediaQueue.add(
-        'inventory-sync',
-        {
-          tenantId,
-          channelId,
-          productId: priceData.product_id.toString(),
-          syncType: 'price',
-        },
-      );
+      await this.tokopediaQueue.add('inventory-sync', {
+        tenantId,
+        channelId,
+        productId: priceData.product_id.toString(),
+        syncType: 'price',
+      });
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -704,27 +731,26 @@ export class TokopediaWebhookService {
 
       const paymentData = payload.data.payment;
 
-      this.logger.log(`Tokopedia payment confirmed for order: ${paymentData.order_id}`, {
-        tenantId,
-        channelId,
-        orderId: paymentData.order_id,
-        amount: paymentData.amount,
-        paymentMethod: paymentData.payment_method,
-      });
-
-      // Queue order sync job to update payment status
-      await this.tokopediaQueue.add(
-        'order-sync',
+      this.logger.log(
+        `Tokopedia payment confirmed for order: ${paymentData.order_id}`,
         {
           tenantId,
           channelId,
-          orderId: paymentData.order_id.toString(),
-          syncDirection: 'inbound',
+          orderId: paymentData.order_id,
+          amount: paymentData.amount,
+          paymentMethod: paymentData.payment_method,
         },
       );
 
-      return { success: true };
+      // Queue order sync job to update payment status
+      await this.tokopediaQueue.add('order-sync', {
+        tenantId,
+        channelId,
+        orderId: paymentData.order_id.toString(),
+        syncDirection: 'inbound',
+      });
 
+      return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -742,19 +768,25 @@ export class TokopediaWebhookService {
 
       const notificationData = payload.data.notification;
 
-      this.logger.log(`Tokopedia system notification: ${notificationData.title}`, {
-        tenantId,
-        channelId,
-        type: notificationData.type,
-        severity: notificationData.severity,
-        message: notificationData.message,
-      });
+      this.logger.log(
+        `Tokopedia system notification: ${notificationData.title}`,
+        {
+          tenantId,
+          channelId,
+          type: notificationData.type,
+          severity: notificationData.severity,
+          message: notificationData.message,
+        },
+      );
 
       await this.logService.log({
         tenantId,
         channelId,
         type: IntegrationLogType.SYSTEM,
-        level: notificationData.severity === 'error' ? IntegrationLogLevel.ERROR : IntegrationLogLevel.INFO,
+        level:
+          notificationData.severity === 'error'
+            ? IntegrationLogLevel.ERROR
+            : IntegrationLogLevel.INFO,
         message: `Tokopedia: ${notificationData.title}`,
         metadata: {
           type: notificationData.type,
@@ -764,7 +796,6 @@ export class TokopediaWebhookService {
       });
 
       return { success: true };
-
     } catch (error) {
       return { success: false, error: error.message };
     }

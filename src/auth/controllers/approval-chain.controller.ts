@@ -32,8 +32,15 @@ import { PermissionsGuard } from '../guards/permissions.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { CurrentTenant } from '../decorators/current-tenant.decorator';
 import { Permissions } from '../decorators/permissions.decorator';
-import { PermissionResource, PermissionAction } from '../entities/permission.entity';
-import { ApprovalType, ApprovalStatus, ApprovalMode } from '../entities/approval-chain.entity';
+import {
+  PermissionResource,
+  PermissionAction,
+} from '../entities/permission.entity';
+import {
+  ApprovalType,
+  ApprovalStatus,
+  ApprovalMode,
+} from '../entities/approval-chain.entity';
 import {
   CreateApprovalChainDto,
   UpdateApprovalChainDto,
@@ -66,9 +73,16 @@ export class ApprovalChainController {
     description: 'Approval chain berhasil dibuat',
     type: ApprovalChainResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Data tidak valid atau kode sudah ada' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk membuat approval chain' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.CREATE })
+  @ApiBadRequestResponse({
+    description: 'Data tidak valid atau kode sudah ada',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk membuat approval chain',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.CREATE,
+  })
   async create(
     @Body() createApprovalChainDto: CreateApprovalChainDto,
     @CurrentTenant() tenantId: string,
@@ -82,7 +96,7 @@ export class ApprovalChainController {
 
     return StandardResponse.created(
       approvalChain as ApprovalChainResponseDto,
-      'Approval chain berhasil dibuat'
+      'Approval chain berhasil dibuat',
     );
   }
 
@@ -95,13 +109,40 @@ export class ApprovalChainController {
     description: 'Daftar approval chain berhasil diambil',
     type: [ApprovalChainResponseDto],
   })
-  @ApiQuery({ name: 'type', required: false, description: 'Filter berdasarkan jenis' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter berdasarkan status' })
-  @ApiQuery({ name: 'mode', required: false, description: 'Filter berdasarkan mode' })
-  @ApiQuery({ name: 'departmentId', required: false, description: 'Filter berdasarkan departemen' })
-  @ApiQuery({ name: 'search', required: false, description: 'Kata kunci pencarian' })
-  @ApiQuery({ name: 'includeInactive', required: false, description: 'Sertakan chain tidak aktif' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filter berdasarkan jenis',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter berdasarkan status',
+  })
+  @ApiQuery({
+    name: 'mode',
+    required: false,
+    description: 'Filter berdasarkan mode',
+  })
+  @ApiQuery({
+    name: 'departmentId',
+    required: false,
+    description: 'Filter berdasarkan departemen',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Kata kunci pencarian',
+  })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    description: 'Sertakan chain tidak aktif',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async findAll(
     @Query() query: ApprovalChainQueryDto,
     @CurrentTenant() tenantId: string,
@@ -115,7 +156,10 @@ export class ApprovalChainController {
         query.limit || 20,
       );
     } else if (query.type) {
-      approvalChains = await this.approvalChainService.findByType(query.type, tenantId);
+      approvalChains = await this.approvalChainService.findByType(
+        query.type,
+        tenantId,
+      );
     } else if (query.departmentId) {
       approvalChains = await this.approvalChainService.findByDepartment(
         query.departmentId,
@@ -166,7 +210,10 @@ export class ApprovalChainController {
       },
     },
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async getApprovalTypes(): Promise<StandardResponse<any[]>> {
     const types = [
       {
@@ -231,17 +278,23 @@ export class ApprovalChainController {
   @Get('stats')
   @ApiOperation({
     summary: 'Dapatkan statistik approval chain',
-    description: 'Mengambil statistik approval chain termasuk jumlah per jenis dan usage',
+    description:
+      'Mengambil statistik approval chain termasuk jumlah per jenis dan usage',
   })
   @ApiOkResponse({
     description: 'Statistik approval chain berhasil diambil',
     type: ApprovalChainStatsDto,
   })
-  @Permissions({ resource: PermissionResource.ANALYTICS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.ANALYTICS,
+    action: PermissionAction.READ,
+  })
   async getStats(
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<ApprovalChainStatsDto>> {
-    const stats = await this.approvalChainService.getApprovalChainStats(tenantId);
+    const stats = await this.approvalChainService.getApprovalChainStats(
+      tenantId,
+    );
 
     return {
       success: true,
@@ -261,12 +314,18 @@ export class ApprovalChainController {
     type: ApprovalChainResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Approval chain tidak ditemukan' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<ApprovalChainResponseDto>> {
-    const approvalChain = await this.approvalChainService.findById(id, tenantId);
+    const approvalChain = await this.approvalChainService.findById(
+      id,
+      tenantId,
+    );
 
     return {
       success: true,
@@ -278,19 +337,24 @@ export class ApprovalChainController {
   @Get(':id/validate')
   @ApiOperation({
     summary: 'Validasi konfigurasi approval chain',
-    description: 'Memvalidasi konfigurasi approval chain dan memberikan warning/error',
+    description:
+      'Memvalidasi konfigurasi approval chain dan memberikan warning/error',
   })
   @ApiParam({ name: 'id', description: 'ID approval chain' })
   @ApiOkResponse({
     description: 'Validasi approval chain berhasil',
     type: ApprovalChainValidationDto,
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async validate(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
   ): Promise<StandardResponse<ApprovalChainValidationDto>> {
-    const validation = await this.approvalChainService.validateChainConfiguration(id, tenantId);
+    const validation =
+      await this.approvalChainService.validateChainConfiguration(id, tenantId);
 
     return {
       success: true,
@@ -311,8 +375,14 @@ export class ApprovalChainController {
   })
   @ApiNotFoundResponse({ description: 'Approval chain tidak ditemukan' })
   @ApiBadRequestResponse({ description: 'Data tidak valid' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin atau approval chain adalah system-defined' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @ApiForbiddenResponse({
+    description:
+      'Tidak memiliki izin atau approval chain adalah system-defined',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateApprovalChainDto: UpdateApprovalChainDto,
@@ -343,7 +413,10 @@ export class ApprovalChainController {
     description: 'Status approval chain berhasil diubah',
     type: ApprovalChainResponseDto,
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: ApprovalStatus,
@@ -375,7 +448,10 @@ export class ApprovalChainController {
     type: ApprovalChainResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Kode approval chain baru sudah ada' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.CREATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.CREATE,
+  })
   async clone(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() cloneApprovalChainDto: CloneApprovalChainDto,
@@ -407,7 +483,10 @@ export class ApprovalChainController {
     description: 'Test approval chain berhasil',
     type: ApprovalChainTestResultDto,
   })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.READ })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.READ,
+  })
   async test(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() testDto: TestApprovalChainDto,
@@ -454,17 +533,24 @@ export class ApprovalChainController {
       },
     },
   })
-  @ApiBadRequestResponse({ description: 'Request tidak valid atau tidak ada chain yang sesuai' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.CREATE })
+  @ApiBadRequestResponse({
+    description: 'Request tidak valid atau tidak ada chain yang sesuai',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.CREATE,
+  })
   async executeApproval(
     @Body() executionDto: ApprovalExecutionDto,
     @CurrentTenant() tenantId: string,
-  ): Promise<StandardResponse<{
-    executionId: string;
-    chainId: string;
-    status: string;
-    currentStepOrder: number;
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      executionId: string;
+      chainId: string;
+      status: string;
+      currentStepOrder: number;
+    }>
+  > {
     const execution = await this.approvalChainService.executeApproval(
       {
         id: executionDto.requestId,
@@ -514,17 +600,22 @@ export class ApprovalChainController {
     },
   })
   @ApiBadRequestResponse({ description: 'Respon tidak valid' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async respondToApproval(
     @Body() responseDto: ApprovalResponseDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
-  ): Promise<StandardResponse<{
-    executionId: string;
-    stepOrder: number;
-    status: string;
-    nextStepOrder?: number;
-  }>> {
+  ): Promise<
+    StandardResponse<{
+      executionId: string;
+      stepOrder: number;
+      status: string;
+      nextStepOrder?: number;
+    }>
+  > {
     try {
       const execution = await this.approvalChainService.processApprovalResponse(
         responseDto.executionId,
@@ -537,8 +628,8 @@ export class ApprovalChainController {
 
       return {
         success: true,
-        message: responseDto.approved 
-          ? 'Approval berhasil diberikan' 
+        message: responseDto.approved
+          ? 'Approval berhasil diberikan'
           : 'Rejection berhasil diberikan',
         data: {
           executionId: execution.id,
@@ -549,7 +640,7 @@ export class ApprovalChainController {
       };
     } catch (error) {
       throw new BadRequestException(
-        'Fitur ini memerlukan implementasi storage untuk execution data'
+        'Fitur ini memerlukan implementasi storage untuk execution data',
       );
     }
   }
@@ -560,7 +651,10 @@ export class ApprovalChainController {
     description: 'Mengubah status beberapa approval chain sekaligus',
   })
   @ApiOkResponse({ description: 'Status approval chain berhasil diubah' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.UPDATE })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.UPDATE,
+  })
   async bulkUpdateStatus(
     @Body() bulkUpdateDto: BulkUpdateApprovalChainStatusDto,
     @CurrentTenant() tenantId: string,
@@ -582,14 +676,22 @@ export class ApprovalChainController {
   @Delete(':id')
   @ApiOperation({
     summary: 'Hapus approval chain',
-    description: 'Menghapus approval chain (soft delete). Approval chain sistem tidak dapat dihapus.',
+    description:
+      'Menghapus approval chain (soft delete). Approval chain sistem tidak dapat dihapus.',
   })
   @ApiParam({ name: 'id', description: 'ID approval chain' })
   @ApiNoContentResponse({ description: 'Approval chain berhasil dihapus' })
   @ApiNotFoundResponse({ description: 'Approval chain tidak ditemukan' })
-  @ApiBadRequestResponse({ description: 'Approval chain masih digunakan atau adalah system-defined' })
-  @ApiForbiddenResponse({ description: 'Tidak memiliki izin untuk menghapus approval chain' })
-  @Permissions({ resource: PermissionResource.SETTINGS, action: PermissionAction.DELETE })
+  @ApiBadRequestResponse({
+    description: 'Approval chain masih digunakan atau adalah system-defined',
+  })
+  @ApiForbiddenResponse({
+    description: 'Tidak memiliki izin untuk menghapus approval chain',
+  })
+  @Permissions({
+    resource: PermissionResource.SETTINGS,
+    action: PermissionAction.DELETE,
+  })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,

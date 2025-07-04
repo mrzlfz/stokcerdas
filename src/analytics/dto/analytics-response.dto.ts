@@ -213,7 +213,11 @@ export class InventoryTurnoverItemDto {
   lastSaleDate?: string;
 
   @ApiProperty({ description: 'Recommended action' })
-  recommendation: 'increase_stock' | 'reduce_stock' | 'maintain' | 'discontinue';
+  recommendation:
+    | 'increase_stock'
+    | 'reduce_stock'
+    | 'maintain'
+    | 'discontinue';
 }
 
 export class InventoryTurnoverResponseDto {
@@ -331,7 +335,10 @@ export class ProductPerformanceResponseDto {
   @ApiProperty({ type: ComparisonDataDto, description: 'Period comparison' })
   comparison?: ComparisonDataDto;
 
-  @ApiProperty({ type: [KPIAlertDto], description: 'Product performance alerts' })
+  @ApiProperty({
+    type: [KPIAlertDto],
+    description: 'Product performance alerts',
+  })
   alerts?: KPIAlertDto[];
 }
 
@@ -445,7 +452,10 @@ export class DashboardMetricsResponseDto {
     lastUpdated: string;
   };
 
-  @ApiProperty({ type: [KPIAlertDto], description: 'Critical dashboard alerts' })
+  @ApiProperty({
+    type: [KPIAlertDto],
+    description: 'Critical dashboard alerts',
+  })
   alerts: KPIAlertDto[];
 
   @ApiProperty({ description: 'Real-time metrics' })
@@ -522,7 +532,12 @@ export class BenchmarkComparisonDto {
   relativePerformance: number;
 
   @ApiProperty({ description: 'Performance category' })
-  performanceCategory: 'excellent' | 'above_average' | 'average' | 'below_average' | 'poor';
+  performanceCategory:
+    | 'excellent'
+    | 'above_average'
+    | 'average'
+    | 'below_average'
+    | 'poor';
 
   @ApiProperty({ description: 'Percentile ranking' })
   percentileRank: number;

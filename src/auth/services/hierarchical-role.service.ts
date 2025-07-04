@@ -1,8 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TreeRepository, Repository } from 'typeorm';
-import { HierarchicalRole, RoleType, RoleLevel, RoleStatus } from '../entities/hierarchical-role.entity';
-import { RoleHierarchy, InheritanceType, HierarchyStatus } from '../entities/role-hierarchy.entity';
+import {
+  HierarchicalRole,
+  RoleType,
+  RoleLevel,
+  RoleStatus,
+} from '../entities/hierarchical-role.entity';
+import {
+  RoleHierarchy,
+  InheritanceType,
+  HierarchyStatus,
+} from '../entities/role-hierarchy.entity';
 import { Permission } from '../entities/permission.entity';
 
 @Injectable()
@@ -53,7 +67,9 @@ export class HierarchicalRoleService {
       role.depth = 0;
     }
 
-    const savedRole = await this.roleRepository.save(role) as unknown as HierarchicalRole;
+    const savedRole = (await this.roleRepository.save(
+      role,
+    )) as unknown as HierarchicalRole;
 
     // Update path after saving - simplified since updatePath method doesn't exist
     // savedRole.updatePath(savedRole.parent?.path);
@@ -81,7 +97,10 @@ export class HierarchicalRoleService {
   }
 
   // Find all roles for a tenant
-  async findAll(tenantId: string, includeInactive = false): Promise<HierarchicalRole[]> {
+  async findAll(
+    tenantId: string,
+    includeInactive = false,
+  ): Promise<HierarchicalRole[]> {
     const queryBuilder = this.roleRepository
       .createQueryBuilder('role')
       .leftJoinAndSelect('role.parent', 'parent')
@@ -90,11 +109,12 @@ export class HierarchicalRoleService {
       .andWhere('role.isDeleted = false');
 
     if (!includeInactive) {
-      queryBuilder.andWhere('role.status = :status', { status: RoleStatus.ACTIVE });
+      queryBuilder.andWhere('role.status = :status', {
+        status: RoleStatus.ACTIVE,
+      });
     }
 
-    queryBuilder.orderBy('role.depth', 'ASC')
-      .addOrderBy('role.name', 'ASC');
+    queryBuilder.orderBy('role.depth', 'ASC').addOrderBy('role.name', 'ASC');
 
     return queryBuilder.getMany();
   }
@@ -102,8 +122,8 @@ export class HierarchicalRoleService {
   // Get role tree structure
   async getRoleTree(tenantId: string): Promise<HierarchicalRole[]> {
     const roots = await this.roleRepository.findRoots();
-    const filteredRoots = roots.filter(root => 
-      root.tenantId === tenantId && !root.isDeleted
+    const filteredRoots = roots.filter(
+      root => root.tenantId === tenantId && !root.isDeleted,
     );
 
     const result = [];
@@ -116,13 +136,19 @@ export class HierarchicalRoleService {
   }
 
   // Get role with all ancestors
-  async getRoleWithAncestors(id: string, tenantId: string): Promise<HierarchicalRole> {
+  async getRoleWithAncestors(
+    id: string,
+    tenantId: string,
+  ): Promise<HierarchicalRole> {
     const role = await this.findById(id, tenantId);
     return this.roleRepository.findAncestorsTree(role);
   }
 
   // Get role with all descendants
-  async getRoleWithDescendants(id: string, tenantId: string): Promise<HierarchicalRole> {
+  async getRoleWithDescendants(
+    id: string,
+    tenantId: string,
+  ): Promise<HierarchicalRole> {
     const role = await this.findById(id, tenantId);
     return this.roleRepository.findDescendantsTree(role);
   }
@@ -135,7 +161,7 @@ export class HierarchicalRoleService {
     userId: string,
   ): Promise<HierarchicalRole> {
     const role = await this.findById(id, tenantId);
-    
+
     // Check if system role is being modified
     if (role.isSystemRole && !role.canBeDeleted) {
       throw new ForbiddenException('Role sistem tidak dapat dimodifikasi');
@@ -165,11 +191,13 @@ export class HierarchicalRoleService {
         role.depth = 0;
       } else {
         const newParent = await this.findById(parentId, tenantId);
-        
+
         // Prevent circular references
         const descendants = await this.roleRepository.findDescendants(role);
         if (descendants.some(desc => desc.id === parentId)) {
-          throw new BadRequestException('Tidak dapat memindahkan role ke anak rolenya sendiri');
+          throw new BadRequestException(
+            'Tidak dapat memindahkan role ke anak rolenya sendiri',
+          );
         }
 
         role.parent = newParent;
@@ -202,12 +230,14 @@ export class HierarchicalRoleService {
 
     // Check if role has active children
     const children = await this.roleRepository.findDescendants(role);
-    const activeChildren = children.filter(child => 
-      child.status === RoleStatus.ACTIVE && !child.isDeleted
+    const activeChildren = children.filter(
+      child => child.status === RoleStatus.ACTIVE && !child.isDeleted,
     );
 
     if (activeChildren.length > 0) {
-      throw new BadRequestException('Tidak dapat menghapus role yang memiliki sub-role aktif');
+      throw new BadRequestException(
+        'Tidak dapat menghapus role yang memiliki sub-role aktif',
+      );
     }
 
     // TODO: Check if role has active users
@@ -227,10 +257,10 @@ export class HierarchicalRoleService {
     userId: string,
   ): Promise<HierarchicalRole> {
     const role = await this.findById(id, tenantId);
-    
+
     role.status = status;
     role.updatedBy = userId;
-    
+
     return this.roleRepository.save(role);
   }
 
@@ -320,9 +350,15 @@ export class HierarchicalRoleService {
     }
 
     // Prevent circular references
-    const isCircular = await this.wouldCreateCircularReference(parentRoleId, childRoleId, tenantId);
+    const isCircular = await this.wouldCreateCircularReference(
+      parentRoleId,
+      childRoleId,
+      tenantId,
+    );
     if (isCircular) {
-      throw new BadRequestException('Tidak dapat membuat referensi sirkular dalam hierarki role');
+      throw new BadRequestException(
+        'Tidak dapat membuat referensi sirkular dalam hierarki role',
+      );
     }
 
     const hierarchy = this.hierarchyRepository.create({
@@ -359,7 +395,10 @@ export class HierarchicalRoleService {
   }
 
   // Get parent roles for a role
-  async getParentRoles(roleId: string, tenantId: string): Promise<HierarchicalRole[]> {
+  async getParentRoles(
+    roleId: string,
+    tenantId: string,
+  ): Promise<HierarchicalRole[]> {
     const hierarchies = await this.hierarchyRepository.find({
       where: {
         tenantId,
@@ -374,7 +413,10 @@ export class HierarchicalRoleService {
   }
 
   // Get child roles for a role
-  async getChildRoles(roleId: string, tenantId: string): Promise<HierarchicalRole[]> {
+  async getChildRoles(
+    roleId: string,
+    tenantId: string,
+  ): Promise<HierarchicalRole[]> {
     const hierarchies = await this.hierarchyRepository.find({
       where: {
         tenantId,
@@ -407,7 +449,11 @@ export class HierarchicalRoleService {
 
     // Get inherited permissions
     if (role.inheritsPermissions) {
-      const inheritedPermissions = await this.getInheritedPermissions(roleId, tenantId, context);
+      const inheritedPermissions = await this.getInheritedPermissions(
+        roleId,
+        tenantId,
+        context,
+      );
       inheritedPermissions.forEach(p => permissions.add(p));
     }
 
@@ -415,7 +461,10 @@ export class HierarchicalRoleService {
   }
 
   // Get direct permissions for a role
-  async getRolePermissions(roleId: string, tenantId: string): Promise<string[]> {
+  async getRolePermissions(
+    roleId: string,
+    tenantId: string,
+  ): Promise<string[]> {
     // TODO: Implement role-permission relationship
     // This would query the role_permissions table or similar
     return [];
@@ -449,13 +498,17 @@ export class HierarchicalRoleService {
       }
 
       // Get parent role permissions
-      const parentPermissions = await this.getEffectivePermissions(parentRole.id, tenantId, context);
+      const parentPermissions = await this.getEffectivePermissions(
+        parentRole.id,
+        tenantId,
+        context,
+      );
 
       for (const permission of parentPermissions) {
         // Check if permission should be inherited
         if (hierarchy.shouldInheritPermission(permission)) {
           const override = hierarchy.getPermissionOverride(permission);
-          
+
           if (override === 'grant') {
             permissions.add(permission);
           } else if (override === 'deny') {
@@ -486,7 +539,10 @@ export class HierarchicalRoleService {
     if (!grantingRole.canGrantTo(receivingRole)) return false;
 
     // Check if granting role has the permission
-    const grantingPermissions = await this.getEffectivePermissions(grantingRoleId, tenantId);
+    const grantingPermissions = await this.getEffectivePermissions(
+      grantingRoleId,
+      tenantId,
+    );
     if (!grantingPermissions.includes(permissionKey)) return false;
 
     return true;
@@ -539,7 +595,7 @@ export class HierarchicalRoleService {
   // Get role statistics
   async getRoleStats(tenantId: string): Promise<any> {
     const roles = await this.findAll(tenantId, true);
-    
+
     const stats = {
       total: roles.length,
       active: roles.filter(r => r.status === RoleStatus.ACTIVE).length,
@@ -547,8 +603,10 @@ export class HierarchicalRoleService {
       deprecated: roles.filter(r => r.status === RoleStatus.DEPRECATED).length,
       byType: {
         system: roles.filter(r => r.type === RoleType.SYSTEM).length,
-        organizational: roles.filter(r => r.type === RoleType.ORGANIZATIONAL).length,
-        departmental: roles.filter(r => r.type === RoleType.DEPARTMENTAL).length,
+        organizational: roles.filter(r => r.type === RoleType.ORGANIZATIONAL)
+          .length,
+        departmental: roles.filter(r => r.type === RoleType.DEPARTMENTAL)
+          .length,
         functional: roles.filter(r => r.type === RoleType.FUNCTIONAL).length,
         custom: roles.filter(r => r.type === RoleType.CUSTOM).length,
       },
@@ -572,17 +630,17 @@ export class HierarchicalRoleService {
   // Private helper methods
   private async updateDescendantPaths(role: HierarchicalRole): Promise<void> {
     const descendants = await this.roleRepository.findDescendants(role);
-    
+
     for (const descendant of descendants) {
       if (descendant.id !== role.id) {
         const ancestors = await this.roleRepository.findAncestors(descendant);
         const sortedAncestors = ancestors
           .filter(a => a.id !== descendant.id)
           .sort((a, b) => a.depth - b.depth);
-        
+
         const pathComponents = sortedAncestors.map(a => a.code);
         pathComponents.push(descendant.code);
-        
+
         descendant.path = pathComponents.join('/');
         await this.roleRepository.save(descendant);
       }
@@ -596,12 +654,17 @@ export class HierarchicalRoleService {
   ): Promise<boolean> {
     // Check if child role is already an ancestor of parent role
     const childRole = await this.findById(childRoleId, tenantId);
-    const childDescendants = await this.roleRepository.findDescendants(childRole);
-    
+    const childDescendants = await this.roleRepository.findDescendants(
+      childRole,
+    );
+
     return childDescendants.some(desc => desc.id === parentRoleId);
   }
 
-  private checkContextRestrictions(hierarchy: RoleHierarchy, context: any): boolean {
+  private checkContextRestrictions(
+    hierarchy: RoleHierarchy,
+    context: any,
+  ): boolean {
     const restrictions = hierarchy.conditions;
     if (!restrictions) return true;
 
@@ -632,7 +695,7 @@ export class HierarchicalRoleService {
     await this.roleRepository
       .createQueryBuilder()
       .update(HierarchicalRole)
-      .set({ 
+      .set({
         status,
         updatedBy: userId,
         updatedAt: new Date(),

@@ -5,8 +5,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LazadaApiService, LazadaConfig } from './lazada-api.service';
 import { LazadaAuthService } from './lazada-auth.service';
 import { IntegrationLogService } from '../../common/services/integration-log.service';
-import { IntegrationLogType, IntegrationLogLevel } from '../../entities/integration-log.entity';
-import { Order, OrderType, OrderStatus } from '../../../orders/entities/order.entity';
+import {
+  IntegrationLogType,
+  IntegrationLogLevel,
+} from '../../entities/integration-log.entity';
+import {
+  Order,
+  OrderType,
+  OrderStatus,
+} from '../../../orders/entities/order.entity';
 import { OrderItem } from '../../../orders/entities/order.entity';
 
 export interface LazadaOrder {
@@ -115,16 +122,16 @@ export class LazadaOrderService {
   // Lazada order status mapping
   private readonly statusMapping = {
     // Lazada -> Local
-    'pending': 'pending',
-    'unpaid': 'awaiting_payment',
-    'paid': 'confirmed',
-    'ready_to_ship': 'processing',
-    'shipped': 'shipped',
-    'delivered': 'delivered',
-    'canceled': 'cancelled',
-    'returned': 'returned',
-    'failed_delivery': 'failed',
-    'pending_cancel': 'pending_cancellation',
+    pending: 'pending',
+    unpaid: 'awaiting_payment',
+    paid: 'confirmed',
+    ready_to_ship: 'processing',
+    shipped: 'shipped',
+    delivered: 'delivered',
+    canceled: 'cancelled',
+    returned: 'returned',
+    failed_delivery: 'failed',
+    pending_cancel: 'pending_cancellation',
   };
 
   constructor(
@@ -144,7 +151,12 @@ export class LazadaOrderService {
     tenantId: string,
     channelId: string,
     options: OrderSyncOptions = {},
-  ): Promise<{ success: boolean; syncedCount: number; errorCount: number; errors: string[] }> {
+  ): Promise<{
+    success: boolean;
+    syncedCount: number;
+    errorCount: number;
+    errors: string[];
+  }> {
     const errors: string[] = [];
     let syncedCount = 0;
     let errorCount = 0;
@@ -157,7 +169,10 @@ export class LazadaOrderService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -195,18 +210,16 @@ export class LazadaOrderService {
       }
 
       // Get orders from Lazada
-      const result = await this.lazadaApi.makeLazadaRequest<{ orders: LazadaOrder[]; count_total: number }>(
-        tenantId,
-        channelId,
-        lazadaConfig,
-        {
-          method: 'GET',
-          path: '/orders/get',
-          params,
-          requiresAuth: true,
-          rateLimitKey: 'orders_get',
-        },
-      );
+      const result = await this.lazadaApi.makeLazadaRequest<{
+        orders: LazadaOrder[];
+        count_total: number;
+      }>(tenantId, channelId, lazadaConfig, {
+        method: 'GET',
+        path: '/orders/get',
+        params,
+        requiresAuth: true,
+        rateLimitKey: 'orders_get',
+      });
 
       if (!result.success || !result.data) {
         throw new Error(result.error || 'Failed to fetch orders from Lazada');
@@ -223,10 +236,17 @@ export class LazadaOrderService {
       // Sync each order
       for (const lazadaOrder of lazadaOrders) {
         try {
-          await this.syncSingleOrderFromLazada(tenantId, channelId, lazadaOrder);
+          await this.syncSingleOrderFromLazada(
+            tenantId,
+            channelId,
+            lazadaOrder,
+          );
           syncedCount++;
         } catch (error) {
-          this.logger.error(`Failed to sync order ${lazadaOrder.order_number}: ${error.message}`, error.stack);
+          this.logger.error(
+            `Failed to sync order ${lazadaOrder.order_number}: ${error.message}`,
+            error.stack,
+          );
           errors.push(`Order ${lazadaOrder.order_number}: ${error.message}`);
           errorCount++;
         }
@@ -253,7 +273,6 @@ export class LazadaOrderService {
         errorCount,
         errors,
       };
-
     } catch (error) {
       this.logger.error(`Order sync failed: ${error.message}`, error.stack);
 
@@ -286,7 +305,10 @@ export class LazadaOrderService {
   ): Promise<{ success: boolean; data?: LazadaOrder; error?: string }> {
     try {
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -320,9 +342,11 @@ export class LazadaOrderService {
         success: true,
         data: result.data,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get order details: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get order details: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -352,7 +376,10 @@ export class LazadaOrderService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -411,9 +438,11 @@ export class LazadaOrderService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to ship Lazada order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to ship Lazada order: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -439,7 +468,10 @@ export class LazadaOrderService {
       });
 
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -486,9 +518,11 @@ export class LazadaOrderService {
       });
 
       return { success: true };
-
     } catch (error) {
-      this.logger.error(`Failed to cancel Lazada order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to cancel Lazada order: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -506,7 +540,10 @@ export class LazadaOrderService {
   ): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
       // Get valid credentials
-      const credentials = await this.authService.getValidCredentials(tenantId, channelId);
+      const credentials = await this.authService.getValidCredentials(
+        tenantId,
+        channelId,
+      );
 
       const lazadaConfig: LazadaConfig = {
         appKey: credentials.appKey,
@@ -542,9 +579,11 @@ export class LazadaOrderService {
         success: true,
         data: result.data,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to get tracking info: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to get tracking info: ${error.message}`,
+        error.stack,
+      );
       return {
         success: false,
         error: error.message,
@@ -560,24 +599,43 @@ export class LazadaOrderService {
     lazadaOrder: LazadaOrder,
   ): Promise<void> {
     // Find or create local order
-    let localOrder = await this.findLocalOrderByExternalId(tenantId, lazadaOrder.order_number);
+    let localOrder = await this.findLocalOrderByExternalId(
+      tenantId,
+      lazadaOrder.order_number,
+    );
 
     if (!localOrder) {
       // Create new local order
-      localOrder = await this.createLocalOrderFromLazada(tenantId, channelId, lazadaOrder);
+      localOrder = await this.createLocalOrderFromLazada(
+        tenantId,
+        channelId,
+        lazadaOrder,
+      );
     } else {
       // Update existing local order
       await this.updateLocalOrderFromLazada(localOrder, lazadaOrder);
     }
 
     // Sync order items
-    await this.syncOrderItemsFromLazada(tenantId, localOrder, lazadaOrder.order_items);
+    await this.syncOrderItemsFromLazada(
+      tenantId,
+      localOrder,
+      lazadaOrder.order_items,
+    );
 
     // Store mapping if not exists
-    await this.ensureOrderMapping(tenantId, channelId, localOrder.id, lazadaOrder.order_number);
+    await this.ensureOrderMapping(
+      tenantId,
+      channelId,
+      localOrder.id,
+      lazadaOrder.order_number,
+    );
   }
 
-  private async findLocalOrderByExternalId(tenantId: string, externalId: string): Promise<Order | null> {
+  private async findLocalOrderByExternalId(
+    tenantId: string,
+    externalId: string,
+  ): Promise<Order | null> {
     // This would query through channel mappings
     // For now, return null to always create new orders
     return null;
@@ -624,7 +682,7 @@ export class LazadaOrderService {
     localOrder.status = this.mapOrderStatus(lazadaOrder.status);
     localOrder.totalAmount = parseFloat(lazadaOrder.price) || 0;
     localOrder.notes = lazadaOrder.remarks;
-    
+
     await this.orderRepository.save(localOrder);
   }
 
@@ -667,7 +725,7 @@ export class LazadaOrderService {
         // localItem.status = this.mapOrderItemStatus(lazadaItem.status);
         // localItem.trackingNumber = lazadaItem.tracking_code;
         // localItem.shippingProvider = lazadaItem.shipment_provider;
-        
+
         await this.orderItemRepository.save(localItem);
       }
     }
@@ -675,14 +733,14 @@ export class LazadaOrderService {
 
   private mapOrderStatus(lazadaStatus: string): OrderStatus {
     const mapping: Record<string, OrderStatus> = {
-      'pending': OrderStatus.PENDING,
-      'confirmed': OrderStatus.CONFIRMED,
-      'processing': OrderStatus.PROCESSING,
-      'shipped': OrderStatus.SHIPPED,
-      'delivered': OrderStatus.DELIVERED,
-      'cancelled': OrderStatus.CANCELLED,
-      'refunded': OrderStatus.REFUNDED,
-      'returned': OrderStatus.RETURNED,
+      pending: OrderStatus.PENDING,
+      confirmed: OrderStatus.CONFIRMED,
+      processing: OrderStatus.PROCESSING,
+      shipped: OrderStatus.SHIPPED,
+      delivered: OrderStatus.DELIVERED,
+      cancelled: OrderStatus.CANCELLED,
+      refunded: OrderStatus.REFUNDED,
+      returned: OrderStatus.RETURNED,
     };
     return mapping[lazadaStatus] || OrderStatus.PENDING;
   }
@@ -704,14 +762,14 @@ export class LazadaOrderService {
       };
     }
 
-    const fullAddress = [
-      address.address1,
-      address.address2,
-      address.address3,
-    ].filter(Boolean).join(' ');
+    const fullAddress = [address.address1, address.address2, address.address3]
+      .filter(Boolean)
+      .join(' ');
 
     return {
-      name: `${address.first_name || ''} ${address.last_name || ''}`.trim() || 'Customer',
+      name:
+        `${address.first_name || ''} ${address.last_name || ''}`.trim() ||
+        'Customer',
       address: fullAddress || '',
       city: address.city || '',
       state: address.region || '',

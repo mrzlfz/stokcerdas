@@ -20,7 +20,10 @@ import { AutomationSchedule } from '../entities/automation-schedule.entity';
 import { ReorderExecution } from '../entities/reorder-rule.entity';
 
 // Types
-import { AlertType, AlertSeverity } from '../../alerts/entities/alert-configuration.entity';
+import {
+  AlertType,
+  AlertSeverity,
+} from '../../alerts/entities/alert-configuration.entity';
 
 // Job Data Interfaces
 export interface ProcessReorderRulesJobData {
@@ -111,7 +114,11 @@ export interface SendNotificationJobData {
 
 export interface MaintenanceJobData {
   tenantId?: string;
-  taskType: 'cleanup_executions' | 'archive_logs' | 'update_metrics' | 'health_check';
+  taskType:
+    | 'cleanup_executions'
+    | 'archive_logs'
+    | 'update_metrics'
+    | 'health_check';
   parameters?: Record<string, any>;
 }
 
@@ -141,17 +148,23 @@ export class AutomationProcessor {
   // =============================================
 
   @Process('processReorderRules')
-  async processReorderRulesJob(job: Job<ProcessReorderRulesJobData>): Promise<any> {
+  async processReorderRulesJob(
+    job: Job<ProcessReorderRulesJobData>,
+  ): Promise<any> {
     const { data } = job;
     const startTime = Date.now();
-    
+
     try {
-      this.logger.log(`Processing reorder rules job for tenant ${data.tenantId}`);
-      
+      this.logger.log(
+        `Processing reorder rules job for tenant ${data.tenantId}`,
+      );
+
       // Prevent concurrent processing for same tenant
       const lockKey = `process_rules_${data.tenantId}`;
       if (this.processingState.get(lockKey)) {
-        this.logger.warn(`Reorder rules processing already running for tenant ${data.tenantId}`);
+        this.logger.warn(
+          `Reorder rules processing already running for tenant ${data.tenantId}`,
+        );
         return { skipped: true, reason: 'Already processing' };
       }
 
@@ -201,8 +214,8 @@ export class AutomationProcessor {
         const executionTime = Date.now() - startTime;
         this.logger.log(
           `Reorder rules processing completed for tenant ${data.tenantId}. ` +
-          `Processed: ${metrics.totalRulesProcessed}, Triggered: ${metrics.triggeredRules}, ` +
-          `Time: ${executionTime}ms`
+            `Processed: ${metrics.totalRulesProcessed}, Triggered: ${metrics.triggeredRules}, ` +
+            `Time: ${executionTime}ms`,
         );
 
         // Emit completion event
@@ -220,14 +233,15 @@ export class AutomationProcessor {
           executionTime,
           triggeredBy: data.triggeredBy,
         };
-
       } finally {
         this.processingState.delete(lockKey);
       }
-
     } catch (error) {
-      this.logger.error(`Reorder rules processing failed for tenant ${data.tenantId}: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Reorder rules processing failed for tenant ${data.tenantId}: ${error.message}`,
+        error.stack,
+      );
+
       // Emit error event
       this.eventEmitter.emit('automation.processing.failed', {
         tenantId: data.tenantId,
@@ -236,30 +250,39 @@ export class AutomationProcessor {
       });
 
       // Send error notification
-      await this.sendErrorNotification(data.tenantId, 'Reorder Rules Processing Failed', error.message);
+      await this.sendErrorNotification(
+        data.tenantId,
+        'Reorder Rules Processing Failed',
+        error.message,
+      );
 
       throw error;
     }
   }
 
   @Process('executeAutomatedPurchase')
-  async executeAutomatedPurchaseJob(job: Job<ExecuteAutomatedPurchaseJobData>): Promise<any> {
+  async executeAutomatedPurchaseJob(
+    job: Job<ExecuteAutomatedPurchaseJobData>,
+  ): Promise<any> {
     const { data } = job;
-    
+
     try {
-      this.logger.log(`Executing automated purchase for tenant ${data.tenantId}, rule ${data.reorderRuleId}`);
-      
+      this.logger.log(
+        `Executing automated purchase for tenant ${data.tenantId}, rule ${data.reorderRuleId}`,
+      );
+
       await job.progress(20);
 
-      const result = await this.automatedPurchasingService.executeAutomatedPurchase({
-        tenantId: data.tenantId,
-        reorderRuleId: data.reorderRuleId,
-        productId: data.productId,
-        locationId: data.locationId,
-        forceExecution: data.forceExecution,
-        dryRun: data.dryRun,
-        overrides: data.overrides,
-      });
+      const result =
+        await this.automatedPurchasingService.executeAutomatedPurchase({
+          tenantId: data.tenantId,
+          reorderRuleId: data.reorderRuleId,
+          productId: data.productId,
+          locationId: data.locationId,
+          forceExecution: data.forceExecution,
+          dryRun: data.dryRun,
+          overrides: data.overrides,
+        });
 
       await job.progress(80);
 
@@ -271,19 +294,25 @@ export class AutomationProcessor {
       await job.progress(100);
 
       this.logger.log(
-        `Automated purchase ${result.success ? 'completed' : 'failed'} for tenant ${data.tenantId}. ` +
-        `PO Created: ${result.shouldCreatePurchaseOrder}, Value: IDR ${result.estimatedValue.toLocaleString()}`
+        `Automated purchase ${
+          result.success ? 'completed' : 'failed'
+        } for tenant ${data.tenantId}. ` +
+          `PO Created: ${
+            result.shouldCreatePurchaseOrder
+          }, Value: IDR ${result.estimatedValue.toLocaleString()}`,
       );
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Automated purchase execution failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Automated purchase execution failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.sendErrorNotification(
         data.tenantId,
         'Automated Purchase Failed',
-        `Failed to execute automated purchase for rule ${data.reorderRuleId}: ${error.message}`
+        `Failed to execute automated purchase for rule ${data.reorderRuleId}: ${error.message}`,
       );
 
       throw error;
@@ -291,22 +320,27 @@ export class AutomationProcessor {
   }
 
   @Process('bulkAutomatedPurchase')
-  async bulkAutomatedPurchaseJob(job: Job<BulkAutomatedPurchaseJobData>): Promise<any> {
+  async bulkAutomatedPurchaseJob(
+    job: Job<BulkAutomatedPurchaseJobData>,
+  ): Promise<any> {
     const { data } = job;
-    
+
     try {
-      this.logger.log(`Executing bulk automated purchase for tenant ${data.tenantId}`);
-      
+      this.logger.log(
+        `Executing bulk automated purchase for tenant ${data.tenantId}`,
+      );
+
       await job.progress(10);
 
-      const result = await this.automatedPurchasingService.executeBulkAutomatedPurchase({
-        tenantId: data.tenantId,
-        reorderRuleIds: data.reorderRuleIds,
-        productIds: data.productIds,
-        locationIds: data.locationIds,
-        filters: data.filters,
-        options: data.options,
-      });
+      const result =
+        await this.automatedPurchasingService.executeBulkAutomatedPurchase({
+          tenantId: data.tenantId,
+          reorderRuleIds: data.reorderRuleIds,
+          productIds: data.productIds,
+          locationIds: data.locationIds,
+          filters: data.filters,
+          options: data.options,
+        });
 
       await job.progress(80);
 
@@ -317,19 +351,23 @@ export class AutomationProcessor {
 
       this.logger.log(
         `Bulk automated purchase completed for tenant ${data.tenantId}. ` +
-        `Processed: ${result.totalProcessed}, Successful: ${result.successfulOrders}, ` +
-        `Failed: ${result.failedOrders}, Total Value: IDR ${result.summary.totalValue.toLocaleString()}`
+          `Processed: ${result.totalProcessed}, Successful: ${result.successfulOrders}, ` +
+          `Failed: ${
+            result.failedOrders
+          }, Total Value: IDR ${result.summary.totalValue.toLocaleString()}`,
       );
 
       return result;
-
     } catch (error) {
-      this.logger.error(`Bulk automated purchase failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Bulk automated purchase failed: ${error.message}`,
+        error.stack,
+      );
+
       await this.sendErrorNotification(
         data.tenantId,
         'Bulk Automated Purchase Failed',
-        `Bulk purchase execution failed: ${error.message}`
+        `Bulk purchase execution failed: ${error.message}`,
       );
 
       throw error;
@@ -337,12 +375,16 @@ export class AutomationProcessor {
   }
 
   @Process('scheduledAutomation')
-  async scheduledAutomationJob(job: Job<ScheduledAutomationJobData>): Promise<any> {
+  async scheduledAutomationJob(
+    job: Job<ScheduledAutomationJobData>,
+  ): Promise<any> {
     const { data } = job;
-    
+
     try {
-      this.logger.log(`Executing scheduled automation: ${data.scheduleName} (${data.scheduleType})`);
-      
+      this.logger.log(
+        `Executing scheduled automation: ${data.scheduleName} (${data.scheduleType})`,
+      );
+
       await job.progress(20);
 
       // Get and update schedule
@@ -356,7 +398,9 @@ export class AutomationProcessor {
 
       // Check if schedule is still active and eligible
       if (!schedule.canExecute) {
-        this.logger.warn(`Schedule ${data.scheduleId} is not eligible for execution`);
+        this.logger.warn(
+          `Schedule ${data.scheduleId} is not eligible for execution`,
+        );
         return { skipped: true, reason: 'Schedule not eligible' };
       }
 
@@ -366,19 +410,34 @@ export class AutomationProcessor {
       let result: any;
       switch (data.scheduleType) {
         case 'REORDER_CHECK':
-          result = await this.executeReorderCheckSchedule(schedule, data.jobParameters);
+          result = await this.executeReorderCheckSchedule(
+            schedule,
+            data.jobParameters,
+          );
           break;
         case 'INVENTORY_REVIEW':
-          result = await this.executeInventoryReviewSchedule(schedule, data.jobParameters);
+          result = await this.executeInventoryReviewSchedule(
+            schedule,
+            data.jobParameters,
+          );
           break;
         case 'DEMAND_FORECAST':
-          result = await this.executeDemandForecastSchedule(schedule, data.jobParameters);
+          result = await this.executeDemandForecastSchedule(
+            schedule,
+            data.jobParameters,
+          );
           break;
         case 'SUPPLIER_EVALUATION':
-          result = await this.executeSupplierEvaluationSchedule(schedule, data.jobParameters);
+          result = await this.executeSupplierEvaluationSchedule(
+            schedule,
+            data.jobParameters,
+          );
           break;
         case 'SYSTEM_MAINTENANCE':
-          result = await this.executeSystemMaintenanceSchedule(schedule, data.jobParameters);
+          result = await this.executeSystemMaintenanceSchedule(
+            schedule,
+            data.jobParameters,
+          );
           break;
         default:
           throw new Error(`Unknown schedule type: ${data.scheduleType}`);
@@ -397,7 +456,9 @@ export class AutomationProcessor {
 
       await job.progress(100);
 
-      this.logger.log(`Scheduled automation ${data.scheduleName} completed successfully`);
+      this.logger.log(
+        `Scheduled automation ${data.scheduleName} completed successfully`,
+      );
 
       return {
         success: true,
@@ -406,18 +467,24 @@ export class AutomationProcessor {
         result,
         executionTime: Date.now() - job.timestamp,
       };
-
     } catch (error) {
-      this.logger.error(`Scheduled automation ${data.scheduleName} failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Scheduled automation ${data.scheduleName} failed: ${error.message}`,
+        error.stack,
+      );
+
       // Update schedule with error
       try {
         const schedule = await this.automationScheduleRepository.findOne({
           where: { id: data.scheduleId, tenantId: data.tenantId },
         });
-        
+
         if (schedule) {
-          schedule.recordExecution(false, Date.now() - job.timestamp, error.message);
+          schedule.recordExecution(
+            false,
+            Date.now() - job.timestamp,
+            error.message,
+          );
           await this.automationScheduleRepository.save(schedule);
 
           // Send error notification if configured
@@ -426,7 +493,9 @@ export class AutomationProcessor {
           }
         }
       } catch (updateError) {
-        this.logger.error(`Failed to update schedule error status: ${updateError.message}`);
+        this.logger.error(
+          `Failed to update schedule error status: ${updateError.message}`,
+        );
       }
 
       throw error;
@@ -440,10 +509,12 @@ export class AutomationProcessor {
   @Process('sendNotification')
   async sendNotificationJob(job: Job<SendNotificationJobData>): Promise<any> {
     const { data } = job;
-    
+
     try {
-      this.logger.log(`Sending ${data.type} notification to ${data.recipients.length} recipients`);
-      
+      this.logger.log(
+        `Sending ${data.type} notification to ${data.recipients.length} recipients`,
+      );
+
       await job.progress(20);
 
       switch (data.type) {
@@ -462,7 +533,9 @@ export class AutomationProcessor {
 
       await job.progress(100);
 
-      this.logger.log(`${data.type} notification sent successfully to ${data.recipients.length} recipients`);
+      this.logger.log(
+        `${data.type} notification sent successfully to ${data.recipients.length} recipients`,
+      );
 
       return {
         success: true,
@@ -470,9 +543,11 @@ export class AutomationProcessor {
         recipients: data.recipients.length,
         sentAt: new Date(),
       };
-
     } catch (error) {
-      this.logger.error(`Notification sending failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Notification sending failed: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -484,16 +559,19 @@ export class AutomationProcessor {
   @Process('maintenance')
   async maintenanceJob(job: Job<MaintenanceJobData>): Promise<any> {
     const { data } = job;
-    
+
     try {
       this.logger.log(`Executing maintenance task: ${data.taskType}`);
-      
+
       await job.progress(20);
 
       let result: any;
       switch (data.taskType) {
         case 'cleanup_executions':
-          result = await this.cleanupOldExecutions(data.tenantId, data.parameters);
+          result = await this.cleanupOldExecutions(
+            data.tenantId,
+            data.parameters,
+          );
           break;
         case 'archive_logs':
           result = await this.archiveOldLogs(data.tenantId, data.parameters);
@@ -502,7 +580,10 @@ export class AutomationProcessor {
           result = await this.updateMetrics(data.tenantId, data.parameters);
           break;
         case 'health_check':
-          result = await this.performHealthCheck(data.tenantId, data.parameters);
+          result = await this.performHealthCheck(
+            data.tenantId,
+            data.parameters,
+          );
           break;
         default:
           throw new Error(`Unknown maintenance task: ${data.taskType}`);
@@ -510,7 +591,11 @@ export class AutomationProcessor {
 
       await job.progress(100);
 
-      this.logger.log(`Maintenance task ${data.taskType} completed: ${JSON.stringify(result)}`);
+      this.logger.log(
+        `Maintenance task ${data.taskType} completed: ${JSON.stringify(
+          result,
+        )}`,
+      );
 
       return {
         success: true,
@@ -518,9 +603,11 @@ export class AutomationProcessor {
         result,
         executedAt: new Date(),
       };
-
     } catch (error) {
-      this.logger.error(`Maintenance task ${data.taskType} failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Maintenance task ${data.taskType} failed: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -551,7 +638,10 @@ export class AutomationProcessor {
       },
     };
 
-    return this.automationRuleEngine.processAutomationRules(schedule.tenantId, context);
+    return this.automationRuleEngine.processAutomationRules(
+      schedule.tenantId,
+      context,
+    );
   }
 
   private async executeInventoryReviewSchedule(
@@ -560,7 +650,7 @@ export class AutomationProcessor {
   ): Promise<any> {
     // Implement inventory review logic
     this.logger.log('Executing inventory review schedule');
-    
+
     // Get all active reorder rules for the tenant
     const rules = await this.reorderRuleRepository.find({
       where: { tenantId: schedule.tenantId, isActive: true },
@@ -571,11 +661,12 @@ export class AutomationProcessor {
     for (const rule of rules) {
       try {
         // Analyze current rule performance
-        const metrics = await this.reorderCalculationService.getReorderRuleMetrics(
-          schedule.tenantId,
-          rule.id,
-        );
-        
+        const metrics =
+          await this.reorderCalculationService.getReorderRuleMetrics(
+            schedule.tenantId,
+            rule.id,
+          );
+
         reviewResults.push({
           ruleId: rule.id,
           productName: rule.product?.name,
@@ -591,7 +682,9 @@ export class AutomationProcessor {
     return {
       totalRulesReviewed: reviewResults.length,
       rulesNeedingAttention: reviewResults.filter(r => r.needsAttention).length,
-      averagePerformanceScore: reviewResults.reduce((sum, r) => sum + r.performanceScore, 0) / reviewResults.length,
+      averagePerformanceScore:
+        reviewResults.reduce((sum, r) => sum + r.performanceScore, 0) /
+        reviewResults.length,
       details: reviewResults,
     };
   }
@@ -602,7 +695,7 @@ export class AutomationProcessor {
   ): Promise<any> {
     // Implement demand forecast update logic
     this.logger.log('Executing demand forecast schedule');
-    
+
     // This would integrate with ML forecasting service
     // For now, return placeholder results
     return {
@@ -619,7 +712,7 @@ export class AutomationProcessor {
   ): Promise<any> {
     // Implement supplier evaluation logic
     this.logger.log('Executing supplier evaluation schedule');
-    
+
     // This would evaluate supplier performance
     return {
       suppliersEvaluated: 0,
@@ -635,7 +728,7 @@ export class AutomationProcessor {
   ): Promise<any> {
     // Implement system maintenance logic
     this.logger.log('Executing system maintenance schedule');
-    
+
     const results = {
       executionsCleanedUp: 0,
       logsArchived: 0,
@@ -646,7 +739,7 @@ export class AutomationProcessor {
     // Cleanup old executions
     results.executionsCleanedUp = await this.cleanupOldExecutions(
       schedule.tenantId,
-      { retentionDays: parameters?.retentionDays || 90 }
+      { retentionDays: parameters?.retentionDays || 90 },
     );
 
     // Update metrics
@@ -668,7 +761,8 @@ export class AutomationProcessor {
     jobData: ProcessReorderRulesJobData,
     metrics: any,
   ): Promise<void> {
-    const message = `Automation rules processing completed for tenant ${jobData.tenantId}.
+    const message =
+      `Automation rules processing completed for tenant ${jobData.tenantId}.
 
 ` +
       `📊 Summary:
@@ -702,8 +796,10 @@ export class AutomationProcessor {
   private async sendPurchaseOrderNotification(result: any): Promise<void> {
     if (!result.success || !result.purchaseOrderId) return;
 
-    const severity = result.urgencyLevel >= 8 ? AlertSeverity.CRITICAL : AlertSeverity.WARNING;
-    const message = `Automated purchase order created successfully.
+    const severity =
+      result.urgencyLevel >= 8 ? AlertSeverity.CRITICAL : AlertSeverity.WARNING;
+    const message =
+      `Automated purchase order created successfully.
 
 ` +
       `📦 Order Details:
@@ -714,7 +810,9 @@ export class AutomationProcessor {
 ` +
       `• Estimated Value: IDR ${result.estimatedValue.toLocaleString()}
 ` +
-      `• Supplier: ${result.supplierSelection.selectedSupplier?.supplier?.name || 'Unknown'}
+      `• Supplier: ${
+        result.supplierSelection.selectedSupplier?.supplier?.name || 'Unknown'
+      }
 ` +
       `• Urgency Level: ${result.urgencyLevel}/10
 ` +
@@ -738,8 +836,12 @@ export class AutomationProcessor {
     );
   }
 
-  private async sendBulkPurchaseNotification(result: any, batchId?: string): Promise<void> {
-    const message = `Bulk automated purchase processing completed.
+  private async sendBulkPurchaseNotification(
+    result: any,
+    batchId?: string,
+  ): Promise<void> {
+    const message =
+      `Bulk automated purchase processing completed.
 
 ` +
       `📊 Batch Summary:
@@ -776,8 +878,12 @@ export class AutomationProcessor {
     );
   }
 
-  private async sendScheduleCompletionNotification(schedule: AutomationSchedule, result: any): Promise<void> {
-    const message = `Scheduled automation task completed successfully.
+  private async sendScheduleCompletionNotification(
+    schedule: AutomationSchedule,
+    result: any,
+  ): Promise<void> {
+    const message =
+      `Scheduled automation task completed successfully.
 
 ` +
       `📅 Schedule Details:
@@ -788,7 +894,9 @@ export class AutomationProcessor {
 ` +
       `• Execution Time: ${(schedule.lastExecutionTimeMs || 0) / 1000}s
 ` +
-      `• Next Execution: ${schedule.nextExecution?.toISOString() || 'Not scheduled'}
+      `• Next Execution: ${
+        schedule.nextExecution?.toISOString() || 'Not scheduled'
+      }
 
 ` +
       `✅ Results: ${JSON.stringify(result, null, 2)}`;
@@ -802,8 +910,12 @@ export class AutomationProcessor {
     }
   }
 
-  private async sendScheduleErrorNotification(schedule: AutomationSchedule, error: string): Promise<void> {
-    const message = `Scheduled automation task failed.
+  private async sendScheduleErrorNotification(
+    schedule: AutomationSchedule,
+    error: string,
+  ): Promise<void> {
+    const message =
+      `Scheduled automation task failed.
 
 ` +
       `📅 Schedule Details:
@@ -845,7 +957,11 @@ export class AutomationProcessor {
     );
   }
 
-  private async sendErrorNotification(tenantId: string, subject: string, error: string): Promise<void> {
+  private async sendErrorNotification(
+    tenantId: string,
+    subject: string,
+    error: string,
+  ): Promise<void> {
     await this.alertManagementService.createAlert(
       tenantId,
       AlertType.SYSTEM_MAINTENANCE,
@@ -856,18 +972,29 @@ export class AutomationProcessor {
     );
   }
 
-  private async sendEmailNotification(data: SendNotificationJobData): Promise<void> {
+  private async sendEmailNotification(
+    data: SendNotificationJobData,
+  ): Promise<void> {
     await this.emailService.sendEmail({
-      to: Array.isArray(data.recipients) ? data.recipients.join(',') : data.recipients,
+      to: Array.isArray(data.recipients)
+        ? data.recipients.join(',')
+        : data.recipients,
       subject: data.subject,
       text: data.message,
     });
   }
 
-  private async sendAlertNotification(data: SendNotificationJobData): Promise<void> {
-    const severity = data.priority === 'critical' ? AlertSeverity.CRITICAL :
-                    data.priority === 'high' ? AlertSeverity.WARNING :
-                    data.priority === 'low' ? AlertSeverity.INFO : AlertSeverity.WARNING;
+  private async sendAlertNotification(
+    data: SendNotificationJobData,
+  ): Promise<void> {
+    const severity =
+      data.priority === 'critical'
+        ? AlertSeverity.CRITICAL
+        : data.priority === 'high'
+        ? AlertSeverity.WARNING
+        : data.priority === 'low'
+        ? AlertSeverity.INFO
+        : AlertSeverity.WARNING;
 
     await this.alertManagementService.createAlert(
       data.tenantId,
@@ -879,16 +1006,23 @@ export class AutomationProcessor {
     );
   }
 
-  private async sendWebhookNotification(data: SendNotificationJobData): Promise<void> {
+  private async sendWebhookNotification(
+    data: SendNotificationJobData,
+  ): Promise<void> {
     // Implement webhook notification logic
-    this.logger.log(`Webhook notification sent to ${data.recipients.join(', ')}`);
+    this.logger.log(
+      `Webhook notification sent to ${data.recipients.join(', ')}`,
+    );
   }
 
   // =============================================
   // HELPER METHODS - MAINTENANCE
   // =============================================
 
-  private async cleanupOldExecutions(tenantId?: string, parameters?: any): Promise<number> {
+  private async cleanupOldExecutions(
+    tenantId?: string,
+    parameters?: any,
+  ): Promise<number> {
     const retentionDays = parameters?.retentionDays || 90;
     const cutoffDate = moment().subtract(retentionDays, 'days').toDate();
 
@@ -903,27 +1037,36 @@ export class AutomationProcessor {
 
     const result = await query.execute();
     this.logger.log(`Cleaned up ${result.affected || 0} old execution records`);
-    
+
     return result.affected || 0;
   }
 
-  private async archiveOldLogs(tenantId?: string, parameters?: any): Promise<number> {
+  private async archiveOldLogs(
+    tenantId?: string,
+    parameters?: any,
+  ): Promise<number> {
     // Implement log archiving logic
     this.logger.log('Log archiving not implemented yet');
     return 0;
   }
 
-  private async updateMetrics(tenantId?: string, parameters?: any): Promise<void> {
+  private async updateMetrics(
+    tenantId?: string,
+    parameters?: any,
+  ): Promise<void> {
     // Implement metrics update logic
     this.logger.log('Updating automation metrics');
-    
+
     // This would update cached metrics, performance counters, etc.
   }
 
-  private async performHealthCheck(tenantId?: string, parameters?: any): Promise<any> {
+  private async performHealthCheck(
+    tenantId?: string,
+    parameters?: any,
+  ): Promise<any> {
     // Implement health check logic
     this.logger.log('Performing automation system health check');
-    
+
     const health = {
       status: 'healthy',
       components: {

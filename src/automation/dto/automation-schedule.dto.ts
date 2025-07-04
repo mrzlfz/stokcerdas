@@ -1,26 +1,26 @@
-import { 
-  IsString, 
-  IsOptional, 
-  IsEnum, 
-  IsNumber, 
-  IsBoolean, 
-  IsArray, 
-  IsObject, 
-  ValidateNested, 
-  Min, 
-  Max, 
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsArray,
+  IsObject,
+  ValidateNested,
+  Min,
+  Max,
   IsDateString,
   IsEmail,
   ArrayMaxSize,
-  Matches
+  Matches,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
-import { 
-  ScheduleType, 
+import {
+  ScheduleType,
   ScheduleStatus,
-  ExecutionStatus
+  ExecutionStatus,
 } from '../entities/automation-schedule.entity';
 
 export class JobFiltersDto {
@@ -83,7 +83,7 @@ export class JobFiltersDto {
     description: 'Kondisi filter tambahan',
     example: [
       { field: 'urgencyLevel', operator: 'gte', value: 5 },
-      { field: 'orderValue', operator: 'lte', value: 1000000 }
+      { field: 'orderValue', operator: 'lte', value: 1000000 },
     ],
   })
   @IsOptional()
@@ -107,7 +107,8 @@ export class CreateAutomationScheduleDto {
 
   @ApiPropertyOptional({
     description: 'Deskripsi schedule automation',
-    example: 'Schedule harian untuk mengecek semua reorder rules dan mengeksekusi yang diperlukan',
+    example:
+      'Schedule harian untuk mengecek semua reorder rules dan mengeksekusi yang diperlukan',
   })
   @IsOptional()
   @IsString({ message: 'Deskripsi harus berupa string' })
@@ -119,7 +120,9 @@ export class CreateAutomationScheduleDto {
     enum: ScheduleType,
     example: ScheduleType.REORDER_CHECK,
   })
-  @IsEnum(ScheduleType, { message: 'Schedule type harus berupa nilai yang valid' })
+  @IsEnum(ScheduleType, {
+    message: 'Schedule type harus berupa nilai yang valid',
+  })
   type: ScheduleType;
 
   @ApiProperty({
@@ -127,9 +130,12 @@ export class CreateAutomationScheduleDto {
     example: '0 8 * * *', // Daily at 8 AM
   })
   @IsString({ message: 'Cron expression harus berupa string' })
-  @Matches(/^(\*|([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])|\*\/([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])) (\*|([0-9]|1[0-9]|2[0-3])|\*\/([0-9]|1[0-9]|2[0-3])) (\*|([1-9]|1[0-9]|2[0-9]|3[0-1])|\*\/([1-9]|1[0-9]|2[0-9]|3[0-1])) (\*|([1-9]|1[0-2])|\*\/([1-9]|1[0-2])) (\*|([0-6])|\*\/([0-6]))$/, {
-    message: 'Cron expression harus berupa format yang valid',
-  })
+  @Matches(
+    /^(\*|([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])|\*\/([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])) (\*|([0-9]|1[0-9]|2[0-3])|\*\/([0-9]|1[0-9]|2[0-3])) (\*|([1-9]|1[0-9]|2[0-9]|3[0-1])|\*\/([1-9]|1[0-9]|2[0-9]|3[0-1])) (\*|([1-9]|1[0-2])|\*\/([1-9]|1[0-2])) (\*|([0-6])|\*\/([0-6]))$/,
+    {
+      message: 'Cron expression harus berupa format yang valid',
+    },
+  )
   cronExpression: string;
 
   @ApiPropertyOptional({
@@ -146,7 +152,10 @@ export class CreateAutomationScheduleDto {
     example: '2025-01-01T00:00:00Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Start date harus berupa format tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'Start date harus berupa format tanggal yang valid' },
+  )
   startDate?: Date;
 
   @ApiPropertyOptional({
@@ -154,7 +163,10 @@ export class CreateAutomationScheduleDto {
     example: '2025-12-31T23:59:59Z',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'End date harus berupa format tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'End date harus berupa format tanggal yang valid' },
+  )
   endDate?: Date;
 
   @ApiPropertyOptional({
@@ -218,10 +230,10 @@ export class CreateAutomationScheduleDto {
 
   @ApiPropertyOptional({
     description: 'Parameter untuk job',
-    example: { 
+    example: {
       batchSize: 10,
       maxConcurrentJobs: 3,
-      urgencyThreshold: 5
+      urgencyThreshold: 5,
     },
   })
   @IsOptional()
@@ -252,7 +264,13 @@ export class CreateAutomationScheduleDto {
   })
   @IsOptional()
   @IsArray({ message: 'Notification emails harus berupa array' })
-  @IsEmail({}, { each: true, message: 'Setiap notification email harus berupa email yang valid' })
+  @IsEmail(
+    {},
+    {
+      each: true,
+      message: 'Setiap notification email harus berupa email yang valid',
+    },
+  )
   @ArrayMaxSize(10, { message: 'Maksimal 10 email notifikasi' })
   notificationEmails?: string[];
 
@@ -369,7 +387,9 @@ export class CreateAutomationScheduleDto {
   isActive?: boolean;
 }
 
-export class UpdateAutomationScheduleDto extends PartialType(CreateAutomationScheduleDto) {
+export class UpdateAutomationScheduleDto extends PartialType(
+  CreateAutomationScheduleDto,
+) {
   @ApiPropertyOptional({
     description: 'Status schedule',
     enum: ScheduleStatus,
@@ -601,7 +621,10 @@ export class ScheduleExecutionQueryDto {
     example: '2025-01-01',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'From date harus berupa format tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'From date harus berupa format tanggal yang valid' },
+  )
   fromDate?: string;
 
   @ApiPropertyOptional({
@@ -609,7 +632,10 @@ export class ScheduleExecutionQueryDto {
     example: '2025-01-31',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'To date harus berupa format tanggal yang valid' })
+  @IsDateString(
+    {},
+    { message: 'To date harus berupa format tanggal yang valid' },
+  )
   toDate?: string;
 
   @ApiPropertyOptional({
