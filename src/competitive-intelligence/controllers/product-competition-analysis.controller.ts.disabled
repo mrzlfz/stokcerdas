@@ -1,0 +1,630 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpStatus,
+  HttpException,
+  Logger,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import { 
+  ProductCompetitionAnalysisService, 
+  ProductCompetitionAnalysisRequest, 
+  ProductCompetitionAnalysisResult,
+} from '../services/product-competition-analysis.service';
+import { MarketplaceType, DataQuality } from '../entities/competitive-product.entity';
+
+// DTOs for API requests
+export class StartProductCompetitionAnalysisDto {
+  analysisConfig: {
+    targetProducts?: string[];
+    competitorProducts?: string[];
+    marketplaces?: MarketplaceType[];
+    categories?: string[];
+    analysisDepth: 'basic' | 'standard' | 'comprehensive' | 'strategic';
+    comparisonDimensions: ('price' | 'features' | 'performance' | 'positioning' | 'lifecycle' | 'market_share')[];
+    includeIndonesianContext: boolean;
+    benchmarkingScope: 'category' | 'market' | 'direct_competitors' | 'all';
+  };
+  filterCriteria?: {
+    minDataQuality?: DataQuality;
+    excludeInactiveProducts?: boolean;
+    threatLevelRange?: { min: number; max: number };
+    regionFilter?: string[];
+    priceRange?: { min: number; max: number };
+  };
+  timeframe?: {
+    analysisWindow?: number;
+    historicalDepth?: number;
+  };
+}
+
+export class CompetitiveProfileQueryDto {
+  targetProductIds?: string; // comma-separated
+  includeIndirectCompetitors?: boolean;
+  marketplaces?: string; // comma-separated
+  analysisDepth?: 'basic' | 'standard' | 'comprehensive';
+}
+
+export class FeatureComparisonQueryDto {
+  productIds: string; // comma-separated, required
+  comparisonType?: 'detailed' | 'summary' | 'matrix';
+  includeScoring?: boolean;
+  focusAreas?: string; // comma-separated feature categories
+}
+
+export class MarketPositioningQueryDto {
+  categories?: string; // comma-separated
+  priceRange?: string; // format: "min-max"
+  includePositioningMap?: boolean;
+  includeStrategicGroups?: boolean;
+}
+
+export class CompetitiveScoringQueryDto {
+  productIds?: string; // comma-separated
+  scoringDimensions?: string; // comma-separated
+  includeTrajectory?: boolean;
+  benchmarkAgainst?: 'market' | 'category' | 'direct_competitors';
+}
+
+export class GapAnalysisQueryDto {
+  targetProductId: string;
+  comparisonScope?: 'direct_competitors' | 'category_leaders' | 'market_leaders';
+  priorityFilter?: 'high' | 'medium' | 'low';
+  includeInvestmentRecommendations?: boolean;
+}
+
+@ApiTags('Product Competition Analysis')
+@Controller('api/v1/competitive-intelligence/product-competition')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class ProductCompetitionAnalysisController {
+  private readonly logger = new Logger(ProductCompetitionAnalysisController.name);
+
+  constructor(
+    private readonly productCompetitionAnalysisService: ProductCompetitionAnalysisService,
+  ) {}
+
+  @Post('analyze')
+  @Permissions('competitive_intelligence:create', 'analytics:read')
+  @ApiOperation({ 
+    summary: 'Start comprehensive product competition analysis',
+    description: 'Analyze competitive landscape for specified products with configurable depth and dimensions'
+  })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Competition analysis completed successfully',
+    type: Object
+  })
+  @ApiResponse({ 
+    status: HttpStatus.BAD_REQUEST, 
+    description: 'Invalid analysis configuration' 
+  })
+  @ApiBody({ type: StartProductCompetitionAnalysisDto })
+  async startProductCompetitionAnalysis(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) analyzeDto: StartProductCompetitionAnalysisDto,
+  ): Promise<ProductCompetitionAnalysisResult> {
+    try {
+      this.logger.log(`Starting product competition analysis for tenant: ${tenantId}`);
+
+      const request: ProductCompetitionAnalysisRequest = {
+        tenantId,
+        ...analyzeDto,
+      };
+
+      const result = await this.productCompetitionAnalysisService.analyzeProductCompetition(request);
+
+      this.logger.log(`Product competition analysis completed: ${result.analysisId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Product competition analysis failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Analysis failed: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('profiles')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get competitive product profiles',
+    description: 'Retrieve detailed competitive profiles for products'
+  })
+  @ApiQuery({ name: 'targetProductIds', required: false, description: 'Comma-separated product IDs' })
+  @ApiQuery({ name: 'includeIndirectCompetitors', required: false, type: Boolean })
+  @ApiQuery({ name: 'marketplaces', required: false, description: 'Comma-separated marketplace types' })
+  @ApiQuery({ name: 'analysisDepth', required: false, enum: ['basic', 'standard', 'comprehensive'] })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Competitive profiles retrieved successfully' 
+  })
+  async getCompetitiveProfiles(
+    @CurrentTenant() tenantId: string,
+    @Query() query: CompetitiveProfileQueryDto,
+  ) {
+    try {
+      const targetProductIds = query.targetProductIds ? query.targetProductIds.split(',') : undefined;
+      const marketplaces = query.marketplaces ? query.marketplaces.split(',') as MarketplaceType[] : undefined;
+
+      const profiles = await this.productCompetitionAnalysisService.getCompetitiveProfiles(
+        tenantId,
+        {
+          targetProductIds,
+          includeIndirectCompetitors: query.includeIndirectCompetitors || false,
+          marketplaces,
+          analysisDepth: query.analysisDepth || 'standard',
+        }
+      );
+
+      return {
+        success: true,
+        data: profiles,
+        metadata: {
+          profilesCount: profiles.length,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get competitive profiles: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve profiles: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('features/comparison')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get feature comparison matrix',
+    description: 'Compare features across competitive products'
+  })
+  @ApiQuery({ name: 'productIds', required: true, description: 'Comma-separated product IDs to compare' })
+  @ApiQuery({ name: 'comparisonType', required: false, enum: ['detailed', 'summary', 'matrix'] })
+  @ApiQuery({ name: 'includeScoring', required: false, type: Boolean })
+  @ApiQuery({ name: 'focusAreas', required: false, description: 'Comma-separated feature categories' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Feature comparison retrieved successfully' 
+  })
+  async getFeatureComparison(
+    @CurrentTenant() tenantId: string,
+    @Query() query: FeatureComparisonQueryDto,
+  ) {
+    try {
+      if (!query.productIds) {
+        throw new BadRequestException('productIds parameter is required');
+      }
+
+      const productIds = query.productIds.split(',');
+      const focusAreas = query.focusAreas ? query.focusAreas.split(',') : undefined;
+
+      const comparison = await this.productCompetitionAnalysisService.getFeatureComparison(
+        tenantId,
+        {
+          productIds,
+          comparisonType: query.comparisonType || 'matrix',
+          includeScoring: query.includeScoring || false,
+          focusAreas,
+        }
+      );
+
+      return {
+        success: true,
+        data: comparison,
+        metadata: {
+          productsCompared: productIds.length,
+          comparisonType: query.comparisonType || 'matrix',
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get feature comparison: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve feature comparison: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('positioning')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market positioning analysis',
+    description: 'Analyze market positioning and strategic groups'
+  })
+  @ApiQuery({ name: 'categories', required: false, description: 'Comma-separated categories' })
+  @ApiQuery({ name: 'priceRange', required: false, description: 'Price range in format: min-max' })
+  @ApiQuery({ name: 'includePositioningMap', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeStrategicGroups', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Market positioning analysis retrieved successfully' 
+  })
+  async getMarketPositioning(
+    @CurrentTenant() tenantId: string,
+    @Query() query: MarketPositioningQueryDto,
+  ) {
+    try {
+      const categories = query.categories ? query.categories.split(',') : undefined;
+      let priceRange: { min: number; max: number } | undefined;
+      
+      if (query.priceRange) {
+        const [min, max] = query.priceRange.split('-').map(Number);
+        if (!isNaN(min) && !isNaN(max)) {
+          priceRange = { min, max };
+        }
+      }
+
+      const positioning = await this.productCompetitionAnalysisService.getMarketPositioning(
+        tenantId,
+        {
+          categories,
+          priceRange,
+          includePositioningMap: query.includePositioningMap || true,
+          includeStrategicGroups: query.includeStrategicGroups || true,
+        }
+      );
+
+      return {
+        success: true,
+        data: positioning,
+        metadata: {
+          categoriesAnalyzed: categories?.length || 0,
+          priceRangeApplied: !!priceRange,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get market positioning: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve market positioning: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('scoring')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get competitive scoring analysis',
+    description: 'Get competitive scores and performance metrics'
+  })
+  @ApiQuery({ name: 'productIds', required: false, description: 'Comma-separated product IDs' })
+  @ApiQuery({ name: 'scoringDimensions', required: false, description: 'Comma-separated scoring dimensions' })
+  @ApiQuery({ name: 'includeTrajectory', required: false, type: Boolean })
+  @ApiQuery({ name: 'benchmarkAgainst', required: false, enum: ['market', 'category', 'direct_competitors'] })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Competitive scoring retrieved successfully' 
+  })
+  async getCompetitiveScoring(
+    @CurrentTenant() tenantId: string,
+    @Query() query: CompetitiveScoringQueryDto,
+  ) {
+    try {
+      const productIds = query.productIds ? query.productIds.split(',') : undefined;
+      const scoringDimensions = query.scoringDimensions ? query.scoringDimensions.split(',') : undefined;
+
+      const scoring = await this.productCompetitionAnalysisService.getCompetitiveScoring(
+        tenantId,
+        {
+          productIds,
+          scoringDimensions,
+          includeTrajectory: query.includeTrajectory || false,
+          benchmarkAgainst: query.benchmarkAgainst || 'market',
+        }
+      );
+
+      return {
+        success: true,
+        data: scoring,
+        metadata: {
+          productsScored: scoring.length,
+          benchmarkScope: query.benchmarkAgainst || 'market',
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get competitive scoring: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve competitive scoring: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('gap-analysis/:productId')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get competitive gap analysis for a product',
+    description: 'Analyze gaps and opportunities for a specific product'
+  })
+  @ApiParam({ name: 'productId', description: 'Target product ID for gap analysis' })
+  @ApiQuery({ name: 'comparisonScope', required: false, enum: ['direct_competitors', 'category_leaders', 'market_leaders'] })
+  @ApiQuery({ name: 'priorityFilter', required: false, enum: ['high', 'medium', 'low'] })
+  @ApiQuery({ name: 'includeInvestmentRecommendations', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Gap analysis retrieved successfully' 
+  })
+  async getGapAnalysis(
+    @CurrentTenant() tenantId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Query() query: GapAnalysisQueryDto,
+  ) {
+    try {
+      const gapAnalysis = await this.productCompetitionAnalysisService.getGapAnalysis(
+        tenantId,
+        {
+          targetProductId: productId,
+          comparisonScope: query.comparisonScope || 'direct_competitors',
+          priorityFilter: query.priorityFilter,
+          includeInvestmentRecommendations: query.includeInvestmentRecommendations || true,
+        }
+      );
+
+      return {
+        success: true,
+        data: gapAnalysis,
+        metadata: {
+          targetProductId: productId,
+          comparisonScope: query.comparisonScope || 'direct_competitors',
+          gapsIdentified: gapAnalysis.identifiedGaps?.length || 0,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get gap analysis: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve gap analysis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('threats')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get competitive threats analysis',
+    description: 'Identify and analyze competitive threats'
+  })
+  @ApiQuery({ name: 'threatLevel', required: false, enum: ['low', 'medium', 'high', 'critical'] })
+  @ApiQuery({ name: 'categories', required: false, description: 'Comma-separated categories' })
+  @ApiQuery({ name: 'timeframe', required: false, description: 'Analysis timeframe in days' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Competitive threats retrieved successfully' 
+  })
+  async getCompetitiveThreats(
+    @CurrentTenant() tenantId: string,
+    @Query('threatLevel') threatLevel?: string,
+    @Query('categories') categories?: string,
+    @Query('timeframe') timeframe?: string,
+  ) {
+    try {
+      const categoryList = categories ? categories.split(',') : undefined;
+      const timeframeDays = timeframe ? parseInt(timeframe, 10) : 30;
+
+      const threats = await this.productCompetitionAnalysisService.getCompetitiveThreats(
+        tenantId,
+        {
+          threatLevel: threatLevel as any,
+          categories: categoryList,
+          timeframeDays,
+        }
+      );
+
+      return {
+        success: true,
+        data: threats,
+        metadata: {
+          threatsIdentified: threats.length,
+          threatLevelFilter: threatLevel,
+          timeframeDays,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get competitive threats: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve competitive threats: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('opportunities')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market opportunities analysis',
+    description: 'Identify market opportunities and strategic recommendations'
+  })
+  @ApiQuery({ name: 'opportunityType', required: false, enum: ['market_gap', 'pricing', 'feature', 'positioning', 'channel'] })
+  @ApiQuery({ name: 'priority', required: false, enum: ['high', 'medium', 'low'] })
+  @ApiQuery({ name: 'categories', required: false, description: 'Comma-separated categories' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Market opportunities retrieved successfully' 
+  })
+  async getMarketOpportunities(
+    @CurrentTenant() tenantId: string,
+    @Query('opportunityType') opportunityType?: string,
+    @Query('priority') priority?: string,
+    @Query('categories') categories?: string,
+  ) {
+    try {
+      const categoryList = categories ? categories.split(',') : undefined;
+
+      const opportunities = await this.productCompetitionAnalysisService.getMarketOpportunities(
+        tenantId,
+        {
+          opportunityType: opportunityType as any,
+          priority: priority as any,
+          categories: categoryList,
+        }
+      );
+
+      return {
+        success: true,
+        data: opportunities,
+        metadata: {
+          opportunitiesIdentified: opportunities.length,
+          opportunityTypeFilter: opportunityType,
+          priorityFilter: priority,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get market opportunities: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve market opportunities: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('analysis/:analysisId')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get saved competition analysis by ID',
+    description: 'Retrieve a previously completed competition analysis'
+  })
+  @ApiParam({ name: 'analysisId', description: 'Competition analysis ID' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Competition analysis retrieved successfully' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.NOT_FOUND, 
+    description: 'Analysis not found' 
+  })
+  async getCompetitionAnalysis(
+    @CurrentTenant() tenantId: string,
+    @Param('analysisId') analysisId: string,
+  ) {
+    try {
+      const analysis = await this.productCompetitionAnalysisService.getAnalysisById(tenantId, analysisId);
+
+      if (!analysis) {
+        throw new HttpException('Analysis not found', HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        success: true,
+        data: analysis,
+        metadata: {
+          analysisId,
+          retrievedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get competition analysis: ${error.message}`, error.stack);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
+      throw new HttpException(
+        `Failed to retrieve analysis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('analysis')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'List competition analyses',
+    description: 'Get list of competition analyses with filtering options'
+  })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (default: 20)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Sort field (default: createdAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order (default: DESC)' })
+  @ApiQuery({ name: 'analysisDepth', required: false, enum: ['basic', 'standard', 'comprehensive', 'strategic'] })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Competition analyses list retrieved successfully' 
+  })
+  async listCompetitionAnalyses(
+    @CurrentTenant() tenantId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+    @Query('sortBy') sortBy = 'createdAt',
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
+    @Query('analysisDepth') analysisDepth?: string,
+  ) {
+    try {
+      const pageNum = Math.max(1, parseInt(page, 10));
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+
+      const result = await this.productCompetitionAnalysisService.listAnalyses(
+        tenantId,
+        {
+          page: pageNum,
+          limit: limitNum,
+          sortBy,
+          sortOrder,
+          filters: {
+            analysisDepth: analysisDepth as any,
+          }
+        }
+      );
+
+      return {
+        success: true,
+        data: result.analyses,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: result.total,
+          totalPages: Math.ceil(result.total / limitNum),
+        },
+        metadata: {
+          sortBy,
+          sortOrder,
+          filtersApplied: !!analysisDepth,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to list competition analyses: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve analyses list: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+}

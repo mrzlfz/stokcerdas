@@ -1,12 +1,13 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixEnterpriseSchemaPattern21751631100000 implements MigrationInterface {
+export class FixEnterpriseSchemaPattern21751631100000
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Comprehensive fix for Pattern 2: Inconsistent tenant naming and mixed conventions
+    // Affected tables: alert_configurations, workflows
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Comprehensive fix for Pattern 2: Inconsistent tenant naming and mixed conventions
-        // Affected tables: alert_configurations, workflows
-        
-        await queryRunner.query(`
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- ====================================
@@ -240,11 +241,11 @@ export class FixEnterpriseSchemaPattern21751631100000 implements MigrationInterf
                 RAISE NOTICE 'Enterprise Schema Pattern 2 fixes completed successfully';
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Rollback by removing the snake_case columns that were added
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Rollback by removing the snake_case columns that were added
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove added snake_case columns from alert_configurations
@@ -276,6 +277,5 @@ export class FixEnterpriseSchemaPattern21751631100000 implements MigrationInterf
                 RAISE NOTICE 'Enterprise Schema Pattern 2 rollback completed';
             END $$;
         `);
-    }
-
+  }
 }

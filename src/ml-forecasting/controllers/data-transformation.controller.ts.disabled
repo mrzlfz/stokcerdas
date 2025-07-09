@@ -1,0 +1,234 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Logger,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import {
+  DataTransformationService,
+  TransformationRequest,
+  TransformationResult,
+  TransformationRule,
+  CleaningRule,
+  QualityThreshold,
+} from '../services/data-transformation.service';
+
+// DTOs for API documentation and validation
+export class TransformationRequestDto implements TransformationRequest {
+  jobId: string;
+  tenantId: string;
+  data: {
+    sales?: any[];
+    inventory?: any[];
+    products?: any[];
+    orders?: any[];
+    external?: any[];
+  };
+  transformations: TransformationRule[];
+  cleaningRules: CleaningRule[];
+  qualityThresholds: QualityThreshold[];
+  outputFormat: 'ml_ready' | 'analysis_ready' | 'visualization_ready';
+  validateOutput?: boolean;
+}
+
+export class QuickTransformationDto {
+  data: any[];
+  dataType: 'sales' | 'inventory' | 'products' | 'orders' | 'external';
+  transformations: string[]; // Predefined transformation names
+  outputFormat?: 'ml_ready' | 'analysis_ready' | 'visualization_ready';
+}
+
+export class TransformationPresetDto {
+  name: string;
+  description: string;
+  dataTypes: string[];
+  transformations: TransformationRule[];
+  cleaningRules: CleaningRule[];
+  qualityThresholds: QualityThreshold[];
+}
+
+export class DataQualityAssessmentDto {
+  data: any[];
+  dataType: string;
+  assessmentLevel: 'basic' | 'standard' | 'comprehensive';
+}
+
+@Controller('ml-forecasting/data-transformation')
+@ApiTags('Data Transformation & Cleaning')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class DataTransformationController {
+  private readonly logger = new Logger(DataTransformationController.name);
+
+  constructor(
+    private readonly transformationService: DataTransformationService,
+  ) {}
+
+  /**
+   * Main data transformation and cleaning endpoint
+   */
+  @Post('transform')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read', 'analytics:read')
+  @ApiOperation({
+    summary: 'Transform and clean data for ML training',
+    description: 'Apply comprehensive data transformation and cleaning rules to prepare data for ML models',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data transformation completed successfully',
+    type: TransformationResult,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid transformation request',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Insufficient permissions',
+  })
+  async transformData(
+    @Body() request: TransformationRequestDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ): Promise<TransformationResult> {
+    this.logger.log(`Data transformation requested by user ${user.id} for tenant ${tenantId}`);
+
+    // Override tenant ID and generate job ID for security
+    request.tenantId = tenantId;
+    if (!request.jobId) {
+      request.jobId = `transform_${tenantId}_${Date.now()}`;
+    }
+
+    try {
+      const result = await this.transformationService.transformAndCleanData(request);
+      
+      this.logger.log(`Data transformation completed: ${result.jobId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Data transformation failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Quick transformation with predefined rules
+   */
+  @Post('quick-transform')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Quick data transformation',
+    description: 'Apply predefined transformation rules for common use cases',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quick transformation completed successfully',
+  })
+  async quickTransform(
+    @Body() request: QuickTransformationDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<TransformationResult> {
+    this.logger.log(`Quick transformation for ${request.dataType} data`);
+
+    // Build transformation request from quick request
+    const transformationRequest: TransformationRequest = {
+      jobId: `quick_${tenantId}_${Date.now()}`,
+      tenantId,
+      data: { [request.dataType]: request.data },
+      transformations: this.buildPredefinedTransformations(
+        request.transformations,
+        request.dataType,
+      ),
+      cleaningRules: this.buildPredefinedCleaningRules(request.dataType),
+      qualityThresholds: this.getDefaultQualityThresholds(),
+      outputFormat: request.outputFormat || 'ml_ready',
+      validateOutput: true,
+    };
+
+    return await this.transformationService.transformAndCleanData(transformationRequest);
+  }
+
+  /**
+   * Get available transformation presets
+   */
+  @Get('presets')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get transformation presets',
+    description: 'Get list of predefined transformation and cleaning presets',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Transformation presets retrieved successfully',
+  })
+  async getTransformationPresets(
+    @Query('dataType') dataType?: string,
+  ): Promise<TransformationPresetDto[]> {
+    this.logger.log('Transformation presets requested');
+
+    const presets: TransformationPresetDto[] = [
+      {
+        name: 'ML Training Ready',
+        description: 'Comprehensive transformation for ML model training',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        transformations: this.getMLReadyTransformations(),
+        cleaningRules: this.getMLReadyCleaningRules(),
+        qualityThresholds: this.getStrictQualityThresholds(),
+      },
+      {
+        name: 'Business Analysis',
+        description: 'Transformation optimized for business intelligence and reporting',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        transformations: this.getAnalysisTransformations(),
+        cleaningRules: this.getBasicCleaningRules(),
+        qualityThresholds: this.getDefaultQualityThresholds(),
+      },
+      {
+        name: 'Time Series Forecasting',
+        description: 'Specialized transformation for time series forecasting models',
+        dataTypes: ['sales', 'inventory'],
+        transformations: this.getTimeSeriesTransformations(),
+        cleaningRules: this.getTimeSeriesCleaningRules(),
+        qualityThresholds: this.getDefaultQualityThresholds(),
+      },
+      {
+        name: 'Customer Behavior Analysis',
+        description: 'Transformation focused on customer behavior patterns',
+        dataTypes: ['orders', 'sales'],
+        transformations: this.getCustomerAnalysisTransformations(),
+        cleaningRules: this.getBasicCleaningRules(),
+        qualityThresholds: this.getDefaultQualityThresholds(),
+      },
+      {
+        name: 'Product Performance',
+        description: 'Product-focused transformation for performance analysis',
+        dataTypes: ['products', 'sales', 'inventory'],
+        transformations: this.getProductPerformanceTransformations(),
+        cleaningRules: this.getBasicCleaningRules(),
+        qualityThresholds: this.getDefaultQualityThresholds(),
+      },
+    ];
+
+    if (dataType) {
+      return presets.filter(preset => preset.dataTypes.includes(dataType));
+    }
+
+    return presets;
+  }\n\n  /**\n   * Apply transformation preset\n   */\n  @Post('apply-preset')\n  @HttpCode(HttpStatus.OK)\n  @Permissions('ml_forecasting:read')\n  @ApiOperation({\n    summary: 'Apply transformation preset',\n    description: 'Apply a predefined transformation preset to data',\n  })\n  @ApiResponse({\n    status: 200,\n    description: 'Preset applied successfully',\n  })\n  async applyPreset(\n    @Body() request: {\n      presetName: string;\n      data: any;\n    },\n    @CurrentTenant() tenantId: string,\n  ): Promise<TransformationResult> {\n    this.logger.log(`Applying preset: ${request.presetName}`);\n\n    const presets = await this.getTransformationPresets();\n    const preset = presets.find(p => p.name === request.presetName);\n\n    if (!preset) {\n      throw new BadRequestException(`Preset not found: ${request.presetName}`);\n    }\n\n    const transformationRequest: TransformationRequest = {\n      jobId: `preset_${tenantId}_${Date.now()}`,\n      tenantId,\n      data: request.data,\n      transformations: preset.transformations,\n      cleaningRules: preset.cleaningRules,\n      qualityThresholds: preset.qualityThresholds,\n      outputFormat: 'ml_ready',\n      validateOutput: true,\n    };\n\n    return await this.transformationService.transformAndCleanData(transformationRequest);\n  }\n\n  /**\n   * Assess data quality before transformation\n   */\n  @Post('assess-quality')\n  @HttpCode(HttpStatus.OK)\n  @Permissions('ml_forecasting:read')\n  @ApiOperation({\n    summary: 'Assess data quality',\n    description: 'Analyze data quality and get recommendations before transformation',\n  })\n  @ApiResponse({\n    status: 200,\n    description: 'Data quality assessment completed',\n  })\n  async assessDataQuality(\n    @Body() request: DataQualityAssessmentDto,\n    @CurrentTenant() tenantId: string,\n  ): Promise<{\n    qualityScore: number;\n    completeness: number;\n    consistency: number;\n    validity: number;\n    uniqueness: number;\n    issues: any[];\n    recommendations: string[];\n    transformationSuggestions: string[];\n  }> {\n    this.logger.log(`Data quality assessment for ${request.dataType}`);\n\n    // Perform quality assessment\n    const assessment = await this.performDataQualityAssessment(\n      request.data,\n      request.dataType,\n      request.assessmentLevel,\n    );\n\n    return assessment;\n  }\n\n  /**\n   * Get transformation statistics and insights\n   */\n  @Get('stats')\n  @Permissions('ml_forecasting:read')\n  @ApiOperation({\n    summary: 'Get transformation statistics',\n    description: 'Get statistics and insights about data transformations for the tenant',\n  })\n  @ApiResponse({\n    status: 200,\n    description: 'Transformation statistics retrieved successfully',\n  })\n  async getTransformationStats(\n    @CurrentTenant() tenantId: string,\n    @Query('period') period: 'day' | 'week' | 'month' = 'month',\n  ): Promise<{\n    totalTransformations: number;\n    successRate: number;\n    averageProcessingTime: number;\n    averageQualityScore: number;\n    popularTransformations: string[];\n    qualityImprovements: Record<string, number>;\n    recentJobs: any[];\n  }> {\n    this.logger.log(`Transformation stats requested for tenant ${tenantId}`);\n\n    // This would typically query a metrics/stats table\n    // For now, return mock data\n    return {\n      totalTransformations: 157,\n      successRate: 94.3,\n      averageProcessingTime: 2840, // ms\n      averageQualityScore: 89.7,\n      popularTransformations: [\n        'normalize',\n        'outlier_removal',\n        'missing_value_imputation',\n        'standardize',\n        'encode'\n      ],\n      qualityImprovements: {\n        completeness: 15.2,\n        consistency: 22.8,\n        validity: 8.9,\n      },\n      recentJobs: [\n        {\n          jobId: 'transform_tenant1_1640995200000',\n          dataTypes: ['sales', 'inventory'],\n          status: 'completed',\n          processingTime: 2100,\n          qualityScore: 92.5,\n          timestamp: new Date().toISOString(),\n        },\n        {\n          jobId: 'quick_tenant1_1640991600000',\n          dataTypes: ['products'],\n          status: 'completed',\n          processingTime: 1850,\n          qualityScore: 87.3,\n          timestamp: new Date(Date.now() - 3600000).toISOString(),\n        },\n      ],\n    };\n  }\n\n  /**\n   * Validate transformation rules\n   */\n  @Post('validate-rules')\n  @HttpCode(HttpStatus.OK)\n  @Permissions('ml_forecasting:read')\n  @ApiOperation({\n    summary: 'Validate transformation rules',\n    description: 'Validate transformation and cleaning rules before applying them',\n  })\n  @ApiResponse({\n    status: 200,\n    description: 'Rules validation completed',\n  })\n  async validateRules(\n    @Body() request: {\n      transformations: TransformationRule[];\n      cleaningRules: CleaningRule[];\n      sampleData?: any[];\n    },\n  ): Promise<{\n    valid: boolean;\n    issues: any[];\n    warnings: string[];\n    suggestions: string[];\n  }> {\n    this.logger.log('Validating transformation rules');\n\n    const validation = {\n      valid: true,\n      issues: [] as any[],\n      warnings: [] as string[],\n      suggestions: [] as string[],\n    };\n\n    // Validate transformation rules\n    for (const rule of request.transformations) {\n      const ruleValidation = this.validateTransformationRule(rule);\n      if (!ruleValidation.valid) {\n        validation.valid = false;\n        validation.issues.push({\n          rule: rule.name,\n          type: 'transformation',\n          issues: ruleValidation.issues,\n        });\n      }\n      validation.warnings.push(...ruleValidation.warnings);\n    }\n\n    // Validate cleaning rules\n    for (const rule of request.cleaningRules) {\n      const ruleValidation = this.validateCleaningRule(rule);\n      if (!ruleValidation.valid) {\n        validation.valid = false;\n        validation.issues.push({\n          rule: rule.name,\n          type: 'cleaning',\n          issues: ruleValidation.issues,\n        });\n      }\n      validation.warnings.push(...ruleValidation.warnings);\n    }\n\n    // Generate suggestions\n    validation.suggestions = this.generateRuleSuggestions(\n      request.transformations,\n      request.cleaningRules,\n    );\n\n    return validation;\n  }\n\n  // ========== PRIVATE HELPER METHODS ==========\n\n  /**\n   * Build predefined transformations based on request\n   */\n  private buildPredefinedTransformations(\n    transformationNames: string[],\n    dataType: string,\n  ): TransformationRule[] {\n    const transformations: TransformationRule[] = [];\n    let priority = 1;\n\n    for (const name of transformationNames) {\n      switch (name) {\n        case 'normalize':\n          transformations.push({\n            id: `normalize_${priority}`,\n            name: 'Normalize Numeric Fields',\n            type: 'normalize',\n            targetFields: this.getNumericFields(dataType),\n            parameters: {},\n            applyTo: [dataType as any],\n            priority: priority++,\n            enabled: true,\n            description: 'Normalize numeric fields to 0-1 range',\n          });\n          break;\n\n        case 'standardize':\n          transformations.push({\n            id: `standardize_${priority}`,\n            name: 'Standardize Numeric Fields',\n            type: 'standardize',\n            targetFields: this.getNumericFields(dataType),\n            parameters: {},\n            applyTo: [dataType as any],\n            priority: priority++,\n            enabled: true,\n            description: 'Apply z-score standardization to numeric fields',\n          });\n          break;\n\n        case 'encode':\n          transformations.push({\n            id: `encode_${priority}`,\n            name: 'Encode Categorical Fields',\n            type: 'encode',\n            targetFields: this.getCategoricalFields(dataType),\n            parameters: { encoding: 'label' },\n            applyTo: [dataType as any],\n            priority: priority++,\n            enabled: true,\n            description: 'Label encode categorical fields',\n          });\n          break;\n\n        case 'derive_features':\n          transformations.push({\n            id: `derive_${priority}`,\n            name: 'Derive Business Features',\n            type: 'derive',\n            targetFields: [],\n            parameters: {\n              derivations: this.getBusinessDerivations(dataType),\n            },\n            applyTo: [dataType as any],\n            priority: priority++,\n            enabled: true,\n            description: 'Derive business-relevant features',\n          });\n          break;\n      }\n    }\n\n    return transformations;\n  }\n\n  /**\n   * Build predefined cleaning rules for data type\n   */\n  private buildPredefinedCleaningRules(dataType: string): CleaningRule[] {\n    const rules: CleaningRule[] = [\n      {\n        id: 'outlier_removal',\n        name: 'Remove Statistical Outliers',\n        type: 'outlier_removal',\n        targetFields: this.getNumericFields(dataType),\n        method: 'iqr',\n        parameters: { factor: 1.5 },\n        applyTo: [dataType as any],\n        severity: 'warning',\n        autoFix: true,\n        description: 'Remove outliers using IQR method',\n      },\n      {\n        id: 'missing_imputation',\n        name: 'Impute Missing Values',\n        type: 'missing_value_imputation',\n        targetFields: this.getNumericFields(dataType),\n        method: 'mean',\n        parameters: {},\n        applyTo: [dataType as any],\n        severity: 'warning',\n        autoFix: true,\n        description: 'Fill missing values with mean',\n      },\n      {\n        id: 'duplicate_removal',\n        name: 'Remove Duplicates',\n        type: 'duplicate_removal',\n        targetFields: this.getKeyFields(dataType),\n        method: 'exact_match',\n        parameters: {},\n        applyTo: [dataType as any],\n        severity: 'error',\n        autoFix: true,\n        description: 'Remove duplicate records',\n      },\n    ];\n\n    return rules;\n  }\n\n  /**\n   * Get numeric fields for data type\n   */\n  private getNumericFields(dataType: string): string[] {\n    const fieldMappings: Record<string, string[]> = {\n      sales: ['value', 'transactionCount', 'totalRevenue', 'averagePrice'],\n      inventory: ['stockLevel', 'stockValue', 'turnoverRate'],\n      products: ['salesVelocity', 'priceChanges', 'competitorActivity', 'seasonalityFactor'],\n      orders: ['orderCount', 'averageOrderValue', 'fulfillmentTime', 'returnRate', 'profitMargin'],\n      external: ['value', 'confidence'],\n    };\n\n    return fieldMappings[dataType] || ['value'];\n  }\n\n  /**\n   * Get categorical fields for data type\n   */\n  private getCategoricalFields(dataType: string): string[] {\n    const fieldMappings: Record<string, string[]> = {\n      sales: ['productId', 'locationId', 'categoryId'],\n      inventory: ['movementType', 'productId', 'locationId'],\n      products: ['stage', 'productId'],\n      orders: ['customerSegment', 'acquisitionChannel'],\n      external: ['source', 'dataType', 'impact'],\n    };\n\n    return fieldMappings[dataType] || [];\n  }\n\n  /**\n   * Get key fields for duplicate detection\n   */\n  private getKeyFields(dataType: string): string[] {\n    const fieldMappings: Record<string, string[]> = {\n      sales: ['date', 'productId', 'locationId'],\n      inventory: ['date', 'productId', 'locationId'],\n      products: ['date', 'productId'],\n      orders: ['date', 'customerSegment'],\n      external: ['date', 'source', 'dataType'],\n    };\n\n    return fieldMappings[dataType] || ['date'];\n  }\n\n  /**\n   * Get business derivations for data type\n   */\n  private getBusinessDerivations(dataType: string): any[] {\n    const derivationMappings: Record<string, any[]> = {\n      sales: [\n        {\n          name: 'revenue_per_transaction',\n          formula: 'totalRevenue / transactionCount',\n          sourceFields: ['totalRevenue', 'transactionCount'],\n        },\n        {\n          name: 'price_variance',\n          formula: '(averagePrice - value) / averagePrice',\n          sourceFields: ['averagePrice', 'value'],\n        },\n      ],\n      inventory: [\n        {\n          name: 'stock_coverage_days',\n          formula: 'stockLevel / turnoverRate',\n          sourceFields: ['stockLevel', 'turnoverRate'],\n        },\n      ],\n      products: [\n        {\n          name: 'growth_rate',\n          formula: 'salesVelocity * seasonalityFactor',\n          sourceFields: ['salesVelocity', 'seasonalityFactor'],\n        },\n      ],\n      orders: [\n        {\n          name: 'profit_per_order',\n          formula: 'averageOrderValue * profitMargin',\n          sourceFields: ['averageOrderValue', 'profitMargin'],\n        },\n      ],\n    };\n\n    return derivationMappings[dataType] || [];\n  }\n\n  // ========== PRESET CONFIGURATIONS ==========\n\n  private getMLReadyTransformations(): TransformationRule[] {\n    return [\n      {\n        id: 'ml_normalize',\n        name: 'ML Normalization',\n        type: 'normalize',\n        targetFields: ['value', 'stockLevel', 'salesVelocity'],\n        parameters: {},\n        applyTo: ['sales', 'inventory', 'products'],\n        priority: 1,\n        enabled: true,\n        description: 'Normalize all numeric features for ML',\n      },\n      {\n        id: 'ml_encode',\n        name: 'ML Categorical Encoding',\n        type: 'encode',\n        targetFields: ['productId', 'locationId', 'categoryId'],\n        parameters: { encoding: 'label' },\n        applyTo: ['sales', 'inventory', 'products', 'orders'],\n        priority: 2,\n        enabled: true,\n        description: 'Encode categorical variables for ML',\n      },\n    ];\n  }\n\n  private getAnalysisTransformations(): TransformationRule[] {\n    return [\n      {\n        id: 'analysis_derive',\n        name: 'Business Metrics Derivation',\n        type: 'derive',\n        targetFields: [],\n        parameters: {\n          derivations: [\n            {\n              name: 'revenue_growth',\n              formula: '(currentRevenue - previousRevenue) / previousRevenue',\n              sourceFields: ['currentRevenue', 'previousRevenue'],\n            },\n          ],\n        },\n        applyTo: ['sales', 'orders'],\n        priority: 1,\n        enabled: true,\n        description: 'Derive business metrics for analysis',\n      },\n    ];\n  }\n\n  private getTimeSeriesTransformations(): TransformationRule[] {\n    return [\n      {\n        id: 'ts_aggregate',\n        name: 'Time Series Aggregation',\n        type: 'aggregate',\n        targetFields: ['value', 'stockLevel'],\n        parameters: {\n          type: 'time_window',\n          window: '1d',\n          functions: ['mean', 'sum', 'std'],\n        },\n        applyTo: ['sales', 'inventory'],\n        priority: 1,\n        enabled: true,\n        description: 'Aggregate data by time windows',\n      },\n    ];\n  }\n\n  private getCustomerAnalysisTransformations(): TransformationRule[] {\n    return [\n      {\n        id: 'customer_segment',\n        name: 'Customer Segmentation',\n        type: 'encode',\n        targetFields: ['customerSegment'],\n        parameters: { encoding: 'onehot' },\n        applyTo: ['orders'],\n        priority: 1,\n        enabled: true,\n        description: 'One-hot encode customer segments',\n      },\n    ];\n  }\n\n  private getProductPerformanceTransformations(): TransformationRule[] {\n    return [\n      {\n        id: 'product_performance',\n        name: 'Product Performance Metrics',\n        type: 'derive',\n        targetFields: [],\n        parameters: {\n          derivations: [\n            {\n              name: 'performance_score',\n              formula: 'salesVelocity * (1 - returnRate)',\n              sourceFields: ['salesVelocity', 'returnRate'],\n            },\n          ],\n        },\n        applyTo: ['products', 'orders'],\n        priority: 1,\n        enabled: true,\n        description: 'Calculate product performance scores',\n      },\n    ];\n  }\n\n  private getMLReadyCleaningRules(): CleaningRule[] {\n    return [\n      {\n        id: 'ml_outliers',\n        name: 'Strict Outlier Removal',\n        type: 'outlier_removal',\n        targetFields: ['value', 'stockLevel'],\n        method: 'zscore',\n        parameters: { threshold: 2.5 },\n        applyTo: ['sales', 'inventory', 'products', 'orders'],\n        severity: 'error',\n        autoFix: true,\n        description: 'Strict outlier removal for ML',\n      },\n    ];\n  }\n\n  private getBasicCleaningRules(): CleaningRule[] {\n    return [\n      {\n        id: 'basic_missing',\n        name: 'Basic Missing Value Handling',\n        type: 'missing_value_imputation',\n        targetFields: ['value'],\n        method: 'median',\n        parameters: {},\n        applyTo: ['sales', 'inventory', 'products', 'orders'],\n        severity: 'warning',\n        autoFix: true,\n        description: 'Fill missing values with median',\n      },\n    ];\n  }\n\n  private getTimeSeriesCleaningRules(): CleaningRule[] {\n    return [\n      {\n        id: 'ts_interpolation',\n        name: 'Time Series Interpolation',\n        type: 'missing_value_imputation',\n        targetFields: ['value', 'stockLevel'],\n        method: 'forward_fill',\n        parameters: {},\n        applyTo: ['sales', 'inventory'],\n        severity: 'warning',\n        autoFix: true,\n        description: 'Forward fill missing time series values',\n      },\n    ];\n  }\n\n  private getDefaultQualityThresholds(): QualityThreshold[] {\n    return [\n      {\n        metric: 'completeness',\n        threshold: 80,\n        action: 'warning',\n        scope: 'dataset',\n      },\n      {\n        metric: 'validity',\n        threshold: 90,\n        action: 'warning',\n        scope: 'dataset',\n      },\n    ];\n  }\n\n  private getStrictQualityThresholds(): QualityThreshold[] {\n    return [\n      {\n        metric: 'completeness',\n        threshold: 95,\n        action: 'reject',\n        scope: 'dataset',\n      },\n      {\n        metric: 'validity',\n        threshold: 98,\n        action: 'reject',\n        scope: 'dataset',\n      },\n      {\n        metric: 'consistency',\n        threshold: 90,\n        action: 'auto_fix',\n        scope: 'dataset',\n      },\n    ];\n  }\n\n  // ========== VALIDATION METHODS ==========\n\n  private validateTransformationRule(rule: TransformationRule): {\n    valid: boolean;\n    issues: string[];\n    warnings: string[];\n  } {\n    const result = {\n      valid: true,\n      issues: [] as string[],\n      warnings: [] as string[],\n    };\n\n    if (!rule.type) {\n      result.valid = false;\n      result.issues.push('Transformation type is required');\n    }\n\n    if (!rule.targetFields || rule.targetFields.length === 0) {\n      result.valid = false;\n      result.issues.push('Target fields are required');\n    }\n\n    if (rule.priority < 1) {\n      result.warnings.push('Priority should be positive');\n    }\n\n    return result;\n  }\n\n  private validateCleaningRule(rule: CleaningRule): {\n    valid: boolean;\n    issues: string[];\n    warnings: string[];\n  } {\n    const result = {\n      valid: true,\n      issues: [] as string[],\n      warnings: [] as string[],\n    };\n\n    if (!rule.type) {\n      result.valid = false;\n      result.issues.push('Cleaning rule type is required');\n    }\n\n    if (!rule.method) {\n      result.valid = false;\n      result.issues.push('Cleaning method is required');\n    }\n\n    if (!rule.targetFields || rule.targetFields.length === 0) {\n      result.valid = false;\n      result.issues.push('Target fields are required');\n    }\n\n    return result;\n  }\n\n  private generateRuleSuggestions(\n    transformations: TransformationRule[],\n    cleaningRules: CleaningRule[],\n  ): string[] {\n    const suggestions: string[] = [];\n\n    // Check for missing outlier removal\n    const hasOutlierRemoval = cleaningRules.some(rule => rule.type === 'outlier_removal');\n    if (!hasOutlierRemoval) {\n      suggestions.push('Consider adding outlier removal for better data quality');\n    }\n\n    // Check for missing normalization\n    const hasNormalization = transformations.some(rule => rule.type === 'normalize' || rule.type === 'standardize');\n    if (!hasNormalization) {\n      suggestions.push('Consider adding normalization or standardization for ML readiness');\n    }\n\n    // Check for categorical encoding\n    const hasEncoding = transformations.some(rule => rule.type === 'encode');\n    if (!hasEncoding) {\n      suggestions.push('Consider adding categorical encoding for machine learning');\n    }\n\n    return suggestions;\n  }\n\n  /**\n   * Perform data quality assessment\n   */\n  private async performDataQualityAssessment(\n    data: any[],\n    dataType: string,\n    level: string,\n  ): Promise<{\n    qualityScore: number;\n    completeness: number;\n    consistency: number;\n    validity: number;\n    uniqueness: number;\n    issues: any[];\n    recommendations: string[];\n    transformationSuggestions: string[];\n  }> {\n    // Simplified quality assessment\n    const completeness = this.calculateCompleteness(data);\n    const consistency = this.calculateConsistency(data);\n    const validity = this.calculateValidity(data);\n    const uniqueness = this.calculateUniqueness(data);\n    \n    const qualityScore = (completeness + consistency + validity + uniqueness) / 4;\n\n    const issues = [];\n    const recommendations = [];\n    const transformationSuggestions = [];\n\n    if (completeness < 80) {\n      issues.push({ type: 'completeness', severity: 'medium', description: 'High rate of missing values' });\n      recommendations.push('Implement missing value imputation');\n      transformationSuggestions.push('missing_value_imputation');\n    }\n\n    if (validity < 90) {\n      issues.push({ type: 'validity', severity: 'high', description: 'Invalid data values detected' });\n      recommendations.push('Add data validation rules');\n      transformationSuggestions.push('data_validation');\n    }\n\n    return {\n      qualityScore,\n      completeness,\n      consistency,\n      validity,\n      uniqueness,\n      issues,\n      recommendations,\n      transformationSuggestions,\n    };\n  }\n\n  private calculateCompleteness(data: any[]): number {\n    if (data.length === 0) return 100;\n    \n    let totalFields = 0;\n    let filledFields = 0;\n    \n    data.forEach(record => {\n      Object.values(record).forEach(value => {\n        totalFields++;\n        if (value !== null && value !== undefined && value !== '') {\n          filledFields++;\n        }\n      });\n    });\n    \n    return totalFields > 0 ? (filledFields / totalFields) * 100 : 100;\n  }\n\n  private calculateConsistency(data: any[]): number {\n    // Check data type consistency\n    const fieldTypes: Record<string, Set<string>> = {};\n    \n    data.forEach(record => {\n      Object.entries(record).forEach(([key, value]) => {\n        if (!fieldTypes[key]) fieldTypes[key] = new Set();\n        fieldTypes[key].add(typeof value);\n      });\n    });\n    \n    const consistentFields = Object.values(fieldTypes).filter(types => types.size === 1).length;\n    const totalFields = Object.keys(fieldTypes).length;\n    \n    return totalFields > 0 ? (consistentFields / totalFields) * 100 : 100;\n  }\n\n  private calculateValidity(data: any[]): number {\n    let validRecords = 0;\n    \n    data.forEach(record => {\n      let isValid = true;\n      Object.values(record).forEach(value => {\n        if (typeof value === 'number' && (isNaN(value) || !isFinite(value))) {\n          isValid = false;\n        }\n      });\n      if (isValid) validRecords++;\n    });\n    \n    return data.length > 0 ? (validRecords / data.length) * 100 : 100;\n  }\n\n  private calculateUniqueness(data: any[]): number {\n    const uniqueRecords = new Set(data.map(record => JSON.stringify(record)));\n    return data.length > 0 ? (uniqueRecords.size / data.length) * 100 : 100;\n  }\n}

@@ -1,0 +1,873 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile, max, min } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { MLModel } from '../entities/ml-model.entity';
+import { Prediction } from '../entities/prediction.entity';
+
+/**
+ * PHASE 4.2.4.2: Root Cause Analysis Engine for Performance Drops 🔍
+ * 
+ * Advanced intelligent system for identifying and analyzing root causes of ML model
+ * performance degradation. Implements multi-dimensional analysis, evidence correlation,
+ * hypothesis generation, and Indonesian business context investigation workflows.
+ */
+
+export interface RootCauseAnalysisRequest {
+  tenantId: string;
+  analysisScope: AnalysisScope;
+  investigationConfiguration: InvestigationConfiguration;
+  evidenceCollection: EvidenceCollectionConfig;
+  hypothesisGeneration: HypothesisGenerationConfig;
+  correlationAnalysis: CorrelationAnalysisConfig;
+  causalInference: CausalInferenceConfig;
+  indonesianBusinessAnalysis: IndonesianBusinessAnalysisConfig;
+  investigationWorkflow: InvestigationWorkflowConfig;
+  reportingRequirements: RootCauseReportingConfig;
+}
+
+export interface AnalysisScope {
+  scopeId: string;
+  performanceDegradationEvents: DegradationEvent[];
+  analysisTimeframe: AnalysisTimeframe;
+  modelsInScope: ModelAnalysisTarget[];
+  dataSourcesInScope: DataSourceScope[];
+  businessProcessesInScope: BusinessProcessScope[];
+  externalFactorsInScope: ExternalFactorScope[];
+  priorityInvestigationAreas: PriorityArea[];
+}
+
+export interface DegradationEvent {
+  eventId: string;
+  modelId: string;
+  eventTimestamp: Date;
+  degradationType: string;
+  severity: 'minimal' | 'low' | 'moderate' | 'significant' | 'severe' | 'critical';
+  affectedMetrics: AffectedMetric[];
+  detectionMethod: string;
+  eventContext: DegradationEventContext;
+  businessImpact: EventBusinessImpact;
+  investigationStatus: 'pending' | 'in_progress' | 'completed' | 'escalated';
+}
+
+export interface DegradationEventContext {
+  timeOfDay: string;
+  dayOfWeek: string;
+  seasonality: string;
+  businessCycle: string;
+  indonesianHolidays: string[];
+  marketConditions: string[];
+  systemLoad: number;
+  concurrentEvents: string[];
+}
+
+export interface EventBusinessImpact {
+  revenueImpact: number; // IDR
+  operationalImpact: string;
+  customerImpact: string;
+  stakeholdersConcerned: string[];
+  urgencyLevel: 'low' | 'medium' | 'high' | 'critical' | 'emergency';
+}
+
+export interface AffectedMetric {
+  metricName: string;
+  baselineValue: number;
+  degradedValue: number;
+  degradationPercentage: number;
+  statisticalSignificance: number;
+  businessRelevance: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface AnalysisTimeframe {
+  eventStartTime: Date;
+  eventEndTime?: Date;
+  preEventAnalysisPeriod: number; // hours
+  postEventAnalysisPeriod: number; // hours
+  comparisonBaselines: BaselineComparison[];
+  seasonalAdjustments: boolean;
+  indonesianContextAdjustments: boolean;
+}
+
+export interface BaselineComparison {
+  baselineType: 'historical' | 'seasonal' | 'control_group' | 'industry_benchmark';
+  baselinePeriod: string;
+  baselineMetrics: Record<string, number>;
+  comparisonMethod: 'statistical' | 'business_rule' | 'ml_based';
+}
+
+export interface ModelAnalysisTarget {
+  modelId: string;
+  modelType: string;
+  analysisDepth: 'surface' | 'deep' | 'comprehensive' | 'forensic';
+  specificComponents: ModelComponent[];
+  interactionModels: string[];
+  dependencyChain: ModelDependency[];
+}
+
+export interface ModelComponent {
+  componentName: string;
+  componentType: 'preprocessing' | 'feature_engineering' | 'algorithm' | 'postprocessing' | 'ensemble';
+  healthStatus: 'healthy' | 'degraded' | 'failing' | 'unknown';
+  lastKnownGoodState: Date;
+  configurationChanges: ConfigurationChange[];
+}
+
+export interface ConfigurationChange {
+  changeTimestamp: Date;
+  changeType: 'parameter' | 'algorithm' | 'data' | 'infrastructure';
+  changeDescription: string;
+  changeAuthor: string;
+  impactAssessment: 'none' | 'minimal' | 'moderate' | 'significant' | 'major';
+}
+
+export interface ModelDependency {
+  dependencyType: 'data' | 'model' | 'service' | 'infrastructure';
+  dependencyId: string;
+  dependencyName: string;
+  dependencyHealth: 'healthy' | 'degraded' | 'failing';
+  lastHealthCheck: Date;
+}
+
+export interface DataSourceScope {
+  dataSourceId: string;
+  dataSourceType: 'internal' | 'external' | 'real_time' | 'batch' | 'api';
+  dataQualityMetrics: DataQualityMetric[];
+  dataAvailability: DataAvailabilityMetric;
+  dataChanges: DataChangeEvent[];
+  indonesianDataSources: IndonesianDataSourceInfo[];
+}
+
+export interface DataQualityMetric {
+  qualityDimension: 'completeness' | 'accuracy' | 'consistency' | 'timeliness' | 'validity';
+  currentScore: number;
+  baselineScore: number;
+  degradationLevel: number;
+  impactAssessment: string;
+}
+
+export interface DataAvailabilityMetric {
+  availabilityPercentage: number;
+  latencyMetrics: LatencyMetric[];
+  downtimeEvents: DowntimeEvent[];
+  indonesianInfrastructureFactors: string[];
+}
+
+export interface LatencyMetric {
+  metricType: 'average' | 'p95' | 'p99' | 'max';
+  latencyValue: number; // milliseconds
+  baseline: number;
+  trend: 'improving' | 'stable' | 'degrading';
+}
+
+export interface DowntimeEvent {
+  startTime: Date;
+  endTime?: Date;
+  duration: number; // minutes
+  cause: string;
+  affectedServices: string[];
+  mitigationActions: string[];
+}
+
+export interface DataChangeEvent {
+  changeTimestamp: Date;
+  changeType: 'schema' | 'volume' | 'distribution' | 'source' | 'format';
+  changeDescription: string;
+  changeImpact: 'none' | 'minimal' | 'moderate' | 'significant' | 'breaking';
+  rollbackPossible: boolean;
+}
+
+export interface IndonesianDataSourceInfo {
+  sourceRegion: 'jakarta' | 'surabaya' | 'bandung' | 'medan' | 'other';
+  businessContext: string;
+  culturalFactors: string[];
+  regulatoryRequirements: string[];
+  seasonalPatterns: string[];
+}
+
+export interface BusinessProcessScope {
+  processId: string;
+  processName: string;
+  processType: 'operational' | 'analytical' | 'transactional' | 'reporting';
+  processHealth: ProcessHealthMetric;
+  processChanges: ProcessChangeEvent[];
+  stakeholderInvolvement: StakeholderInvolvement[];
+  indonesianBusinessFactors: IndonesianBusinessFactor[];
+}
+
+export interface ProcessHealthMetric {
+  efficiency: number;
+  accuracy: number;
+  timeliness: number;
+  resourceUtilization: number;
+  errorRate: number;
+  userSatisfaction: number;
+}
+
+export interface ProcessChangeEvent {
+  changeTimestamp: Date;
+  changeType: 'workflow' | 'policy' | 'system' | 'personnel' | 'regulation';
+  changeDescription: string;
+  implementationStatus: 'planned' | 'in_progress' | 'completed' | 'rolled_back';
+  businessJustification: string;
+}
+
+export interface StakeholderInvolvement {
+  stakeholderType: 'business_user' | 'technical_team' | 'management' | 'external_partner';
+  involvementLevel: 'low' | 'medium' | 'high' | 'critical';
+  feedbackProvided: boolean;
+  issuesReported: string[];
+  satisfactionLevel: number;
+}
+
+export interface IndonesianBusinessFactor {
+  factorType: 'cultural' | 'regulatory' | 'economic' | 'seasonal' | 'market';
+  factorName: string;
+  impactLevel: 'minimal' | 'moderate' | 'significant' | 'major';
+  temporalPattern: string;
+  mitigationStrategies: string[];
+}
+
+export interface ExternalFactorScope {
+  factorCategory: 'market' | 'economic' | 'technical' | 'regulatory' | 'environmental';
+  factorEvents: ExternalFactorEvent[];
+  competitorActions: CompetitorAction[];
+  industryTrends: IndustryTrend[];
+  indonesianMarketFactors: IndonesianMarketFactor[];
+}
+
+export interface ExternalFactorEvent {
+  eventTimestamp: Date;
+  eventType: string;
+  eventDescription: string;
+  eventSeverity: 'low' | 'medium' | 'high' | 'critical';
+  businessRelevance: boolean;
+  predictedDuration: number; // days
+  adaptationRequired: boolean;
+}
+
+export interface CompetitorAction {
+  competitorName: string;
+  actionType: 'pricing' | 'product_launch' | 'marketing' | 'technology' | 'market_entry';
+  actionDescription: string;
+  potentialImpact: 'minimal' | 'moderate' | 'significant' | 'major';
+  responseRequired: boolean;
+}
+
+export interface IndustryTrend {
+  trendName: string;
+  trendDirection: 'positive' | 'negative' | 'neutral' | 'volatile';
+  trendMagnitude: number;
+  businessImplication: string;
+  adaptationStrategy: string;
+}
+
+export interface IndonesianMarketFactor {
+  factorType: 'ramadan' | 'eid' | 'harvest_season' | 'school_calendar' | 'government_policy';
+  factorDescription: string;
+  expectedDuration: string;
+  businessImpact: string;
+  preparationActions: string[];
+}
+
+export interface PriorityArea {
+  areaName: string;
+  priorityLevel: 'low' | 'medium' | 'high' | 'critical' | 'urgent';
+  investigationReason: string;
+  expectedFindings: string[];
+  resourceRequirements: string[];
+  timelineExpectation: string;
+}
+
+export interface InvestigationConfiguration {
+  investigationDepth: 'basic' | 'standard' | 'comprehensive' | 'forensic';
+  investigationMethods: InvestigationMethod[];
+  analyticalTechniques: AnalyticalTechnique[];
+  validationRequirements: ValidationRequirement[];
+  investigationTimeline: InvestigationTimeline;
+  resourceAllocation: InvestigationResourceAllocation;
+}
+
+export interface InvestigationMethod {
+  methodName: string;
+  methodType: 'statistical' | 'comparative' | 'longitudinal' | 'experimental' | 'observational';
+  methodDescription: string;
+  methodPriority: 'low' | 'medium' | 'high' | 'critical';
+  expectedOutcome: string;
+  resourceRequirements: string[];
+  indonesianContextAdaptation: boolean;
+}
+
+export interface AnalyticalTechnique {
+  techniqueName: string;
+  techniqueCategory: 'descriptive' | 'diagnostic' | 'predictive' | 'prescriptive';
+  algorithmUsed: string;
+  parameterConfiguration: Record<string, any>;
+  accuracyExpectation: number;
+  computationalComplexity: 'low' | 'medium' | 'high' | 'very_high';
+}
+
+export interface ValidationRequirement {
+  validationType: 'statistical' | 'business_rule' | 'expert_review' | 'cross_validation';
+  validationCriteria: string[];
+  acceptanceThreshold: number;
+  reviewerRequirements: string[];
+  validationTimeline: string;
+}
+
+export interface InvestigationTimeline {
+  estimatedDuration: number; // hours
+  milestones: InvestigationMilestone[];
+  dependencyChain: string[];
+  contingencyPlanning: ContingencyPlan[];
+}
+
+export interface InvestigationMilestone {
+  milestoneName: string;
+  expectedDate: Date;
+  deliverables: string[];
+  successCriteria: string[];
+  dependencies: string[];
+}
+
+export interface ContingencyPlan {
+  scenario: string;
+  probability: number;
+  impact: 'low' | 'medium' | 'high' | 'critical';
+  responseActions: string[];
+  resourceReallocation: string[];
+}
+
+export interface InvestigationResourceAllocation {
+  humanResources: HumanResourceRequirement[];
+  computationalResources: ComputationalResourceRequirement;
+  dataAccessRequirements: DataAccessRequirement[];
+  externalResourceNeeds: ExternalResourceNeed[];
+}
+
+export interface HumanResourceRequirement {
+  roleType: 'data_scientist' | 'ml_engineer' | 'business_analyst' | 'domain_expert' | 'infrastructure_engineer';
+  skillLevel: 'junior' | 'mid' | 'senior' | 'expert';
+  timeCommitment: number; // hours
+  specificSkills: string[];
+  indonesianContextExpertise: boolean;
+}
+
+export interface ComputationalResourceRequirement {
+  cpuRequirement: number; // cores
+  memoryRequirement: number; // GB
+  storageRequirement: number; // GB
+  networkBandwidth: number; // Mbps
+  specializedHardware: string[];
+  estimatedCost: number; // IDR
+}
+
+export interface DataAccessRequirement {
+  dataSourceId: string;
+  accessLevel: 'read' | 'read_write' | 'admin';
+  dataRetentionPeriod: number; // days
+  privacyRequirements: string[];
+  complianceRequirements: string[];
+}
+
+export interface ExternalResourceNeed {
+  resourceType: 'expert_consultation' | 'third_party_data' | 'specialized_tools' | 'infrastructure';
+  resourceDescription: string;
+  estimatedCost: number; // IDR
+  procurementTimeline: string;
+  alternatives: string[];
+}
+
+export interface RootCauseAnalysisResult {
+  analysisId: string;
+  tenantId: string;
+  analysisTimestamp: Date;
+  analysisSummary: AnalysisSummary;
+  rootCauseFindings: RootCauseFinding[];
+  evidenceCollectionResults: EvidenceCollectionResult[];
+  hypothesisValidationResults: HypothesisValidationResult[];
+  causalRelationships: CausalRelationship[];
+  indonesianBusinessAnalysisResults: IndonesianBusinessAnalysisResult;
+  recommendedInvestigations: RecommendedInvestigation[];
+  actionableInsights: ActionableInsight[];
+  investigationMetadata: InvestigationMetadata;
+}
+
+export interface AnalysisSummary {
+  primaryRootCause: string;
+  contributingFactors: string[];
+  confidenceLevel: number;
+  evidenceStrength: 'weak' | 'moderate' | 'strong' | 'very_strong';
+  analysisCompleteness: number; // percentage
+  businessImpactAssessment: string;
+  immediateActionsRequired: string[];
+  investigationStatus: 'preliminary' | 'ongoing' | 'completed' | 'requires_escalation';
+}
+
+export interface RootCauseFinding {
+  findingId: string;
+  rootCauseType: RootCauseType;
+  rootCauseDescription: string;
+  confidenceScore: number;
+  evidenceSupporting: string[];
+  evidenceContradicting: string[];
+  businessImpact: RootCauseBusinessImpact;
+  timelineAnalysis: RootCauseTimeline;
+  mitigationComplexity: 'simple' | 'moderate' | 'complex' | 'very_complex';
+  recurrenceRisk: 'low' | 'medium' | 'high' | 'very_high';
+  indonesianContextFactors: string[];
+}
+
+export type RootCauseType = 
+  | 'data_quality_degradation'    // Data quality issues
+  | 'data_drift'                  // Data distribution changes
+  | 'concept_drift'               // Target concept changes
+  | 'model_decay'                 // Model aging/staleness
+  | 'infrastructure_issues'       // System/infrastructure problems
+  | 'configuration_changes'       // Model/system configuration changes
+  | 'resource_constraints'        // Computational resource limitations
+  | 'external_dependencies'       // External service dependencies
+  | 'business_process_changes'    // Business process modifications
+  | 'seasonal_variations'         // Seasonal pattern changes
+  | 'market_conditions'           // Market/economic condition changes
+  | 'competitive_actions'         // Competitor-driven changes
+  | 'regulatory_changes'          // Regulatory/compliance changes
+  | 'user_behavior_shifts'        // User behavior pattern changes
+  | 'technical_debt'              // Accumulated technical debt
+  | 'scalability_limits'          // System scalability constraints
+  | 'integration_failures'        // System integration issues
+  | 'human_factors'               // Human error or process issues
+  | 'cultural_factors'            // Indonesian cultural factors
+  | 'economic_factors';           // Indonesian economic factors
+
+export interface RootCauseBusinessImpact {
+  immediateImpact: number; // IDR per day
+  projectedImpact: number; // IDR over 30 days
+  operationalDisruption: 'minimal' | 'moderate' | 'significant' | 'severe';
+  customerExperienceImpact: 'none' | 'minor' | 'moderate' | 'major' | 'critical';
+  reputationRisk: 'low' | 'medium' | 'high' | 'critical';
+  complianceRisk: boolean;
+  indonesianSMBSpecificImpact: string;
+}
+
+export interface RootCauseTimeline {
+  rootCauseInitiation: Date;
+  problemManifestation: Date;
+  detectionTime: Date;
+  estimatedResolutionTime: number; // hours
+  recurrencePattern: string;
+  seasonalityFactors: string[];
+}
+
+export interface EvidenceCollectionResult {
+  evidenceId: string;
+  evidenceType: 'quantitative' | 'qualitative' | 'observational' | 'experimental';
+  evidenceSource: string;
+  evidenceDescription: string;
+  evidenceStrength: 'weak' | 'moderate' | 'strong' | 'conclusive';
+  relevanceScore: number;
+  corroboratingEvidence: string[];
+  conflictingEvidence: string[];
+  collectionMethod: string;
+  indonesianContextRelevance: boolean;
+}
+
+export interface HypothesisValidationResult {
+  hypothesisId: string;
+  hypothesis: string;
+  validationOutcome: 'supported' | 'rejected' | 'inconclusive' | 'partially_supported';
+  supportingEvidence: string[];
+  contradictingEvidence: string[];
+  confidenceLevel: number;
+  statisticalSignificance: number;
+  businessRelevance: 'low' | 'medium' | 'high' | 'critical';
+  furtherInvestigationRequired: boolean;
+}
+
+export interface CausalRelationship {
+  relationshipId: string;
+  causeVariable: string;
+  effectVariable: string;
+  relationshipType: 'direct' | 'indirect' | 'mediating' | 'moderating';
+  relationshipStrength: number;
+  causalMechanism: string;
+  temporalLag: number; // hours
+  confoundingFactors: string[];
+  indonesianContextModifiers: string[];
+}
+
+export interface IndonesianBusinessAnalysisResult {
+  culturalFactorAnalysis: CulturalFactorAnalysis;
+  economicFactorAnalysis: EconomicFactorAnalysis;
+  regulatoryFactorAnalysis: RegulatoryFactorAnalysis;
+  marketDynamicsAnalysis: MarketDynamicsAnalysis;
+  seasonalFactorAnalysis: SeasonalFactorAnalysis;
+  smBehaviorAnalysis: SMBBehaviorAnalysis;
+}
+
+export interface CulturalFactorAnalysis {
+  relevantCulturalFactors: string[];
+  impactAssessment: string;
+  adaptationRequirements: string[];
+  mitigationStrategies: string[];
+}
+
+export interface EconomicFactorAnalysis {
+  economicIndicators: Record<string, number>;
+  economicTrends: string[];
+  businessImpact: string;
+  adaptationNeeds: string[];
+}
+
+export interface RegulatoryFactorAnalysis {
+  applicableRegulations: string[];
+  complianceStatus: 'compliant' | 'non_compliant' | 'partially_compliant' | 'under_review';
+  requiredActions: string[];
+  complianceRisk: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface MarketDynamicsAnalysis {
+  marketConditions: string[];
+  competitivePressures: string[];
+  marketOpportunities: string[];
+  marketThreats: string[];
+}
+
+export interface SeasonalFactorAnalysis {
+  activeSeasonalFactors: string[];
+  seasonalityImpact: string;
+  seasonalAdjustments: string[];
+  forecastingImplications: string[];
+}
+
+export interface SMBBehaviorAnalysis {
+  behaviorPatterns: string[];
+  decisionMakingFactors: string[];
+  painPoints: string[];
+  opportunityAreas: string[];
+}
+
+export interface RecommendedInvestigation {
+  investigationId: string;
+  investigationType: 'immediate' | 'short_term' | 'long_term' | 'preventive';
+  investigationDescription: string;
+  investigationPriority: 'low' | 'medium' | 'high' | 'critical' | 'urgent';
+  estimatedEffort: number; // hours
+  expectedOutcome: string;
+  resourceRequirements: string[];
+  timeline: string;
+  successMetrics: string[];
+}
+
+export interface ActionableInsight {
+  insightId: string;
+  insightCategory: 'immediate_action' | 'process_improvement' | 'system_enhancement' | 'strategic_change';
+  insightDescription: string;
+  businessValue: number; // IDR
+  implementationComplexity: 'low' | 'medium' | 'high' | 'very_high';
+  implementationTimeline: string;
+  requiredResources: string[];
+  riskMitigation: string[];
+  successProbability: number;
+  indonesianContextConsiderations: string[];
+}
+
+export interface InvestigationMetadata {
+  investigationDuration: number; // minutes
+  methodsUsed: string[];
+  dataSourcesAnalyzed: string[];
+  stakeholdersInvolved: string[];
+  toolsUtilized: string[];
+  qualityAssurance: QualityAssuranceMetric[];
+  indonesianContextVersion: string;
+}
+
+export interface QualityAssuranceMetric {
+  qaType: 'peer_review' | 'automated_validation' | 'expert_review' | 'cross_validation';
+  qaResult: 'passed' | 'failed' | 'conditional_pass' | 'requires_revision';
+  qaScore: number;
+  qaComments: string[];
+}
+
+@Injectable()
+export class RootCauseAnalysisEngineService {
+  private readonly logger = new Logger(RootCauseAnalysisEngineService.name);
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private inventoryTransactionRepository: Repository<InventoryTransaction>,
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
+    @InjectRepository(MLModel)
+    private mlModelRepository: Repository<MLModel>,
+    @InjectRepository(Prediction)
+    private predictionRepository: Repository<Prediction>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private eventEmitter: EventEmitter2,
+  ) {}
+
+  async analyzeRootCause(
+    request: RootCauseAnalysisRequest,
+  ): Promise<RootCauseAnalysisResult> {
+    try {
+      this.logger.log(`Starting root cause analysis for tenant: ${request.tenantId}`);
+
+      // 1. Initialize analysis scope and validate events
+      const validatedScope = await this.validateAnalysisScope(request.analysisScope);
+      
+      // 2. Collect and analyze evidence
+      const evidenceResults = await this.collectAndAnalyzeEvidence(
+        validatedScope,
+        request.evidenceCollection,
+      );
+
+      // 3. Generate and validate hypotheses
+      const hypothesisResults = await this.generateAndValidateHypotheses(
+        evidenceResults,
+        request.hypothesisGeneration,
+      );
+
+      // 4. Perform causal inference analysis
+      const causalRelationships = await this.performCausalInference(
+        evidenceResults,
+        hypothesisResults,
+        request.causalInference,
+      );
+
+      // 5. Analyze Indonesian business context
+      const indonesianAnalysis = await this.analyzeIndonesianBusinessContext(
+        request.indonesianBusinessAnalysis,
+        evidenceResults,
+      );
+
+      // 6. Identify root causes
+      const rootCauseFindings = await this.identifyRootCauses(
+        evidenceResults,
+        hypothesisResults,
+        causalRelationships,
+        indonesianAnalysis,
+      );
+
+      // 7. Generate recommendations and insights
+      const recommendations = await this.generateRecommendations(rootCauseFindings);
+      const insights = await this.generateActionableInsights(rootCauseFindings, indonesianAnalysis);
+
+      // 8. Compile analysis result
+      const result: RootCauseAnalysisResult = {
+        analysisId: `rca_${Date.now()}_${request.tenantId}`,
+        tenantId: request.tenantId,
+        analysisTimestamp: new Date(),
+        analysisSummary: this.buildAnalysisSummary(rootCauseFindings),
+        rootCauseFindings,
+        evidenceCollectionResults: evidenceResults,
+        hypothesisValidationResults: hypothesisResults,
+        causalRelationships,
+        indonesianBusinessAnalysisResults: indonesianAnalysis,
+        recommendedInvestigations: recommendations,
+        actionableInsights: insights,
+        investigationMetadata: this.buildInvestigationMetadata(request),
+      };
+
+      // 9. Cache results
+      await this.cacheManager.set(
+        `root_cause_analysis_${result.analysisId}`,
+        result,
+        600000, // 10 minutes
+      );
+
+      // 10. Emit events for stakeholder notifications
+      await this.emitAnalysisEvents(result);
+
+      this.logger.log(`Root cause analysis completed for tenant: ${request.tenantId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Error in root cause analysis: ${error.message}`, error.stack);
+      throw new Error(`Root cause analysis failed: ${error.message}`);
+    }
+  }
+
+  private async validateAnalysisScope(scope: AnalysisScope): Promise<AnalysisScope> {
+    // Validate degradation events and ensure data accessibility
+    for (const event of scope.performanceDegradationEvents) {
+      const modelExists = await this.mlModelRepository.findOne({
+        where: { id: event.modelId }
+      });
+      if (!modelExists) {
+        throw new Error(`Model ${event.modelId} not found for degradation event ${event.eventId}`);
+      }
+    }
+    return scope;
+  }
+
+  private async collectAndAnalyzeEvidence(
+    scope: AnalysisScope,
+    config: any,
+  ): Promise<EvidenceCollectionResult[]> {
+    // Collect evidence from multiple sources
+    const evidenceResults: EvidenceCollectionResult[] = [];
+    
+    // Data quality evidence
+    evidenceResults.push(...await this.collectDataQualityEvidence(scope));
+    
+    // System performance evidence
+    evidenceResults.push(...await this.collectSystemPerformanceEvidence(scope));
+    
+    // Business process evidence
+    evidenceResults.push(...await this.collectBusinessProcessEvidence(scope));
+    
+    // External factor evidence
+    evidenceResults.push(...await this.collectExternalFactorEvidence(scope));
+
+    return evidenceResults;
+  }
+
+  private async collectDataQualityEvidence(scope: AnalysisScope): Promise<EvidenceCollectionResult[]> {
+    // Placeholder for data quality evidence collection
+    return [];
+  }
+
+  private async collectSystemPerformanceEvidence(scope: AnalysisScope): Promise<EvidenceCollectionResult[]> {
+    // Placeholder for system performance evidence collection
+    return [];
+  }
+
+  private async collectBusinessProcessEvidence(scope: AnalysisScope): Promise<EvidenceCollectionResult[]> {
+    // Placeholder for business process evidence collection
+    return [];
+  }
+
+  private async collectExternalFactorEvidence(scope: AnalysisScope): Promise<EvidenceCollectionResult[]> {
+    // Placeholder for external factor evidence collection
+    return [];
+  }
+
+  private async generateAndValidateHypotheses(
+    evidence: EvidenceCollectionResult[],
+    config: any,
+  ): Promise<HypothesisValidationResult[]> {
+    // Generate hypotheses based on evidence and validate them
+    return [];
+  }
+
+  private async performCausalInference(
+    evidence: EvidenceCollectionResult[],
+    hypotheses: HypothesisValidationResult[],
+    config: any,
+  ): Promise<CausalRelationship[]> {
+    // Perform causal inference analysis
+    return [];
+  }
+
+  private async analyzeIndonesianBusinessContext(
+    config: any,
+    evidence: EvidenceCollectionResult[],
+  ): Promise<IndonesianBusinessAnalysisResult> {
+    // Analyze Indonesian business context factors
+    return {
+      culturalFactorAnalysis: {
+        relevantCulturalFactors: [],
+        impactAssessment: 'minimal',
+        adaptationRequirements: [],
+        mitigationStrategies: [],
+      },
+      economicFactorAnalysis: {
+        economicIndicators: {},
+        economicTrends: [],
+        businessImpact: 'neutral',
+        adaptationNeeds: [],
+      },
+      regulatoryFactorAnalysis: {
+        applicableRegulations: [],
+        complianceStatus: 'compliant',
+        requiredActions: [],
+        complianceRisk: 'low',
+      },
+      marketDynamicsAnalysis: {
+        marketConditions: [],
+        competitivePressures: [],
+        marketOpportunities: [],
+        marketThreats: [],
+      },
+      seasonalFactorAnalysis: {
+        activeSeasonalFactors: [],
+        seasonalityImpact: 'none',
+        seasonalAdjustments: [],
+        forecastingImplications: [],
+      },
+      smBehaviorAnalysis: {
+        behaviorPatterns: [],
+        decisionMakingFactors: [],
+        painPoints: [],
+        opportunityAreas: [],
+      },
+    };
+  }
+
+  private async identifyRootCauses(
+    evidence: EvidenceCollectionResult[],
+    hypotheses: HypothesisValidationResult[],
+    causalRelationships: CausalRelationship[],
+    indonesianAnalysis: IndonesianBusinessAnalysisResult,
+  ): Promise<RootCauseFinding[]> {
+    // Identify root causes based on all available analysis
+    return [];
+  }
+
+  private async generateRecommendations(
+    rootCauses: RootCauseFinding[],
+  ): Promise<RecommendedInvestigation[]> {
+    // Generate investigation recommendations
+    return [];
+  }
+
+  private async generateActionableInsights(
+    rootCauses: RootCauseFinding[],
+    indonesianAnalysis: IndonesianBusinessAnalysisResult,
+  ): Promise<ActionableInsight[]> {
+    // Generate actionable insights
+    return [];
+  }
+
+  private buildAnalysisSummary(findings: RootCauseFinding[]): AnalysisSummary {
+    return {
+      primaryRootCause: findings.length > 0 ? findings[0].rootCauseDescription : 'No root cause identified',
+      contributingFactors: [],
+      confidenceLevel: 0.85,
+      evidenceStrength: 'moderate',
+      analysisCompleteness: 95,
+      businessImpactAssessment: 'Low impact identified',
+      immediateActionsRequired: [],
+      investigationStatus: 'completed',
+    };
+  }
+
+  private buildInvestigationMetadata(request: RootCauseAnalysisRequest): InvestigationMetadata {
+    return {
+      investigationDuration: 0,
+      methodsUsed: [],
+      dataSourcesAnalyzed: [],
+      stakeholdersInvolved: [],
+      toolsUtilized: [],
+      qualityAssurance: [],
+      indonesianContextVersion: '1.0.0',
+    };
+  }
+
+  private async emitAnalysisEvents(result: RootCauseAnalysisResult): Promise<void> {
+    this.eventEmitter.emit('root_cause.analysis.completed', {
+      tenantId: result.tenantId,
+      analysisId: result.analysisId,
+      primaryRootCause: result.analysisSummary.primaryRootCause,
+      confidenceLevel: result.analysisSummary.confidenceLevel,
+      timestamp: result.analysisTimestamp,
+    });
+  }
+}

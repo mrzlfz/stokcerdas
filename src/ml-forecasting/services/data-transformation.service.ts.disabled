@@ -1,0 +1,1854 @@
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+
+import { TimeSeriesDataPoint } from './data-pipeline.service';
+import {
+  InventoryHistoryPoint,
+  ProductLifecyclePoint,
+  OrderPatternPoint,
+  ExternalDataPoint,
+} from './historical-data-extraction.service';
+
+export interface TransformationRequest {
+  jobId: string;
+  tenantId: string;
+  data: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: InventoryHistoryPoint[];
+    products?: ProductLifecyclePoint[];
+    orders?: OrderPatternPoint[];
+    external?: ExternalDataPoint[];
+  };
+  transformations: TransformationRule[];
+  cleaningRules: CleaningRule[];
+  qualityThresholds: QualityThreshold[];
+  outputFormat: 'ml_ready' | 'analysis_ready' | 'visualization_ready';
+  validateOutput?: boolean;
+}
+
+export interface TransformationRule {
+  id: string;
+  name: string;
+  type: 'normalize' | 'standardize' | 'encode' | 'scale' | 'aggregate' | 'derive' | 'filter';
+  targetFields: string[];
+  parameters: Record<string, any>;
+  applyTo: ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+  priority: number;
+  enabled: boolean;
+  description?: string;
+}
+
+export interface CleaningRule {
+  id: string;
+  name: string;
+  type: 'outlier_removal' | 'missing_value_imputation' | 'duplicate_removal' | 'data_validation' | 'format_correction';
+  targetFields: string[];
+  method: string;
+  parameters: Record<string, any>;
+  applyTo: ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+  severity: 'warning' | 'error' | 'critical';
+  autoFix: boolean;
+  description?: string;
+}
+
+export interface QualityThreshold {
+  metric: 'completeness' | 'accuracy' | 'consistency' | 'uniqueness' | 'validity';
+  threshold: number;
+  action: 'warning' | 'reject' | 'auto_fix';
+  scope: 'field' | 'record' | 'dataset';
+}
+
+export interface TransformationResult {
+  jobId: string;
+  status: 'completed' | 'partial' | 'failed';
+  transformedData: {
+    sales?: ProcessedDataPoint[];
+    inventory?: ProcessedDataPoint[];
+    products?: ProcessedDataPoint[];
+    orders?: ProcessedDataPoint[];
+    external?: ProcessedDataPoint[];
+    combined?: ProcessedDataPoint[];
+  };
+  metadata: {
+    processingTime: number;
+    recordsProcessed: Record<string, number>;
+    recordsOutput: Record<string, number>;
+    qualityScores: Record<string, number>;
+    transformationsApplied: string[];
+    cleaningActions: CleaningAction[];
+  };
+  quality: QualityReport;
+  warnings: string[];
+  errors: string[];
+  recommendations: string[];
+}
+
+export interface ProcessedDataPoint {
+  id: string;
+  timestamp: string;
+  features: Record<string, number | string | boolean>;
+  target?: number;
+  metadata: {
+    originalDataType: string;
+    transformationsApplied: string[];
+    qualityScore: number;
+    confidence: number;
+  };
+}
+
+export interface CleaningAction {
+  rule: string;
+  field: string;
+  action: 'removed' | 'imputed' | 'corrected' | 'flagged';
+  count: number;
+  impact: 'low' | 'medium' | 'high';
+  details: string;
+}
+
+export interface QualityReport {
+  overall: number;
+  byDataType: Record<string, number>;
+  byMetric: Record<string, number>;
+  issues: QualityIssue[];
+  improvements: string[];
+}
+
+export interface QualityIssue {
+  severity: 'warning' | 'error' | 'critical';
+  type: string;
+  field: string;
+  message: string;
+  count: number;
+  impact: string;
+  suggestion: string;
+}
+
+@Injectable()
+export class DataTransformationService {
+  private readonly logger = new Logger(DataTransformationService.name);
+
+  // Indonesian business context constants
+  private readonly indonesianTimezones = ['WIB', 'WITA', 'WIT'];
+  private readonly indonesianCurrency = 'IDR';
+  private readonly businessDays = [1, 2, 3, 4, 5]; // Monday to Friday
+  private readonly indonesianHolidays = [
+    '01-01', // New Year
+    '04-10', // Eid al-Fitr (approximate)
+    '08-17', // Independence Day
+    '12-25', // Christmas
+  ];
+
+  constructor(
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
+    private eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * PHASE 2.2.3: Main data transformation and cleaning entry point
+   */
+  async transformAndCleanData(
+    request: TransformationRequest,
+  ): Promise<TransformationResult> {
+    const startTime = Date.now();
+    
+    this.logger.log(`Starting data transformation for job ${request.jobId}`);
+
+    const result: TransformationResult = {
+      jobId: request.jobId,
+      status: 'completed',
+      transformedData: {},
+      metadata: {
+        processingTime: 0,
+        recordsProcessed: {},
+        recordsOutput: {},
+        qualityScores: {},
+        transformationsApplied: [],
+        cleaningActions: [],
+      },
+      quality: {
+        overall: 0,
+        byDataType: {},
+        byMetric: {},
+        issues: [],
+        improvements: [],
+      },
+      warnings: [],
+      errors: [],
+      recommendations: [],
+    };
+
+    try {
+      // 1. Validate transformation request
+      await this.validateTransformationRequest(request);
+
+      // 2. Apply data cleaning rules first
+      const cleanedData = await this.applyDataCleaning(request.data, request.cleaningRules);
+      result.metadata.cleaningActions = cleanedData.actions;
+
+      // 3. Apply transformations to cleaned data
+      const transformedData = await this.applyTransformations(
+        cleanedData.data,
+        request.transformations,
+      );
+      result.transformedData = transformedData.data;
+      result.metadata.transformationsApplied = transformedData.applied;
+
+      // 4. Perform quality validation
+      if (request.validateOutput) {
+        const qualityReport = await this.validateTransformedData(
+          result.transformedData,
+          request.qualityThresholds,
+        );
+        result.quality = qualityReport;
+      }
+
+      // 5. Format output based on requested format
+      if (request.outputFormat === 'ml_ready') {
+        result.transformedData = await this.formatForML(result.transformedData);
+      } else if (request.outputFormat === 'analysis_ready') {
+        result.transformedData = await this.formatForAnalysis(result.transformedData);
+      } else if (request.outputFormat === 'visualization_ready') {
+        result.transformedData = await this.formatForVisualization(result.transformedData);
+      }
+
+      // 6. Calculate final metrics
+      result.metadata.processingTime = Date.now() - startTime;
+      result.metadata.recordsProcessed = this.countRecords(request.data);
+      result.metadata.recordsOutput = this.countRecords(result.transformedData);
+
+      // 7. Generate recommendations
+      result.recommendations = await this.generateTransformationRecommendations(result);
+
+      // 8. Emit completion event
+      this.eventEmitter.emit('transformation.completed', {
+        jobId: request.jobId,
+        tenantId: request.tenantId,
+        processingTime: result.metadata.processingTime,
+        qualityScore: result.quality.overall,
+      });
+
+      this.logger.log(`Data transformation completed for job ${request.jobId} in ${result.metadata.processingTime}ms`);
+
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Data transformation failed for job ${request.jobId}: ${error.message}`, error.stack);
+      
+      result.status = 'failed';
+      result.errors.push(error.message);
+      result.metadata.processingTime = Date.now() - startTime;
+
+      // Emit error event
+      this.eventEmitter.emit('transformation.failed', {
+        jobId: request.jobId,
+        tenantId: request.tenantId,
+        error: error.message,
+      });
+
+      return result;
+    }
+  }
+
+  /**
+   * Apply data cleaning rules to raw data
+   */
+  private async applyDataCleaning(
+    data: TransformationRequest['data'],
+    cleaningRules: CleaningRule[],
+  ): Promise<{
+    data: TransformationRequest['data'];
+    actions: CleaningAction[];
+  }> {
+    this.logger.debug('Applying data cleaning rules');
+
+    const cleanedData = JSON.parse(JSON.stringify(data)); // Deep clone
+    const actions: CleaningAction[] = [];
+
+    // Sort rules by severity (critical first)
+    const sortedRules = cleaningRules.sort((a, b) => {
+      const severityOrder = { critical: 3, error: 2, warning: 1 };
+      return severityOrder[b.severity] - severityOrder[a.severity];
+    });
+
+    for (const rule of sortedRules) {
+      this.logger.debug(`Applying cleaning rule: ${rule.name}`);
+
+      for (const dataType of rule.applyTo) {
+        if (!cleanedData[dataType]) continue;
+
+        const ruleActions = await this.applySingleCleaningRule(
+          cleanedData[dataType],
+          rule,
+          dataType,
+        );
+        actions.push(...ruleActions);
+      }
+    }
+
+    return { data: cleanedData, actions };
+  }
+
+  /**
+   * Apply a single cleaning rule to data
+   */
+  private async applySingleCleaningRule(
+    dataArray: any[],
+    rule: CleaningRule,
+    dataType: string,
+  ): Promise<CleaningAction[]> {
+    const actions: CleaningAction[] = [];
+
+    switch (rule.type) {
+      case 'outlier_removal':
+        actions.push(...await this.removeOutliers(dataArray, rule, dataType));
+        break;
+
+      case 'missing_value_imputation':
+        actions.push(...await this.imputeMissingValues(dataArray, rule, dataType));
+        break;
+
+      case 'duplicate_removal':
+        actions.push(...await this.removeDuplicates(dataArray, rule, dataType));
+        break;
+
+      case 'data_validation':
+        actions.push(...await this.validateDataFormat(dataArray, rule, dataType));
+        break;
+
+      case 'format_correction':
+        actions.push(...await this.correctDataFormat(dataArray, rule, dataType));
+        break;
+
+      default:
+        this.logger.warn(`Unknown cleaning rule type: ${rule.type}`);
+    }
+
+    return actions;
+  }
+
+  /**
+   * Remove outliers using statistical methods
+   */
+  private async removeOutliers(
+    dataArray: any[],
+    rule: CleaningRule,
+    dataType: string,
+  ): Promise<CleaningAction[]> {
+    const actions: CleaningAction[] = [];
+
+    for (const field of rule.targetFields) {
+      const values = dataArray
+        .map(item => this.getFieldValue(item, field))
+        .filter(val => val !== null && val !== undefined && !isNaN(val as number))
+        .map(val => Number(val));
+
+      if (values.length === 0) continue;
+
+      const { outliers, method } = this.detectOutliers(values, rule.method, rule.parameters);
+      let removedCount = 0;
+
+      // Remove outliers from original array
+      const outlierIndices = new Set<number>();
+      dataArray.forEach((item, index) => {
+        const value = Number(this.getFieldValue(item, field));
+        if (outliers.includes(value)) {
+          outlierIndices.add(index);
+        }
+      });
+
+      // Remove in reverse order to maintain indices
+      Array.from(outlierIndices)
+        .sort((a, b) => b - a)
+        .forEach(index => {
+          if (rule.autoFix) {
+            dataArray.splice(index, 1);
+            removedCount++;
+          }
+        });
+
+      if (removedCount > 0) {
+        actions.push({
+          rule: rule.name,
+          field,
+          action: 'removed',
+          count: removedCount,
+          impact: removedCount > values.length * 0.1 ? 'high' : removedCount > values.length * 0.05 ? 'medium' : 'low',
+          details: `Removed ${removedCount} outliers using ${method} method`,
+        });
+      }
+    }
+
+    return actions;
+  }
+
+  /**
+   * Impute missing values
+   */
+  private async imputeMissingValues(
+    dataArray: any[],
+    rule: CleaningRule,
+    dataType: string,
+  ): Promise<CleaningAction[]> {
+    const actions: CleaningAction[] = [];
+
+    for (const field of rule.targetFields) {
+      let imputedCount = 0;
+      const method = rule.method || 'mean';
+
+      // Calculate imputation value
+      const imputationValue = this.calculateImputationValue(dataArray, field, method, rule.parameters);
+
+      // Apply imputation
+      dataArray.forEach(item => {
+        const value = this.getFieldValue(item, field);
+        if (value === null || value === undefined || value === '' || (typeof value === 'number' && isNaN(value))) {
+          if (rule.autoFix) {
+            this.setFieldValue(item, field, imputationValue);
+            imputedCount++;
+          }
+        }
+      });
+
+      if (imputedCount > 0) {
+        actions.push({
+          rule: rule.name,
+          field,
+          action: 'imputed',
+          count: imputedCount,
+          impact: imputedCount > dataArray.length * 0.2 ? 'high' : imputedCount > dataArray.length * 0.1 ? 'medium' : 'low',
+          details: `Imputed ${imputedCount} missing values using ${method} method (value: ${imputationValue})`,
+        });
+      }
+    }
+
+    return actions;
+  }
+
+  /**
+   * Remove duplicate records
+   */
+  private async removeDuplicates(
+    dataArray: any[],
+    rule: CleaningRule,
+    dataType: string,
+  ): Promise<CleaningAction[]> {
+    const actions: CleaningAction[] = [];
+    const keyField = rule.parameters.keyField || 'id';
+    const seen = new Set<string>();
+    const duplicateIndices: number[] = [];
+
+    dataArray.forEach((item, index) => {
+      const key = rule.targetFields.map(field => this.getFieldValue(item, field)).join('|');
+      if (seen.has(key)) {
+        duplicateIndices.push(index);
+      } else {
+        seen.add(key);
+      }
+    });
+
+    if (duplicateIndices.length > 0 && rule.autoFix) {
+      // Remove duplicates in reverse order
+      duplicateIndices.reverse().forEach(index => {
+        dataArray.splice(index, 1);
+      });
+
+      actions.push({
+        rule: rule.name,
+        field: rule.targetFields.join(', '),
+        action: 'removed',
+        count: duplicateIndices.length,
+        impact: duplicateIndices.length > dataArray.length * 0.1 ? 'high' : 'low',
+        details: `Removed ${duplicateIndices.length} duplicate records`,
+      });
+    }
+
+    return actions;
+  }
+
+  /**
+   * Validate data format and values
+   */
+  private async validateDataFormat(
+    dataArray: any[],
+    rule: CleaningRule,
+    dataType: string,
+  ): Promise<CleaningAction[]> {
+    const actions: CleaningAction[] = [];
+
+    for (const field of rule.targetFields) {
+      let invalidCount = 0;
+      const validator = rule.parameters.validator;
+
+      dataArray.forEach(item => {
+        const value = this.getFieldValue(item, field);
+        if (!this.validateValue(value, validator, rule.parameters)) {
+          invalidCount++;
+          if (rule.autoFix) {
+            // Flag invalid records
+            this.setFieldValue(item, `${field}_invalid`, true);
+          }
+        }
+      });
+
+      if (invalidCount > 0) {
+        actions.push({
+          rule: rule.name,
+          field,
+          action: 'flagged',
+          count: invalidCount,
+          impact: invalidCount > dataArray.length * 0.1 ? 'high' : 'low',
+          details: `Flagged ${invalidCount} records with invalid ${field} values`,
+        });
+      }
+    }
+
+    return actions;
+  }
+
+  /**
+   * Correct data format issues
+   */
+  private async correctDataFormat(
+    dataArray: any[],
+    rule: CleaningRule,
+    dataType: string,
+  ): Promise<CleaningAction[]> {
+    const actions: CleaningAction[] = [];
+
+    for (const field of rule.targetFields) {
+      let correctedCount = 0;
+      const formatter = rule.parameters.formatter;
+
+      dataArray.forEach(item => {
+        const value = this.getFieldValue(item, field);
+        const correctedValue = this.formatValue(value, formatter, rule.parameters);
+        
+        if (correctedValue !== value && rule.autoFix) {
+          this.setFieldValue(item, field, correctedValue);
+          correctedCount++;
+        }
+      });
+
+      if (correctedCount > 0) {
+        actions.push({
+          rule: rule.name,
+          field,
+          action: 'corrected',
+          count: correctedCount,
+          impact: 'low',
+          details: `Corrected ${correctedCount} ${field} format issues`,
+        });
+      }
+    }
+
+    return actions;
+  }
+
+  /**
+   * Apply transformation rules to cleaned data
+   */
+  private async applyTransformations(
+    data: TransformationRequest['data'],
+    transformationRules: TransformationRule[],
+  ): Promise<{
+    data: { [key: string]: ProcessedDataPoint[] };
+    applied: string[];
+  }> {
+    this.logger.debug('Applying transformation rules');
+
+    const transformedData: { [key: string]: ProcessedDataPoint[] } = {};
+    const appliedTransformations: string[] = [];
+
+    // Sort rules by priority
+    const sortedRules = transformationRules
+      .filter(rule => rule.enabled)
+      .sort((a, b) => a.priority - b.priority);
+
+    for (const rule of sortedRules) {
+      this.logger.debug(`Applying transformation: ${rule.name}`);
+
+      for (const dataType of rule.applyTo) {
+        if (!data[dataType]) continue;
+
+        if (!transformedData[dataType]) {
+          transformedData[dataType] = this.convertToProcessedDataPoints(data[dataType], dataType);
+        }
+
+        await this.applySingleTransformation(transformedData[dataType], rule);
+        appliedTransformations.push(`${rule.name} (${dataType})`);
+      }
+    }
+
+    return { data: transformedData, applied: appliedTransformations };
+  }
+
+  /**
+   * Apply a single transformation rule
+   */
+  private async applySingleTransformation(
+    dataPoints: ProcessedDataPoint[],
+    rule: TransformationRule,
+  ): Promise<void> {
+    switch (rule.type) {
+      case 'normalize':
+        this.normalizeFields(dataPoints, rule.targetFields, rule.parameters);
+        break;
+
+      case 'standardize':
+        this.standardizeFields(dataPoints, rule.targetFields, rule.parameters);
+        break;
+
+      case 'encode':
+        this.encodeFields(dataPoints, rule.targetFields, rule.parameters);
+        break;
+
+      case 'scale':
+        this.scaleFields(dataPoints, rule.targetFields, rule.parameters);
+        break;
+
+      case 'aggregate':
+        await this.aggregateFields(dataPoints, rule.targetFields, rule.parameters);
+        break;
+
+      case 'derive':
+        this.deriveFields(dataPoints, rule.targetFields, rule.parameters);
+        break;
+
+      case 'filter':
+        this.filterRecords(dataPoints, rule.targetFields, rule.parameters);
+        break;
+
+      default:
+        this.logger.warn(`Unknown transformation type: ${rule.type}`);
+    }
+
+    // Update metadata for each processed point
+    dataPoints.forEach(point => {
+      point.metadata.transformationsApplied.push(rule.name);
+    });
+  }
+
+  // ========== TRANSFORMATION METHODS ==========
+
+  /**
+   * Normalize fields to 0-1 range
+   */
+  private normalizeFields(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    parameters: Record<string, any>,
+  ): void {
+    for (const field of fields) {
+      const values = dataPoints
+        .map(point => Number(point.features[field]))
+        .filter(val => !isNaN(val));
+
+      if (values.length === 0) continue;
+
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min;
+
+      if (range > 0) {
+        dataPoints.forEach(point => {
+          const value = Number(point.features[field]);
+          if (!isNaN(value)) {
+            point.features[`${field}_normalized`] = (value - min) / range;
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Standardize fields (z-score normalization)
+   */
+  private standardizeFields(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    parameters: Record<string, any>,
+  ): void {
+    for (const field of fields) {
+      const values = dataPoints
+        .map(point => Number(point.features[field]))
+        .filter(val => !isNaN(val));
+
+      if (values.length === 0) continue;
+
+      const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+      const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+      const stdDev = Math.sqrt(variance);
+
+      if (stdDev > 0) {
+        dataPoints.forEach(point => {
+          const value = Number(point.features[field]);
+          if (!isNaN(value)) {
+            point.features[`${field}_standardized`] = (value - mean) / stdDev;
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Encode categorical fields
+   */
+  private encodeFields(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    parameters: Record<string, any>,
+  ): void {
+    const encodingType = parameters.encoding || 'label'; // 'label', 'onehot', 'target'
+
+    for (const field of fields) {
+      if (encodingType === 'label') {
+        this.labelEncodeField(dataPoints, field);
+      } else if (encodingType === 'onehot') {
+        this.oneHotEncodeField(dataPoints, field);
+      } else if (encodingType === 'target') {
+        this.targetEncodeField(dataPoints, field, parameters.targetField);
+      }
+    }
+  }
+
+  /**
+   * Scale fields using specified method
+   */
+  private scaleFields(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    parameters: Record<string, any>,
+  ): void {
+    const scalingMethod = parameters.method || 'minmax'; // 'minmax', 'robust', 'quantile'
+
+    for (const field of fields) {
+      if (scalingMethod === 'minmax') {
+        this.minMaxScale(dataPoints, field, parameters.range || [0, 1]);
+      } else if (scalingMethod === 'robust') {
+        this.robustScale(dataPoints, field);
+      } else if (scalingMethod === 'quantile') {
+        this.quantileScale(dataPoints, field, parameters.quantiles || [0.25, 0.75]);
+      }
+    }
+  }
+
+  /**
+   * Aggregate fields using time windows or grouping
+   */
+  private async aggregateFields(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    parameters: Record<string, any>,
+  ): Promise<void> {
+    const aggregationType = parameters.type || 'time_window'; // 'time_window', 'group_by'
+    const window = parameters.window || '1d'; // '1h', '1d', '1w', '1m'
+    const functions = parameters.functions || ['mean']; // 'mean', 'sum', 'count', 'min', 'max', 'std'
+
+    if (aggregationType === 'time_window') {
+      await this.aggregateByTimeWindow(dataPoints, fields, window, functions);
+    } else if (aggregationType === 'group_by') {
+      await this.aggregateByGroup(dataPoints, fields, parameters.groupBy, functions);
+    }
+  }
+
+  /**
+   * Derive new fields based on existing ones
+   */
+  private deriveFields(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    parameters: Record<string, any>,
+  ): void {
+    const derivations = parameters.derivations || [];
+
+    for (const derivation of derivations) {
+      const newField = derivation.name;
+      const formula = derivation.formula;
+      const sourceFields = derivation.sourceFields || [];
+
+      dataPoints.forEach(point => {
+        try {
+          const value = this.evaluateFormula(formula, point.features, sourceFields);
+          point.features[newField] = value;
+        } catch (error) {
+          this.logger.warn(`Failed to derive field ${newField}: ${error.message}`);
+          point.features[newField] = null;
+        }
+      });
+    }
+  }
+
+  /**
+   * Filter records based on conditions
+   */
+  private filterRecords(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    parameters: Record<string, any>,
+  ): void {
+    const conditions = parameters.conditions || [];
+    
+    // Apply each condition to filter the array
+    for (const condition of conditions) {
+      const field = condition.field;
+      const operator = condition.operator; // '>', '<', '>=', '<=', '==', '!=', 'in', 'not_in'
+      const value = condition.value;
+
+      dataPoints.filter(point => {
+        const fieldValue = point.features[field];
+        return this.evaluateCondition(fieldValue, operator, value);
+      });
+    }
+  }
+
+  // ========== UTILITY METHODS ==========
+
+  /**
+   * Detect outliers using various statistical methods
+   */
+  private detectOutliers(
+    values: number[],
+    method: string,
+    parameters: Record<string, any>,
+  ): { outliers: number[]; method: string } {
+    const outliers: number[] = [];
+
+    switch (method) {
+      case 'iqr':
+        return this.detectOutliersIQR(values, parameters.factor || 1.5);
+      
+      case 'zscore':
+        return this.detectOutliersZScore(values, parameters.threshold || 3);
+      
+      case 'isolation_forest':
+        return this.detectOutliersIsolationForest(values, parameters.contamination || 0.1);
+      
+      default:
+        return this.detectOutliersIQR(values, 1.5);
+    }
+  }
+
+  /**
+   * IQR method for outlier detection
+   */
+  private detectOutliersIQR(values: number[], factor: number = 1.5): { outliers: number[]; method: string } {
+    const sorted = [...values].sort((a, b) => a - b);
+    const q1Index = Math.floor(sorted.length * 0.25);
+    const q3Index = Math.floor(sorted.length * 0.75);
+    
+    const q1 = sorted[q1Index];
+    const q3 = sorted[q3Index];
+    const iqr = q3 - q1;
+    
+    const lowerBound = q1 - factor * iqr;
+    const upperBound = q3 + factor * iqr;
+    
+    const outliers = values.filter(value => value < lowerBound || value > upperBound);
+    
+    return { outliers, method: 'IQR' };
+  }
+
+  /**
+   * Z-score method for outlier detection
+   */
+  private detectOutliersZScore(values: number[], threshold: number = 3): { outliers: number[]; method: string } {
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+    
+    const outliers = values.filter(value => Math.abs((value - mean) / stdDev) > threshold);
+    
+    return { outliers, method: 'Z-Score' };
+  }
+
+  /**
+   * Simplified Isolation Forest for outlier detection
+   */
+  private detectOutliersIsolationForest(values: number[], contamination: number = 0.1): { outliers: number[]; method: string } {
+    // Simplified implementation - in production, use a proper isolation forest library
+    const outliersCount = Math.floor(values.length * contamination);
+    const sorted = [...values].sort((a, b) => a - b);
+    
+    // Take extreme values as outliers
+    const outliers = [
+      ...sorted.slice(0, Math.floor(outliersCount / 2)),
+      ...sorted.slice(-Math.ceil(outliersCount / 2))
+    ];
+    
+    return { outliers, method: 'Isolation Forest' };
+  }
+
+  /**
+   * Calculate imputation value based on method
+   */
+  private calculateImputationValue(
+    dataArray: any[],
+    field: string,
+    method: string,
+    parameters: Record<string, any>,
+  ): any {
+    const values = dataArray
+      .map(item => this.getFieldValue(item, field))
+      .filter(val => val !== null && val !== undefined && val !== '');
+
+    if (values.length === 0) return null;
+
+    switch (method) {
+      case 'mean':
+        const numericValues = values.filter(val => !isNaN(Number(val))).map(val => Number(val));
+        return numericValues.length > 0 ? numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length : null;
+
+      case 'median':
+        const sortedNumeric = values.filter(val => !isNaN(Number(val))).map(val => Number(val)).sort((a, b) => a - b);
+        const mid = Math.floor(sortedNumeric.length / 2);
+        return sortedNumeric.length > 0 ? 
+          (sortedNumeric.length % 2 === 0 ? (sortedNumeric[mid - 1] + sortedNumeric[mid]) / 2 : sortedNumeric[mid]) : null;
+
+      case 'mode':
+        const frequency: Record<string, number> = {};
+        values.forEach(val => {
+          const key = String(val);
+          frequency[key] = (frequency[key] || 0) + 1;
+        });
+        const mostFrequent = Object.entries(frequency).reduce((a, b) => frequency[a[0]] > frequency[b[0]] ? a : b);
+        return mostFrequent[0];
+
+      case 'forward_fill':
+        return parameters.lastValidValue || null;
+
+      case 'constant':
+        return parameters.constantValue || 0;
+
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Convert raw data to ProcessedDataPoint format
+   */
+  private convertToProcessedDataPoints(dataArray: any[], dataType: string): ProcessedDataPoint[] {
+    return dataArray.map((item, index) => ({
+      id: item.id || `${dataType}_${index}`,
+      timestamp: item.date || item.timestamp || new Date().toISOString(),
+      features: this.extractFeatures(item, dataType),
+      target: this.extractTarget(item, dataType),
+      metadata: {
+        originalDataType: dataType,
+        transformationsApplied: [],
+        qualityScore: 100,
+        confidence: 1.0,
+      },
+    }));
+  }
+
+  /**
+   * Extract features from raw data item
+   */
+  private extractFeatures(item: any, dataType: string): Record<string, number | string | boolean> {
+    const features: Record<string, number | string | boolean> = {};
+
+    switch (dataType) {
+      case 'sales':
+        features.value = item.value || 0;
+        features.productId = item.productId || '';
+        features.locationId = item.locationId || '';
+        features.categoryId = item.categoryId || '';
+        if (item.metadata) {
+          features.transactionCount = item.metadata.transactionCount || 0;
+          features.totalRevenue = item.metadata.totalRevenue || 0;
+          features.averagePrice = item.metadata.averagePrice || 0;
+        }
+        break;
+
+      case 'inventory':
+        features.stockLevel = item.stockLevel || 0;
+        features.stockValue = item.stockValue || 0;
+        features.turnoverRate = item.turnoverRate || 0;
+        features.movementType = item.movementType || '';
+        features.productId = item.productId || '';
+        features.locationId = item.locationId || '';
+        break;
+
+      case 'products':
+        features.salesVelocity = item.salesVelocity || 0;
+        features.priceChanges = item.priceChanges || 0;
+        features.promotionalActivity = item.promotionalActivity || false;
+        features.competitorActivity = item.competitorActivity || 0;
+        features.seasonalityFactor = item.seasonalityFactor || 1;
+        features.stage = item.stage || '';
+        features.productId = item.productId || '';
+        break;
+
+      case 'orders':
+        features.orderCount = item.orderCount || 0;
+        features.averageOrderValue = item.averageOrderValue || 0;
+        features.fulfillmentTime = item.fulfillmentTime || 0;
+        features.returnRate = item.returnRate || 0;
+        features.profitMargin = item.profitMargin || 0;
+        features.customerSegment = item.customerSegment || '';
+        features.acquisitionChannel = item.acquisitionChannel || '';
+        break;
+
+      case 'external':
+        features.value = item.value || 0;
+        features.source = item.source || '';
+        features.dataType = item.dataType || '';
+        features.impact = item.impact || '';
+        features.confidence = item.confidence || 0;
+        break;
+
+      default:
+        // Generic feature extraction
+        for (const [key, value] of Object.entries(item)) {
+          if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
+            features[key] = value;
+          }
+        }
+    }
+
+    return features;
+  }
+
+  /**
+   * Extract target variable from raw data item
+   */
+  private extractTarget(item: any, dataType: string): number | undefined {
+    switch (dataType) {
+      case 'sales':
+        return item.value;
+      case 'inventory':
+        return item.stockLevel;
+      case 'products':
+        return item.salesVelocity;
+      case 'orders':
+        return item.orderCount;
+      case 'external':
+        return item.value;
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Get field value with nested path support
+   */
+  private getFieldValue(item: any, fieldPath: string): any {
+    const parts = fieldPath.split('.');
+    let value = item;
+    
+    for (const part of parts) {
+      if (value && typeof value === 'object') {
+        value = value[part];
+      } else {
+        return undefined;
+      }
+    }
+    
+    return value;
+  }
+
+  /**
+   * Set field value with nested path support
+   */
+  private setFieldValue(item: any, fieldPath: string, value: any): void {
+    const parts = fieldPath.split('.');
+    let current = item;
+    
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!current[part] || typeof current[part] !== 'object') {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    
+    current[parts[parts.length - 1]] = value;
+  }
+
+  /**
+   * Validate value against validator
+   */
+  private validateValue(value: any, validator: string, parameters: Record<string, any>): boolean {
+    switch (validator) {
+      case 'numeric':
+        return !isNaN(Number(value));
+      
+      case 'positive':
+        return !isNaN(Number(value)) && Number(value) > 0;
+      
+      case 'range':
+        const num = Number(value);
+        return !isNaN(num) && num >= parameters.min && num <= parameters.max;
+      
+      case 'string_length':
+        return typeof value === 'string' && value.length >= parameters.min && value.length <= parameters.max;
+      
+      case 'enum':
+        return parameters.values.includes(value);
+      
+      case 'date':
+        return !isNaN(Date.parse(value));
+      
+      case 'currency':
+        return /^\d+(\.\d{2})?$/.test(String(value));
+      
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Format value according to formatter
+   */
+  private formatValue(value: any, formatter: string, parameters: Record<string, any>): any {
+    switch (formatter) {
+      case 'uppercase':
+        return String(value).toUpperCase();
+      
+      case 'lowercase':
+        return String(value).toLowerCase();
+      
+      case 'trim':
+        return String(value).trim();
+      
+      case 'round':
+        return Math.round(Number(value) * Math.pow(10, parameters.decimals || 0)) / Math.pow(10, parameters.decimals || 0);
+      
+      case 'currency':
+        return parseFloat(String(value).replace(/[^0-9.-]+/g, ''));
+      
+      case 'date_iso':
+        return new Date(value).toISOString();
+      
+      case 'boolean':
+        return Boolean(value);
+      
+      default:
+        return value;
+    }
+  }
+
+  /**
+   * Label encode categorical field
+   */
+  private labelEncodeField(dataPoints: ProcessedDataPoint[], field: string): void {
+    const uniqueValues = [...new Set(dataPoints.map(point => point.features[field]))];
+    const encoding: Record<string, number> = {};
+    
+    uniqueValues.forEach((value, index) => {
+      encoding[String(value)] = index;
+    });
+
+    dataPoints.forEach(point => {
+      const value = point.features[field];
+      point.features[`${field}_encoded`] = encoding[String(value)] || -1;
+    });
+  }
+
+  /**
+   * One-hot encode categorical field
+   */
+  private oneHotEncodeField(dataPoints: ProcessedDataPoint[], field: string): void {
+    const uniqueValues = [...new Set(dataPoints.map(point => point.features[field]))];
+    
+    dataPoints.forEach(point => {
+      uniqueValues.forEach(value => {
+        point.features[`${field}_${value}`] = point.features[field] === value ? 1 : 0;
+      });
+    });
+  }
+
+  /**
+   * Target encode categorical field
+   */
+  private targetEncodeField(dataPoints: ProcessedDataPoint[], field: string, targetField: string): void {
+    const categoryMeans: Record<string, number> = {};
+    const categoryCounts: Record<string, number> = {};
+
+    // Calculate mean target value for each category
+    dataPoints.forEach(point => {
+      const category = String(point.features[field]);
+      const target = Number(point.features[targetField] || point.target || 0);
+      
+      if (!categoryMeans[category]) {
+        categoryMeans[category] = 0;
+        categoryCounts[category] = 0;
+      }
+      
+      categoryMeans[category] += target;
+      categoryCounts[category]++;
+    });
+
+    // Calculate final means
+    Object.keys(categoryMeans).forEach(category => {
+      categoryMeans[category] = categoryMeans[category] / categoryCounts[category];
+    });
+
+    // Apply encoding
+    dataPoints.forEach(point => {
+      const category = String(point.features[field]);
+      point.features[`${field}_target_encoded`] = categoryMeans[category] || 0;
+    });
+  }
+
+  /**
+   * Min-max scaling
+   */
+  private minMaxScale(dataPoints: ProcessedDataPoint[], field: string, range: [number, number]): void {
+    const values = dataPoints.map(point => Number(point.features[field])).filter(val => !isNaN(val));
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const scale = max - min;
+
+    if (scale > 0) {
+      dataPoints.forEach(point => {
+        const value = Number(point.features[field]);
+        if (!isNaN(value)) {
+          const normalized = (value - min) / scale;
+          point.features[`${field}_scaled`] = range[0] + normalized * (range[1] - range[0]);
+        }
+      });
+    }
+  }
+
+  /**
+   * Robust scaling using quartiles
+   */
+  private robustScale(dataPoints: ProcessedDataPoint[], field: string): void {
+    const values = dataPoints.map(point => Number(point.features[field])).filter(val => !isNaN(val));
+    const sorted = values.sort((a, b) => a - b);
+    
+    const q1 = sorted[Math.floor(sorted.length * 0.25)];
+    const q3 = sorted[Math.floor(sorted.length * 0.75)];
+    const median = sorted[Math.floor(sorted.length * 0.5)];
+    const iqr = q3 - q1;
+
+    if (iqr > 0) {
+      dataPoints.forEach(point => {
+        const value = Number(point.features[field]);
+        if (!isNaN(value)) {
+          point.features[`${field}_robust_scaled`] = (value - median) / iqr;
+        }
+      });
+    }
+  }
+
+  /**
+   * Quantile scaling
+   */
+  private quantileScale(dataPoints: ProcessedDataPoint[], field: string, quantiles: [number, number]): void {
+    const values = dataPoints.map(point => Number(point.features[field])).filter(val => !isNaN(val));
+    const sorted = values.sort((a, b) => a - b);
+    
+    const q1 = sorted[Math.floor(sorted.length * quantiles[0])];
+    const q3 = sorted[Math.floor(sorted.length * quantiles[1])];
+    const range = q3 - q1;
+
+    if (range > 0) {
+      dataPoints.forEach(point => {
+        const value = Number(point.features[field]);
+        if (!isNaN(value)) {
+          point.features[`${field}_quantile_scaled`] = Math.max(0, Math.min(1, (value - q1) / range));
+        }
+      });
+    }
+  }
+
+  /**
+   * Aggregate by time window
+   */
+  private async aggregateByTimeWindow(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    window: string,
+    functions: string[],
+  ): Promise<void> {
+    // Group by time window
+    const windowMs = this.parseTimeWindow(window);
+    const groups: Record<string, ProcessedDataPoint[]> = {};
+
+    dataPoints.forEach(point => {
+      const timestamp = new Date(point.timestamp).getTime();
+      const windowStart = Math.floor(timestamp / windowMs) * windowMs;
+      const windowKey = new Date(windowStart).toISOString();
+      
+      if (!groups[windowKey]) {
+        groups[windowKey] = [];
+      }
+      groups[windowKey].push(point);
+    });
+
+    // Apply aggregation functions
+    for (const [windowKey, groupPoints] of Object.entries(groups)) {
+      for (const field of fields) {
+        for (const func of functions) {
+          const values = groupPoints.map(point => Number(point.features[field])).filter(val => !isNaN(val));
+          let aggregatedValue: number;
+
+          switch (func) {
+            case 'mean':
+              aggregatedValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+              break;
+            case 'sum':
+              aggregatedValue = values.reduce((sum, val) => sum + val, 0);
+              break;
+            case 'count':
+              aggregatedValue = values.length;
+              break;
+            case 'min':
+              aggregatedValue = Math.min(...values);
+              break;
+            case 'max':
+              aggregatedValue = Math.max(...values);
+              break;
+            case 'std':
+              const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+              aggregatedValue = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+              break;
+            default:
+              aggregatedValue = 0;
+          }
+
+          // Add aggregated feature to all points in the window
+          groupPoints.forEach(point => {
+            point.features[`${field}_${func}_${window}`] = aggregatedValue;
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Aggregate by group
+   */
+  private async aggregateByGroup(
+    dataPoints: ProcessedDataPoint[],
+    fields: string[],
+    groupBy: string,
+    functions: string[],
+  ): Promise<void> {
+    // Group by specified field
+    const groups: Record<string, ProcessedDataPoint[]> = {};
+
+    dataPoints.forEach(point => {
+      const groupKey = String(point.features[groupBy]);
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(point);
+    });
+
+    // Apply aggregation functions
+    for (const [groupKey, groupPoints] of Object.entries(groups)) {
+      for (const field of fields) {
+        for (const func of functions) {
+          const values = groupPoints.map(point => Number(point.features[field])).filter(val => !isNaN(val));
+          let aggregatedValue: number;
+
+          switch (func) {
+            case 'mean':
+              aggregatedValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+              break;
+            case 'sum':
+              aggregatedValue = values.reduce((sum, val) => sum + val, 0);
+              break;
+            case 'count':
+              aggregatedValue = values.length;
+              break;
+            case 'min':
+              aggregatedValue = Math.min(...values);
+              break;
+            case 'max':
+              aggregatedValue = Math.max(...values);
+              break;
+            case 'std':
+              const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+              aggregatedValue = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+              break;
+            default:
+              aggregatedValue = 0;
+          }
+
+          // Add aggregated feature to all points in the group
+          groupPoints.forEach(point => {
+            point.features[`${field}_${func}_by_${groupBy}`] = aggregatedValue;
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Evaluate mathematical formula
+   */
+  private evaluateFormula(formula: string, features: Record<string, any>, sourceFields: string[]): number {
+    // This is a simplified formula evaluator
+    // In production, use a proper math expression parser like mathjs
+    
+    let expression = formula;
+    
+    // Replace field names with their values
+    for (const field of sourceFields) {
+      const value = features[field] || 0;
+      expression = expression.replace(new RegExp(`\\b${field}\\b`, 'g'), String(value));
+    }
+    
+    // Basic math operations - be very careful with eval!
+    // This is a security risk and should be replaced with a proper expression evaluator
+    try {
+      // Only allow basic math operations
+      if (/^[0-9+\-*/.() ]+$/.test(expression)) {
+        return eval(expression);
+      } else {
+        throw new Error('Invalid formula');
+      }
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  /**
+   * Evaluate filter condition
+   */
+  private evaluateCondition(fieldValue: any, operator: string, conditionValue: any): boolean {
+    switch (operator) {
+      case '>':
+        return Number(fieldValue) > Number(conditionValue);
+      case '<':
+        return Number(fieldValue) < Number(conditionValue);
+      case '>=':
+        return Number(fieldValue) >= Number(conditionValue);
+      case '<=':
+        return Number(fieldValue) <= Number(conditionValue);
+      case '==':
+        return fieldValue == conditionValue;
+      case '!=':
+        return fieldValue != conditionValue;
+      case 'in':
+        return Array.isArray(conditionValue) && conditionValue.includes(fieldValue);
+      case 'not_in':
+        return Array.isArray(conditionValue) && !conditionValue.includes(fieldValue);
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Parse time window string to milliseconds
+   */
+  private parseTimeWindow(window: string): number {
+    const units: Record<string, number> = {
+      's': 1000,
+      'm': 60 * 1000,
+      'h': 60 * 60 * 1000,
+      'd': 24 * 60 * 60 * 1000,
+      'w': 7 * 24 * 60 * 60 * 1000,
+    };
+
+    const match = window.match(/^(\d+)([smhdw])$/);
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
+      return value * (units[unit] || 1000);
+    }
+
+    return 24 * 60 * 60 * 1000; // Default to 1 day
+  }
+
+  // ========== OUTPUT FORMATTING ==========
+
+  /**
+   * Format data for ML training
+   */
+  private async formatForML(data: { [key: string]: ProcessedDataPoint[] }): Promise<{ [key: string]: ProcessedDataPoint[] }> {
+    const mlFormattedData: { [key: string]: ProcessedDataPoint[] } = {};
+
+    for (const [dataType, points] of Object.entries(data)) {
+      mlFormattedData[dataType] = points.map(point => ({
+        ...point,
+        features: this.selectMLFeatures(point.features),
+        metadata: {
+          ...point.metadata,
+          mlReady: true,
+        },
+      }));
+    }
+
+    return mlFormattedData;
+  }
+
+  /**
+   * Format data for analysis
+   */
+  private async formatForAnalysis(data: { [key: string]: ProcessedDataPoint[] }): Promise<{ [key: string]: ProcessedDataPoint[] }> {
+    // Keep all features for analysis
+    return data;
+  }
+
+  /**
+   * Format data for visualization
+   */
+  private async formatForVisualization(data: { [key: string]: ProcessedDataPoint[] }): Promise<{ [key: string]: ProcessedDataPoint[] }> {
+    const vizFormattedData: { [key: string]: ProcessedDataPoint[] } = {};
+
+    for (const [dataType, points] of Object.entries(data)) {
+      vizFormattedData[dataType] = points.map(point => ({
+        ...point,
+        features: this.selectVizFeatures(point.features),
+        metadata: {
+          ...point.metadata,
+          vizReady: true,
+        },
+      }));
+    }
+
+    return vizFormattedData;
+  }
+
+  /**
+   * Select features suitable for ML training
+   */
+  private selectMLFeatures(features: Record<string, any>): Record<string, any> {
+    const mlFeatures: Record<string, any> = {};
+
+    // Only include numeric features and encoded categorical features
+    for (const [key, value] of Object.entries(features)) {
+      if (typeof value === 'number' && !isNaN(value)) {
+        mlFeatures[key] = value;
+      } else if (key.includes('_encoded') || key.includes('_scaled') || key.includes('_normalized')) {
+        mlFeatures[key] = value;
+      }
+    }
+
+    return mlFeatures;
+  }
+
+  /**
+   * Select features suitable for visualization
+   */
+  private selectVizFeatures(features: Record<string, any>): Record<string, any> {
+    const vizFeatures: Record<string, any> = {};
+
+    // Include original features and some derived ones
+    for (const [key, value] of Object.entries(features)) {
+      if (!key.includes('_encoded') && !key.includes('_scaled')) {
+        vizFeatures[key] = value;
+      }
+    }
+
+    return vizFeatures;
+  }
+
+  // ========== VALIDATION AND QUALITY ==========
+
+  /**
+   * Validate transformation request
+   */
+  private async validateTransformationRequest(request: TransformationRequest): Promise<void> {
+    if (!request.jobId) {
+      throw new BadRequestException('Job ID is required');
+    }
+
+    if (!request.tenantId) {
+      throw new BadRequestException('Tenant ID is required');
+    }
+
+    if (!request.data || Object.keys(request.data).length === 0) {
+      throw new BadRequestException('Data is required');
+    }
+
+    if (!request.transformations || request.transformations.length === 0) {
+      throw new BadRequestException('At least one transformation rule is required');
+    }
+
+    // Validate transformation rules
+    for (const rule of request.transformations) {
+      if (!rule.type || !rule.targetFields || rule.targetFields.length === 0) {
+        throw new BadRequestException(`Invalid transformation rule: ${rule.name}`);
+      }
+    }
+
+    // Validate cleaning rules
+    for (const rule of request.cleaningRules) {
+      if (!rule.type || !rule.targetFields || rule.targetFields.length === 0) {
+        throw new BadRequestException(`Invalid cleaning rule: ${rule.name}`);
+      }
+    }
+  }
+
+  /**
+   * Validate transformed data against quality thresholds
+   */
+  private async validateTransformedData(
+    data: { [key: string]: ProcessedDataPoint[] },
+    thresholds: QualityThreshold[],
+  ): Promise<QualityReport> {
+    const report: QualityReport = {
+      overall: 0,
+      byDataType: {},
+      byMetric: {},
+      issues: [],
+      improvements: [],
+    };
+
+    // Calculate quality metrics for each data type
+    for (const [dataType, points] of Object.entries(data)) {
+      const dataTypeScore = await this.calculateDataTypeQuality(points, thresholds);
+      report.byDataType[dataType] = dataTypeScore;
+
+      // Check for quality issues
+      const issues = await this.identifyQualityIssues(points, thresholds, dataType);
+      report.issues.push(...issues);
+    }
+
+    // Calculate overall quality score
+    const scores = Object.values(report.byDataType);
+    report.overall = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+
+    // Generate improvement suggestions
+    report.improvements = await this.generateQualityImprovements(report);
+
+    return report;
+  }
+
+  /**
+   * Calculate quality score for a data type
+   */
+  private async calculateDataTypeQuality(
+    points: ProcessedDataPoint[],
+    thresholds: QualityThreshold[],
+  ): Promise<number> {
+    if (points.length === 0) return 0;
+
+    let totalScore = 0;
+    let metricCount = 0;
+
+    // Completeness
+    const completenessScore = this.calculateCompleteness(points);
+    totalScore += completenessScore;
+    metricCount++;
+
+    // Consistency
+    const consistencyScore = this.calculateConsistency(points);
+    totalScore += consistencyScore;
+    metricCount++;
+
+    // Validity
+    const validityScore = this.calculateValidity(points);
+    totalScore += validityScore;
+    metricCount++;
+
+    return metricCount > 0 ? totalScore / metricCount : 0;
+  }
+
+  /**
+   * Calculate completeness score
+   */
+  private calculateCompleteness(points: ProcessedDataPoint[]): number {
+    if (points.length === 0) return 100;
+
+    let totalFields = 0;
+    let completeFields = 0;
+
+    points.forEach(point => {
+      for (const [key, value] of Object.entries(point.features)) {
+        totalFields++;
+        if (value !== null && value !== undefined && value !== '') {
+          completeFields++;
+        }
+      }
+    });
+
+    return totalFields > 0 ? (completeFields / totalFields) * 100 : 100;
+  }
+
+  /**
+   * Calculate consistency score
+   */
+  private calculateConsistency(points: ProcessedDataPoint[]): number {
+    // Check for data type consistency across records
+    const fieldTypes: Record<string, Set<string>> = {};
+
+    points.forEach(point => {
+      for (const [key, value] of Object.entries(point.features)) {
+        if (!fieldTypes[key]) {
+          fieldTypes[key] = new Set();
+        }
+        fieldTypes[key].add(typeof value);
+      }
+    });
+
+    let consistentFields = 0;
+    let totalFields = Object.keys(fieldTypes).length;
+
+    for (const [field, types] of Object.entries(fieldTypes)) {
+      if (types.size === 1) {
+        consistentFields++;
+      }
+    }
+
+    return totalFields > 0 ? (consistentFields / totalFields) * 100 : 100;
+  }
+
+  /**
+   * Calculate validity score
+   */
+  private calculateValidity(points: ProcessedDataPoint[]): number {
+    let validRecords = 0;
+
+    points.forEach(point => {
+      let isValid = true;
+      
+      // Check for invalid numeric values
+      for (const [key, value] of Object.entries(point.features)) {
+        if (typeof value === 'number' && (isNaN(value) || !isFinite(value))) {
+          isValid = false;
+          break;
+        }
+      }
+
+      if (isValid) {
+        validRecords++;
+      }
+    });
+
+    return points.length > 0 ? (validRecords / points.length) * 100 : 100;
+  }
+
+  /**
+   * Identify quality issues
+   */
+  private async identifyQualityIssues(
+    points: ProcessedDataPoint[],
+    thresholds: QualityThreshold[],
+    dataType: string,
+  ): Promise<QualityIssue[]> {
+    const issues: QualityIssue[] = [];
+
+    // Check against thresholds
+    for (const threshold of thresholds) {
+      let metricValue: number;
+
+      switch (threshold.metric) {
+        case 'completeness':
+          metricValue = this.calculateCompleteness(points);
+          break;
+        case 'consistency':
+          metricValue = this.calculateConsistency(points);
+          break;
+        case 'validity':
+          metricValue = this.calculateValidity(points);
+          break;
+        default:
+          continue;
+      }
+
+      if (metricValue < threshold.threshold) {
+        issues.push({
+          severity: threshold.action === 'reject' ? 'critical' : threshold.action === 'auto_fix' ? 'warning' : 'error',
+          type: threshold.metric,
+          field: dataType,
+          message: `${threshold.metric} score (${metricValue.toFixed(1)}%) below threshold (${threshold.threshold}%)`,
+          count: points.length,
+          impact: metricValue < threshold.threshold * 0.5 ? 'High quality degradation' : 'Moderate quality impact',
+          suggestion: this.getQualityImprovement(threshold.metric),
+        });
+      }
+    }
+
+    return issues;
+  }
+
+  /**
+   * Generate quality improvement suggestions
+   */
+  private async generateQualityImprovements(report: QualityReport): Promise<string[]> {
+    const improvements: string[] = [];
+
+    if (report.overall < 80) {
+      improvements.push('Overall data quality needs improvement. Consider reviewing data collection processes.');
+    }
+
+    if (report.byMetric.completeness && report.byMetric.completeness < 90) {
+      improvements.push('Improve data completeness by implementing required field validations.');
+    }
+
+    if (report.byMetric.consistency && report.byMetric.consistency < 85) {
+      improvements.push('Enhance data consistency by standardizing data types and formats.');
+    }
+
+    if (report.byMetric.validity && report.byMetric.validity < 95) {
+      improvements.push('Implement stricter data validation rules to improve validity.');
+    }
+
+    return improvements;
+  }
+
+  /**
+   * Get quality improvement suggestion
+   */
+  private getQualityImprovement(metric: string): string {
+    switch (metric) {
+      case 'completeness':
+        return 'Implement required field validations and default value strategies';
+      case 'consistency':
+        return 'Standardize data types and implement format validation';
+      case 'validity':
+        return 'Add stricter input validation and data type checking';
+      case 'accuracy':
+        return 'Implement data verification processes and cross-validation';
+      case 'uniqueness':
+        return 'Add unique constraints and duplicate detection mechanisms';
+      default:
+        return 'Review and improve data collection processes';
+    }
+  }
+
+  /**
+   * Generate transformation recommendations
+   */
+  private async generateTransformationRecommendations(result: TransformationResult): Promise<string[]> {
+    const recommendations: string[] = [];
+
+    // Performance recommendations
+    if (result.metadata.processingTime > 30000) {
+      recommendations.push('Consider optimizing transformation rules for better performance');
+    }
+
+    // Quality recommendations
+    if (result.quality.overall < 80) {
+      recommendations.push('Improve data quality by enhancing cleaning rules');
+    }
+
+    // Coverage recommendations
+    const outputRatio = Object.values(result.metadata.recordsOutput).reduce((sum, count) => sum + count, 0) /
+                        Object.values(result.metadata.recordsProcessed).reduce((sum, count) => sum + count, 0);
+    
+    if (outputRatio < 0.8) {
+      recommendations.push('High data loss during transformation. Review cleaning rules severity');
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * Count records in data object
+   */
+  private countRecords(data: any): Record<string, number> {
+    const counts: Record<string, number> = {};
+    
+    for (const [dataType, dataArray] of Object.entries(data)) {
+      if (Array.isArray(dataArray)) {
+        counts[dataType] = dataArray.length;
+      }
+    }
+    
+    return counts;
+  }
+}

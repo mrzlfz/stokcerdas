@@ -44,6 +44,9 @@ export class TrainingJob extends BaseEntity {
   })
   status: TrainingJobStatus;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  queueJobId?: string;
+
   @Column({ type: 'jsonb' })
   trainingConfig: {
     dataSource: {

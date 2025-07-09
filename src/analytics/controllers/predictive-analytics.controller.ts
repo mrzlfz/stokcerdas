@@ -25,9 +25,11 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/entities/user.entity';
 
+import { BaseAnalyticsController } from './base-analytics.controller';
 import { PredictiveAnalyticsService } from '../services/predictive-analytics.service';
 import { PriceOptimizationService } from '../services/price-optimization.service';
 import { DemandAnomalyService } from '../services/demand-anomaly.service';
+import { ModelServingService } from '../../ml-forecasting/services/model-serving.service';
 
 import {
   PredictiveAnalysisType,
@@ -55,14 +57,15 @@ import {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Controller('analytics/predictive')
-export class PredictiveAnalyticsController {
-  private readonly logger = new Logger(PredictiveAnalyticsController.name);
-
+export class PredictiveAnalyticsController extends BaseAnalyticsController {
   constructor(
     private readonly predictiveAnalyticsService: PredictiveAnalyticsService,
     private readonly priceOptimizationService: PriceOptimizationService,
     private readonly demandAnomalyService: DemandAnomalyService,
-  ) {}
+    private readonly modelServingService: ModelServingService,
+  ) {
+    super();
+  }
 
   // Unified Predictive Analytics Endpoint
   @Post('analyze')
@@ -82,10 +85,20 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Body() query: PredictiveAnalyticsQueryDto,
   ): Promise<PredictiveAnalyticsResponseDto> {
+    const startTime = Date.now();
+
     try {
-      this.logger.debug(
-        `Performing ${query.analysisType} analysis for tenant ${user.tenantId}`,
+      this.logAnalyticsOperation(
+        user.tenantId,
+        `Predictive Analysis - ${query.analysisType}`,
+        undefined,
+        { analysisType: query.analysisType },
       );
+
+      // Validate analysis type
+      if (!query.analysisType) {
+        this.handleValidationError('Jenis analisis wajib dipilih');
+      }
 
       let data: any;
       let summary: any;
@@ -168,9 +181,8 @@ export class PredictiveAnalyticsController {
           break;
 
         default:
-          throw new HttpException(
-            `Unsupported analysis type: ${query.analysisType}`,
-            HttpStatus.BAD_REQUEST,
+          this.handleValidationError(
+            `Jenis analisis tidak didukung: ${query.analysisType}`,
           );
       }
 
@@ -186,26 +198,44 @@ export class PredictiveAnalyticsController {
         summary,
       );
 
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        `Predictive Analysis - ${query.analysisType} Completed`,
+        executionTime,
+      );
+
+      // Enhance meta with standardized format
+      const enhancedMeta = {
+        ...meta,
+        ...this.createMetaObject(
+          undefined,
+          undefined,
+          undefined,
+          executionTime,
+        ),
+      };
+
       return {
         analysisType: query.analysisType,
         data,
-        meta,
+        meta: enhancedMeta,
         summary,
         insights,
         correlations,
         nextRecommendedAnalysis,
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to perform predictive analysis: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        `Predictive Analysis - ${query.analysisType} Failed`,
+        executionTime,
       );
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+
+      this.handleServiceError(
+        error,
+        `Analisis prediktif ${query.analysisType}`,
       );
     }
   }
@@ -227,23 +257,39 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Query() query: StockoutPredictionQueryDto,
   ): Promise<StockoutPredictionResponseDto> {
+    const startTime = Date.now();
+
     try {
-      return await this.predictiveAnalyticsService.generateStockoutPredictions(
+      this.logAnalyticsOperation(
         user.tenantId,
-        query,
+        'Stockout Risk Prediction',
+        undefined,
+        { timeHorizon: query.timeHorizon },
       );
+
+      const result =
+        await this.predictiveAnalyticsService.generateStockoutPredictions(
+          user.tenantId,
+          query,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Stockout Risk Prediction Completed',
+        executionTime,
+      );
+
+      return result;
     } catch (error) {
-      this.logger.error(
-        `Failed to predict stockout risk: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Stockout Risk Prediction Failed',
+        executionTime,
       );
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+
+      this.handleServiceError(error, 'Prediksi risiko kehabisan stok');
     }
   }
 
@@ -264,23 +310,39 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Query() query: SlowMovingDetectionQueryDto,
   ): Promise<SlowMovingDetectionResponseDto> {
+    const startTime = Date.now();
+
     try {
-      return await this.predictiveAnalyticsService.detectSlowMovingItems(
+      this.logAnalyticsOperation(
         user.tenantId,
-        query,
+        'Slow-Moving Items Detection',
+        undefined,
+        { lookbackDays: query.lookbackDays },
       );
+
+      const result =
+        await this.predictiveAnalyticsService.detectSlowMovingItems(
+          user.tenantId,
+          query,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Slow-Moving Items Detection Completed',
+        executionTime,
+      );
+
+      return result;
     } catch (error) {
-      this.logger.error(
-        `Failed to detect slow-moving items: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Slow-Moving Items Detection Failed',
+        executionTime,
       );
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+
+      this.handleServiceError(error, 'Deteksi barang dengan perputaran lambat');
     }
   }
 
@@ -301,23 +363,42 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Query() query: OptimalReorderQueryDto,
   ): Promise<OptimalReorderResponseDto> {
+    const startTime = Date.now();
+
     try {
-      return await this.predictiveAnalyticsService.generateOptimalReorders(
+      this.logAnalyticsOperation(
         user.tenantId,
-        query,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to generate optimal reorders: ${error.message}`,
-        error.stack,
-      );
-      throw new HttpException(
+        'Optimal Reorder Generation',
+        undefined,
         {
-          success: false,
-          error: error.message,
+          forecastHorizon: query.forecastHorizon,
+          safetyStockMultiplier: query.safetyStockMultiplier,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
       );
+
+      const result =
+        await this.predictiveAnalyticsService.generateOptimalReorders(
+          user.tenantId,
+          query,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Optimal Reorder Generation Completed',
+        executionTime,
+      );
+
+      return result;
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Optimal Reorder Generation Failed',
+        executionTime,
+      );
+
+      this.handleServiceError(error, 'Generasi rekomendasi pemesanan optimal');
     }
   }
 
@@ -338,23 +419,42 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Query() query: PriceOptimizationQueryDto,
   ): Promise<PriceOptimizationResponseDto> {
+    const startTime = Date.now();
+
     try {
-      return await this.priceOptimizationService.generatePriceOptimizations(
+      this.logAnalyticsOperation(
         user.tenantId,
-        query,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to optimize pricing: ${error.message}`,
-        error.stack,
-      );
-      throw new HttpException(
+        'Price Optimization',
+        undefined,
         {
-          success: false,
-          error: error.message,
+          targetMargin: query.targetMargin,
+          maxPriceIncrease: query.maxPriceIncrease,
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
       );
+
+      const result =
+        await this.priceOptimizationService.generatePriceOptimizations(
+          user.tenantId,
+          query,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Price Optimization Completed',
+        executionTime,
+      );
+
+      return result;
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Price Optimization Failed',
+        executionTime,
+      );
+
+      this.handleServiceError(error, 'Optimasi harga');
     }
   }
 
@@ -375,23 +475,41 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Query() query: DemandAnomalyQueryDto,
   ): Promise<DemandAnomalyResponseDto> {
+    const startTime = Date.now();
+
     try {
-      return await this.demandAnomalyService.detectDemandAnomalies(
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Demand Anomaly Detection',
+        undefined,
+        {
+          sensitivityLevel: query.sensitivityLevel,
+          detectSpikes: query.detectSpikes,
+        },
+      );
+
+      const result = await this.demandAnomalyService.detectDemandAnomalies(
         user.tenantId,
         query,
       );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Demand Anomaly Detection Completed',
+        executionTime,
+      );
+
+      return result;
     } catch (error) {
-      this.logger.error(
-        `Failed to detect demand anomalies: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Demand Anomaly Detection Failed',
+        executionTime,
       );
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+
+      this.handleServiceError(error, 'Deteksi anomali permintaan');
     }
   }
 
@@ -412,23 +530,41 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Query() query: SeasonalAnalysisQueryDto,
   ): Promise<SeasonalAnalysisResponseDto> {
+    const startTime = Date.now();
+
     try {
-      return await this.demandAnomalyService.performSeasonalAnalysis(
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Seasonal Analysis',
+        undefined,
+        {
+          analysisPeriodMonths: query.analysisPeriodMonths,
+          useIndonesianHolidays: query.useIndonesianHolidays,
+        },
+      );
+
+      const result = await this.demandAnomalyService.performSeasonalAnalysis(
         user.tenantId,
         query,
       );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Seasonal Analysis Completed',
+        executionTime,
+      );
+
+      return result;
     } catch (error) {
-      this.logger.error(
-        `Failed to perform seasonal analysis: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Seasonal Analysis Failed',
+        executionTime,
       );
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+
+      this.handleServiceError(error, 'Analisis musiman');
     }
   }
 
@@ -448,9 +584,14 @@ export class PredictiveAnalyticsController {
     @CurrentUser() user: any,
     @Query('timeframe') timeframe: '7d' | '30d' | '90d' = '30d',
   ) {
+    const startTime = Date.now();
+
     try {
-      this.logger.debug(
-        `Generating predictive insights summary for tenant ${user.tenantId}`,
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Predictive Insights Summary',
+        undefined,
+        { timeframe },
       );
 
       // Generate quick insights from each analysis type
@@ -479,31 +620,37 @@ export class PredictiveAnalyticsController {
         ...anomalyInsights.recommendations,
       ]);
 
-      return {
-        success: true,
-        timeframe,
-        generatedAt: new Date().toISOString(),
-        summary: {
-          stockoutRisk: stockoutInsights.summary,
-          slowMovingItems: slowMovingInsights.summary,
-          pricingOpportunities: priceInsights.summary,
-          demandAnomalies: anomalyInsights.summary,
-        },
-        prioritizedRecommendations,
-        nextSteps: this.generateNextSteps(prioritizedRecommendations),
-      };
-    } catch (error) {
-      this.logger.error(
-        `Failed to generate insights summary: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Predictive Insights Summary Completed',
+        executionTime,
       );
-      throw new HttpException(
+
+      return this.createSuccessResponse(
         {
-          success: false,
-          error: error.message,
+          timeframe,
+          summary: {
+            stockoutRisk: stockoutInsights.summary,
+            slowMovingItems: slowMovingInsights.summary,
+            pricingOpportunities: priceInsights.summary,
+            demandAnomalies: anomalyInsights.summary,
+          },
+          prioritizedRecommendations,
+          nextSteps: this.generateNextSteps(prioritizedRecommendations),
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        this.createMetaObject(undefined, undefined, undefined, executionTime),
+        'Ringkasan wawasan prediktif berhasil dibuat',
       );
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Predictive Insights Summary Failed',
+        executionTime,
+      );
+
+      this.handleServiceError(error, 'Generasi ringkasan wawasan prediktif');
     }
   }
 
@@ -761,5 +908,120 @@ export class PredictiveAnalyticsController {
       'Focus on medium-priority optimization opportunities',
       'Implement preventive measures based on insights',
     ];
+  }
+
+  // Professional Demand Forecasting Endpoint
+  @Post('demand-forecast')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Generate professional demand forecast',
+    description:
+      'Generate demand forecasts using professional algorithms including Holt-Winters exponential smoothing, Islamic calendar integration, and advanced seasonality detection',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Professional demand forecast generated successfully',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'Product ID for forecast (optional)',
+        },
+        categoryId: {
+          type: 'string',
+          description: 'Category ID for forecast (optional)',
+        },
+        locationId: {
+          type: 'string',
+          description: 'Location ID for forecast (optional)',
+        },
+        timeHorizon: {
+          type: 'string',
+          enum: ['7d', '30d', '90d'],
+          description: 'Forecast time horizon',
+          default: '30d',
+        },
+        forecastType: {
+          type: 'string',
+          enum: ['demand', 'sales', 'stock'],
+          description: 'Type of forecast',
+          default: 'demand',
+        },
+      },
+    },
+  })
+  async generateDemandForecast(
+    @CurrentUser() user: any,
+    @Body()
+    forecastRequest: {
+      productId?: string;
+      categoryId?: string;
+      locationId?: string;
+      timeHorizon: '7d' | '30d' | '90d';
+      forecastType?: 'demand' | 'sales' | 'stock';
+    },
+  ): Promise<any> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Professional Demand Forecasting',
+        undefined,
+        {
+          timeHorizon: forecastRequest.timeHorizon,
+          forecastType: forecastRequest.forecastType,
+          productId: forecastRequest.productId,
+        },
+      );
+
+      const result =
+        await this.predictiveAnalyticsService.generateDemandForecast(
+          {
+            productId: forecastRequest.productId,
+            categoryId: forecastRequest.categoryId,
+            locationId: forecastRequest.locationId,
+            timeHorizon: forecastRequest.timeHorizon || '30d',
+            forecastType: forecastRequest.forecastType || 'demand',
+          },
+          user.tenantId,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Professional Demand Forecasting Completed',
+        executionTime,
+      );
+
+      return {
+        success: true,
+        data: result,
+        meta: {
+          executionTime: `${executionTime}ms`,
+          generatedAt: new Date().toISOString(),
+          tenantId: user.tenantId,
+          userId: user.id,
+        },
+      };
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      console.error('🚨 DETAILED ERROR DEBUG:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        details: error,
+      });
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Professional Demand Forecasting Failed',
+        executionTime,
+      );
+
+      this.handleServiceError(error, 'Professional demand forecasting');
+    }
   }
 }

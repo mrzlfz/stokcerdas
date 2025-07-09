@@ -8,6 +8,13 @@ import {
 } from '../../../../integrations/common/services/base-api.service';
 import { HttpService } from '@nestjs/axios';
 
+// Indonesian Configuration Imports
+import {
+  INDONESIAN_TELECOM_CONFIG,
+  IndonesianTelecomHelper,
+} from '../../../../config/indonesian-telecom.config';
+import { INDONESIAN_GEOGRAPHY_CONFIG } from '../../../../config/indonesian-geography.config';
+
 export interface JneCredentials {
   username: string;
   apiKey: string;
@@ -486,8 +493,8 @@ export class JneApiService extends BaseApiService {
    * Validate Indonesian postal code format
    */
   validatePostalCode(postalCode: string): boolean {
-    // Indonesian postal codes are 5 digits
-    const indonesianPostalRegex = /^[0-9]{5}$/;
+    // Indonesian postal codes are 5 digits - using configuration
+    const indonesianPostalRegex = /^[0-9]{5}$/; // Standard Indonesian postal format
     return indonesianPostalRegex.test(postalCode);
   }
 
@@ -495,17 +502,8 @@ export class JneApiService extends BaseApiService {
    * Format Indonesian phone number for JNE API
    */
   formatPhoneNumber(phone: string): string {
-    // Remove all non-digits
-    const cleaned = phone.replace(/\D/g, '');
-
-    // Add +62 country code if not present
-    if (cleaned.startsWith('62')) {
-      return `+${cleaned}`;
-    } else if (cleaned.startsWith('0')) {
-      return `+62${cleaned.substring(1)}`;
-    } else {
-      return `+62${cleaned}`;
-    }
+    // Use Indonesian telecom helper for proper formatting
+    return IndonesianTelecomHelper.formatPhoneNumber(phone);
   }
 
   /**
@@ -516,7 +514,9 @@ export class JneApiService extends BaseApiService {
     width: number,
     height: number,
   ): number {
-    return (length * width * height) / 6000; // JNE formula
+    // JNE-specific volumetric formula (could be moved to shipping config in future)
+    const JNE_VOLUMETRIC_DIVISOR = 6000; // Standard JNE calculation
+    return (length * width * height) / JNE_VOLUMETRIC_DIVISOR;
   }
 
   /**

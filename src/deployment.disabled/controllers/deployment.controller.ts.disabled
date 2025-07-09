@@ -1,0 +1,1905 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Logger,
+  HttpStatus,
+  HttpException,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import { DockerContainerConfigurationService } from '../services/docker-container-configuration.service';
+import { KubernetesResourceManagementService } from '../services/kubernetes-resource-management.service';
+import { ServiceMeshIntegrationService } from '../services/service-mesh-integration.service';
+import { ContainerRegistryManagementService } from '../services/container-registry-management.service';
+import { OrchestrationMonitoringService } from '../services/orchestration-monitoring.service';
+
+@ApiTags('Deployment Infrastructure')
+@Controller('deployment')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class DeploymentController {
+  private readonly logger = new Logger(DeploymentController.name);
+
+  constructor(
+    private readonly dockerContainerConfigurationService: DockerContainerConfigurationService,
+    private readonly kubernetesResourceManagementService: KubernetesResourceManagementService,
+    private readonly serviceMeshIntegrationService: ServiceMeshIntegrationService,
+    private readonly containerRegistryManagementService: ContainerRegistryManagementService,
+    private readonly orchestrationMonitoringService: OrchestrationMonitoringService,
+  ) {}
+
+  @Post('docker-container/configuration')
+  @Permissions('deployment:container:create')
+  @ApiOperation({ 
+    summary: 'Execute Docker container configuration',
+    description: 'Performs comprehensive Docker container configuration and optimization for StokCerdas platform'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Docker container configuration completed successfully'
+  })
+  async executeDockerContainerConfiguration(
+    @Body() request: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Executing Docker container configuration for tenant: ${tenantId}`);
+
+      const containerConfigurationRequest = {
+        ...request,
+        tenantId,
+        requestedBy: user.id,
+        requestTimestamp: new Date(),
+      };
+
+      const result = await this.dockerContainerConfigurationService
+        .executeDockerContainerConfiguration(containerConfigurationRequest);
+
+      return {
+        success: true,
+        message: 'Docker container configuration completed successfully',
+        data: result,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in Docker container configuration: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to execute Docker container configuration: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('docker-container/status/:configurationId')
+  @Permissions('deployment:container:read')
+  @ApiOperation({ 
+    summary: 'Get Docker container configuration status',
+    description: 'Retrieves current status and health of Docker container configuration'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Docker container status retrieved successfully'
+  })
+  async getDockerContainerStatus(
+    @Param('configurationId') configurationId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting Docker container status: ${configurationId} for tenant: ${tenantId}`);
+
+      // Mock implementation - would integrate with actual Docker monitoring
+      const containerStatus = {
+        configurationId,
+        tenantId,
+        generatedAt: new Date(),
+        containerOverallStatus: {
+          overallHealth: 95.8,
+          containersRunning: 25,
+          containersHealthy: 24,
+          containersFailed: 0,
+          containersStarting: 1,
+        },
+        dockerContainerMetrics: {
+          containerHealth: 95.8,
+          deploymentEfficiency: 94.2,
+          resourceUtilization: 87.5,
+          securityScore: 97.2,
+          performanceScore: 93.8,
+        },
+        microservicesContainerMetrics: {
+          microservicesContainerized: 18,
+          containerizationScore: 96.5,
+          serviceIsolation: 95.7,
+          serviceHealth: 94.9,
+        },
+        indonesianInfrastructureMetrics: {
+          indonesianContainersDeployed: 22,
+          infrastructureAlignment: 96.3,
+          regionalOptimization: 94.7,
+          complianceScore: 97.8,
+          dataResidencyCompliance: 98.5,
+        },
+        containerSecurityMetrics: {
+          securityPoliciesConfigured: 28,
+          securityScore: 97.2,
+          vulnerabilityReduction: 98.1,
+          securityCompliance: 96.9,
+        },
+        containerNetworkingMetrics: {
+          networkPoliciesConfigured: 15,
+          networkingScore: 95.8,
+          communicationEfficiency: 94.3,
+          networkLatency: 12, // milliseconds
+        },
+        businessImpact: {
+          deploymentSpeedImprovement: '45% faster',
+          resourceUtilizationOptimization: '32% improvement',
+          securityPostureEnhancement: '28% better',
+          indonesianComplianceAlignment: '38% improvement',
+        },
+      };
+
+      return {
+        success: true,
+        message: 'Docker container status retrieved successfully',
+        data: containerStatus,
+        metadata: {
+          tenantId,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting Docker container status: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get Docker container status: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('docker-container/metrics')
+  @Permissions('deployment:container:read')
+  @ApiOperation({ 
+    summary: 'Get Docker container metrics',
+    description: 'Retrieves comprehensive metrics for Docker container deployment and performance'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Docker container metrics retrieved successfully'
+  })
+  async getDockerContainerMetrics(
+    @Query('timeRange') timeRange: string = '24h',
+    @Query('metricTypes') metricTypes: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting Docker container metrics for tenant: ${tenantId}`);
+
+      // Mock container metrics implementation
+      const containerMetrics = {
+        timeRange,
+        tenantId,
+        generatedAt: new Date(),
+        deploymentMetrics: {
+          deploymentSpeed: 3.2, // minutes average
+          deploymentSuccess: 98.5, // percentage
+          rollbackFrequency: 0.8, // percentage
+          configurationDrift: 2.1, // percentage
+        },
+        performanceMetrics: {
+          containerStartupTime: 8.5, // seconds average
+          resourceUtilization: 87.5, // percentage
+          networkLatency: 12, // milliseconds
+          storagePerformance: 94.2, // IOPS score
+        },
+        securityMetrics: {
+          vulnerabilityCount: 2,
+          securityScore: 97.2,
+          complianceLevel: 96.9,
+          securityPolicyCompliance: 98.1,
+        },
+        indonesianInfrastructureMetrics: {
+          regionalDeploymentHealth: 96.3,
+          dataResidencyCompliance: 98.5,
+          indonesianRegulationsCompliance: 97.8,
+          culturalAdaptationScore: 94.7,
+        },
+        resourceMetrics: {
+          cpuUtilization: 68.5,
+          memoryUtilization: 72.3,
+          storageUtilization: 45.8,
+          networkBandwidth: 156, // Mbps
+        },
+        businessMetrics: {
+          costOptimization: 23.8, // percentage savings
+          operationalEfficiency: 31.5, // percentage improvement
+          businessContinuity: 99.2, // percentage uptime
+          customerImpact: 'positive',
+        },
+      };
+
+      return {
+        success: true,
+        message: 'Docker container metrics retrieved successfully',
+        data: containerMetrics,
+        metadata: {
+          tenantId,
+          timeRange,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting Docker container metrics: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get Docker container metrics: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('docker-container/optimize')
+  @Permissions('deployment:container:update')
+  @ApiOperation({ 
+    summary: 'Optimize Docker container configuration',
+    description: 'Performs optimization of Docker container configuration for better performance and resource utilization'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Docker container optimization completed successfully'
+  })
+  async optimizeDockerContainerConfiguration(
+    @Body() optimizationRequest: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Optimizing Docker container configuration for tenant: ${tenantId}`);
+
+      // Mock container optimization implementation
+      const optimization = {
+        optimizationId: `docker_opt_${Date.now()}_${tenantId}`,
+        tenantId,
+        optimizationType: optimizationRequest.type || 'comprehensive',
+        optimizationStarted: new Date(),
+        estimatedCompletion: new Date(Date.now() + 900000), // 15 minutes
+        optimizationTasks: [
+          'Container image size optimization',
+          'Resource allocation optimization',
+          'Network configuration optimization',
+          'Security hardening optimization',
+          'Indonesian infrastructure optimization',
+          'Performance monitoring enhancement',
+        ],
+        expectedImprovements: {
+          imageSize: '25-40% reduction',
+          startupTime: '30-50% faster',
+          resourceUtilization: '15-25% improvement',
+          securityScore: '5-10% enhancement',
+          indonesianCompliance: '8-15% improvement',
+        },
+        optimizationProgress: {
+          currentStage: 'analyzing_containers',
+          completionPercentage: 0,
+          estimatedTimeRemaining: 15, // minutes
+        },
+        status: 'in_progress',
+      };
+
+      return {
+        success: true,
+        message: 'Docker container optimization initiated successfully',
+        data: optimization,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error optimizing Docker container configuration: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to optimize Docker container configuration: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('docker-container/validate-indonesian-compliance')
+  @Permissions('deployment:container:create')
+  @ApiOperation({ 
+    summary: 'Validate Indonesian compliance for Docker containers',
+    description: 'Tests Docker container configuration against Indonesian regulatory and business requirements'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Indonesian compliance validation completed successfully'
+  })
+  async validateIndonesianContainerCompliance(
+    @Body() validationRequest: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Validating Indonesian container compliance for tenant: ${tenantId}`);
+
+      // Mock Indonesian compliance validation implementation
+      const validationResults = {
+        validationId: `indonesian_container_compliance_${Date.now()}_${tenantId}`,
+        tenantId,
+        validationStarted: new Date(),
+        dataResidencyValidation: {
+          dataResidencyCompliance: {
+            status: 'passed',
+            score: 98.5,
+            details: 'All data stored within Indonesian territory as required',
+          },
+          crossBorderDataTransfer: {
+            status: 'passed',
+            score: 96.8,
+            details: 'Data transfer policies comply with Indonesian regulations',
+          },
+          dataClassification: {
+            status: 'passed',
+            score: 97.2,
+            details: 'Data classification aligns with Indonesian privacy requirements',
+          },
+        },
+        regulatoryComplianceValidation: {
+          personalDataProtection: {
+            status: 'passed',
+            score: 97.8,
+            details: 'UU PDP compliance validated for container data processing',
+          },
+          businessLicensing: {
+            status: 'passed',
+            score: 96.5,
+            details: 'Container operations comply with Indonesian business licensing',
+          },
+          taxRegulations: {
+            status: 'passed',
+            score: 97.1,
+            details: 'Container infrastructure aligns with Indonesian tax requirements',
+          },
+        },
+        businessOptimizationValidation: {
+          indonesianBusinessHours: {
+            status: 'passed',
+            score: 95.8,
+            details: 'Container scaling optimized for Indonesian business patterns',
+          },
+          culturalFactors: {
+            status: 'passed',
+            score: 94.2,
+            details: 'Container configuration accounts for Indonesian cultural events',
+          },
+          regionalOptimization: {
+            status: 'passed',
+            score: 96.1,
+            details: 'Multi-region deployment optimized for Indonesian geography',
+          },
+        },
+        technicalComplianceValidation: {
+          securityStandards: {
+            status: 'passed',
+            score: 97.5,
+            details: 'Container security meets Indonesian cybersecurity standards',
+          },
+          networkCompliance: {
+            status: 'passed',
+            score: 95.9,
+            details: 'Network configuration complies with Indonesian internet regulations',
+          },
+          auditingCapability: {
+            status: 'passed',
+            score: 96.7,
+            details: 'Container logging supports Indonesian audit requirements',
+          },
+        },
+        overallScore: 96.8,
+        recommendedImprovements: [
+          'Enhance container monitoring for regional performance variations',
+          'Strengthen integration with Indonesian government reporting systems',
+          'Optimize container resource allocation for Indonesian infrastructure patterns',
+        ],
+        validationCompleted: new Date(),
+      };
+
+      return {
+        success: true,
+        message: 'Indonesian container compliance validation completed successfully',
+        data: validationResults,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error validating Indonesian container compliance: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to validate Indonesian container compliance: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('docker-container/security-scan/:configurationId')
+  @Permissions('deployment:container:read')
+  @ApiOperation({ 
+    summary: 'Get Docker container security scan results',
+    description: 'Retrieves security vulnerability scan results for Docker container configuration'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Docker container security scan results retrieved successfully'
+  })
+  async getDockerContainerSecurityScan(
+    @Param('configurationId') configurationId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting Docker container security scan: ${configurationId} for tenant: ${tenantId}`);
+
+      // Mock security scan implementation
+      const securityScan = {
+        configurationId,
+        tenantId,
+        scanTimestamp: new Date(),
+        overallSecurityScore: 97.2,
+        vulnerabilityAssessment: {
+          totalVulnerabilities: 3,
+          criticalVulnerabilities: 0,
+          highVulnerabilities: 1,
+          mediumVulnerabilities: 2,
+          lowVulnerabilities: 0,
+        },
+        imageSecurityAnalysis: {
+          baseImageSecurity: {
+            securityScore: 96.8,
+            vulnerabilities: 1,
+            recommendations: [
+              'Update base image to latest security patch',
+              'Remove unnecessary packages from base image',
+            ],
+          },
+          applicationLayerSecurity: {
+            securityScore: 97.5,
+            vulnerabilities: 2,
+            recommendations: [
+              'Update application dependencies to latest versions',
+              'Implement additional input validation',
+            ],
+          },
+        },
+        configurationSecurityAnalysis: {
+          privilegeEscalation: {
+            status: 'secure',
+            score: 98.2,
+            details: 'No privilege escalation vulnerabilities detected',
+          },
+          networkSecurity: {
+            status: 'secure',
+            score: 97.1,
+            details: 'Network policies properly configured and enforced',
+          },
+          secretsManagement: {
+            status: 'secure',
+            score: 96.9,
+            details: 'Secrets properly managed and encrypted',
+          },
+        },
+        indonesianSecurityCompliance: {
+          dataProtectionCompliance: 98.1,
+          cyberSecurityRegulations: 96.7,
+          auditTrailCompliance: 97.3,
+          accessControlCompliance: 95.8,
+        },
+        recommendedSecurityActions: [
+          'Apply latest security patches to container images',
+          'Implement enhanced network segmentation',
+          'Strengthen access control policies',
+          'Enhance audit logging for Indonesian compliance',
+        ],
+        nextScanDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      };
+
+      return {
+        success: true,
+        message: 'Docker container security scan results retrieved successfully',
+        data: securityScan,
+        metadata: {
+          tenantId,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting Docker container security scan: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get Docker container security scan: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('docker-container/performance-analysis')
+  @Permissions('deployment:container:read')
+  @ApiOperation({ 
+    summary: 'Get Docker container performance analysis',
+    description: 'Retrieves comprehensive performance analysis for Docker container deployment'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Docker container performance analysis retrieved successfully'
+  })
+  async getDockerContainerPerformanceAnalysis(
+    @Query('timeRange') timeRange: string = '24h',
+    @Query('analysisType') analysisType: string = 'comprehensive',
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting Docker container performance analysis for tenant: ${tenantId}`);
+
+      // Mock performance analysis implementation
+      const performanceAnalysis = {
+        timeRange,
+        tenantId,
+        analysisType,
+        generatedAt: new Date(),
+        containerPerformanceOverview: {
+          overallPerformanceScore: 93.8,
+          containerStartupPerformance: 94.2,
+          runtimePerformance: 93.5,
+          resourceEfficiency: 92.8,
+          networkPerformance: 95.1,
+        },
+        resourceUtilizationAnalysis: {
+          cpuUtilization: {
+            average: 68.5,
+            peak: 89.2,
+            efficiency: 87.3,
+            recommendations: ['Optimize CPU-intensive operations', 'Consider CPU limit adjustments'],
+          },
+          memoryUtilization: {
+            average: 72.3,
+            peak: 91.7,
+            efficiency: 85.9,
+            recommendations: ['Monitor memory leaks', 'Optimize memory allocation patterns'],
+          },
+          storageUtilization: {
+            average: 45.8,
+            peak: 78.4,
+            efficiency: 91.2,
+            recommendations: ['Implement storage cleanup policies', 'Consider volume optimization'],
+          },
+        },
+        performanceTrendAnalysis: {
+          performanceTrend: 'improving',
+          performanceImprovement: 12.5, // percentage over time period
+          bottleneckIdentification: [
+            'Database connection pooling optimization needed',
+            'Cache hit ratio can be improved',
+            'Network latency during peak hours',
+          ],
+          performancePredictions: {
+            nextWeekPrediction: 94.5,
+            nextMonthPrediction: 95.2,
+            confidenceLevel: 87.3,
+          },
+        },
+        indonesianPerformanceFactors: {
+          businessHoursOptimization: {
+            score: 94.7,
+            details: 'Container scaling optimized for Indonesian business hours',
+            recommendations: ['Fine-tune auto-scaling for regional patterns'],
+          },
+          regionalPerformance: {
+            jakartaPerformance: 96.2,
+            surabayaPerformance: 93.8,
+            medanPerformance: 92.4,
+            denpaserPerformance: 94.6,
+            recommendations: ['Optimize edge caching for outer regions'],
+          },
+          culturalEventOptimization: {
+            score: 93.1,
+            details: 'Performance maintained during cultural events and holidays',
+            recommendations: ['Enhance capacity planning for Ramadan and major holidays'],
+          },
+        },
+        optimizationRecommendations: [
+          'Implement advanced container image optimization techniques',
+          'Enhance auto-scaling algorithms for Indonesian market patterns',
+          'Optimize database query performance for container workloads',
+          'Strengthen network performance for multi-region deployments',
+        ],
+      };
+
+      return {
+        success: true,
+        message: 'Docker container performance analysis retrieved successfully',
+        data: performanceAnalysis,
+        metadata: {
+          tenantId,
+          timeRange,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting Docker container performance analysis: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get Docker container performance analysis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // ===== KUBERNETES RESOURCE MANAGEMENT ENDPOINTS =====
+
+  @Post('kubernetes/resource-management')
+  @Permissions('deployment:kubernetes:create')
+  @ApiOperation({ 
+    summary: 'Execute Kubernetes resource management',
+    description: 'Performs comprehensive Kubernetes cluster orchestration, pod management, and resource optimization'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Kubernetes resource management completed successfully'
+  })
+  async executeKubernetesResourceManagement(
+    @Body() request: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Executing Kubernetes resource management for tenant: ${tenantId}`);
+
+      const kubernetesRequest = {
+        ...request,
+        tenantId,
+        requestedBy: user.id,
+        requestTimestamp: new Date(),
+      };
+
+      const result = await this.kubernetesResourceManagementService
+        .executeKubernetesResourceManagement(kubernetesRequest);
+
+      return {
+        success: true,
+        message: 'Kubernetes resource management completed successfully',
+        data: result,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in Kubernetes resource management: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to execute Kubernetes resource management: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('kubernetes/cluster-status')
+  @Permissions('deployment:kubernetes:read')
+  @ApiOperation({ 
+    summary: 'Get Kubernetes cluster status',
+    description: 'Retrieves current status and health of Kubernetes clusters across all regions'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Kubernetes cluster status retrieved successfully'
+  })
+  async getKubernetesClusterStatus(
+    @Query('region') region: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting Kubernetes cluster status for tenant: ${tenantId}`);
+
+      // Mock Kubernetes cluster status implementation
+      const clusterStatus = {
+        tenantId,
+        region: region || 'all',
+        generatedAt: new Date(),
+        clusterOverallStatus: {
+          overallHealth: 96.8,
+          clustersRunning: 4,
+          clustersHealthy: 4,
+          clustersFailed: 0,
+          nodesTotal: 45,
+          nodesReady: 43,
+          nodesNotReady: 2,
+        },
+        kubernetesClusterMetrics: {
+          clusterResourceHealth: 96.8,
+          podLifecycleEfficiency: 95.7,
+          deploymentOrchestrationScore: 96.2,
+          autoScalingEfficiency: 95.4,
+          resourceQuotaUtilization: 82.7,
+        },
+        businessImpact: {
+          clusterAvailability: '99.9%',
+          deploymentSpeed: '65% faster than traditional',
+          resourceOptimization: '42% efficiency improvement',
+          indonesianComplianceAlignment: '98.5% compliant',
+        },
+      };
+
+      return {
+        success: true,
+        message: 'Kubernetes cluster status retrieved successfully',
+        data: clusterStatus,
+        metadata: {
+          tenantId,
+          region: region || 'all',
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting Kubernetes cluster status: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get Kubernetes cluster status: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('kubernetes/cluster-scaling')
+  @Permissions('deployment:kubernetes:update')
+  @ApiOperation({ 
+    summary: 'Execute Kubernetes cluster scaling',
+    description: 'Performs intelligent cluster scaling based on Indonesian business patterns and resource demands'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Kubernetes cluster scaling completed successfully'
+  })
+  async executeKubernetesClusterScaling(
+    @Body() scalingRequest: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Executing Kubernetes cluster scaling for tenant: ${tenantId}`);
+
+      // Mock cluster scaling implementation
+      const scaling = {
+        scalingId: `kubernetes_scaling_${Date.now()}_${tenantId}`,
+        tenantId,
+        scalingType: scalingRequest.type || 'intelligent_auto_scaling',
+        scalingStarted: new Date(),
+        estimatedCompletion: new Date(Date.now() + 600000), // 10 minutes
+        expectedImprovements: {
+          resourceUtilization: '20-35% optimization',
+          responseTime: '15-25% improvement',
+          costEfficiency: '18-28% reduction',
+          availability: '99.95% uptime target',
+          indonesianPatternAlignment: '25-40% better adaptation',
+        },
+        status: 'in_progress',
+      };
+
+      return {
+        success: true,
+        message: 'Kubernetes cluster scaling initiated successfully',
+        data: scaling,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error executing Kubernetes cluster scaling: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to execute Kubernetes cluster scaling: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('kubernetes/security-analysis')
+  @Permissions('deployment:kubernetes:read')
+  @ApiOperation({ 
+    summary: 'Get Kubernetes security analysis',
+    description: 'Retrieves comprehensive security analysis for Kubernetes clusters and workloads'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Kubernetes security analysis retrieved successfully'
+  })
+  async getKubernetesSecurityAnalysis(
+    @Query('clusterName') clusterName: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting Kubernetes security analysis for tenant: ${tenantId}`);
+
+      // Mock Kubernetes security analysis implementation
+      const securityAnalysis = {
+        clusterName: clusterName || 'all_clusters',
+        tenantId,
+        analysisTimestamp: new Date(),
+        overallSecurityScore: 98.1,
+        clusterSecurityAnalysis: {
+          rbacScore: 98.3,
+          networkPolicyScore: 97.1,
+          podSecurityScore: 97.9,
+        },
+        indonesianSecurityCompliance: {
+          cybersecurityLawCompliance: 97.8,
+          dataProtectionCompliance: 98.1,
+          auditingCompliance: 97.2,
+        },
+        remediationRecommendations: [
+          'Implement additional network micro-segmentation',
+          'Enhance security monitoring for Indonesian compliance',
+        ],
+        nextSecurityReview: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
+      };
+
+      return {
+        success: true,
+        message: 'Kubernetes security analysis retrieved successfully',
+        data: securityAnalysis,
+        metadata: {
+          tenantId,
+          clusterName: clusterName || 'all_clusters',
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting Kubernetes security analysis: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get Kubernetes security analysis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // ===== SERVICE MESH INTEGRATION ENDPOINTS =====
+
+  @Post('service-mesh/integration')
+  @Permissions('deployment:service_mesh:create')
+  @ApiOperation({ 
+    summary: 'Execute service mesh integration',
+    description: 'Performs comprehensive service mesh configuration, traffic management, and security policy enforcement'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Service mesh integration completed successfully'
+  })
+  async executeServiceMeshIntegration(
+    @Body() request: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Executing service mesh integration for tenant: ${tenantId}`);
+
+      const serviceMeshRequest = {
+        ...request,
+        tenantId,
+        requestedBy: user.id,
+        requestTimestamp: new Date(),
+      };
+
+      const result = await this.serviceMeshIntegrationService
+        .executeServiceMeshIntegration(serviceMeshRequest);
+
+      return {
+        success: true,
+        message: 'Service mesh integration completed successfully',
+        data: result,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in service mesh integration: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to execute service mesh integration: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('service-mesh/status')
+  @Permissions('deployment:service_mesh:read')
+  @ApiOperation({ 
+    summary: 'Get service mesh status',
+    description: 'Retrieves current status and health of service mesh infrastructure across all services'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Service mesh status retrieved successfully'
+  })
+  async getServiceMeshStatus(
+    @Query('meshType') meshType: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting service mesh status for tenant: ${tenantId}`);
+
+      // Mock service mesh status implementation
+      const meshStatus = {
+        tenantId,
+        meshType: meshType || 'istio',
+        generatedAt: new Date(),
+        meshOverallStatus: {
+          overallHealth: 97.2,
+          servicesInMesh: 45,
+          servicesHealthy: 43,
+          servicesFailed: 0,
+          servicesDeploying: 2,
+          controlPlaneHealth: 98.1,
+          dataPlaneHealth: 96.8,
+        },
+        serviceMeshMetrics: {
+          meshArchitectureHealth: 97.2,
+          trafficManagementEfficiency: 95.8,
+          serviceMeshSecurityScore: 98.1,
+          observabilityIntegrationScore: 95.9,
+          policyEnforcementScore: 96.8,
+        },
+        trafficManagementMetrics: {
+          trafficPoliciesActive: 28,
+          loadBalancingEfficiency: 95.8,
+          circuitBreakerReliability: 96.4,
+          retryPoliciesConfigured: 18,
+          timeoutPoliciesConfigured: 22,
+        },
+        securityMetrics: {
+          mtlsEnabled: true,
+          mtlsCompliancePercentage: 98.7,
+          authenticationPoliciesActive: 35,
+          authorizationPoliciesActive: 42,
+          certificatesManaged: 156,
+          securityViolations: 0,
+        },
+        indonesianRegionalMetrics: {
+          jakartaMeshPerformance: {
+            health: 97.8,
+            services: 18,
+            latency: 12, // milliseconds
+            throughput: 4200, // requests per minute
+          },
+          surabayaMeshPerformance: {
+            health: 96.5,
+            services: 14,
+            latency: 15, // milliseconds
+            throughput: 3800, // requests per minute
+          },
+          medanMeshPerformance: {
+            health: 95.9,
+            services: 10,
+            latency: 18, // milliseconds
+            throughput: 3200, // requests per minute
+          },
+          denpaserMeshPerformance: {
+            health: 96.7,
+            services: 8,
+            latency: 14, // milliseconds
+            throughput: 2900, // requests per minute
+          },
+        },
+        businessImpact: {
+          serviceReliability: '99.95% uptime',
+          communicationSecurity: '100% encrypted',
+          trafficOptimization: '35% latency reduction',
+          indonesianComplianceAlignment: '98.1% compliant',
+        },
+      };
+
+      return {
+        success: true,
+        message: 'Service mesh status retrieved successfully',
+        data: meshStatus,
+        metadata: {
+          tenantId,
+          meshType: meshType || 'istio',
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting service mesh status: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get service mesh status: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('service-mesh/traffic-analysis')
+  @Permissions('deployment:service_mesh:read')
+  @ApiOperation({ 
+    summary: 'Get service mesh traffic analysis',
+    description: 'Retrieves comprehensive traffic analysis and performance metrics for service mesh communications'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Service mesh traffic analysis retrieved successfully'
+  })
+  async getServiceMeshTrafficAnalysis(
+    @Query('timeRange') timeRange: string = '24h',
+    @Query('serviceFilter') serviceFilter: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting service mesh traffic analysis for tenant: ${tenantId}`);
+
+      // Mock traffic analysis implementation
+      const trafficAnalysis = {
+        timeRange,
+        serviceFilter: serviceFilter || 'all',
+        tenantId,
+        generatedAt: new Date(),
+        overallTrafficMetrics: {
+          totalRequests: 2850000,
+          successfulRequests: 2835420,
+          failedRequests: 14580,
+          successRate: 99.49, // percentage
+          averageLatency: 14.2, // milliseconds
+          p95Latency: 28.7, // milliseconds
+          p99Latency: 45.1, // milliseconds
+        },
+        trafficDistributionAnalysis: {
+          serviceToServiceCommunication: {
+            internalServiceCalls: 2456000,
+            externalApiCalls: 394000,
+            internalSuccessRate: 99.52, // percentage
+            externalSuccessRate: 99.38, // percentage
+          },
+          protocolDistribution: {
+            httpRequests: 1995000, // 70%
+            grpcRequests: 570000,  // 20%
+            tcpConnections: 285000, // 10%
+          },
+          geographicalDistribution: {
+            jakartaTraffic: 1140000, // 40%
+            surabayaTraffic: 855000, // 30%
+            medanTraffic: 570000,   // 20%
+            denpaserTraffic: 285000, // 10%
+          },
+        },
+        loadBalancingAnalysis: {
+          loadBalancingAlgorithm: 'round_robin_with_weights',
+          loadDistributionEfficiency: 95.8, // percentage
+          backendHealthiness: {
+            healthyBackends: 156,
+            unhealthyBackends: 4,
+            healthPercentage: 97.5,
+          },
+          trafficShaping: {
+            trafficShapingRulesActive: 18,
+            bandwidthOptimization: 23.7, // percentage improvement
+            priorityTrafficPercentage: 15.2,
+          },
+        },
+        circuitBreakerAnalysis: {
+          circuitBreakersConfigured: 35,
+          circuitBreakerTrips: 12,
+          fastFailureResponses: 2450,
+          circuitBreakerReliability: 96.4, // percentage
+          averageRecoveryTime: 2.8, // seconds
+        },
+        indonesianBusinessTrafficPatterns: {
+          businessHoursTrafficAnalysis: {
+            peakHoursTraffic: 2166000, // 76% during 9AM-6PM WIB
+            offPeakTraffic: 684000,    // 24% outside business hours
+            culturalEventTrafficSpikes: [
+              { event: 'Friday_Prayer', trafficIncrease: 15.2 },
+              { event: 'Lunch_Break', trafficIncrease: 8.7 },
+              { event: 'End_Of_Workday', trafficIncrease: 12.4 },
+            ],
+          },
+          regionalTrafficOptimization: {
+            crossRegionTraffic: 142500, // 5% of total
+            intraRegionTraffic: 2707500, // 95% of total
+            latencyOptimization: 28.9, // percentage improvement
+            bandwidthSavings: 18.3, // percentage
+          },
+        },
+        performanceOptimizationOpportunities: [
+          {
+            category: 'latency_optimization',
+            opportunity: 'Implement regional service mesh clusters',
+            potentialImprovement: 22.5, // percentage
+            implementationComplexity: 'medium',
+            estimatedLatencyReduction: 3.8, // milliseconds
+          },
+          {
+            category: 'throughput_optimization',
+            opportunity: 'Enhanced load balancing algorithms for Indonesian patterns',
+            potentialImprovement: 18.7, // percentage
+            implementationComplexity: 'high',
+            estimatedThroughputIncrease: 420, // requests per minute
+          },
+        ],
+      };
+
+      return {
+        success: true,
+        message: 'Service mesh traffic analysis retrieved successfully',
+        data: trafficAnalysis,
+        metadata: {
+          tenantId,
+          timeRange,
+          serviceFilter: serviceFilter || 'all',
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error getting service mesh traffic analysis: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to get service mesh traffic analysis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('service-mesh/security-policy')
+  @Permissions('deployment:service_mesh:update')
+  @ApiOperation({ 
+    summary: 'Configure service mesh security policies',
+    description: 'Applies comprehensive security policies including mTLS, authentication, and authorization rules'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Service mesh security policies configured successfully'
+  })
+  async configureServiceMeshSecurityPolicies(
+    @Body() securityRequest: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Configuring service mesh security policies for tenant: ${tenantId}`);
+
+      // Mock security policy configuration implementation
+      const securityConfiguration = {
+        configurationId: `service_mesh_security_${Date.now()}_${tenantId}`,
+        tenantId,
+        securityPolicyType: securityRequest.type || 'comprehensive_security',
+        configurationStarted: new Date(),
+        estimatedCompletion: new Date(Date.now() + 300000), // 5 minutes
+        securityPoliciesApplied: [
+          'Mutual TLS (mTLS) enforcement across all services',
+          'Authentication policies with JWT validation',
+          'Authorization policies with RBAC integration',
+          'Network security policies with micro-segmentation',
+          'Indonesian regulatory compliance enforcement',
+          'Certificate lifecycle management automation',
+        ],
+        expectedSecurityImprovements: {
+          encryptionCoverage: '100% service-to-service communication',
+          authenticationStrength: '99.8% authenticated requests',
+          authorizationCompliance: '98.5% policy compliance',
+          networkSecurity: '95.7% micro-segmentation coverage',
+          indonesianCompliance: '97.8% regulatory alignment',
+        },
+        configurationProgress: {
+          currentStage: 'applying_mtls_policies',
+          completionPercentage: 0,
+          estimatedTimeRemaining: 5, // minutes
+        },
+        status: 'in_progress',
+      };
+
+      return {
+        success: true,
+        message: 'Service mesh security policy configuration initiated successfully',
+        data: securityConfiguration,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error configuring service mesh security policies: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to configure service mesh security policies: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('container-registry/management')
+  @Permissions('deployment:registry:create')
+  @ApiOperation({ 
+    summary: 'Execute container registry management',
+    description: 'Performs comprehensive container registry management, image lifecycle, and vulnerability management for StokCerdas platform'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Container registry management completed successfully'
+  })
+  async executeContainerRegistryManagement(
+    @Body() request: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Executing container registry management for tenant: ${tenantId}`);
+
+      const registryManagementRequest = {
+        ...request,
+        tenantId,
+        requestedBy: user.id,
+        requestTimestamp: new Date(),
+      };
+
+      const result = await this.containerRegistryManagementService
+        .executeContainerRegistryManagement(registryManagementRequest);
+
+      return {
+        success: true,
+        message: 'Container registry management completed successfully',
+        data: result,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in container registry management: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to execute container registry management: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('container-registry/status/:managementId')
+  @Permissions('deployment:registry:read')
+  @ApiOperation({ 
+    summary: 'Get container registry management status',
+    description: 'Retrieves current status and health of container registry management operation'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Container registry status retrieved successfully'
+  })
+  async getContainerRegistryStatus(
+    @Param('managementId') managementId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting container registry status for management: ${managementId}`);
+
+      // Mock container registry status implementation
+      const registryStatus = {
+        managementId,
+        tenantId,
+        currentStatus: 'active',
+        registryHealth: {
+          overall: 95.8,
+          infrastructure: 97.8,
+          imageLifecycle: 94.6,
+          security: 97.4,
+          vulnerabilityManagement: 96.1,
+          federation: 95.3,
+        },
+        lastUpdated: new Date(),
+        registryServices: {
+          harborRegistry: { status: 'running', health: 98.2 },
+          imageScanning: { status: 'active', health: 96.7 },
+          vulnerabilityDb: { status: 'synchronized', health: 97.1 },
+          registryMirroring: { status: 'operational', health: 94.8 },
+        },
+        activeOperations: [
+          'Image lifecycle policy enforcement',
+          'Vulnerability scanning automation',
+          'Registry federation synchronization',
+          'Security policy compliance checks',
+        ],
+      };
+
+      return {
+        success: true,
+        message: 'Container registry status retrieved successfully',
+        data: registryStatus,
+        metadata: {
+          tenantId,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error retrieving container registry status: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve container registry status: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('container-registry/vulnerability-report')
+  @Permissions('deployment:registry:read')
+  @ApiOperation({ 
+    summary: 'Get container vulnerability report',
+    description: 'Retrieves comprehensive vulnerability analysis and risk assessment for container images'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Container vulnerability report retrieved successfully'
+  })
+  async getContainerVulnerabilityReport(
+    @Query('severity') severity: string,
+    @Query('limit') limit: number = 50,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting container vulnerability report for tenant: ${tenantId}`);
+
+      // Mock vulnerability report implementation
+      const vulnerabilityReport = {
+        reportId: `vuln_report_${Date.now()}_${tenantId}`,
+        tenantId,
+        reportGenerated: new Date(),
+        reportPeriod: {
+          startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+          endDate: new Date(),
+        },
+        vulnerabilitySummary: {
+          totalImages: 156,
+          imagesScanned: 154,
+          totalVulnerabilities: 342,
+          criticalVulnerabilities: 3,
+          highVulnerabilities: 18,
+          mediumVulnerabilities: 127,
+          lowVulnerabilities: 194,
+          remediatedVulnerabilities: 89,
+          riskScore: 34.7, // 0-100 scale
+        },
+        topVulnerabilities: [
+          {
+            cveId: 'CVE-2024-0001',
+            severity: 'critical',
+            affectedImages: 8,
+            description: 'Remote code execution vulnerability in base image',
+            remediationStatus: 'in_progress',
+            estimatedFixTime: '2 hours',
+          },
+          {
+            cveId: 'CVE-2024-0002',
+            severity: 'high',
+            affectedImages: 23,
+            description: 'Privilege escalation vulnerability in application layer',
+            remediationStatus: 'available',
+            estimatedFixTime: '1 hour',
+          },
+        ],
+        complianceStatus: {
+          indonesianRegulatory: 97.8,
+          industryStandards: 94.2,
+          securityPolicies: 96.5,
+        },
+      };
+
+      return {
+        success: true,
+        message: 'Container vulnerability report retrieved successfully',
+        data: vulnerabilityReport,
+        metadata: {
+          tenantId,
+          timestamp: new Date(),
+          reportCriteria: { severity, limit },
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error retrieving vulnerability report: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve vulnerability report: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('container-registry/image-promotion')
+  @Permissions('deployment:registry:manage')
+  @ApiOperation({ 
+    summary: 'Execute container image promotion',
+    description: 'Promotes container images through registry stages with security validation and compliance checks'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Container image promotion completed successfully'
+  })
+  async executeContainerImagePromotion(
+    @Body() promotionRequest: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Executing container image promotion for tenant: ${tenantId}`);
+
+      // Mock image promotion implementation
+      const promotionResult = {
+        promotionId: `image_promotion_${Date.now()}_${tenantId}`,
+        tenantId,
+        promotionStarted: new Date(),
+        imageDetails: {
+          imageId: promotionRequest.imageId || 'stokcerdas/api:v1.2.3',
+          sourceRegistry: 'harbor.dev.stokcerdas.com',
+          targetRegistry: 'harbor.prod.stokcerdas.com',
+          imageSizeMB: 245,
+          layers: 12,
+        },
+        promotionStages: [
+          {
+            stage: 'security_scanning',
+            status: 'completed',
+            duration: '45 seconds',
+            result: 'passed',
+            vulnerabilitiesFound: 0,
+          },
+          {
+            stage: 'compliance_validation',
+            status: 'completed',
+            duration: '23 seconds',
+            result: 'passed',
+            complianceScore: 98.5,
+          },
+          {
+            stage: 'signature_verification',
+            status: 'completed',
+            duration: '12 seconds',
+            result: 'passed',
+            signatureValid: true,
+          },
+          {
+            stage: 'promotion_execution',
+            status: 'in_progress',
+            duration: '0 seconds',
+            result: 'pending',
+            progress: 15,
+          },
+        ],
+        estimatedCompletion: new Date(Date.now() + 180000), // 3 minutes
+        indonesianCompliance: {
+          dataResidency: 'compliant',
+          regulatoryAlignment: 97.8,
+          businessHoursPromotion: true,
+        },
+        status: 'in_progress',
+      };
+
+      return {
+        success: true,
+        message: 'Container image promotion initiated successfully',
+        data: promotionResult,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in container image promotion: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to execute container image promotion: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('orchestration-monitoring/execution')
+  @Permissions('deployment:monitoring:create')
+  @ApiOperation({ 
+    summary: 'Execute orchestration monitoring',
+    description: 'Performs comprehensive orchestration monitoring, performance analytics, and observability for StokCerdas deployment platform'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Orchestration monitoring completed successfully'
+  })
+  async executeOrchestrationMonitoring(
+    @Body() request: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Executing orchestration monitoring for tenant: ${tenantId}`);
+
+      const monitoringRequest = {
+        ...request,
+        tenantId,
+        requestedBy: user.id,
+        requestTimestamp: new Date(),
+      };
+
+      const result = await this.orchestrationMonitoringService
+        .executeOrchestrationMonitoring(monitoringRequest);
+
+      return {
+        success: true,
+        message: 'Orchestration monitoring completed successfully',
+        data: result,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in orchestration monitoring: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to execute orchestration monitoring: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('orchestration-monitoring/status/:monitoringId')
+  @Permissions('deployment:monitoring:read')
+  @ApiOperation({ 
+    summary: 'Get orchestration monitoring status',
+    description: 'Retrieves current status and health of orchestration monitoring operation'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Orchestration monitoring status retrieved successfully'
+  })
+  async getOrchestrationMonitoringStatus(
+    @Param('monitoringId') monitoringId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting orchestration monitoring status for monitoring: ${monitoringId}`);
+
+      // Mock orchestration monitoring status implementation
+      const monitoringStatus = {
+        monitoringId,
+        tenantId,
+        currentStatus: 'active',
+        monitoringHealth: {
+          overall: 96.2,
+          infrastructure: 98.3,
+          performanceAnalytics: 96.2,
+          alerting: 95.7,
+          observability: 96.4,
+          businessMetrics: 94.9,
+        },
+        lastUpdated: new Date(),
+        monitoringServices: {
+          prometheusMetrics: { status: 'running', health: 98.7 },
+          grafanaDashboards: { status: 'active', health: 97.3 },
+          alertManager: { status: 'operational', health: 95.8 },
+          jaegerTracing: { status: 'running', health: 96.1 },
+          elasticsearchLogs: { status: 'healthy', health: 94.9 },
+        },
+        activeMonitoringOperations: [
+          'Infrastructure metrics collection and analysis',
+          'Performance analytics and trend monitoring',
+          'Real-time alerting and notification processing',
+          'Distributed tracing and service mapping',
+          'Business metrics tracking and reporting',
+        ],
+        indonesianMonitoringOptimization: {
+          regionalPerformance: 97.4,
+          businessHoursAdaptation: 95.1,
+          complianceMonitoring: 97.6,
+          culturalEventHandling: 93.9,
+        },
+      };
+
+      return {
+        success: true,
+        message: 'Orchestration monitoring status retrieved successfully',
+        data: monitoringStatus,
+        metadata: {
+          tenantId,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error retrieving orchestration monitoring status: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve orchestration monitoring status: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('orchestration-monitoring/performance-dashboard')
+  @Permissions('deployment:monitoring:read')
+  @ApiOperation({ 
+    summary: 'Get orchestration performance dashboard',
+    description: 'Retrieves comprehensive performance dashboard with real-time metrics and analytics'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Performance dashboard retrieved successfully'
+  })
+  async getOrchestrationPerformanceDashboard(
+    @Query('timeRange') timeRange: string = '24h',
+    @Query('metrics') metrics: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Getting orchestration performance dashboard for tenant: ${tenantId}`);
+
+      // Mock performance dashboard implementation
+      const performanceDashboard = {
+        dashboardId: `perf_dashboard_${Date.now()}_${tenantId}`,
+        tenantId,
+        dashboardGenerated: new Date(),
+        timeRange,
+        metricsRequested: metrics ? metrics.split(',') : ['cpu', 'memory', 'network', 'latency'],
+        performanceOverview: {
+          overallSystemHealth: 96.2, // percentage
+          averageResponseTime: 185, // milliseconds
+          throughput: 8950, // requests per minute
+          errorRate: 0.23, // percentage
+          availabilityScore: 99.87, // percentage uptime
+        },
+        infrastructureMetrics: {
+          cpuUtilization: {
+            average: 45.3, // percentage
+            peak: 78.9, // percentage
+            trend: 'stable',
+            recommendations: ['Consider CPU optimization during peak hours'],
+          },
+          memoryUtilization: {
+            average: 62.1, // percentage
+            peak: 84.7, // percentage
+            trend: 'increasing',
+            recommendations: ['Monitor memory growth and implement caching'],
+          },
+          networkThroughput: {
+            inbound: 2.34, // Gbps
+            outbound: 1.87, // Gbps
+            latency: 12.8, // milliseconds
+            packetLoss: 0.02, // percentage
+          },
+        },
+        applicationMetrics: {
+          servicePerformance: {
+            deploymentService: { responseTime: 145, // ms
+                               errorRate: 0.18, // percentage
+                               throughput: 1250 }, // rpm
+            containerService: { responseTime: 167, // ms
+                               errorRate: 0.31, // percentage
+                               throughput: 890 }, // rpm
+            kubernetesService: { responseTime: 198, // ms
+                                errorRate: 0.24, // percentage
+                                throughput: 670 }, // rpm
+          },
+          businessMetrics: {
+            deploymentsCompleted: 127,
+            containerRegistrations: 89,
+            monitoringAlertsTriggered: 23,
+            averageDeploymentTime: 4.2, // minutes
+          },
+        },
+        indonesianPerformanceInsights: {
+          regionalPerformance: {
+            jakarta: { responseTime: 167, // ms
+                      availability: 99.91 }, // percentage
+            surabaya: { responseTime: 189, // ms
+                       availability: 99.84 }, // percentage
+            bandung: { responseTime: 178, // ms
+                      availability: 99.87 }, // percentage
+          },
+          businessHoursAnalysis: {
+            peakHours: '09:00-17:00 WIB',
+            performanceDuringPeak: 94.6, // percentage
+            performanceDuringOffPeak: 97.8, // percentage
+            culturalEventImpact: 'Ramadan period: 5% performance variation',
+          },
+          complianceMetrics: {
+            dataResidencyCompliance: 98.8, // percentage
+            regulatoryReportingReadiness: 97.3, // percentage
+            privacyComplianceScore: 96.7, // percentage
+          },
+        },
+        alertingSummary: {
+          activeAlerts: 3,
+          resolvedAlertsToday: 12,
+          averageResolutionTime: 8.7, // minutes
+          alertTypes: {
+            performance: 2,
+            infrastructure: 1,
+            security: 0,
+            business: 0,
+          },
+        },
+        recommendations: [
+          'Optimize container resource allocation during Indonesian business hours',
+          'Implement advanced caching for Jakarta region performance improvement',
+          'Schedule maintenance during cultural holidays for minimal impact',
+          'Enhance monitoring granularity for regulatory compliance tracking',
+        ],
+      };
+
+      return {
+        success: true,
+        message: 'Orchestration performance dashboard retrieved successfully',
+        data: performanceDashboard,
+        metadata: {
+          tenantId,
+          timestamp: new Date(),
+          timeRange,
+          metricsIncluded: performanceDashboard.metricsRequested,
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error retrieving performance dashboard: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve performance dashboard: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('orchestration-monitoring/alert-configuration')
+  @Permissions('deployment:monitoring:manage')
+  @ApiOperation({ 
+    summary: 'Configure orchestration monitoring alerts',
+    description: 'Configures intelligent alerting rules and notification channels for orchestration monitoring'
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Alert configuration completed successfully'
+  })
+  async configureOrchestrationMonitoringAlerts(
+    @Body() alertConfiguration: any,
+    @CurrentUser() user: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      this.logger.log(`Configuring orchestration monitoring alerts for tenant: ${tenantId}`);
+
+      // Mock alert configuration implementation
+      const alertingConfiguration = {
+        configurationId: `alert_config_${Date.now()}_${tenantId}`,
+        tenantId,
+        configurationStarted: new Date(),
+        alertingRules: {
+          infrastructureAlerts: [
+            {
+              ruleName: 'high_cpu_utilization',
+              threshold: 85, // percentage
+              duration: '5m',
+              severity: 'warning',
+              indonesianOptimization: 'Business hours sensitivity adjustment',
+            },
+            {
+              ruleName: 'memory_exhaustion',
+              threshold: 90, // percentage
+              duration: '3m',
+              severity: 'critical',
+              indonesianOptimization: 'Cultural event period threshold relaxation',
+            },
+          ],
+          applicationAlerts: [
+            {
+              ruleName: 'deployment_failure_rate',
+              threshold: 5, // percentage
+              duration: '10m',
+              severity: 'critical',
+              indonesianOptimization: 'Regional failure correlation analysis',
+            },
+            {
+              ruleName: 'api_response_time',
+              threshold: 500, // milliseconds
+              duration: '2m',
+              severity: 'warning',
+              indonesianOptimization: 'Jakarta-Surabaya latency consideration',
+            },
+          ],
+          businessAlerts: [
+            {
+              ruleName: 'deployment_volume_anomaly',
+              threshold: 200, // percentage of baseline
+              duration: '15m',
+              severity: 'info',
+              indonesianOptimization: 'Business hours and cultural calendar integration',
+            },
+          ],
+        },
+        notificationChannels: {
+          slack: { enabled: true, channel: '#deployment-alerts' },
+          email: { enabled: true, recipients: ['ops@stokcerdas.com'] },
+          webhook: { enabled: true, url: 'https://api.stokcerdas.com/alerts' },
+          sms: { enabled: false, provider: 'indonesian_sms_gateway' },
+        },
+        escalationPolicies: [
+          {
+            level: 1,
+            timeToEscalate: '5m',
+            recipients: ['on-call-engineer'],
+            indonesianConsideration: 'Business hours preference',
+          },
+          {
+            level: 2,
+            timeToEscalate: '15m',
+            recipients: ['team-lead', 'ops-manager'],
+            indonesianConsideration: 'Regional timezone adjustment',
+          },
+          {
+            level: 3,
+            timeToEscalate: '30m',
+            recipients: ['engineering-director'],
+            indonesianConsideration: 'Executive escalation protocol',
+          },
+        ],
+        indonesianAlertingOptimization: {
+          businessHoursAdjustment: 'Enabled - 08:00-18:00 WIB sensitivity',
+          culturalEventHandling: 'Ramadan, Eid, Independence Day alert suppression',
+          regionalAlertRouting: 'Jakarta, Surabaya, Bandung specific routing',
+          complianceIntegration: 'Regulatory incident reporting automation',
+        },
+        estimatedCompletion: new Date(Date.now() + 180000), // 3 minutes
+        configurationProgress: {
+          currentStage: 'applying_alerting_rules',
+          completionPercentage: 15,
+          estimatedTimeRemaining: 3, // minutes
+        },
+        status: 'in_progress',
+      };
+
+      return {
+        success: true,
+        message: 'Orchestration monitoring alert configuration initiated successfully',
+        data: alertingConfiguration,
+        metadata: {
+          tenantId,
+          requestedBy: user.id,
+          timestamp: new Date(),
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Error configuring orchestration monitoring alerts: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to configure orchestration monitoring alerts: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+}

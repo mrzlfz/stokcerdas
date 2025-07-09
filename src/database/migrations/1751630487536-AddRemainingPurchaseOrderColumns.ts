@@ -1,10 +1,11 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddRemainingPurchaseOrderColumns1751630487536 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Add remaining camelCase columns for purchase_orders
-        await queryRunner.query(`
+export class AddRemainingPurchaseOrderColumns1751630487536
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add remaining camelCase columns for purchase_orders
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add firstReceivedAt column (camelCase) if missing
@@ -44,10 +45,10 @@ export class AddRemainingPurchaseOrderColumns1751630487536 implements MigrationI
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'purchase_orders' AND column_name = 'firstReceivedAt') THEN
@@ -67,6 +68,5 @@ export class AddRemainingPurchaseOrderColumns1751630487536 implements MigrationI
                 END IF;
             END $$;
         `);
-    }
-
+  }
 }

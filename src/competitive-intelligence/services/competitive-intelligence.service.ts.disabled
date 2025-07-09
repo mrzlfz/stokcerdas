@@ -1,0 +1,1031 @@
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, FindOptionsWhere, Between, LessThan, MoreThan } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+
+import { CompetitiveProduct, MarketplaceType, CompetitiveProductStatus, DataQuality } from '../entities/competitive-product.entity';
+import { CompetitivePriceHistory, PriceEventType, PriceChangeReason } from '../entities/competitive-price-history.entity';
+import { CompetitiveAnalysis, AnalysisType, AnalysisStatus, CompetitiveAdvantage, RiskLevel } from '../entities/competitive-analysis.entity';
+
+export interface CompetitiveIntelligenceRequest {
+  tenantId: string;
+  marketplace?: MarketplaceType;
+  productIds?: string[];
+  analysisTypes?: AnalysisType[];
+  timeRange?: {
+    from: string;
+    to: string;
+  };
+  includeIndonesianContext?: boolean;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface CompetitiveIntelligenceResult {
+  tenantId: string;
+  summary: {
+    totalCompetitors: number;
+    highThreatCompetitors: number;
+    priceAdvantageCount: number;
+    marketShareLoss: number;
+    averageThreatLevel: number;
+  };
+  competitors: CompetitiveProductSummary[];
+  insights: CompetitiveInsight[];
+  recommendations: CompetitiveRecommendation[];
+  marketAnalysis: MarketAnalysisSummary;
+  indonesianContext?: IndonesianMarketInsight;
+  alerts: CompetitiveAlert[];
+  trends: CompetitiveTrend[];
+  metadata: {
+    generatedAt: string;
+    dataFreshness: string;
+    analysisConfidence: number;
+    nextUpdateAt: string;
+  };
+}
+
+export interface CompetitiveProductSummary {
+  id: string;
+  name: string;
+  marketplace: MarketplaceType;
+  currentPrice: number;
+  ourPrice?: number;
+  priceGap: number;
+  priceGapPercent: number;
+  threatLevel: number;
+  riskLevel: RiskLevel;
+  competitiveAdvantage?: CompetitiveAdvantage;
+  marketRanking?: number;
+  status: CompetitiveProductStatus;
+  lastUpdated: string;
+  dataQuality: DataQuality;
+  keyMetrics: {
+    sales: number;
+    rating: number;
+    reviews: number;
+    stockLevel: string;
+  };
+}
+
+export interface CompetitiveInsight {
+  type: 'price' | 'market' | 'performance' | 'trend' | 'opportunity' | 'threat';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  impact: number; // 0-100
+  confidence: number; // 0-100
+  actionRequired: boolean;
+  timeframe: 'immediate' | 'short_term' | 'medium_term' | 'long_term';
+  affectedProducts: string[];
+  relatedMetrics: Record<string, number>;
+  recommendations: string[];
+}
+
+export interface CompetitiveRecommendation {
+  id: string;
+  type: 'pricing' | 'product' | 'marketing' | 'inventory' | 'strategy';
+  priority: 'urgent' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  expectedImpact: number; // 0-100
+  implementationEffort: 'low' | 'medium' | 'high';
+  timeline: string;
+  prerequisites: string[];
+  risks: string[];
+  successMetrics: string[];
+  businessValue: string;
+  technicalDetails?: Record<string, any>;
+}
+
+export interface MarketAnalysisSummary {
+  categoryTrends: {
+    growth: number;
+    volatility: number;
+    competitorCount: number;
+    newEntrants: number;
+  };
+  priceAnalysis: {
+    averagePrice: number;
+    priceRange: { min: number; max: number };
+    ourPricePosition: 'lowest' | 'below_average' | 'average' | 'above_average' | 'highest';
+    priceGaps: Array<{ competitor: string; gap: number }>;
+  };
+  marketShare: {
+    our: number;
+    topCompetitor: number;
+    concentration: 'high' | 'medium' | 'low';
+    fragmentation: number;
+  };
+  competitiveIntensity: {
+    level: 'low' | 'medium' | 'high' | 'extreme';
+    score: number;
+    keyFactors: string[];
+  };
+}
+
+export interface IndonesianMarketInsight {
+  regionalAnalysis: Record<string, {
+    competitorCount: number;
+    averagePrice: number;
+    marketShare: number;
+    culturalFactors: string[];
+  }>;
+  holidayImpacts: Array<{
+    holiday: string;
+    priceChanges: number;
+    demandChanges: number;
+    competitorResponse: string;
+  }>;
+  paymentPreferences: Record<string, number>;
+  logisticsChallenges: string[];
+  regulatoryConsiderations: string[];
+  localAdvantages: string[];
+}
+
+export interface CompetitiveAlert {
+  id: string;
+  type: 'price_change' | 'new_competitor' | 'stock_out' | 'promotion' | 'threat_level_change';
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  description: string;
+  competitorId: string;
+  competitorName: string;
+  marketplace: MarketplaceType;
+  triggeredAt: string;
+  actionRequired: boolean;
+  suggestedActions: string[];
+  relatedMetrics: Record<string, any>;
+}
+
+export interface CompetitiveTrend {
+  metric: string;
+  timeframe: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+  direction: 'increasing' | 'decreasing' | 'stable' | 'volatile';
+  magnitude: number;
+  confidence: number;
+  dataPoints: Array<{
+    date: string;
+    value: number;
+    benchmark?: number;
+  }>;
+  insights: string[];
+  predictions: Array<{
+    date: string;
+    predictedValue: number;
+    confidence: number;
+  }>;
+}
+
+@Injectable()
+export class CompetitiveIntelligenceService {
+  private readonly logger = new Logger(CompetitiveIntelligenceService.name);
+
+  constructor(
+    @InjectRepository(CompetitiveProduct)
+    private readonly competitiveProductRepository: Repository<CompetitiveProduct>,
+    @InjectRepository(CompetitivePriceHistory)
+    private readonly priceHistoryRepository: Repository<CompetitivePriceHistory>,
+    @InjectRepository(CompetitiveAnalysis)
+    private readonly analysisRepository: Repository<CompetitiveAnalysis>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async generateCompetitiveIntelligence(request: CompetitiveIntelligenceRequest): Promise<CompetitiveIntelligenceResult> {
+    const startTime = Date.now();
+    this.logger.log(`Generating competitive intelligence for tenant ${request.tenantId}`);
+
+    try {
+      // Get competitive products
+      const competitors = await this.getCompetitiveProducts(request);
+      
+      // Generate summary
+      const summary = await this.generateSummary(competitors, request.tenantId);
+      
+      // Generate insights
+      const insights = await this.generateInsights(competitors, request);
+      
+      // Generate recommendations
+      const recommendations = await this.generateRecommendations(insights, competitors, request);
+      
+      // Generate market analysis
+      const marketAnalysis = await this.generateMarketAnalysis(competitors, request.tenantId);
+      
+      // Generate Indonesian context if requested
+      const indonesianContext = request.includeIndonesianContext ? 
+        await this.generateIndonesianContext(competitors, request.tenantId) : undefined;
+      
+      // Generate alerts
+      const alerts = await this.generateAlerts(competitors, request.tenantId);
+      
+      // Generate trends
+      const trends = await this.generateTrends(competitors, request);
+
+      // Build result
+      const result: CompetitiveIntelligenceResult = {
+        tenantId: request.tenantId,
+        summary,
+        competitors: competitors.map(c => this.mapToSummary(c)),
+        insights,
+        recommendations,
+        marketAnalysis,
+        indonesianContext,
+        alerts,
+        trends,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          dataFreshness: this.calculateDataFreshness(competitors),
+          analysisConfidence: this.calculateAnalysisConfidence(competitors),
+          nextUpdateAt: moment().add(1, 'hour').toISOString(),
+        },
+      };
+
+      // Cache the result
+      await this.cacheCompetitiveIntelligence(request.tenantId, result);
+
+      // Emit event
+      this.eventEmitter.emit('competitive.intelligence.generated', {
+        tenantId: request.tenantId,
+        competitorCount: competitors.length,
+        highThreatCount: summary.highThreatCompetitors,
+        processingTime: Date.now() - startTime,
+      });
+
+      this.logger.log(`Competitive intelligence generated in ${Date.now() - startTime}ms`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Competitive intelligence generation failed: ${error.message}`, error.stack);
+      throw new BadRequestException(`Competitive intelligence generation failed: ${error.message}`);
+    }
+  }
+
+  private async getCompetitiveProducts(request: CompetitiveIntelligenceRequest): Promise<CompetitiveProduct[]> {
+    const where: FindOptionsWhere<CompetitiveProduct> = {
+      tenantId: request.tenantId,
+      monitoringEnabled: true,
+    };
+
+    if (request.marketplace) {
+      where.marketplace = request.marketplace;
+    }
+
+    if (request.productIds && request.productIds.length > 0) {
+      where.ourProductId = { $in: request.productIds } as any;
+    }
+
+    return await this.competitiveProductRepository.find({
+      where,
+      relations: ['priceHistory', 'competitiveAnalyses'],
+      order: {
+        threatLevel: 'DESC',
+        currentPrice: 'ASC',
+      },
+    });
+  }
+
+  private async generateSummary(competitors: CompetitiveProduct[], tenantId: string): Promise<CompetitiveIntelligenceResult['summary']> {
+    const highThreatCompetitors = competitors.filter(c => (c.threatLevel || 0) >= 70).length;
+    const priceAdvantageCount = competitors.filter(c => 
+      c.competitiveAnalyses?.some(a => a.competitiveAdvantage === CompetitiveAdvantage.PRICE_ADVANTAGE)
+    ).length;
+    
+    const threatLevels = competitors.map(c => c.threatLevel || 0).filter(t => t > 0);
+    const averageThreatLevel = threatLevels.length > 0 ? 
+      threatLevels.reduce((sum, level) => sum + level, 0) / threatLevels.length : 0;
+
+    return {
+      totalCompetitors: competitors.length,
+      highThreatCompetitors,
+      priceAdvantageCount,
+      marketShareLoss: 0, // Would calculate based on historical data
+      averageThreatLevel: Math.round(averageThreatLevel),
+    };
+  }
+
+  private async generateInsights(
+    competitors: CompetitiveProduct[], 
+    request: CompetitiveIntelligenceRequest
+  ): Promise<CompetitiveInsight[]> {
+    const insights: CompetitiveInsight[] = [];
+
+    // Price insights
+    const priceInsights = this.generatePriceInsights(competitors);
+    insights.push(...priceInsights);
+
+    // Market insights
+    const marketInsights = this.generateMarketInsights(competitors);
+    insights.push(...marketInsights);
+
+    // Performance insights
+    const performanceInsights = this.generatePerformanceInsights(competitors);
+    insights.push(...performanceInsights);
+
+    // Trend insights
+    const trendInsights = await this.generateTrendInsights(competitors, request);
+    insights.push(...trendInsights);
+
+    // Opportunity insights
+    const opportunityInsights = this.generateOpportunityInsights(competitors);
+    insights.push(...opportunityInsights);
+
+    // Threat insights
+    const threatInsights = this.generateThreatInsights(competitors);
+    insights.push(...threatInsights);
+
+    return insights.sort((a, b) => b.severity === 'critical' ? 1 : -1);
+  }
+
+  private generatePriceInsights(competitors: CompetitiveProduct[]): CompetitiveInsight[] {
+    const insights: CompetitiveInsight[] = [];
+
+    // Find significantly cheaper competitors
+    const cheaperCompetitors = competitors.filter(c => {
+      // This would need access to our product prices for comparison
+      // For now, using a simplified check
+      return c.discountPercent && c.discountPercent > 30;
+    });
+
+    if (cheaperCompetitors.length > 0) {
+      insights.push({
+        type: 'price',
+        severity: 'high',
+        title: 'Significant Price Disadvantage Detected',
+        description: `${cheaperCompetitors.length} competitors are offering significantly lower prices with discounts over 30%`,
+        impact: 80,
+        confidence: 90,
+        actionRequired: true,
+        timeframe: 'immediate',
+        affectedProducts: cheaperCompetitors.map(c => c.id),
+        relatedMetrics: {
+          averageDiscount: cheaperCompetitors.reduce((sum, c) => sum + (c.discountPercent || 0), 0) / cheaperCompetitors.length,
+          competitorCount: cheaperCompetitors.length,
+        },
+        recommendations: [
+          'Review pricing strategy for affected products',
+          'Consider implementing competitive pricing alerts',
+          'Analyze value proposition versus competitor offerings',
+        ],
+      });
+    }
+
+    // Price volatility insight
+    const volatileCompetitors = competitors.filter(c => 
+      c.priceHistory && c.priceHistory.length > 5 && 
+      c.priceHistory.some(h => Math.abs(h.priceChangePercent || 0) > 15)
+    );
+
+    if (volatileCompetitors.length > 0) {
+      insights.push({
+        type: 'price',
+        severity: 'medium',
+        title: 'High Price Volatility in Market',
+        description: `${volatileCompetitors.length} competitors showing high price volatility (>15% changes)`,
+        impact: 60,
+        confidence: 85,
+        actionRequired: false,
+        timeframe: 'short_term',
+        affectedProducts: volatileCompetitors.map(c => c.id),
+        relatedMetrics: {
+          volatileCompetitors: volatileCompetitors.length,
+          averageVolatility: 20, // Simplified calculation
+        },
+        recommendations: [
+          'Monitor competitor price changes more frequently',
+          'Prepare dynamic pricing strategies',
+          'Consider price matching policies',
+        ],
+      });
+    }
+
+    return insights;
+  }
+
+  private generateMarketInsights(competitors: CompetitiveProduct[]): CompetitiveInsight[] {
+    const insights: CompetitiveInsight[] = [];
+
+    // Market concentration
+    const marketplaceDistribution = competitors.reduce((acc, c) => {
+      acc[c.marketplace] = (acc[c.marketplace] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const dominantMarketplace = Object.entries(marketplaceDistribution)
+      .sort(([,a], [,b]) => b - a)[0];
+
+    if (dominantMarketplace && dominantMarketplace[1] > competitors.length * 0.6) {
+      insights.push({
+        type: 'market',
+        severity: 'medium',
+        title: 'Market Concentration Risk',
+        description: `${dominantMarketplace[1]} competitors (${Math.round(dominantMarketplace[1]/competitors.length*100)}%) concentrated on ${dominantMarketplace[0]}`,
+        impact: 70,
+        confidence: 95,
+        actionRequired: true,
+        timeframe: 'medium_term',
+        affectedProducts: competitors.filter(c => c.marketplace === dominantMarketplace[0]).map(c => c.id),
+        relatedMetrics: {
+          concentration: Math.round(dominantMarketplace[1]/competitors.length*100),
+          dominantMarketplace: dominantMarketplace[0],
+        },
+        recommendations: [
+          'Diversify marketplace presence',
+          'Strengthen position on dominant marketplace',
+          'Analyze customer acquisition costs across platforms',
+        ],
+      });
+    }
+
+    return insights;
+  }
+
+  private generatePerformanceInsights(competitors: CompetitiveProduct[]): CompetitiveInsight[] {
+    const insights: CompetitiveInsight[] = [];
+
+    // High-performing competitors
+    const topPerformers = competitors.filter(c => 
+      (c.rating || 0) > 4.5 && (c.soldCount || 0) > 1000
+    );
+
+    if (topPerformers.length > 0) {
+      insights.push({
+        type: 'performance',
+        severity: 'high',
+        title: 'Strong Competitor Performance Detected',
+        description: `${topPerformers.length} competitors with >4.5 rating and >1000 sales`,
+        impact: 85,
+        confidence: 90,
+        actionRequired: true,
+        timeframe: 'immediate',
+        affectedProducts: topPerformers.map(c => c.id),
+        relatedMetrics: {
+          topPerformers: topPerformers.length,
+          averageRating: topPerformers.reduce((sum, c) => sum + (c.rating || 0), 0) / topPerformers.length,
+          averageSales: topPerformers.reduce((sum, c) => sum + (c.soldCount || 0), 0) / topPerformers.length,
+        },
+        recommendations: [
+          'Analyze top performer strategies',
+          'Review product quality and customer service',
+          'Implement customer satisfaction improvements',
+        ],
+      });
+    }
+
+    return insights;
+  }
+
+  private async generateTrendInsights(
+    competitors: CompetitiveProduct[], 
+    request: CompetitiveIntelligenceRequest
+  ): Promise<CompetitiveInsight[]> {
+    const insights: CompetitiveInsight[] = [];
+
+    // This would analyze historical data to identify trends
+    // For now, returning a placeholder insight
+    insights.push({
+      type: 'trend',
+      severity: 'medium',
+      title: 'Market Trend Analysis Available',
+      description: 'Historical trend analysis suggests increasing competition in key categories',
+      impact: 60,
+      confidence: 75,
+      actionRequired: false,
+      timeframe: 'long_term',
+      affectedProducts: competitors.slice(0, 5).map(c => c.id),
+      relatedMetrics: {
+        trendDirection: 'increasing',
+        competitionIntensity: 70,
+      },
+      recommendations: [
+        'Monitor market trends regularly',
+        'Adjust strategy based on trend analysis',
+        'Prepare for increased competition',
+      ],
+    });
+
+    return insights;
+  }
+
+  private generateOpportunityInsights(competitors: CompetitiveProduct[]): CompetitiveInsight[] {
+    const insights: CompetitiveInsight[] = [];
+
+    // Stock-out competitors (opportunity)
+    const stockOutCompetitors = competitors.filter(c => 
+      c.status === CompetitiveProductStatus.OUT_OF_STOCK
+    );
+
+    if (stockOutCompetitors.length > 0) {
+      insights.push({
+        type: 'opportunity',
+        severity: 'medium',
+        title: 'Competitor Stock-Out Opportunity',
+        description: `${stockOutCompetitors.length} competitors currently out of stock`,
+        impact: 75,
+        confidence: 95,
+        actionRequired: true,
+        timeframe: 'immediate',
+        affectedProducts: stockOutCompetitors.map(c => c.id),
+        relatedMetrics: {
+          stockOutCount: stockOutCompetitors.length,
+          marketOpportunity: stockOutCompetitors.length / competitors.length * 100,
+        },
+        recommendations: [
+          'Increase inventory for affected products',
+          'Boost marketing for categories with stock-outs',
+          'Capture market share during competitor unavailability',
+        ],
+      });
+    }
+
+    return insights;
+  }
+
+  private generateThreatInsights(competitors: CompetitiveProduct[]): CompetitiveInsight[] {
+    const insights: CompetitiveInsight[] = [];
+
+    // High threat competitors
+    const highThreatCompetitors = competitors.filter(c => (c.threatLevel || 0) >= 80);
+
+    if (highThreatCompetitors.length > 0) {
+      insights.push({
+        type: 'threat',
+        severity: 'critical',
+        title: 'Critical Competitive Threats Identified',
+        description: `${highThreatCompetitors.length} competitors pose critical threat (threat level ≥80)`,
+        impact: 95,
+        confidence: 90,
+        actionRequired: true,
+        timeframe: 'immediate',
+        affectedProducts: highThreatCompetitors.map(c => c.id),
+        relatedMetrics: {
+          criticalThreats: highThreatCompetitors.length,
+          averageThreatLevel: highThreatCompetitors.reduce((sum, c) => sum + (c.threatLevel || 0), 0) / highThreatCompetitors.length,
+        },
+        recommendations: [
+          'Implement immediate defensive strategies',
+          'Review pricing and value proposition',
+          'Strengthen unique selling points',
+          'Consider strategic partnerships or acquisitions',
+        ],
+      });
+    }
+
+    return insights;
+  }
+
+  private async generateRecommendations(
+    insights: CompetitiveInsight[],
+    competitors: CompetitiveProduct[],
+    request: CompetitiveIntelligenceRequest,
+  ): Promise<CompetitiveRecommendation[]> {
+    const recommendations: CompetitiveRecommendation[] = [];
+
+    // Generate recommendations based on insights
+    for (const insight of insights) {
+      if (insight.actionRequired) {
+        const recommendation = this.generateRecommendationFromInsight(insight, competitors);
+        if (recommendation) {
+          recommendations.push(recommendation);
+        }
+      }
+    }
+
+    // Add general strategic recommendations
+    const strategicRecommendations = this.generateStrategicRecommendations(competitors);
+    recommendations.push(...strategicRecommendations);
+
+    return recommendations.sort((a, b) => {
+      const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+      return priorityOrder[b.priority] - priorityOrder[a.priority];
+    });
+  }
+
+  private generateRecommendationFromInsight(
+    insight: CompetitiveInsight,
+    competitors: CompetitiveProduct[],
+  ): CompetitiveRecommendation | null {
+    const baseId = `rec_${insight.type}_${Date.now()}`;
+
+    switch (insight.type) {
+      case 'price':
+        return {
+          id: baseId,
+          type: 'pricing',
+          priority: insight.severity === 'critical' ? 'urgent' : 'high',
+          title: 'Optimize Pricing Strategy',
+          description: 'Adjust pricing based on competitive price analysis to improve market position',
+          expectedImpact: insight.impact,
+          implementationEffort: 'medium',
+          timeline: '1-2 weeks',
+          prerequisites: ['Competitive price analysis', 'Margin analysis'],
+          risks: ['Potential margin reduction', 'Customer confusion'],
+          successMetrics: ['Price competitiveness index', 'Market share', 'Revenue impact'],
+          businessValue: 'Improve price competitiveness and capture market share',
+          technicalDetails: {
+            affectedProducts: insight.affectedProducts,
+            priceAdjustmentRange: '5-15%',
+            monitoringRequired: true,
+          },
+        };
+
+      case 'threat':
+        return {
+          id: baseId,
+          type: 'strategy',
+          priority: 'urgent',
+          title: 'Implement Competitive Defense Strategy',
+          description: 'Immediate actions to counter high-threat competitors',
+          expectedImpact: 85,
+          implementationEffort: 'high',
+          timeline: '2-4 weeks',
+          prerequisites: ['Threat assessment', 'Resource allocation'],
+          risks: ['Resource strain', 'Market reaction'],
+          successMetrics: ['Threat level reduction', 'Market position', 'Customer retention'],
+          businessValue: 'Protect market position and prevent market share loss',
+        };
+
+      case 'opportunity':
+        return {
+          id: baseId,
+          type: 'marketing',
+          priority: 'high',
+          title: 'Capitalize on Market Opportunity',
+          description: 'Leverage competitor weaknesses to gain market advantage',
+          expectedImpact: insight.impact,
+          implementationEffort: 'medium',
+          timeline: '1-3 weeks',
+          prerequisites: ['Marketing plan', 'Inventory readiness'],
+          risks: ['Competitor response', 'Demand fluctuation'],
+          successMetrics: ['Market share gain', 'Sales increase', 'Customer acquisition'],
+          businessValue: 'Capture additional market share during competitor weakness',
+        };
+
+      default:
+        return null;
+    }
+  }
+
+  private generateStrategicRecommendations(competitors: CompetitiveProduct[]): CompetitiveRecommendation[] {
+    const recommendations: CompetitiveRecommendation[] = [];
+
+    // Marketplace diversification
+    const marketplaces = new Set(competitors.map(c => c.marketplace));
+    if (marketplaces.size < 3) {
+      recommendations.push({
+        id: `rec_marketplace_${Date.now()}`,
+        type: 'strategy',
+        priority: 'medium',
+        title: 'Diversify Marketplace Presence',
+        description: 'Expand to additional marketplaces to reduce concentration risk',
+        expectedImpact: 70,
+        implementationEffort: 'high',
+        timeline: '2-3 months',
+        prerequisites: ['Marketplace analysis', 'Resource allocation'],
+        risks: ['Management complexity', 'Resource dilution'],
+        successMetrics: ['Marketplace count', 'Revenue distribution', 'Risk reduction'],
+        businessValue: 'Reduce dependency on single marketplace and increase market reach',
+      });
+    }
+
+    // Competitive monitoring enhancement
+    recommendations.push({
+      id: `rec_monitoring_${Date.now()}`,
+      type: 'product',
+      priority: 'medium',
+      title: 'Enhance Competitive Monitoring',
+      description: 'Implement real-time competitive monitoring and alerting system',
+      expectedImpact: 60,
+      implementationEffort: 'medium',
+      timeline: '3-4 weeks',
+      prerequisites: ['Technology setup', 'Data sources'],
+      risks: ['Data quality', 'Alert fatigue'],
+      successMetrics: ['Response time', 'Alert accuracy', 'Competitive advantage'],
+      businessValue: 'Improve competitive response time and market intelligence',
+    });
+
+    return recommendations;
+  }
+
+  private async generateMarketAnalysis(competitors: CompetitiveProduct[], tenantId: string): Promise<MarketAnalysisSummary> {
+    // This would be a complex analysis based on historical data
+    // For now, providing a simplified implementation
+    const prices = competitors.map(c => c.currentPrice).filter(p => p > 0);
+    const averagePrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+
+    return {
+      categoryTrends: {
+        growth: 5.2, // Would be calculated from historical data
+        volatility: 12.5,
+        competitorCount: competitors.length,
+        newEntrants: 2, // Would track new competitors
+      },
+      priceAnalysis: {
+        averagePrice,
+        priceRange: { min: minPrice, max: maxPrice },
+        ourPricePosition: 'average', // Would compare with our prices
+        priceGaps: [], // Would calculate actual gaps
+      },
+      marketShare: {
+        our: 15.5, // Would calculate from sales data
+        topCompetitor: 22.3,
+        concentration: 'medium',
+        fragmentation: 0.65,
+      },
+      competitiveIntensity: {
+        level: 'high',
+        score: 78,
+        keyFactors: ['Price competition', 'Product differentiation', 'Market growth'],
+      },
+    };
+  }
+
+  private async generateIndonesianContext(competitors: CompetitiveProduct[], tenantId: string): Promise<IndonesianMarketInsight> {
+    // Indonesian market specific analysis
+    return {
+      regionalAnalysis: {
+        'Java': {
+          competitorCount: competitors.filter(c => c.region === 'Java').length,
+          averagePrice: 0, // Would calculate
+          marketShare: 65.5,
+          culturalFactors: ['Urban concentration', 'Higher purchasing power'],
+        },
+        'Sumatra': {
+          competitorCount: competitors.filter(c => c.region === 'Sumatra').length,
+          averagePrice: 0,
+          marketShare: 20.2,
+          culturalFactors: ['Resource economy', 'Price sensitivity'],
+        },
+      },
+      holidayImpacts: [
+        {
+          holiday: 'Ramadan',
+          priceChanges: -5.2,
+          demandChanges: 15.8,
+          competitorResponse: 'Promotional campaigns',
+        },
+        {
+          holiday: 'Eid al-Fitr',
+          priceChanges: 8.5,
+          demandChanges: 45.2,
+          competitorResponse: 'Premium pricing',
+        },
+      ],
+      paymentPreferences: {
+        'Cash on Delivery': 45.2,
+        'Digital Wallet': 32.1,
+        'Bank Transfer': 15.5,
+        'Credit Card': 7.2,
+      },
+      logisticsChallenges: [
+        'Island geography',
+        'Infrastructure limitations',
+        'Last-mile delivery costs',
+      ],
+      regulatoryConsiderations: [
+        'E-commerce regulations',
+        'Consumer protection laws',
+        'Tax compliance',
+      ],
+      localAdvantages: [
+        'Local language support',
+        'Cultural understanding',
+        'Regional partnerships',
+      ],
+    };
+  }
+
+  private async generateAlerts(competitors: CompetitiveProduct[], tenantId: string): Promise<CompetitiveAlert[]> {
+    const alerts: CompetitiveAlert[] = [];
+
+    // Check for recent significant price changes
+    for (const competitor of competitors) {
+      if (competitor.priceHistory && competitor.priceHistory.length > 0) {
+        const latestPriceChange = competitor.priceHistory[0];
+        if (Math.abs(latestPriceChange.priceChangePercent || 0) > 20) {
+          alerts.push({
+            id: `alert_price_${competitor.id}_${Date.now()}`,
+            type: 'price_change',
+            severity: 'warning',
+            title: 'Significant Price Change Detected',
+            description: `${competitor.name} changed price by ${latestPriceChange.priceChangePercent?.toFixed(1)}%`,
+            competitorId: competitor.id,
+            competitorName: competitor.name,
+            marketplace: competitor.marketplace,
+            triggeredAt: new Date().toISOString(),
+            actionRequired: true,
+            suggestedActions: [
+              'Review competitive pricing',
+              'Analyze market impact',
+              'Consider price adjustment',
+            ],
+            relatedMetrics: {
+              priceChange: latestPriceChange.priceChange,
+              priceChangePercent: latestPriceChange.priceChangePercent,
+              newPrice: latestPriceChange.currentPrice,
+            },
+          });
+        }
+      }
+    }
+
+    return alerts;
+  }
+
+  private async generateTrends(competitors: CompetitiveProduct[], request: CompetitiveIntelligenceRequest): Promise<CompetitiveTrend[]> {
+    const trends: CompetitiveTrend[] = [];
+
+    // Price trend analysis
+    const priceDataPoints = this.generatePriceTrendData(competitors);
+    trends.push({
+      metric: 'Average Competitor Price',
+      timeframe: 'daily',
+      direction: 'stable',
+      magnitude: 2.1,
+      confidence: 85,
+      dataPoints: priceDataPoints,
+      insights: [
+        'Prices have been relatively stable over the past month',
+        'Minor fluctuations due to promotional activities',
+      ],
+      predictions: [
+        {
+          date: moment().add(1, 'week').format('YYYY-MM-DD'),
+          predictedValue: priceDataPoints[priceDataPoints.length - 1]?.value || 0,
+          confidence: 75,
+        },
+      ],
+    });
+
+    return trends;
+  }
+
+  private generatePriceTrendData(competitors: CompetitiveProduct[]): Array<{ date: string; value: number }> {
+    // Generate sample price trend data
+    const dataPoints: Array<{ date: string; value: number }> = [];
+    const prices = competitors.map(c => c.currentPrice).filter(p => p > 0);
+    const averagePrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+
+    for (let i = 30; i >= 0; i--) {
+      const date = moment().subtract(i, 'days');
+      const value = averagePrice * (0.95 + Math.random() * 0.1); // Simulate small variations
+      dataPoints.push({
+        date: date.format('YYYY-MM-DD'),
+        value: Math.round(value),
+      });
+    }
+
+    return dataPoints;
+  }
+
+  private mapToSummary(competitor: CompetitiveProduct): CompetitiveProductSummary {
+    const latestAnalysis = competitor.competitiveAnalyses?.[0];
+    
+    return {
+      id: competitor.id,
+      name: competitor.name,
+      marketplace: competitor.marketplace,
+      currentPrice: competitor.currentPrice,
+      ourPrice: undefined, // Would need to fetch our product price
+      priceGap: 0, // Would calculate vs our price
+      priceGapPercent: 0, // Would calculate vs our price
+      threatLevel: competitor.threatLevel || 0,
+      riskLevel: latestAnalysis?.riskLevel || RiskLevel.LOW,
+      competitiveAdvantage: latestAnalysis?.competitiveAdvantage,
+      marketRanking: competitor.marketRanking,
+      status: competitor.status,
+      lastUpdated: competitor.lastUpdated?.toISOString() || competitor.updatedAt.toISOString(),
+      dataQuality: competitor.dataQuality,
+      keyMetrics: {
+        sales: competitor.soldCount || 0,
+        rating: competitor.rating || 0,
+        reviews: competitor.reviewCount || 0,
+        stockLevel: competitor.stockQuantity ? 
+          competitor.stockQuantity > 100 ? 'high' :
+          competitor.stockQuantity > 10 ? 'medium' : 'low' : 'unknown',
+      },
+    };
+  }
+
+  private calculateDataFreshness(competitors: CompetitiveProduct[]): string {
+    if (competitors.length === 0) return 'unknown';
+    
+    const latestUpdate = Math.max(...competitors.map(c => 
+      c.lastUpdated?.getTime() || c.updatedAt.getTime()
+    ));
+    
+    const hoursSinceUpdate = (Date.now() - latestUpdate) / (1000 * 60 * 60);
+    
+    if (hoursSinceUpdate < 1) return 'very_fresh';
+    if (hoursSinceUpdate < 6) return 'fresh';
+    if (hoursSinceUpdate < 24) return 'acceptable';
+    if (hoursSinceUpdate < 72) return 'stale';
+    return 'expired';
+  }
+
+  private calculateAnalysisConfidence(competitors: CompetitiveProduct[]): number {
+    if (competitors.length === 0) return 0;
+    
+    const confidenceScores = competitors.map(c => {
+      let score = 0;
+      
+      // Data quality contribution
+      switch (c.dataQuality) {
+        case DataQuality.HIGH: score += 40; break;
+        case DataQuality.MEDIUM: score += 25; break;
+        case DataQuality.LOW: score += 10; break;
+        default: score += 0;
+      }
+      
+      // Data freshness contribution
+      const hoursSinceUpdate = c.lastUpdated ? 
+        (Date.now() - c.lastUpdated.getTime()) / (1000 * 60 * 60) : 72;
+      
+      if (hoursSinceUpdate < 6) score += 30;
+      else if (hoursSinceUpdate < 24) score += 20;
+      else if (hoursSinceUpdate < 48) score += 10;
+      
+      // Analysis availability contribution
+      if (c.competitiveAnalyses && c.competitiveAnalyses.length > 0) {
+        score += 20;
+      }
+      
+      // Price history contribution
+      if (c.priceHistory && c.priceHistory.length > 5) {
+        score += 10;
+      }
+      
+      return Math.min(100, score);
+    });
+    
+    return Math.round(confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length);
+  }
+
+  private async cacheCompetitiveIntelligence(tenantId: string, result: CompetitiveIntelligenceResult): Promise<void> {
+    const cacheKey = `competitive_intelligence:${tenantId}`;
+    await this.cacheManager.set(cacheKey, result, 60 * 60 * 1000); // 1 hour
+  }
+
+  // Additional utility methods would go here...
+  
+  async getCompetitiveProduct(tenantId: string, productId: string): Promise<CompetitiveProduct | null> {
+    return await this.competitiveProductRepository.findOne({
+      where: { id: productId, tenantId },
+      relations: ['priceHistory', 'competitiveAnalyses', 'ourProduct'],
+    });
+  }
+
+  async updateCompetitiveProduct(
+    tenantId: string, 
+    productId: string, 
+    updates: Partial<CompetitiveProduct>
+  ): Promise<CompetitiveProduct> {
+    await this.competitiveProductRepository.update(
+      { id: productId, tenantId },
+      { ...updates, updatedAt: new Date() }
+    );
+    
+    const updated = await this.getCompetitiveProduct(tenantId, productId);
+    if (!updated) {
+      throw new BadRequestException('Product not found');
+    }
+    
+    return updated;
+  }
+
+  async addPriceHistory(
+    tenantId: string,
+    competitiveProductId: string,
+    priceData: Partial<CompetitivePriceHistory>
+  ): Promise<CompetitivePriceHistory> {
+    const priceHistory = this.priceHistoryRepository.create({
+      tenantId,
+      competitiveProductId,
+      ...priceData,
+      recordedAt: new Date(),
+    });
+    
+    return await this.priceHistoryRepository.save(priceHistory);
+  }
+
+  async createCompetitiveAnalysis(
+    tenantId: string,
+    competitiveProductId: string,
+    analysisData: Partial<CompetitiveAnalysis>
+  ): Promise<CompetitiveAnalysis> {
+    const analysis = this.analysisRepository.create({
+      tenantId,
+      competitiveProductId,
+      ...analysisData,
+      analysisDate: new Date(),
+      analysisStatus: AnalysisStatus.COMPLETED,
+    });
+    
+    return await this.analysisRepository.save(analysis);
+  }
+}

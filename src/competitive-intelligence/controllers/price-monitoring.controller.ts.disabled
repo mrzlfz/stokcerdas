@@ -1,0 +1,1145 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpStatus,
+  HttpException,
+  Logger,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import { 
+  PriceMonitoringService, 
+  PriceMonitoringRequest, 
+  PriceMonitoringResult,
+} from '../services/price-monitoring.service';
+import { MarketplaceType, DataQuality } from '../entities/competitive-product.entity';
+
+// DTOs for API requests
+export class StartPriceMonitoringDto {
+  monitoringConfig: {
+    products?: string[];
+    marketplaces?: MarketplaceType[];
+    categories?: string[];
+    brands?: string[];
+    priceRanges?: Array<{ min: number; max: number }>;
+    monitoringFrequency: 'realtime' | 'hourly' | 'daily' | 'weekly';
+    alertThresholds: {
+      priceChangePercent: number;
+      significantDrop: number;
+      significantIncrease: number;
+      stockoutAlert: boolean;
+      newCompetitorAlert: boolean;
+    };
+    analysisDepth: 'basic' | 'standard' | 'comprehensive';
+    includeIndonesianContext?: boolean;
+  };
+  filterCriteria?: {
+    minDataQuality?: DataQuality;
+    excludeInactiveProducts?: boolean;
+    onlyDirectCompetitors?: boolean;
+    regionFilter?: string[];
+  };
+}
+
+export class PriceHistoryQueryDto {
+  timeRangeFrom: string;
+  timeRangeTo: string;
+  includeEvents?: boolean;
+  includeAnalysis?: boolean;
+  granularity?: 'hourly' | 'daily' | 'weekly';
+}
+
+export class PriceAnalysisQueryDto {
+  timeRangeFrom?: string;
+  timeRangeTo?: string;
+  analysisType?: 'trends' | 'anomalies' | 'competitive' | 'comprehensive';
+  includeForecasting?: boolean;
+  includeIndonesianContext?: boolean;
+  marketplaces?: string; // comma-separated
+  categories?: string; // comma-separated
+}
+
+export class PriceAlertConfigDto {
+  productIds?: string[];
+  alertTypes: ('price_drop' | 'price_increase' | 'anomaly' | 'competitive_threat')[];
+  thresholds: {
+    priceChangePercent?: number;
+    anomalyScore?: number;
+    competitiveThreat?: number;
+  };
+  notificationChannels: ('email' | 'sms' | 'push' | 'webhook')[];
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  isActive?: boolean;
+}
+
+@ApiTags('Price Monitoring')
+@Controller('api/v1/competitive-intelligence/price-monitoring')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class PriceMonitoringController {
+  private readonly logger = new Logger(PriceMonitoringController.name);
+
+  constructor(
+    private readonly priceMonitoringService: PriceMonitoringService,
+  ) {}
+
+  @Post('start')
+  @ApiOperation({
+    summary: 'Start price monitoring',
+    description: 'Initiate comprehensive price monitoring for specified products and marketplaces',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Price monitoring started successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        monitoringId: { type: 'string' },
+        status: { type: 'string' },
+        estimatedCompletionTime: { type: 'string' },
+        monitoredProducts: { type: 'number' },
+        configuration: { type: 'object' },
+      },
+    },
+  })
+  @ApiBody({ type: StartPriceMonitoringDto })
+  @Permissions('competitive_intelligence:monitor')
+  async startPriceMonitoring(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) monitoringDto: StartPriceMonitoringDto,
+  ): Promise<{
+    monitoringId: string;
+    status: string;
+    estimatedCompletionTime: string;
+    monitoredProducts: number;
+    configuration: any;
+  }> {
+    try {
+      this.logger.log(`Starting price monitoring for tenant: ${tenantId}`);
+
+      const request: PriceMonitoringRequest = {
+        tenantId,
+        monitoringConfig: {
+          ...monitoringDto.monitoringConfig,
+          includeIndonesianContext: monitoringDto.monitoringConfig.includeIndonesianContext ?? true,
+        },
+        filterCriteria: monitoringDto.filterCriteria,
+      };
+
+      const result = await this.priceMonitoringService.monitorPrices(request);
+
+      const estimatedCompletionTime = this.calculateEstimatedTime(
+        result.monitoredProducts.totalCount,
+        monitoringDto.monitoringConfig.monitoringFrequency,
+      );
+
+      this.logger.log(`Price monitoring started: ${result.monitoringId}, monitoring ${result.monitoredProducts.totalCount} products`);
+
+      return {
+        monitoringId: result.monitoringId,
+        status: 'completed', // Since monitoring is synchronous
+        estimatedCompletionTime,
+        monitoredProducts: result.monitoredProducts.totalCount,
+        configuration: monitoringDto.monitoringConfig,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to start price monitoring: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to start price monitoring',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('results/:monitoringId')
+  @ApiOperation({
+    summary: 'Get monitoring results',
+    description: 'Retrieve detailed results from a price monitoring session',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Monitoring results retrieved successfully',
+  })
+  @ApiParam({ name: 'monitoringId', description: 'Monitoring session ID' })
+  @Permissions('competitive_intelligence:read')
+  async getMonitoringResults(
+    @CurrentTenant() tenantId: string,
+    @Param('monitoringId') monitoringId: string,
+  ): Promise<PriceMonitoringResult | { error: string }> {
+    try {
+      this.logger.log(`Getting monitoring results: ${monitoringId} for tenant: ${tenantId}`);
+
+      const result = await this.priceMonitoringService.getMonitoringResult(monitoringId);
+      
+      if (!result) {
+        return { error: 'Monitoring results not found or expired' };
+      }
+
+      // Verify tenant access
+      if (result.tenantId !== tenantId) {
+        throw new HttpException('Access denied to monitoring results', HttpStatus.FORBIDDEN);
+      }
+
+      this.logger.log(`Monitoring results retrieved: ${monitoringId}, ${result.priceChanges.length} price changes`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get monitoring results: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve monitoring results',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('latest')
+  @ApiOperation({
+    summary: 'Get latest monitoring summary',
+    description: 'Retrieve summary of the most recent price monitoring session',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Latest monitoring summary retrieved successfully',
+  })
+  @Permissions('competitive_intelligence:read')
+  async getLatestMonitoringSummary(
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    monitoringId: string;
+    timestamp: string;
+    summary: {
+      priceChanges: number;
+      alerts: number;
+      anomalies: number;
+      recommendations: number;
+    };
+    nextScheduledMonitoring: string;
+    monitoringHealth: {
+      status: 'healthy' | 'degraded' | 'stopped';
+      lastSuccessful: string;
+      failureRate: number;
+      avgProcessingTime: number;
+    };
+  } | { error: string }> {
+    try {
+      this.logger.log(`Getting latest monitoring summary for tenant: ${tenantId}`);
+
+      const latest = await this.priceMonitoringService.getLatestMonitoringForTenant(tenantId);
+      
+      if (!latest) {
+        return { error: 'No monitoring data available' };
+      }
+
+      // Calculate next scheduled monitoring time
+      const nextScheduled = this.calculateNextScheduledTime();
+
+      // Mock monitoring health data (would be calculated from actual metrics)
+      const monitoringHealth = {
+        status: 'healthy' as const,
+        lastSuccessful: latest.timestamp,
+        failureRate: 2.5, // 2.5%
+        avgProcessingTime: 45, // seconds
+      };
+
+      this.logger.log(`Latest monitoring summary retrieved for tenant: ${tenantId}`);
+
+      return {
+        ...latest,
+        nextScheduledMonitoring: nextScheduled,
+        monitoringHealth,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get latest monitoring summary: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve latest monitoring summary',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('price-history/:productId')
+  @ApiOperation({
+    summary: 'Get product price history',
+    description: 'Retrieve detailed price history and analysis for a specific product',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Price history retrieved successfully',
+  })
+  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiQuery({ name: 'timeRangeFrom', required: true, type: String })
+  @ApiQuery({ name: 'timeRangeTo', required: true, type: String })
+  @ApiQuery({ name: 'includeEvents', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeAnalysis', required: false, type: Boolean })
+  @ApiQuery({ name: 'granularity', required: false, enum: ['hourly', 'daily', 'weekly'] })
+  @Permissions('competitive_intelligence:read')
+  async getProductPriceHistory(
+    @CurrentTenant() tenantId: string,
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Query() query: PriceHistoryQueryDto,
+  ): Promise<{
+    productId: string;
+    timeRange: { from: string; to: string };
+    dataPoints: number;
+    priceMovement: {
+      startPrice: number;
+      endPrice: number;
+      minPrice: number;
+      maxPrice: number;
+      averagePrice: number;
+      totalChange: number;
+      totalChangePercent: number;
+    };
+    volatility: number;
+    trend: {
+      trendDirection: string;
+      trendStrength: number;
+    };
+    events: Array<{
+      date: string;
+      price: number;
+      eventType: string;
+      reason: string;
+      change: number;
+      changePercent: number;
+      significance?: string;
+    }>;
+    analysis?: {
+      patterns: string[];
+      seasonality: any;
+      competitiveContext: any;
+      forecast: any;
+    };
+    visualizationData: {
+      chartData: Array<{
+        timestamp: string;
+        price: number;
+        volume?: number;
+        events?: string[];
+      }>;
+      trendLines: Array<{
+        type: 'support' | 'resistance' | 'trend';
+        points: Array<{ x: string; y: number }>;
+      }>;
+      annotations: Array<{
+        type: 'event' | 'anomaly' | 'trend_change';
+        timestamp: string;
+        description: string;
+        severity: 'info' | 'warning' | 'critical';
+      }>;
+    };
+  }> {
+    try {
+      this.logger.log(`Getting price history for product: ${productId}, tenant: ${tenantId}`);
+
+      const timeRange = {
+        from: query.timeRangeFrom,
+        to: query.timeRangeTo,
+      };
+
+      const historyData = await this.priceMonitoringService.getPriceHistoryAnalysis(
+        tenantId,
+        productId,
+        timeRange,
+      );
+
+      // Calculate additional metrics
+      const startPrice = historyData.priceMovement.startPrice;
+      const endPrice = historyData.priceMovement.endPrice;
+      const totalChange = endPrice - startPrice;
+      const totalChangePercent = startPrice > 0 ? (totalChange / startPrice) * 100 : 0;
+
+      // Generate visualization data
+      const visualizationData = this.generateVisualizationData(historyData.events, query.granularity);
+
+      // Generate analysis if requested
+      let analysis;
+      if (query.includeAnalysis) {
+        analysis = {
+          patterns: this.identifyPricePatterns(historyData.events),
+          seasonality: this.analyzeSeasonality(historyData.events),
+          competitiveContext: {
+            marketPosition: 'competitive', // Would calculate from market data
+            priceLeadership: 'follower', // Would determine from price movements
+            responsiveness: 'medium', // Would calculate from reaction times
+          },
+          forecast: this.generatePriceForecast(historyData.events),
+        };
+      }
+
+      const result = {
+        productId,
+        timeRange,
+        dataPoints: historyData.dataPoints,
+        priceMovement: {
+          ...historyData.priceMovement,
+          totalChange,
+          totalChangePercent,
+        },
+        volatility: historyData.volatility,
+        trend: historyData.trend,
+        events: query.includeEvents ? historyData.events.map(event => ({
+          ...event,
+          date: event.date.toISOString(),
+          significance: this.calculateEventSignificance(event.changePercent),
+        })) : [],
+        analysis,
+        visualizationData,
+      };
+
+      this.logger.log(`Price history retrieved for product: ${productId}, ${historyData.dataPoints} data points`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get price history: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve price history',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('analysis/dashboard')
+  @ApiOperation({
+    summary: 'Get price monitoring dashboard',
+    description: 'Retrieve comprehensive price monitoring dashboard data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard data retrieved successfully',
+  })
+  @ApiQuery({ name: 'timeRangeFrom', required: false, type: String })
+  @ApiQuery({ name: 'timeRangeTo', required: false, type: String })
+  @ApiQuery({ name: 'analysisType', required: false, enum: ['trends', 'anomalies', 'competitive', 'comprehensive'] })
+  @ApiQuery({ name: 'includeForecasting', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeIndonesianContext', required: false, type: Boolean })
+  @ApiQuery({ name: 'marketplaces', required: false, type: String })
+  @ApiQuery({ name: 'categories', required: false, type: String })
+  @Permissions('competitive_intelligence:read')
+  async getPriceMonitoringDashboard(
+    @CurrentTenant() tenantId: string,
+    @Query() query: PriceAnalysisQueryDto,
+  ): Promise<{
+    overview: {
+      totalProductsMonitored: number;
+      activePriceAlerts: number;
+      anomaliesDetected: number;
+      competitiveThreatLevel: 'low' | 'medium' | 'high' | 'critical';
+      averageResponseTime: number;
+    };
+    recentPriceChanges: Array<{
+      productId: string;
+      productName: string;
+      marketplace: MarketplaceType;
+      oldPrice: number;
+      newPrice: number;
+      changePercent: number;
+      timestamp: string;
+      significance: string;
+      actionRequired: boolean;
+    }>;
+    priceAnomalies: Array<{
+      productId: string;
+      productName: string;
+      marketplace: MarketplaceType;
+      anomalyType: string;
+      severity: string;
+      anomalyScore: number;
+      detectedAt: string;
+      description: string;
+    }>;
+    competitiveIntelligence: Array<{
+      category: string;
+      averagePrice: number;
+      priceRange: { min: number; max: number };
+      competitorCount: number;
+      ourPosition: number;
+      marketTrend: 'up' | 'down' | 'stable';
+      opportunities: number;
+    }>;
+    indonesianMarketInsights?: {
+      regionalPriceVariations: Record<string, number>;
+      seasonalFactors: {
+        currentSeason: string;
+        priceImpact: number;
+        demandForecast: string;
+      };
+      culturalEvents: Array<{
+        event: string;
+        date: string;
+        expectedImpact: number;
+      }>;
+      economicIndicators: {
+        inflation: number;
+        ecommerceGrowth: number;
+        consumerConfidence: number;
+      };
+    };
+    recommendations: Array<{
+      type: 'immediate' | 'strategic' | 'optimization';
+      priority: 'low' | 'medium' | 'high' | 'urgent';
+      title: string;
+      description: string;
+      expectedImpact: string;
+      timeline: string;
+    }>;
+    trends: Array<{
+      category: string;
+      trendDirection: 'up' | 'down' | 'stable' | 'volatile';
+      strength: number;
+      duration: number;
+      forecast: {
+        nextWeek: 'up' | 'down' | 'stable';
+        confidence: number;
+      };
+    }>;
+  }> {
+    try {
+      this.logger.log(`Getting price monitoring dashboard for tenant: ${tenantId}`);
+
+      // Parse query parameters
+      const marketplaces = query.marketplaces ? query.marketplaces.split(',') as MarketplaceType[] : undefined;
+      const categories = query.categories ? query.categories.split(',') : undefined;
+
+      // Mock dashboard data (would be calculated from actual monitoring data)
+      const overview = {
+        totalProductsMonitored: 245,
+        activePriceAlerts: 12,
+        anomaliesDetected: 3,
+        competitiveThreatLevel: 'medium' as const,
+        averageResponseTime: 45, // seconds
+      };
+
+      const recentPriceChanges = [
+        {
+          productId: 'prod-001',
+          productName: 'Samsung Galaxy A54',
+          marketplace: MarketplaceType.TOKOPEDIA,
+          oldPrice: 4500000,
+          newPrice: 4200000,
+          changePercent: -6.7,
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+          significance: 'moderate',
+          actionRequired: true,
+        },
+        {
+          productId: 'prod-002',
+          productName: 'iPhone 14 Pro',
+          marketplace: MarketplaceType.SHOPEE,
+          oldPrice: 18000000,
+          newPrice: 17500000,
+          changePercent: -2.8,
+          timestamp: new Date(Date.now() - 7200000).toISOString(),
+          significance: 'minor',
+          actionRequired: false,
+        },
+      ];
+
+      const priceAnomalies = [
+        {
+          productId: 'prod-003',
+          productName: 'MacBook Air M2',
+          marketplace: MarketplaceType.LAZADA,
+          anomalyType: 'sudden_drop',
+          severity: 'high',
+          anomalyScore: 85,
+          detectedAt: new Date(Date.now() - 1800000).toISOString(),
+          description: 'Sudden 15% price drop detected - potential flash sale or pricing error',
+        },
+      ];
+
+      const competitiveIntelligence = [
+        {
+          category: 'Smartphones',
+          averagePrice: 3500000,
+          priceRange: { min: 1500000, max: 20000000 },
+          competitorCount: 45,
+          ourPosition: 12,
+          marketTrend: 'down' as const,
+          opportunities: 3,
+        },
+        {
+          category: 'Laptops',
+          averagePrice: 8500000,
+          priceRange: { min: 4000000, max: 35000000 },
+          competitorCount: 32,
+          ourPosition: 8,
+          marketTrend: 'stable' as const,
+          opportunities: 1,
+        },
+      ];
+
+      let indonesianMarketInsights;
+      if (query.includeIndonesianContext) {
+        indonesianMarketInsights = {
+          regionalPriceVariations: {
+            'Jakarta': 0, // Baseline
+            'Surabaya': -12, // 12% cheaper
+            'Medan': -18, // 18% cheaper
+            'Bandung': -8, // 8% cheaper
+          },
+          seasonalFactors: {
+            currentSeason: 'Post-Ramadan',
+            priceImpact: -5, // 5% price adjustment
+            demandForecast: 'Moderate recovery expected',
+          },
+          culturalEvents: [
+            {
+              event: 'Independence Day',
+              date: '2024-08-17',
+              expectedImpact: 8, // 8% increase
+            },
+            {
+              event: 'Back to School',
+              date: '2024-07-15',
+              expectedImpact: 12, // 12% increase for electronics
+            },
+          ],
+          economicIndicators: {
+            inflation: 3.2, // %
+            ecommerceGrowth: 15.5, // %
+            consumerConfidence: 78, // Index
+          },
+        };
+      }
+
+      const recommendations = [
+        {
+          type: 'immediate' as const,
+          priority: 'high' as const,
+          title: 'Respond to Competitor Price Drop',
+          description: 'Samsung Galaxy A54 competitor dropped price by 6.7% - consider response strategy',
+          expectedImpact: 'Maintain market competitiveness',
+          timeline: '2 hours',
+        },
+        {
+          type: 'strategic' as const,
+          priority: 'medium' as const,
+          title: 'Optimize Laptop Category Pricing',
+          description: 'Opportunity to improve position in laptop category market',
+          expectedImpact: 'Potential 15% revenue increase',
+          timeline: '1 week',
+        },
+      ];
+
+      const trends = [
+        {
+          category: 'Smartphones',
+          trendDirection: 'down' as const,
+          strength: 0.7,
+          duration: 14, // days
+          forecast: {
+            nextWeek: 'down' as const,
+            confidence: 0.75,
+          },
+        },
+        {
+          category: 'Laptops',
+          trendDirection: 'stable' as const,
+          strength: 0.3,
+          duration: 21, // days
+          forecast: {
+            nextWeek: 'stable' as const,
+            confidence: 0.85,
+          },
+        },
+      ];
+
+      this.logger.log(`Price monitoring dashboard data retrieved for tenant: ${tenantId}`);
+
+      return {
+        overview,
+        recentPriceChanges,
+        priceAnomalies,
+        competitiveIntelligence,
+        indonesianMarketInsights,
+        recommendations,
+        trends,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get dashboard data: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve dashboard data',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('alerts/configure')
+  @ApiOperation({
+    summary: 'Configure price alerts',
+    description: 'Set up automated price alerts with custom thresholds and notification channels',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Price alerts configured successfully',
+  })
+  @ApiBody({ type: PriceAlertConfigDto })
+  @Permissions('competitive_intelligence:configure')
+  async configurePriceAlerts(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) alertConfigDto: PriceAlertConfigDto,
+  ): Promise<{
+    alertConfigId: string;
+    status: 'active' | 'inactive';
+    configuration: any;
+    estimatedAlertsPerDay: number;
+    nextEvaluation: string;
+  }> {
+    try {
+      this.logger.log(`Configuring price alerts for tenant: ${tenantId}`);
+
+      const alertConfigId = `alert_config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Store alert configuration (would be stored in database)
+      const configuration = {
+        tenantId,
+        alertConfigId,
+        ...alertConfigDto,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Calculate estimated alerts per day based on configuration
+      const estimatedAlertsPerDay = this.calculateEstimatedAlerts(alertConfigDto);
+      
+      // Calculate next evaluation time
+      const nextEvaluation = new Date(Date.now() + 3600000).toISOString(); // 1 hour from now
+
+      this.logger.log(`Price alerts configured: ${alertConfigId}, estimated ${estimatedAlertsPerDay} alerts/day`);
+
+      return {
+        alertConfigId,
+        status: alertConfigDto.isActive !== false ? 'active' : 'inactive',
+        configuration: alertConfigDto,
+        estimatedAlertsPerDay,
+        nextEvaluation,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to configure price alerts: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to configure price alerts',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('alerts')
+  @ApiOperation({
+    summary: 'Get active price alerts',
+    description: 'Retrieve all active price alerts with current status and recent triggers',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Price alerts retrieved successfully',
+  })
+  @ApiQuery({ name: 'severity', required: false, enum: ['info', 'warning', 'critical', 'urgent'] })
+  @ApiQuery({ name: 'alertType', required: false, enum: ['price_drop', 'price_increase', 'anomaly', 'competitive_threat'] })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @Permissions('competitive_intelligence:read')
+  async getActivePriceAlerts(
+    @CurrentTenant() tenantId: string,
+    @Query('severity') severity?: string,
+    @Query('alertType') alertType?: string,
+    @Query('limit') limit?: number,
+  ): Promise<{
+    alerts: Array<{
+      alertId: string;
+      type: string;
+      severity: string;
+      productId: string;
+      productName: string;
+      marketplace: MarketplaceType;
+      title: string;
+      message: string;
+      triggeredAt: string;
+      status: 'active' | 'acknowledged' | 'resolved';
+      data: any;
+      actionItems: Array<{
+        action: string;
+        priority: string;
+        timeline: string;
+        status: 'pending' | 'in_progress' | 'completed';
+      }>;
+    }>;
+    summary: {
+      totalActiveAlerts: number;
+      criticalAlerts: number;
+      newAlerts: number;
+      acknowledgedAlerts: number;
+      avgResolutionTime: number; // in hours
+    };
+    configuration: {
+      alertsEnabled: boolean;
+      monitoredProducts: number;
+      notificationChannels: string[];
+      lastConfigUpdate: string;
+    };
+  }> {
+    try {
+      this.logger.log(`Getting active price alerts for tenant: ${tenantId}`);
+
+      // Mock alert data (would be retrieved from database/cache)
+      const alerts = [
+        {
+          alertId: 'alert_001',
+          type: 'price_drop',
+          severity: 'critical',
+          productId: 'prod_001',
+          productName: 'Samsung Galaxy A54',
+          marketplace: MarketplaceType.TOKOPEDIA,
+          title: 'Significant Price Drop Alert',
+          message: 'Competitor dropped price by 6.7% - immediate action required',
+          triggeredAt: new Date(Date.now() - 3600000).toISOString(),
+          status: 'active' as const,
+          data: {
+            oldPrice: 4500000,
+            newPrice: 4200000,
+            changePercent: -6.7,
+          },
+          actionItems: [
+            {
+              action: 'Review pricing strategy',
+              priority: 'high',
+              timeline: '2 hours',
+              status: 'pending' as const,
+            },
+            {
+              action: 'Consider price matching',
+              priority: 'medium',
+              timeline: '4 hours',
+              status: 'pending' as const,
+            },
+          ],
+        },
+        {
+          alertId: 'alert_002',
+          type: 'anomaly',
+          severity: 'warning',
+          productId: 'prod_002',
+          productName: 'iPhone 14 Pro',
+          marketplace: MarketplaceType.SHOPEE,
+          title: 'Price Pattern Anomaly',
+          message: 'Unusual price pattern detected - monitor for potential market disruption',
+          triggeredAt: new Date(Date.now() - 7200000).toISOString(),
+          status: 'acknowledged' as const,
+          data: {
+            anomalyScore: 72,
+            pattern: 'irregular_fluctuation',
+          },
+          actionItems: [
+            {
+              action: 'Monitor market conditions',
+              priority: 'low',
+              timeline: '24 hours',
+              status: 'in_progress' as const,
+            },
+          ],
+        },
+      ];
+
+      // Apply filters
+      let filteredAlerts = alerts;
+      if (severity) {
+        filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity);
+      }
+      if (alertType) {
+        filteredAlerts = filteredAlerts.filter(alert => alert.type === alertType);
+      }
+      if (limit) {
+        filteredAlerts = filteredAlerts.slice(0, limit);
+      }
+
+      // Calculate summary
+      const summary = {
+        totalActiveAlerts: alerts.length,
+        criticalAlerts: alerts.filter(a => a.severity === 'critical' || a.severity === 'urgent').length,
+        newAlerts: alerts.filter(a => a.status === 'active').length,
+        acknowledgedAlerts: alerts.filter(a => a.status === 'acknowledged').length,
+        avgResolutionTime: 4.5, // hours
+      };
+
+      // Configuration info
+      const configuration = {
+        alertsEnabled: true,
+        monitoredProducts: 245,
+        notificationChannels: ['email', 'push'],
+        lastConfigUpdate: new Date(Date.now() - 86400000).toISOString(),
+      };
+
+      this.logger.log(`Retrieved ${filteredAlerts.length} price alerts for tenant: ${tenantId}`);
+
+      return {
+        alerts: filteredAlerts,
+        summary,
+        configuration,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get price alerts: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve price alerts',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('alerts/:alertId/acknowledge')
+  @ApiOperation({
+    summary: 'Acknowledge price alert',
+    description: 'Mark a price alert as acknowledged and optionally add notes',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Alert acknowledged successfully',
+  })
+  @ApiParam({ name: 'alertId', description: 'Alert ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        notes: { type: 'string' },
+        action: { type: 'string' },
+        assignedTo: { type: 'string' },
+      },
+    },
+  })
+  @Permissions('competitive_intelligence:manage')
+  async acknowledgePriceAlert(
+    @CurrentTenant() tenantId: string,
+    @Param('alertId') alertId: string,
+    @Body() acknowledgeData: {
+      notes?: string;
+      action?: string;
+      assignedTo?: string;
+    },
+  ): Promise<{
+    alertId: string;
+    status: 'acknowledged';
+    acknowledgedAt: string;
+    acknowledgedBy: string;
+    notes?: string;
+    nextActions: string[];
+  }> {
+    try {
+      this.logger.log(`Acknowledging price alert: ${alertId} for tenant: ${tenantId}`);
+
+      // Update alert status (would be stored in database)
+      const acknowledgedAt = new Date().toISOString();
+      const acknowledgedBy = 'current_user'; // Would get from authentication context
+
+      // Determine next actions based on alert type and acknowledgment
+      const nextActions = [
+        'Monitor price changes for next 24 hours',
+        'Review competitive response strategy',
+        'Update pricing team on market conditions',
+      ];
+
+      this.logger.log(`Price alert acknowledged: ${alertId}`);
+
+      return {
+        alertId,
+        status: 'acknowledged',
+        acknowledgedAt,
+        acknowledgedBy,
+        notes: acknowledgeData.notes,
+        nextActions,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to acknowledge price alert: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to acknowledge price alert',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // Helper methods
+  private calculateEstimatedTime(productCount: number, frequency: string): string {
+    let baseTimeMinutes = 5;
+    
+    switch (frequency) {
+      case 'realtime':
+        baseTimeMinutes = productCount * 0.1; // 6 seconds per product
+        break;
+      case 'hourly':
+        baseTimeMinutes = productCount * 0.2; // 12 seconds per product
+        break;
+      case 'daily':
+        baseTimeMinutes = productCount * 0.5; // 30 seconds per product
+        break;
+      case 'weekly':
+        baseTimeMinutes = productCount * 1; // 1 minute per product
+        break;
+    }
+
+    const completionTime = new Date(Date.now() + baseTimeMinutes * 60 * 1000);
+    return completionTime.toISOString();
+  }
+
+  private calculateNextScheduledTime(): string {
+    // Calculate next hourly monitoring time
+    const next = new Date();
+    next.setHours(next.getHours() + 1, 0, 0, 0);
+    return next.toISOString();
+  }
+
+  private generateVisualizationData(events: any[], granularity?: string): any {
+    const chartData = events.map(event => ({
+      timestamp: event.date.toISOString(),
+      price: event.price,
+      volume: Math.floor(Math.random() * 1000) + 100, // Mock volume data
+      events: event.eventType ? [event.eventType] : [],
+    }));
+
+    const trendLines = [
+      {
+        type: 'trend' as const,
+        points: [
+          { x: events[0]?.date.toISOString() || '', y: events[0]?.price || 0 },
+          { x: events[events.length - 1]?.date.toISOString() || '', y: events[events.length - 1]?.price || 0 },
+        ],
+      },
+    ];
+
+    const annotations = events
+      .filter(event => Math.abs(event.changePercent) >= 5)
+      .map(event => ({
+        type: Math.abs(event.changePercent) >= 20 ? 'anomaly' as const : 'event' as const,
+        timestamp: event.date.toISOString(),
+        description: `${event.eventType}: ${event.changePercent.toFixed(1)}% change`,
+        severity: Math.abs(event.changePercent) >= 20 ? 'critical' as const 
+          : Math.abs(event.changePercent) >= 10 ? 'warning' as const 
+          : 'info' as const,
+      }));
+
+    return {
+      chartData,
+      trendLines,
+      annotations,
+    };
+  }
+
+  private identifyPricePatterns(events: any[]): string[] {
+    const patterns: string[] = [];
+
+    // Simple pattern detection
+    const priceChanges = events.map(e => e.changePercent).filter(Boolean);
+    
+    if (priceChanges.length >= 3) {
+      const consecutiveDecreases = this.findConsecutivePattern(priceChanges, -1);
+      const consecutiveIncreases = this.findConsecutivePattern(priceChanges, 1);
+      
+      if (consecutiveDecreases >= 3) patterns.push('Downward trend');
+      if (consecutiveIncreases >= 3) patterns.push('Upward trend');
+      
+      const volatility = this.calculatePriceVolatility(priceChanges);
+      if (volatility > 0.2) patterns.push('High volatility');
+      
+      const hasSeasonality = events.some(e => e.reason === 'seasonal_change');
+      if (hasSeasonality) patterns.push('Seasonal pattern detected');
+    }
+
+    return patterns.length > 0 ? patterns : ['No significant patterns detected'];
+  }
+
+  private findConsecutivePattern(values: number[], direction: number): number {
+    let maxConsecutive = 0;
+    let current = 0;
+
+    for (const value of values) {
+      if ((direction > 0 && value > 0) || (direction < 0 && value < 0)) {
+        current++;
+        maxConsecutive = Math.max(maxConsecutive, current);
+      } else {
+        current = 0;
+      }
+    }
+
+    return maxConsecutive;
+  }
+
+  private calculatePriceVolatility(priceChanges: number[]): number {
+    if (priceChanges.length < 2) return 0;
+
+    const mean = priceChanges.reduce((sum, change) => sum + Math.abs(change), 0) / priceChanges.length;
+    const variance = priceChanges.reduce((sum, change) => sum + Math.pow(Math.abs(change) - mean, 2), 0) / priceChanges.length;
+    
+    return Math.sqrt(variance) / 100; // Normalize to 0-1 scale
+  }
+
+  private analyzeSeasonality(events: any[]): any {
+    return {
+      hasSeasonality: events.some(e => e.reason === 'seasonal_change'),
+      seasonalEvents: events.filter(e => e.reason === 'seasonal_change').length,
+      ramadanEffect: events.some(e => e.reason === 'seasonal_change' && e.eventType === 'promotion_start'),
+      holidayPatterns: 'Moderate seasonal influence detected',
+    };
+  }
+
+  private generatePriceForecast(events: any[]): any {
+    const recentPrices = events.slice(-7).map(e => e.price); // Last 7 data points
+    const avgPrice = recentPrices.reduce((sum, price) => sum + price, 0) / recentPrices.length;
+    
+    return {
+      nextWeekForecast: {
+        expectedPrice: avgPrice * (1 + (Math.random() - 0.5) * 0.1), // ±5% variation
+        confidence: 0.65,
+        priceRange: {
+          min: avgPrice * 0.95,
+          max: avgPrice * 1.05,
+        },
+      },
+      methodology: 'Simple moving average with market volatility adjustment',
+      factors: ['Recent price trend', 'Market volatility', 'Seasonal adjustment'],
+    };
+  }
+
+  private calculateEventSignificance(changePercent: number): string {
+    const absChange = Math.abs(changePercent);
+    
+    if (absChange >= 20) return 'critical';
+    if (absChange >= 10) return 'major';
+    if (absChange >= 5) return 'moderate';
+    return 'minor';
+  }
+
+  private calculateEstimatedAlerts(config: PriceAlertConfigDto): number {
+    let baseAlerts = 0;
+
+    // Estimate based on alert types and thresholds
+    if (config.alertTypes.includes('price_drop')) {
+      baseAlerts += config.thresholds.priceChangePercent <= 5 ? 8 : 4; // More sensitive = more alerts
+    }
+    if (config.alertTypes.includes('price_increase')) {
+      baseAlerts += config.thresholds.priceChangePercent <= 5 ? 6 : 3;
+    }
+    if (config.alertTypes.includes('anomaly')) {
+      baseAlerts += config.thresholds.anomalyScore <= 70 ? 3 : 1;
+    }
+    if (config.alertTypes.includes('competitive_threat')) {
+      baseAlerts += 2;
+    }
+
+    // Adjust based on product count
+    const productMultiplier = (config.productIds?.length || 100) / 100;
+    
+    return Math.round(baseAlerts * productMultiplier);
+  }
+}

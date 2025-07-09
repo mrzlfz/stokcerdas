@@ -6,7 +6,7 @@ import {
   JoinColumn,
   OneToMany,
 } from 'typeorm';
-import { BaseEntity } from '../../common/entities/base.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryLocation } from './inventory-location.entity';
 
@@ -15,7 +15,8 @@ import { InventoryLocation } from './inventory-location.entity';
 @Index(['tenantId', 'locationId'])
 @Index(['tenantId', 'productId'])
 @Index(['tenantId', 'quantityOnHand'])
-export class InventoryItem extends BaseEntity {
+@Index(['tenantId', 'isDeleted'])
+export class InventoryItem extends AuditableEntity {
   @Column({ type: 'uuid' })
   productId: string;
 

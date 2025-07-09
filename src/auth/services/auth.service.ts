@@ -20,6 +20,7 @@ import {
   PermissionAction,
 } from '../entities/permission.entity';
 import { RolePermission } from '../entities/role-permission.entity';
+import { Company, BusinessType, CompanyType } from '../entities/company.entity';
 import { LoginDto } from '../dto/login.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
@@ -66,9 +67,28 @@ export class AuthService {
     private readonly permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Generate a unique company code from business name
+   */
+  private generateCompanyCode(businessName: string): string {
+    // Remove special characters and spaces, convert to uppercase
+    const cleanName = businessName
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .replace(/\s+/g, '')
+      .toUpperCase();
+
+    // Take first 3-6 characters and add random suffix
+    const prefix = cleanName.substring(0, Math.min(6, cleanName.length));
+    const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+
+    return `${prefix}${suffix}`;
+  }
 
   /**
    * Validate user credentials
@@ -192,12 +212,16 @@ export class AuthService {
       lastName: registerDto.lastName,
       phoneNumber: registerDto.phoneNumber,
       role: registerDto.role || UserRole.STAFF,
-      status: process.env.NODE_ENV === 'development' || process.env.AUTO_ACTIVATE_USERS === 'true'
-        ? UserStatus.ACTIVE 
-        : UserStatus.PENDING,
-      emailVerified: process.env.NODE_ENV === 'development' || process.env.AUTO_ACTIVATE_USERS === 'true'
-        ? true 
-        : false,
+      status:
+        process.env.NODE_ENV === 'development' ||
+        process.env.AUTO_ACTIVATE_USERS === 'true'
+          ? UserStatus.ACTIVE
+          : UserStatus.PENDING,
+      emailVerified:
+        process.env.NODE_ENV === 'development' ||
+        process.env.AUTO_ACTIVATE_USERS === 'true'
+          ? true
+          : false,
       language: 'id',
       timezone: 'Asia/Jakarta',
       emailVerificationToken: randomBytes(32).toString('hex'),
@@ -207,6 +231,60 @@ export class AuthService {
     this.logger.log(
       `New user registered: ${savedUser.email} (${savedUser.id}) with status: ${savedUser.status}`,
     );
+
+    // Create company if business information is provided
+    if (registerDto.businessName) {
+      const companyCode = this.generateCompanyCode(registerDto.businessName);
+
+      // Map business type string to enum
+      let businessType: BusinessType = BusinessType.OTHER;
+      if (registerDto.businessType) {
+        const typeKey = registerDto.businessType.toUpperCase();
+        if (Object.values(BusinessType).includes(typeKey as BusinessType)) {
+          businessType = typeKey as BusinessType;
+        } else {
+          // Map common strings to enum values
+          const typeMapping: Record<string, BusinessType> = {
+            retail: BusinessType.RETAIL,
+            wholesale: BusinessType.WHOLESALE,
+            trading: BusinessType.TRADING,
+            manufacture: BusinessType.MANUFACTURE,
+            service: BusinessType.SERVICE,
+            ecommerce: BusinessType.ECOMMERCE,
+            restaurant: BusinessType.RESTAURANT,
+            agriculture: BusinessType.AGRICULTURE,
+            technology: BusinessType.TECHNOLOGY,
+            logistics: BusinessType.LOGISTICS,
+            consulting: BusinessType.CONSULTING,
+            distribution: BusinessType.DISTRIBUTION,
+          };
+          businessType =
+            typeMapping[registerDto.businessType.toLowerCase()] ||
+            BusinessType.OTHER;
+        }
+      }
+
+      const company = this.companyRepository.create({
+        tenantId,
+        name: registerDto.businessName,
+        displayName: registerDto.businessName,
+        code: companyCode,
+        type: CompanyType.SUBSIDIARY,
+        businessType,
+        ceoId: savedUser.id,
+        currency: 'IDR',
+        timezone: 'Asia/Jakarta',
+        country: 'Indonesia',
+        isActive: true,
+        fiscalYearStart: 1,
+        fiscalYearEnd: 12,
+      });
+
+      const savedCompany = await this.companyRepository.save(company);
+      this.logger.log(
+        `New company created: ${savedCompany.name} (${savedCompany.id}) for user ${savedUser.email}`,
+      );
+    }
 
     return savedUser;
   }
@@ -245,7 +323,9 @@ export class AuthService {
    */
   async activateAllPendingUsers(tenantId: string): Promise<number> {
     if (process.env.NODE_ENV === 'production') {
-      throw new UnauthorizedException('This operation is not allowed in production');
+      throw new UnauthorizedException(
+        'This operation is not allowed in production',
+      );
     }
 
     const result = await this.userRepository.update(

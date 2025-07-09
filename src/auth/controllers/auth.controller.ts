@@ -317,4 +317,120 @@ export class AuthController {
       },
     };
   }
+
+  @Public()
+  @Post('activate-user')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Activate user (Development/Testing)',
+    description:
+      'Manually activate a user for development and testing purposes',
+  })
+  @ApiHeader({
+    name: 'x-tenant-id',
+    description: 'Tenant ID for user activation',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User activated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  async activateUser(
+    @Body() body: { email: string },
+    @Req() req: Request,
+  ): Promise<{
+    success: boolean;
+    data: { message: string; user?: any };
+    meta: any;
+  }> {
+    const tenantId = req.headers['x-tenant-id'] as string;
+
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID diperlukan');
+    }
+
+    this.logger.log(
+      `Manual user activation attempt for ${body.email} (tenant: ${tenantId})`,
+    );
+
+    const user = await this.authService.activateUser(body.email, tenantId);
+
+    if (!user) {
+      throw new BadRequestException('User tidak ditemukan atau sudah aktif');
+    }
+
+    this.logger.log(`User manually activated: ${user.email} (${user.id})`);
+
+    return {
+      success: true,
+      data: {
+        message: 'User berhasil diaktivasi untuk testing/development',
+        user: {
+          id: user.id,
+          email: user.email,
+          status: user.status,
+          emailVerified: user.emailVerified,
+        },
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+        path: req.url,
+      },
+    };
+  }
+
+  @Public()
+  @Post('activate-all-pending')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Activate all pending users (Development/Testing)',
+    description:
+      'Bulk activate all pending users for development and testing purposes',
+  })
+  @ApiHeader({
+    name: 'x-tenant-id',
+    description: 'Tenant ID for bulk activation',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Users activated successfully',
+  })
+  async activateAllPendingUsers(@Req() req: Request): Promise<{
+    success: boolean;
+    data: { message: string; activatedCount: number };
+    meta: any;
+  }> {
+    const tenantId = req.headers['x-tenant-id'] as string;
+
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID diperlukan');
+    }
+
+    this.logger.log(`Bulk user activation attempt for tenant: ${tenantId}`);
+
+    const activatedCount = await this.authService.activateAllPendingUsers(
+      tenantId,
+    );
+
+    this.logger.log(
+      `Bulk activation completed: ${activatedCount} users activated for tenant ${tenantId}`,
+    );
+
+    return {
+      success: true,
+      data: {
+        message: `${activatedCount} user(s) berhasil diaktivasi untuk testing/development`,
+        activatedCount,
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+        path: req.url,
+      },
+    };
+  }
 }

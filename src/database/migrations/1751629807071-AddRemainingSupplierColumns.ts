@@ -1,10 +1,11 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddRemainingSupplierColumns1751629807071 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Add remaining camelCase columns that match entity property names
-        await queryRunner.query(`
+export class AddRemainingSupplierColumns1751629807071
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add remaining camelCase columns that match entity property names
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add creditLimit column (camelCase) if missing
@@ -148,11 +149,11 @@ export class AddRemainingSupplierColumns1751629807071 implements MigrationInterf
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Remove camelCase columns that were added
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove camelCase columns that were added
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove camelCase columns from suppliers table
@@ -213,6 +214,5 @@ export class AddRemainingSupplierColumns1751629807071 implements MigrationInterf
                 END IF;
             END $$;
         `);
-    }
-
+  }
 }

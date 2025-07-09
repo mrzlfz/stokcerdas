@@ -3,6 +3,8 @@ import {
   NestMiddleware,
   Logger,
   BadRequestException,
+  createParamDecorator,
+  ExecutionContext,
 } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -365,17 +367,95 @@ export class EnterpriseContextMiddleware implements NestMiddleware {
   }
 }
 
-// Helper decorator for accessing enterprise context in controllers
-export const EnterpriseContext = () => {
-  return (
-    target: any,
-    propertyName: string,
-    descriptor: PropertyDescriptor,
-  ) => {
-    // This would be implemented as a parameter decorator
-    // For now, it's a placeholder for future enhancement
-  };
-};
+// Enterprise Context Parameter Decorators
+
+/**
+ * Extract tenant ID from enterprise request context
+ */
+export const TenantId = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string => {
+    const request = ctx.switchToHttp().getRequest<EnterpriseRequest>();
+
+    if (!request.tenantId) {
+      throw new BadRequestException('Tenant context not available in request');
+    }
+
+    return request.tenantId;
+  },
+);
+
+/**
+ * Extract department ID from enterprise request context
+ */
+export const DepartmentId = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string | undefined => {
+    const request = ctx.switchToHttp().getRequest<EnterpriseRequest>();
+    return request.departmentId;
+  },
+);
+
+/**
+ * Extract department context from enterprise request
+ */
+export const DepartmentContext = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): Department | undefined => {
+    const request = ctx.switchToHttp().getRequest<EnterpriseRequest>();
+    return request.departmentContext;
+  },
+);
+
+/**
+ * Extract enterprise user from request context
+ */
+export const EnterpriseUser = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): User => {
+    const request = ctx.switchToHttp().getRequest<EnterpriseRequest>();
+
+    if (!request.user) {
+      throw new BadRequestException('User context not available in request');
+    }
+
+    return request.user;
+  },
+);
+
+/**
+ * Extract user permission cache from enterprise request
+ */
+export const UserPermissions = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest<EnterpriseRequest>();
+    return request.userPermissionCache;
+  },
+);
+
+/**
+ * Extract enterprise session information (audit context)
+ */
+export const EnterpriseSession = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest<EnterpriseRequest>();
+    return request.auditContext;
+  },
+);
+
+/**
+ * Extract full enterprise context from request
+ */
+export const EnterpriseContext = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): Partial<EnterpriseRequest> => {
+    const request = ctx.switchToHttp().getRequest<EnterpriseRequest>();
+
+    return {
+      user: request.user,
+      tenantId: request.tenantId,
+      departmentId: request.departmentId,
+      departmentContext: request.departmentContext,
+      userPermissionCache: request.userPermissionCache,
+      auditContext: request.auditContext,
+    };
+  },
+);
 
 // Utility functions for controllers
 export class EnterpriseContextUtils {

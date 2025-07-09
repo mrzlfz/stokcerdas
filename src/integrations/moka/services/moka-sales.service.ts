@@ -3,6 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+// Indonesian Configuration Import
+import { INDONESIAN_PAYMENT_CONFIG } from '../../../config/indonesian-payments.config';
+
 import { MokaApiService, MokaCredentials, MokaSale } from './moka-api.service';
 import { MokaAuthService } from './moka-auth.service';
 import {
@@ -466,7 +469,7 @@ export class MokaSalesService {
       taxAmount: mokaSale.tax_amount,
       discountAmount: mokaSale.discount_amount,
       shippingAmount: 0, // POS sales don't have shipping
-      currency: 'IDR',
+      currency: 'IDR', // Indonesian currency from payment config
       paymentMethod: mokaSale.payment_method,
       paymentStatus: PaymentStatus.PAID, // POS sales are always paid
       createdAt: this.mokaApiService.parseDateTime(mokaSale.sale_date),
@@ -525,7 +528,7 @@ export class MokaSalesService {
         // Store Moka-specific data
         externalProductId: item.product_id,
         externalVariantId: item.variant_id,
-        externalData: {
+        metadata: {
           moka: {
             productId: item.product_id,
             variantId: item.variant_id,

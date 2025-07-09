@@ -10,10 +10,10 @@ import { BaseEntity } from '../../common/entities/base.entity';
 
 /**
  * Tenant Subscriber untuk otomatis menambahkan tenant_id
- * 
+ *
  * NOTE: Saat ini subscriber ini tidak aktif karena tenant_id
  * dihandle secara eksplisit di service layer untuk keamanan yang lebih baik.
- * 
+ *
  * Jika ingin mengaktifkan kembali, tambahkan ke subscribers di app.module.ts
  */
 @EventSubscriber()
@@ -27,7 +27,6 @@ export class TenantSubscriber implements EntitySubscriberInterface {
   beforeInsert(event: InsertEvent<any>) {
     // Tenant ID harus diset secara eksplisit di service layer
     // untuk menghindari security issues
-    
     // if (event.entity instanceof BaseEntity) {
     //   const tenantId = this.getTenantIdFromContext(event);
     //   if (tenantId && !event.entity.tenantId) {
@@ -40,7 +39,6 @@ export class TenantSubscriber implements EntitySubscriberInterface {
   beforeUpdate(event: UpdateEvent<any>) {
     // Tenant ID harus diset secara eksplisit di service layer
     // untuk menghindari security issues
-    
     // if (event.entity instanceof BaseEntity) {
     //   const tenantId = this.getTenantIdFromContext(event);
     //   if (tenantId && !event.entity.tenantId) {

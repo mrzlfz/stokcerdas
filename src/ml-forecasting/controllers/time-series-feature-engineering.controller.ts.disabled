@@ -1,0 +1,1397 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Logger,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import {
+  TimeSeriesFeatureEngineeringService,
+  FeatureEngineeringRequest,
+  EngineeringResult,
+  FeatureConfig,
+  TimeSeriesFeatureSet,
+  SeasonalInsight,
+  TrendInsight,
+  AnomalyInsight,
+} from '../services/time-series-feature-engineering.service';
+import { TimeSeriesDataPoint } from '../services/data-pipeline.service';
+
+// DTOs for API documentation and validation
+export class FeatureEngineeringRequestDto implements FeatureEngineeringRequest {
+  jobId: string;
+  tenantId: string;
+  data: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: any[];
+    products?: any[];
+    orders?: any[];
+    external?: any[];
+  };
+  features: FeatureConfig[];
+  windowSizes: number[];
+  targetVariable: string;
+  forecastHorizon: number;
+  includeSeasonality?: boolean;
+  includeExogenous?: boolean;
+  indonesianContext?: boolean;
+}
+
+export class QuickFeatureGenerationDto {
+  data: TimeSeriesDataPoint[];
+  targetVariable: string;
+  featureTypes: ('lag' | 'rolling' | 'seasonal' | 'trend' | 'derived')[];
+  windowSizes?: number[];
+  forecastHorizon?: number;
+}
+
+export class FeaturePresetDto {
+  name: string;
+  description: string;
+  features: FeatureConfig[];
+  windowSizes: number[];
+  targetVariable: string;
+  useCase: string;
+  expectedPerformance: {
+    processingTime: string;
+    memoryUsage: string;
+    featureCount: number;
+  };
+}
+
+export class FeatureInsightsDto {
+  correlations: Record<string, number>;
+  importance: Record<string, number>;
+  seasonality: SeasonalInsight[];
+  trends: TrendInsight[];
+  recommendations: string[];
+}
+
+export class FeatureAnalysisDto {
+  data: TimeSeriesDataPoint[];
+  targetVariable: string;
+  analysisType: 'quick' | 'standard' | 'comprehensive';
+  includeVisualization?: boolean;
+}
+
+export class FeatureSelectionDto {
+  features: TimeSeriesFeatureSet[];
+  targetVariable: string;
+  selectionMethod: 'correlation' | 'mutual_info' | 'recursive' | 'lasso';
+  maxFeatures?: number;
+  threshold?: number;
+}
+
+@Controller('ml-forecasting/feature-engineering')
+@ApiTags('Time Series Feature Engineering')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class TimeSeriesFeatureEngineeringController {
+  private readonly logger = new Logger(TimeSeriesFeatureEngineeringController.name);
+
+  constructor(
+    private readonly featureService: TimeSeriesFeatureEngineeringService,
+  ) {}
+
+  /**
+   * Generate comprehensive time series features for ML training
+   */
+  @Post('generate')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:write', 'analytics:write')
+  @ApiOperation({
+    summary: 'Generate time series features for ML training',
+    description: 'Generate comprehensive time series features including lag, rolling statistics, seasonal, trend, and interaction features',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Feature engineering completed successfully',
+    type: EngineeringResult,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid feature engineering request',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Insufficient permissions',
+  })
+  async generateFeatures(
+    @Body() request: FeatureEngineeringRequestDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ): Promise<EngineeringResult> {
+    this.logger.log(`Feature engineering requested by user ${user.id} for tenant ${tenantId}`);
+
+    // Override tenant ID and generate job ID for security
+    request.tenantId = tenantId;
+    if (!request.jobId) {
+      request.jobId = `feature_eng_${tenantId}_${Date.now()}`;
+    }
+
+    try {
+      const result = await this.featureService.generateTimeSeriesFeatures(request);
+      
+      this.logger.log(`Feature engineering completed: ${result.jobId} (${result.performance.featuresSelected} features)`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Feature engineering failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Quick feature generation with predefined configurations
+   */
+  @Post('generate-quick')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Quick feature generation',
+    description: 'Generate features quickly using predefined configurations for common use cases',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quick feature generation completed successfully',
+  })
+  async generateQuickFeatures(
+    @Body() request: QuickFeatureGenerationDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<EngineeringResult> {
+    this.logger.log(`Quick feature generation for tenant ${tenantId}`);
+
+    // Build comprehensive request from quick request
+    const featureRequest: FeatureEngineeringRequest = {
+      jobId: `quick_features_${tenantId}_${Date.now()}`,
+      tenantId,
+      data: { sales: request.data },
+      features: this.buildQuickFeatureConfig(request.featureTypes),
+      windowSizes: request.windowSizes || [7, 14, 30],
+      targetVariable: request.targetVariable,
+      forecastHorizon: request.forecastHorizon || 30,
+      includeSeasonality: request.featureTypes.includes('seasonal'),
+      includeExogenous: false,
+      indonesianContext: true,
+    };
+
+    return await this.featureService.generateTimeSeriesFeatures(featureRequest);
+  }
+
+  /**
+   * Get available feature engineering presets
+   */
+  @Get('presets')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get feature engineering presets',
+    description: 'Get list of predefined feature engineering configurations for common forecasting scenarios',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Feature presets retrieved successfully',
+  })
+  async getFeaturePresets(
+    @Query('useCase') useCase?: string,
+  ): Promise<FeaturePresetDto[]> {
+    this.logger.log('Feature engineering presets requested');
+
+    const presets: FeaturePresetDto[] = [
+      {
+        name: 'Sales Forecasting Standard',
+        description: 'Standard feature set for sales forecasting with weekly and monthly patterns',
+        features: this.getSalesForecastingFeatures(),
+        windowSizes: [7, 14, 30, 90],
+        targetVariable: 'sales_value',
+        useCase: 'sales_forecasting',
+        expectedPerformance: {
+          processingTime: '2-5 seconds',
+          memoryUsage: '50-100 MB',
+          featureCount: 45,
+        },
+      },
+      {
+        name: 'Inventory Optimization',
+        description: 'Feature set optimized for inventory level forecasting and stock optimization',
+        features: this.getInventoryOptimizationFeatures(),
+        windowSizes: [3, 7, 14, 30],
+        targetVariable: 'stock_level',
+        useCase: 'inventory_forecasting',
+        expectedPerformance: {
+          processingTime: '1-3 seconds',
+          memoryUsage: '30-60 MB',
+          featureCount: 35,
+        },
+      },
+      {
+        name: 'Demand Planning Enterprise',
+        description: 'Comprehensive feature set for enterprise demand planning with external factors',
+        features: this.getDemandPlanningFeatures(),
+        windowSizes: [7, 14, 30, 60, 90, 180],
+        targetVariable: 'demand_quantity',
+        useCase: 'demand_planning',
+        expectedPerformance: {
+          processingTime: '5-15 seconds',
+          memoryUsage: '100-200 MB',
+          featureCount: 75,
+        },
+      },
+      {
+        name: 'Quick Retail Analysis',
+        description: 'Fast feature generation for quick retail insights and basic forecasting',
+        features: this.getQuickRetailFeatures(),
+        windowSizes: [7, 30],
+        targetVariable: 'retail_value',
+        useCase: 'quick_analysis',
+        expectedPerformance: {
+          processingTime: '0.5-2 seconds',
+          memoryUsage: '20-40 MB',
+          featureCount: 20,
+        },
+      },
+      {
+        name: 'Indonesian SMB Specialized',
+        description: 'Feature set specialized for Indonesian SMB patterns including holidays and cultural factors',
+        features: this.getIndonesianSMBFeatures(),
+        windowSizes: [7, 14, 30, 90],
+        targetVariable: 'business_value',
+        useCase: 'indonesian_smb',
+        expectedPerformance: {
+          processingTime: '3-8 seconds',
+          memoryUsage: '60-120 MB',
+          featureCount: 55,
+        },
+      },
+      {
+        name: 'High-Frequency Trading',
+        description: 'Feature set for high-frequency data with minute/hourly patterns',
+        features: this.getHighFrequencyFeatures(),
+        windowSizes: [24, 48, 168, 720], // hours: 1day, 2days, 1week, 1month
+        targetVariable: 'price_value',
+        useCase: 'high_frequency',
+        expectedPerformance: {
+          processingTime: '10-30 seconds',
+          memoryUsage: '200-500 MB',
+          featureCount: 90,
+        },
+      },
+    ];
+
+    if (useCase) {
+      return presets.filter(preset => preset.useCase === useCase);
+    }
+
+    return presets;
+  }
+
+  /**
+   * Apply feature engineering preset
+   */
+  @Post('apply-preset')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:write')
+  @ApiOperation({
+    summary: 'Apply feature engineering preset',
+    description: 'Apply a predefined feature engineering configuration to time series data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preset applied successfully',
+  })
+  async applyPreset(
+    @Body() request: {
+      presetName: string;
+      data: TimeSeriesDataPoint[];
+      customizations?: {
+        windowSizes?: number[];
+        targetVariable?: string;
+        includeExogenous?: boolean;
+      };
+    },
+    @CurrentTenant() tenantId: string,
+  ): Promise<EngineeringResult> {
+    this.logger.log(`Applying feature preset: ${request.presetName}`);
+
+    const presets = await this.getFeaturePresets();
+    const preset = presets.find(p => p.name === request.presetName);
+
+    if (!preset) {
+      throw new BadRequestException(`Preset not found: ${request.presetName}`);
+    }
+
+    const featureRequest: FeatureEngineeringRequest = {
+      jobId: `preset_${tenantId}_${Date.now()}`,
+      tenantId,
+      data: { sales: request.data },
+      features: preset.features,
+      windowSizes: request.customizations?.windowSizes || preset.windowSizes,
+      targetVariable: request.customizations?.targetVariable || preset.targetVariable,
+      forecastHorizon: 30,
+      includeSeasonality: true,
+      includeExogenous: request.customizations?.includeExogenous || false,
+      indonesianContext: preset.useCase === 'indonesian_smb',
+    };
+
+    return await this.featureService.generateTimeSeriesFeatures(featureRequest);
+  }
+
+  /**
+   * Get feature insights and analysis
+   */
+  @Post('analyze')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Analyze time series features',
+    description: 'Get insights about feature correlations, importance, seasonality and trends',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Feature analysis completed successfully',
+  })
+  async analyzeFeatures(
+    @Body() request: FeatureAnalysisDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<FeatureInsightsDto> {
+    this.logger.log(`Feature analysis for tenant ${tenantId}`);
+
+    const insights = await this.featureService.getFeatureInsights(
+      tenantId,
+      request.data,
+      request.targetVariable,
+    );
+
+    return insights;
+  }
+
+  /**
+   * Get feature statistics and metadata
+   */
+  @Get('stats')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get feature engineering statistics',
+    description: 'Get statistics and insights about feature engineering operations for the tenant',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Feature statistics retrieved successfully',
+  })
+  async getFeatureStats(
+    @CurrentTenant() tenantId: string,
+    @Query('period') period: 'day' | 'week' | 'month' = 'month',
+  ): Promise<{
+    totalJobs: number;
+    successRate: number;
+    averageProcessingTime: number;
+    averageFeatureCount: number;
+    popularFeatureTypes: string[];
+    qualityMetrics: Record<string, number>;
+    recentJobs: any[];
+  }> {
+    this.logger.log(`Feature engineering stats requested for tenant ${tenantId}`);
+
+    // This would typically query a metrics/stats table
+    // For now, return mock data
+    return {
+      totalJobs: 89,
+      successRate: 94.4,
+      averageProcessingTime: 4200, // ms
+      averageFeatureCount: 52,
+      popularFeatureTypes: [
+        'lag_features',
+        'rolling_statistics',
+        'seasonal_features',
+        'trend_features',
+        'derived_features'
+      ],
+      qualityMetrics: {
+        averageCorrelation: 0.67,
+        averageImportance: 0.23,
+        featureSelectionRatio: 0.78,
+        anomalyDetectionRate: 0.05,
+      },
+      recentJobs: [
+        {
+          jobId: 'feature_eng_tenant1_1640995200000',
+          preset: 'Sales Forecasting Standard',
+          status: 'completed',
+          processingTime: 3800,
+          featuresGenerated: 67,
+          featuresSelected: 43,
+          qualityScore: 0.89,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          jobId: 'quick_features_tenant1_1640991600000',
+          preset: 'Quick Retail Analysis',
+          status: 'completed',
+          processingTime: 1200,
+          featuresGenerated: 25,
+          featuresSelected: 18,
+          qualityScore: 0.76,
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Validate feature engineering configuration
+   */
+  @Post('validate-config')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Validate feature engineering configuration',
+    description: 'Validate feature engineering settings before applying them to data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Configuration validation completed',
+  })
+  async validateConfig(
+    @Body() request: {
+      features: FeatureConfig[];
+      windowSizes: number[];
+      targetVariable: string;
+      dataSize: number;
+      forecastHorizon: number;
+    },
+  ): Promise<{
+    valid: boolean;
+    issues: any[];
+    warnings: string[];
+    suggestions: string[];
+    estimatedPerformance: {
+      processingTime: string;
+      memoryUsage: string;
+      featureCount: number;
+    };
+  }> {
+    this.logger.log('Validating feature engineering configuration');
+
+    const validation = {
+      valid: true,
+      issues: [] as any[],
+      warnings: [] as string[],
+      suggestions: [] as string[],
+      estimatedPerformance: {
+        processingTime: '0 seconds',
+        memoryUsage: '0 MB',
+        featureCount: 0,
+      },
+    };
+
+    // Validate features
+    for (const feature of request.features) {
+      const featureValidation = this.validateFeatureConfig(feature);
+      if (!featureValidation.valid) {
+        validation.valid = false;
+        validation.issues.push({
+          feature: feature.name,
+          issues: featureValidation.issues,
+        });
+      }
+      validation.warnings.push(...featureValidation.warnings);
+    }
+
+    // Validate window sizes
+    for (const windowSize of request.windowSizes) {
+      if (windowSize <= 0 || windowSize > 365) {
+        validation.valid = false;
+        validation.issues.push({
+          type: 'window_size',
+          issue: `Invalid window size: ${windowSize}. Must be between 1 and 365.`,
+        });
+      }
+    }
+
+    // Check data size requirements
+    const maxWindow = Math.max(...request.windowSizes);
+    if (request.dataSize < maxWindow * 2) {
+      validation.warnings.push(`Data size (${request.dataSize}) is small relative to max window size (${maxWindow}). Consider smaller windows or more data.`);
+    }
+
+    // Check forecast horizon
+    if (request.forecastHorizon > request.dataSize / 4) {
+      validation.warnings.push(`Forecast horizon (${request.forecastHorizon}) is large relative to data size. Consider shorter horizon for better accuracy.`);
+    }
+
+    // Estimate performance
+    const enabledFeatures = request.features.filter(f => f.enabled).length;
+    const totalWindows = request.windowSizes.length;
+    const estimatedFeatureCount = enabledFeatures * totalWindows * 3; // rough estimate
+
+    validation.estimatedPerformance = {
+      processingTime: this.estimateProcessingTime(request.dataSize, estimatedFeatureCount),
+      memoryUsage: this.estimateMemoryUsage(request.dataSize, estimatedFeatureCount),
+      featureCount: estimatedFeatureCount,
+    };
+
+    // Generate suggestions
+    validation.suggestions = this.generateConfigSuggestions(request, validation);
+
+    return validation;
+  }
+
+  /**
+   * Get seasonal analysis for time series
+   */
+  @Post('seasonal-analysis')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Analyze seasonal patterns',
+    description: 'Perform detailed seasonal analysis to identify patterns and cycles in time series data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Seasonal analysis completed successfully',
+  })
+  async analyzeSeasonality(
+    @Body() request: {
+      data: TimeSeriesDataPoint[];
+      patterns: ('daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly')[];
+      indonesianContext?: boolean;
+    },
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    patterns: SeasonalInsight[];
+    decomposition: {
+      trend: number[];
+      seasonal: number[];
+      residual: number[];
+    };
+    recommendations: string[];
+    visualizationData: {
+      original: { x: string; y: number }[];
+      trend: { x: string; y: number }[];
+      seasonal: { x: string; y: number }[];
+    };
+  }> {
+    this.logger.log(`Seasonal analysis for tenant ${tenantId}`);
+
+    // Perform quick seasonal analysis
+    const insights = await this.featureService.getFeatureInsights(
+      tenantId,
+      request.data,
+      'value',
+    );
+
+    // Simple trend decomposition
+    const values = request.data.map(p => p.value);
+    const trend = this.calculateSimpleTrend(values);
+    const seasonal = this.calculateSeasonalComponent(values, 7); // weekly seasonality
+    const residual = values.map((v, i) => v - trend[i] - seasonal[i]);
+
+    const recommendations = this.generateSeasonalRecommendations(insights.seasonality, request.indonesianContext);
+
+    return {
+      patterns: insights.seasonality,
+      decomposition: {
+        trend,
+        seasonal,
+        residual,
+      },
+      recommendations,
+      visualizationData: {
+        original: request.data.map(p => ({ x: p.timestamp, y: p.value })),
+        trend: request.data.map((p, i) => ({ x: p.timestamp, y: trend[i] })),
+        seasonal: request.data.map((p, i) => ({ x: p.timestamp, y: seasonal[i] })),
+      },
+    };
+  }
+
+  /**
+   * Get anomaly detection results
+   */
+  @Post('detect-anomalies')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Detect anomalies in time series',
+    description: 'Detect anomalies and outliers in time series data using statistical methods',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Anomaly detection completed successfully',
+  })
+  async detectAnomalies(
+    @Body() request: {
+      data: TimeSeriesDataPoint[];
+      method: 'zscore' | 'iqr' | 'isolation_forest' | 'seasonal_hybrid';
+      sensitivity: 'low' | 'medium' | 'high';
+      windowSize?: number;
+    },
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    anomalies: AnomalyInsight[];
+    statistics: {
+      totalAnomalies: number;
+      anomalyRate: number;
+      severityDistribution: Record<string, number>;
+    };
+    recommendations: string[];
+    visualizationData: {
+      data: { x: string; y: number; isAnomaly: boolean; severity: string }[];
+      thresholds: { upper: number; lower: number }[];
+    };
+  }> {
+    this.logger.log(`Anomaly detection for tenant ${tenantId}`);
+
+    const windowSize = request.windowSize || 30;
+    const anomalies: AnomalyInsight[] = [];
+    const thresholds: { upper: number; lower: number }[] = [];
+
+    // Sensitivity configuration
+    const sensitivityMap = {
+      low: 3.0,    // 3 standard deviations
+      medium: 2.5, // 2.5 standard deviations  
+      high: 2.0,   // 2 standard deviations
+    };
+    const threshold = sensitivityMap[request.sensitivity];
+
+    // Detect anomalies using rolling window
+    for (let i = windowSize; i < request.data.length; i++) {
+      const point = request.data[i];
+      const window = request.data.slice(i - windowSize, i);
+      const windowValues = window.map(p => p.value);
+      
+      const mean = this.calculateMean(windowValues);
+      const std = this.calculateStd(windowValues);
+      const zscore = std > 0 ? Math.abs(point.value - mean) / std : 0;
+
+      thresholds.push({
+        upper: mean + threshold * std,
+        lower: mean - threshold * std,
+      });
+
+      if (zscore > threshold) {
+        anomalies.push({
+          timestamp: point.timestamp,
+          value: point.value,
+          expected: mean,
+          deviation: zscore,
+          type: 'point',
+          severity: zscore > threshold * 1.5 ? 'high' : (zscore > threshold * 1.2 ? 'medium' : 'low'),
+        });
+      }
+    }
+
+    // Calculate statistics
+    const totalAnomalies = anomalies.length;
+    const anomalyRate = request.data.length > 0 ? totalAnomalies / request.data.length : 0;
+    const severityDistribution = {
+      low: anomalies.filter(a => a.severity === 'low').length,
+      medium: anomalies.filter(a => a.severity === 'medium').length,
+      high: anomalies.filter(a => a.severity === 'high').length,
+    };
+
+    // Generate recommendations
+    const recommendations: string[] = [];
+    if (anomalyRate > 0.1) {
+      recommendations.push('High anomaly rate detected. Consider reviewing data quality or adjusting sensitivity.');
+    }
+    if (severityDistribution.high > 0) {
+      recommendations.push('High severity anomalies found. Manual investigation recommended.');
+    }
+    if (anomalyRate < 0.01) {
+      recommendations.push('Very low anomaly rate. Consider increasing sensitivity to detect subtle patterns.');
+    }
+
+    // Prepare visualization data
+    const anomalyTimestamps = new Set(anomalies.map(a => a.timestamp));
+    const visualizationData = request.data.map(point => ({
+      x: point.timestamp,
+      y: point.value,
+      isAnomaly: anomalyTimestamps.has(point.timestamp),
+      severity: anomalies.find(a => a.timestamp === point.timestamp)?.severity || 'normal',
+    }));
+
+    return {
+      anomalies,
+      statistics: {
+        totalAnomalies,
+        anomalyRate,
+        severityDistribution,
+      },
+      recommendations,
+      visualizationData: {
+        data: visualizationData,
+        thresholds,
+      },
+    };
+  }
+
+  /**
+   * Export feature engineering results
+   */
+  @Get('export/:jobId')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Export feature engineering results',
+    description: 'Export feature engineering results in various formats (CSV, JSON, Parquet)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Results exported successfully',
+  })
+  async exportResults(
+    @Param('jobId') jobId: string,
+    @Query('format') format: 'csv' | 'json' | 'parquet' = 'json',
+    @Query('includeMetadata') includeMetadata: boolean = false,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    downloadUrl: string;
+    format: string;
+    size: string;
+    expiresAt: string;
+  }> {
+    this.logger.log(`Exporting feature engineering results: ${jobId}`);
+
+    // This would typically generate a download URL to a file storage service
+    // For now, return mock response
+    return {
+      downloadUrl: `https://storage.stokcerdas.com/exports/${tenantId}/${jobId}.${format}`,
+      format,
+      size: '2.5 MB',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+    };
+  }
+
+  // ========== PRIVATE HELPER METHODS ==========
+
+  /**
+   * Build quick feature configuration
+   */
+  private buildQuickFeatureConfig(featureTypes: string[]): FeatureConfig[] {
+    const configs: FeatureConfig[] = [];
+    let priority = 1;
+
+    if (featureTypes.includes('lag')) {
+      configs.push({
+        name: 'Quick Lag Features',
+        type: 'lag',
+        parameters: { lags: [1, 7, 30] },
+        applyTo: ['sales'],
+        priority: priority++,
+        enabled: true,
+        description: 'Basic lag features for quick analysis',
+      });
+    }
+
+    if (featureTypes.includes('rolling')) {
+      configs.push({
+        name: 'Quick Rolling Statistics',
+        type: 'rolling_stat',
+        parameters: { statistics: ['mean', 'std', 'min', 'max'] },
+        applyTo: ['sales'],
+        priority: priority++,
+        enabled: true,
+        description: 'Basic rolling statistics',
+      });
+    }
+
+    if (featureTypes.includes('seasonal')) {
+      configs.push({
+        name: 'Quick Seasonal Features',
+        type: 'seasonal',
+        parameters: {},
+        applyTo: ['sales'],
+        priority: priority++,
+        enabled: true,
+        description: 'Basic seasonal features',
+      });
+    }
+
+    if (featureTypes.includes('trend')) {
+      configs.push({
+        name: 'Quick Trend Features',
+        type: 'trend',
+        parameters: { windows: [30, 90] },
+        applyTo: ['sales'],
+        priority: priority++,
+        enabled: true,
+        description: 'Basic trend features',
+      });
+    }
+
+    if (featureTypes.includes('derived')) {
+      configs.push({
+        name: 'Quick Derived Features',
+        type: 'derived',
+        parameters: {},
+        applyTo: ['sales'],
+        priority: priority++,
+        enabled: true,
+        description: 'Basic derived features',
+      });
+    }
+
+    return configs;
+  }
+
+  /**
+   * Get sales forecasting feature configuration
+   */
+  private getSalesForecastingFeatures(): FeatureConfig[] {
+    return [
+      {
+        name: 'Sales Lag Features',
+        type: 'lag',
+        parameters: { lags: [1, 7, 14, 30, 90] },
+        applyTo: ['sales'],
+        priority: 1,
+        enabled: true,
+        description: 'Lag features for sales data',
+      },
+      {
+        name: 'Sales Rolling Statistics',
+        type: 'rolling_stat',
+        parameters: { statistics: ['mean', 'std', 'min', 'max', 'median', 'q25', 'q75'] },
+        applyTo: ['sales'],
+        priority: 2,
+        enabled: true,
+        description: 'Rolling statistics for sales trends',
+      },
+      {
+        name: 'Sales Seasonal Features',
+        type: 'seasonal',
+        parameters: {},
+        applyTo: ['sales'],
+        priority: 3,
+        enabled: true,
+        description: 'Seasonal patterns in sales data',
+      },
+      {
+        name: 'Sales Trend Features',
+        type: 'trend',
+        parameters: { windows: [30, 60, 90, 180] },
+        applyTo: ['sales'],
+        priority: 4,
+        enabled: true,
+        description: 'Trend analysis for sales forecasting',
+      },
+      {
+        name: 'Sales Derived Features',
+        type: 'derived',
+        parameters: {},
+        applyTo: ['sales'],
+        priority: 5,
+        enabled: true,
+        description: 'Derived features for sales insights',
+      },
+    ];
+  }
+
+  /**
+   * Get inventory optimization feature configuration
+   */
+  private getInventoryOptimizationFeatures(): FeatureConfig[] {
+    return [
+      {
+        name: 'Inventory Lag Features',
+        type: 'lag',
+        parameters: { lags: [1, 3, 7, 14, 30] },
+        applyTo: ['inventory'],
+        priority: 1,
+        enabled: true,
+        description: 'Lag features for inventory levels',
+      },
+      {
+        name: 'Inventory Rolling Statistics',
+        type: 'rolling_stat',
+        parameters: { statistics: ['mean', 'std', 'min', 'max'] },
+        applyTo: ['inventory'],
+        priority: 2,
+        enabled: true,
+        description: 'Rolling statistics for inventory tracking',
+      },
+      {
+        name: 'Inventory Trend Features',
+        type: 'trend',
+        parameters: { windows: [14, 30, 60] },
+        applyTo: ['inventory'],
+        priority: 3,
+        enabled: true,
+        description: 'Trend analysis for inventory optimization',
+      },
+      {
+        name: 'Inventory Derived Features',
+        type: 'derived',
+        parameters: {},
+        applyTo: ['inventory'],
+        priority: 4,
+        enabled: true,
+        description: 'Derived features for inventory insights',
+      },
+    ];
+  }
+
+  /**
+   * Get demand planning feature configuration
+   */
+  private getDemandPlanningFeatures(): FeatureConfig[] {
+    return [
+      {
+        name: 'Demand Lag Features',
+        type: 'lag',
+        parameters: { lags: [1, 7, 14, 30, 60, 90] },
+        applyTo: ['sales', 'orders'],
+        priority: 1,
+        enabled: true,
+        description: 'Comprehensive lag features for demand planning',
+      },
+      {
+        name: 'Demand Rolling Statistics',
+        type: 'rolling_stat',
+        parameters: { statistics: ['mean', 'std', 'min', 'max', 'median', 'q25', 'q75'] },
+        applyTo: ['sales', 'orders'],
+        priority: 2,
+        enabled: true,
+        description: 'Comprehensive rolling statistics',
+      },
+      {
+        name: 'Demand Seasonal Features',
+        type: 'seasonal',
+        parameters: {},
+        applyTo: ['sales', 'orders'],
+        priority: 3,
+        enabled: true,
+        description: 'Seasonal patterns for demand planning',
+      },
+      {
+        name: 'Demand Trend Features',
+        type: 'trend',
+        parameters: { windows: [30, 60, 90, 180, 365] },
+        applyTo: ['sales', 'orders'],
+        priority: 4,
+        enabled: true,
+        description: 'Long-term trend analysis',
+      },
+      {
+        name: 'Demand Cyclical Features',
+        type: 'cyclical',
+        parameters: { cycles: [7, 30, 365] },
+        applyTo: ['sales', 'orders'],
+        priority: 5,
+        enabled: true,
+        description: 'Cyclical patterns in demand',
+      },
+      {
+        name: 'External Factors',
+        type: 'exogenous',
+        parameters: {},
+        applyTo: ['external'],
+        priority: 6,
+        enabled: true,
+        description: 'External market factors',
+      },
+      {
+        name: 'Demand Derived Features',
+        type: 'derived',
+        parameters: {},
+        applyTo: ['sales', 'orders'],
+        priority: 7,
+        enabled: true,
+        description: 'Advanced derived features',
+      },
+      {
+        name: 'Demand Interaction Features',
+        type: 'interaction',
+        parameters: {},
+        applyTo: ['sales', 'orders'],
+        priority: 8,
+        enabled: true,
+        description: 'Feature interactions for complex patterns',
+      },
+    ];
+  }
+
+  /**
+   * Get quick retail feature configuration
+   */
+  private getQuickRetailFeatures(): FeatureConfig[] {
+    return [
+      {
+        name: 'Quick Retail Lags',
+        type: 'lag',
+        parameters: { lags: [1, 7] },
+        applyTo: ['sales'],
+        priority: 1,
+        enabled: true,
+        description: 'Basic lag features for retail',
+      },
+      {
+        name: 'Quick Retail Rolling',
+        type: 'rolling_stat',
+        parameters: { statistics: ['mean', 'std'] },
+        applyTo: ['sales'],
+        priority: 2,
+        enabled: true,
+        description: 'Basic rolling statistics',
+      },
+      {
+        name: 'Quick Retail Seasonal',
+        type: 'seasonal',
+        parameters: {},
+        applyTo: ['sales'],
+        priority: 3,
+        enabled: true,
+        description: 'Basic seasonal features',
+      },
+    ];
+  }
+
+  /**
+   * Get Indonesian SMB specialized features
+   */
+  private getIndonesianSMBFeatures(): FeatureConfig[] {
+    return [
+      {
+        name: 'Indonesian SMB Lag Features',
+        type: 'lag',
+        parameters: { lags: [1, 7, 14, 30] },
+        applyTo: ['sales', 'orders'],
+        priority: 1,
+        enabled: true,
+        description: 'Lag features optimized for Indonesian SMB patterns',
+      },
+      {
+        name: 'Indonesian SMB Rolling Statistics',
+        type: 'rolling_stat',
+        parameters: { statistics: ['mean', 'std', 'min', 'max', 'median'] },
+        applyTo: ['sales', 'orders'],
+        priority: 2,
+        enabled: true,
+        description: 'Rolling statistics for Indonesian business cycles',
+      },
+      {
+        name: 'Indonesian SMB Seasonal Features',
+        type: 'seasonal',
+        parameters: { includeRamadan: true, includeLebaran: true, includeSchoolHolidays: true },
+        applyTo: ['sales', 'orders'],
+        priority: 3,
+        enabled: true,
+        description: 'Indonesian cultural and religious seasonal patterns',
+      },
+      {
+        name: 'Indonesian SMB Trend Features',
+        type: 'trend',
+        parameters: { windows: [30, 90, 180] },
+        applyTo: ['sales', 'orders'],
+        priority: 4,
+        enabled: true,
+        description: 'Trend analysis for Indonesian SMB market',
+      },
+      {
+        name: 'Indonesian Economic Factors',
+        type: 'exogenous',
+        parameters: { includeIDRUSD: true, includeInflation: true, includeBIRate: true },
+        applyTo: ['external'],
+        priority: 5,
+        enabled: true,
+        description: 'Indonesian economic indicators',
+      },
+      {
+        name: 'Indonesian SMB Derived Features',
+        type: 'derived',
+        parameters: {},
+        applyTo: ['sales', 'orders'],
+        priority: 6,
+        enabled: true,
+        description: 'Features derived for Indonesian SMB context',
+      },
+    ];
+  }
+
+  /**
+   * Get high-frequency trading features
+   */
+  private getHighFrequencyFeatures(): FeatureConfig[] {
+    return [
+      {
+        name: 'High-Frequency Lag Features',
+        type: 'lag',
+        parameters: { lags: [1, 2, 3, 6, 12, 24, 48] }, // hours
+        applyTo: ['sales'],
+        priority: 1,
+        enabled: true,
+        description: 'High-frequency lag features for intraday patterns',
+      },
+      {
+        name: 'High-Frequency Rolling Statistics',
+        type: 'rolling_stat',
+        parameters: { 
+          statistics: ['mean', 'std', 'min', 'max', 'median', 'q25', 'q75'],
+          includeVolatility: true,
+        },
+        applyTo: ['sales'],
+        priority: 2,
+        enabled: true,
+        description: 'Comprehensive rolling statistics for volatility analysis',
+      },
+      {
+        name: 'Intraday Seasonal Features',
+        type: 'seasonal',
+        parameters: { includeHourly: true, includeMinutely: false },
+        applyTo: ['sales'],
+        priority: 3,
+        enabled: true,
+        description: 'Intraday seasonal patterns',
+      },
+      {
+        name: 'High-Frequency Trend Features',
+        type: 'trend',
+        parameters: { windows: [6, 12, 24, 48, 168] }, // 6h, 12h, 1d, 2d, 1w
+        applyTo: ['sales'],
+        priority: 4,
+        enabled: true,
+        description: 'Multi-timeframe trend analysis',
+      },
+      {
+        name: 'High-Frequency Cyclical Features',
+        type: 'cyclical',
+        parameters: { cycles: [24, 168, 720] }, // daily, weekly, monthly in hours
+        applyTo: ['sales'],
+        priority: 5,
+        enabled: true,
+        description: 'Multi-cycle analysis for high-frequency data',
+      },
+      {
+        name: 'High-Frequency Derived Features',
+        type: 'derived',
+        parameters: { includeAcceleration: true, includeVolatilityRegimes: true },
+        applyTo: ['sales'],
+        priority: 6,
+        enabled: true,
+        description: 'Advanced derived features for high-frequency analysis',
+      },
+      {
+        name: 'High-Frequency Interaction Features',
+        type: 'interaction',
+        parameters: { includeVolatilityInteractions: true },
+        applyTo: ['sales'],
+        priority: 7,
+        enabled: true,
+        description: 'Complex feature interactions for high-frequency patterns',
+      },
+    ];
+  }
+
+  /**
+   * Validate feature configuration
+   */
+  private validateFeatureConfig(feature: FeatureConfig): {
+    valid: boolean;
+    issues: string[];
+    warnings: string[];
+  } {
+    const result = {
+      valid: true,
+      issues: [] as string[],
+      warnings: [] as string[],
+    };
+
+    if (!feature.name) {
+      result.valid = false;
+      result.issues.push('Feature name is required');
+    }
+
+    if (!feature.type) {
+      result.valid = false;
+      result.issues.push('Feature type is required');
+    }
+
+    if (!feature.applyTo || feature.applyTo.length === 0) {
+      result.valid = false;
+      result.issues.push('Feature must apply to at least one data type');
+    }
+
+    if (feature.priority < 1) {
+      result.warnings.push('Feature priority should be positive');
+    }
+
+    // Type-specific validations
+    switch (feature.type) {
+      case 'lag':
+        if (!feature.parameters.lags || !Array.isArray(feature.parameters.lags)) {
+          result.valid = false;
+          result.issues.push('Lag features require "lags" parameter as array');
+        }
+        break;
+
+      case 'rolling_stat':
+        if (!feature.parameters.statistics || !Array.isArray(feature.parameters.statistics)) {
+          result.warnings.push('Rolling stat features should specify statistics array');
+        }
+        break;
+
+      case 'trend':
+        if (!feature.parameters.windows || !Array.isArray(feature.parameters.windows)) {
+          result.warnings.push('Trend features should specify windows array');
+        }
+        break;
+    }
+
+    return result;
+  }
+
+  /**
+   * Estimate processing time based on data size and feature count
+   */
+  private estimateProcessingTime(dataSize: number, featureCount: number): string {
+    // Rough estimation formula
+    const baseTime = 100; // base 100ms
+    const dataSizeFactor = dataSize * 0.1; // 0.1ms per data point
+    const featureFactor = featureCount * 50; // 50ms per feature
+    
+    const totalMs = baseTime + dataSizeFactor + featureFactor;
+    
+    if (totalMs < 1000) return `${Math.round(totalMs)}ms`;
+    if (totalMs < 60000) return `${Math.round(totalMs / 1000)}s`;
+    return `${Math.round(totalMs / 60000)}m`;
+  }
+
+  /**
+   * Estimate memory usage
+   */
+  private estimateMemoryUsage(dataSize: number, featureCount: number): string {
+    // Rough estimation formula
+    const baseMemory = 10; // base 10MB
+    const dataSizeFactor = dataSize * 0.001; // 0.001MB per data point
+    const featureFactor = featureCount * 0.5; // 0.5MB per feature
+    
+    const totalMB = baseMemory + dataSizeFactor + featureFactor;
+    
+    if (totalMB < 1024) return `${Math.round(totalMB)}MB`;
+    return `${Math.round(totalMB / 1024 * 10) / 10}GB`;
+  }
+
+  /**
+   * Generate configuration suggestions
+   */
+  private generateConfigSuggestions(request: any, validation: any): string[] {
+    const suggestions: string[] = [];
+
+    // Check for common feature combinations
+    const featureTypes = request.features.map((f: any) => f.type);
+    
+    if (!featureTypes.includes('lag')) {
+      suggestions.push('Consider adding lag features for temporal dependencies');
+    }
+    
+    if (!featureTypes.includes('seasonal') && request.dataSize > 365) {
+      suggestions.push('Consider adding seasonal features for yearly data');
+    }
+    
+    if (!featureTypes.includes('trend') && request.dataSize > 90) {
+      suggestions.push('Consider adding trend features for long-term patterns');
+    }
+
+    // Performance suggestions
+    if (validation.estimatedPerformance.featureCount > 100) {
+      suggestions.push('Large number of features may impact performance. Consider feature selection.');
+    }
+
+    if (request.windowSizes.some((w: number) => w > request.dataSize / 2)) {
+      suggestions.push('Some window sizes are large relative to data size. Consider smaller windows.');
+    }
+
+    return suggestions;
+  }
+
+  // ========== UTILITY METHODS ==========
+
+  private calculateMean(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  private calculateStd(values: number[]): number {
+    if (values.length === 0) return 0;
+    const mean = this.calculateMean(values);
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    return Math.sqrt(variance);
+  }
+
+  private calculateSimpleTrend(values: number[]): number[] {
+    // Simple linear trend calculation
+    const trend: number[] = [];
+    const n = values.length;
+    
+    for (let i = 0; i < n; i++) {
+      const x = i;
+      const y = values[i];
+      
+      // Simple moving average as trend proxy
+      const windowSize = Math.min(30, Math.floor(n / 4));
+      const start = Math.max(0, i - windowSize);
+      const end = Math.min(n, i + windowSize + 1);
+      const window = values.slice(start, end);
+      
+      trend.push(this.calculateMean(window));
+    }
+    
+    return trend;
+  }
+
+  private calculateSeasonalComponent(values: number[], period: number): number[] {
+    const seasonal: number[] = [];
+    
+    for (let i = 0; i < values.length; i++) {
+      const seasonalIndex = i % period;
+      
+      // Calculate average for this seasonal position
+      const seasonalValues: number[] = [];
+      for (let j = seasonalIndex; j < values.length; j += period) {
+        seasonalValues.push(values[j]);
+      }
+      
+      seasonal.push(this.calculateMean(seasonalValues));
+    }
+    
+    return seasonal;
+  }
+
+  private generateSeasonalRecommendations(patterns: SeasonalInsight[], indonesianContext?: boolean): string[] {
+    const recommendations: string[] = [];
+    
+    const strongPatterns = patterns.filter(p => p.strength > 0.5);
+    if (strongPatterns.length > 0) {
+      recommendations.push(`Strong seasonal patterns detected: ${strongPatterns.map(p => p.pattern).join(', ')}`);
+      recommendations.push('Consider using seasonal decomposition in your forecasting models');
+    }
+    
+    const weeklyPattern = patterns.find(p => p.pattern === 'weekly');
+    if (weeklyPattern && weeklyPattern.strength > 0.3) {
+      recommendations.push('Weekly patterns found. Consider day-of-week effects in modeling');
+    }
+    
+    if (indonesianContext) {
+      recommendations.push('Indonesian business context detected. Consider religious holidays (Ramadan, Lebaran) in seasonal modeling');
+      recommendations.push('Include end-of-month payroll effects and school holiday periods');
+    }
+    
+    if (patterns.length === 0) {
+      recommendations.push('No strong seasonal patterns detected. Focus on trend and lag-based features');
+    }
+    
+    return recommendations;
+  }
+}

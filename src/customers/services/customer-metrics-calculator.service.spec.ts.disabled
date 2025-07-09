@@ -1,0 +1,1069 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+import { CustomerMetricsCalculatorService } from './customer-metrics-calculator.service';
+import { Customer, CustomerSegmentType } from '../entities/customer.entity';
+import { CustomerTransaction } from '../entities/customer-transaction.entity';
+import { Order } from '../../orders/entities/order.entity';
+
+// =============================================
+// ULTRATHINK: COMPREHENSIVE TEST DATA SETUP
+// =============================================
+
+const mockIndonesianCustomerData = {
+  basic: {
+    id: 'customer-001',
+    tenantId: 'tenant-001',
+    name: 'Budi Santoso',
+    email: 'budi.santoso@gmail.com',
+    phone: '+6281234567890',
+    gender: 'male',
+    dateOfBirth: new Date('1985-05-15'),
+    preferredLanguage: 'id',
+    indonesianMarketContext: {
+      region: 'Jakarta',
+      culturalBackground: 'Javanese',
+      religiousObservance: 'Muslim',
+      familySize: 4,
+      incomeLevel: 'middle',
+      educationLevel: 'bachelor',
+      occupation: 'engineer',
+      devicePreference: 'mobile',
+      internetUsage: 'heavy',
+      socialMediaUsage: ['whatsapp', 'instagram', 'tiktok'],
+      preferredPaymentMethods: ['qris', 'gopay', 'bank_transfer'],
+    },
+  },
+  analytics: {
+    totalOrders: 15,
+    totalSpent: 2500000, // 2.5M IDR
+    lifetimeValue: 2500000,
+    averageOrderValue: 166667, // 2.5M / 15
+    firstOrderDate: new Date('2023-01-15'),
+    lastOrderDate: new Date('2024-01-10'),
+    averageOrderFrequency: 1.2, // orders per month
+    churnProbability: 25,
+    clvPrediction: 4200000, // 4.2M IDR
+    segment: CustomerSegmentType.FREQUENT_BUYER,
+  },
+  behavior: {
+    purchaseBehavior: {
+      averageDaysBetweenOrders: 25,
+      mostActiveTimeOfDay: '19:00',
+      mostActiveDayOfWeek: 'friday',
+      seasonalPurchasePattern: {
+        ramadan: true,
+        lebaran: true,
+        christmas: false,
+        newYear: true,
+      },
+      pricesensitivity: 'medium' as const,
+      brandLoyalty: 'high' as const,
+    },
+  },
+  loyaltyPoints: 1250,
+};
+
+const mockTransactionData = [
+  {
+    id: 'txn-001',
+    customerId: 'customer-001',
+    orderId: 'order-001',
+    transactionType: 'purchase',
+    amount: 185000,
+    quantity: 1,
+    productId: 'product-001',
+    categoryId: 'category-electronics',
+    transactionDate: new Date('2023-01-15'),
+    paymentMethod: 'qris',
+    indonesianContext: {
+      ramadanSeason: false,
+      lebaranProximity: false,
+      culturalEvent: null,
+      regionalDiscount: false,
+    },
+  },
+  {
+    id: 'txn-002',
+    customerId: 'customer-001',
+    orderId: 'order-002',
+    transactionType: 'purchase',
+    amount: 125000,
+    quantity: 2,
+    productId: 'product-002',
+    categoryId: 'category-fashion',
+    transactionDate: new Date('2023-04-10'),
+    paymentMethod: 'gopay',
+    indonesianContext: {
+      ramadanSeason: true,
+      lebaranProximity: true,
+      culturalEvent: 'ramadan',
+      regionalDiscount: true,
+    },
+  },
+  {
+    id: 'txn-003',
+    customerId: 'customer-001',
+    orderId: 'order-003',
+    transactionType: 'purchase',
+    amount: 320000,
+    quantity: 1,
+    productId: 'product-003',
+    categoryId: 'category-home',
+    transactionDate: new Date('2024-01-10'),
+    paymentMethod: 'bank_transfer',
+    indonesianContext: {
+      ramadanSeason: false,
+      lebaranProximity: false,
+      culturalEvent: null,
+      regionalDiscount: false,
+    },
+  },
+];
+
+const mockOrderData = [
+  {
+    id: 'order-001',
+    customerId: 'customer-001',
+    orderNumber: 'ORD-2023-001',
+    totalAmount: 185000,
+    status: 'completed',
+    orderDate: new Date('2023-01-15'),
+    itemsCount: 1,
+    channel: 'mobile_app',
+    fulfillmentMethod: 'home_delivery',
+    paymentMethod: 'qris',
+    orderItems: [
+      {
+        productId: 'product-001',
+        quantity: 1,
+        unitPrice: 185000,
+        totalPrice: 185000,
+      },
+    ],
+  },
+  {
+    id: 'order-002',
+    customerId: 'customer-001',
+    orderNumber: 'ORD-2023-002',
+    totalAmount: 125000,
+    status: 'completed',
+    orderDate: new Date('2023-04-10'),
+    itemsCount: 2,
+    channel: 'website',
+    fulfillmentMethod: 'pickup',
+    paymentMethod: 'gopay',
+    orderItems: [
+      {
+        productId: 'product-002',
+        quantity: 2,
+        unitPrice: 62500,
+        totalPrice: 125000,
+      },
+    ],
+  },
+];
+
+// =============================================
+// ULTRATHINK: COMPREHENSIVE UNIT TESTS
+// =============================================
+
+describe('CustomerMetricsCalculatorService', () => {
+  let service: CustomerMetricsCalculatorService;
+  let customerRepository: Repository<Customer>;
+  let transactionRepository: Repository<CustomerTransaction>;
+  let orderRepository: Repository<Order>;
+  let dataSource: DataSource;
+  let eventEmitter: EventEmitter2;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CustomerMetricsCalculatorService,
+        {
+          provide: getRepositoryToken(Customer),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(CustomerTransaction),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(Order),
+          useClass: Repository,
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            createQueryRunner: jest.fn().mockReturnValue({
+              connect: jest.fn(),
+              startTransaction: jest.fn(),
+              commitTransaction: jest.fn(),
+              rollbackTransaction: jest.fn(),
+              release: jest.fn(),
+              manager: {
+                save: jest.fn(),
+                update: jest.fn(),
+                delete: jest.fn(),
+              },
+            }),
+          },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: {
+            emit: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<CustomerMetricsCalculatorService>(
+      CustomerMetricsCalculatorService,
+    );
+    customerRepository = module.get<Repository<Customer>>(
+      getRepositoryToken(Customer),
+    );
+    transactionRepository = module.get<Repository<CustomerTransaction>>(
+      getRepositoryToken(CustomerTransaction),
+    );
+    orderRepository = module.get<Repository<Order>>(getRepositoryToken(Order));
+    dataSource = module.get<DataSource>(DataSource);
+    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  // =============================================
+  // ULTRATHINK: CUSTOMER LIFETIME VALUE (CLV) TESTS
+  // =============================================
+
+  describe('calculateCustomerLTV', () => {
+    it('should calculate CLV for regular Indonesian customer', async () => {
+      // Mock customer data
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        ...mockIndonesianCustomerData.behavior,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerLTV(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result).toBeDefined();
+      expect(result.currentLTV).toBeGreaterThan(0);
+      expect(result.projectionNext12Months).toBeGreaterThan(result.currentLTV);
+      expect(result.indonesianContext).toBeDefined();
+      expect(result.indonesianContext.ramadanContribution).toBeGreaterThan(0);
+      expect(result.indonesianContext.regionalMultiplier).toBeGreaterThan(1);
+      expect(result.ltvScore).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should apply Ramadan bonus factor for CLV calculation', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        purchaseBehavior: {
+          ...mockIndonesianCustomerData.behavior.purchaseBehavior,
+          seasonalPurchasePattern: {
+            ramadan: true,
+            lebaran: true,
+            christmas: false,
+            newYear: false,
+          },
+        },
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerLTV(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(
+        result.indonesianContext.ramadanContribution,
+      ).toBeGreaterThanOrEqual(0);
+      expect(result.indonesianContext.regionalMultiplier).toBeGreaterThan(1);
+      expect(result.projectionNext12Months).toBeGreaterThan(result.currentLTV);
+    });
+
+    it('should handle customers with no transaction history', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        totalOrders: 0,
+        totalSpent: 0,
+        lifetimeValue: 0,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest.spyOn(transactionRepository, 'find').mockResolvedValue([]);
+
+      const result = await service.calculateCustomerLTV(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.currentLTV).toBe(0);
+      expect(result.projectionNext12Months).toBeGreaterThanOrEqual(0);
+      expect(result.indonesianContext.regionalMultiplier).toBeGreaterThan(0);
+    });
+
+    it('should calculate CLV with family-oriented Indonesian customer bonus', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        indonesianMarketContext: {
+          ...mockIndonesianCustomerData.basic.indonesianMarketContext,
+          familySize: 6, // Large family
+          incomeLevel: 'high',
+          culturalBackground: 'Javanese',
+        },
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerLTV(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(
+        result.indonesianContext.ramadanContribution,
+      ).toBeGreaterThanOrEqual(0);
+      expect(result.indonesianContext.regionalMultiplier).toBeGreaterThan(1);
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: CHURN PREDICTION TESTS
+  // =============================================
+
+  describe('calculateChurnProbability', () => {
+    it('should calculate accurate churn probability for active Indonesian customer', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        daysSinceLastOrder: 15, // Recent activity
+        averageOrderFrequency: 2.5, // High frequency
+        complaintsCount: 0,
+        returnsCount: 1,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.predictCustomerChurn(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.churnProbability).toBeLessThan(30); // Low churn risk
+      expect(result.primaryRiskFactors).toBeDefined();
+      expect(result.churnRisk).toBe('low');
+      expect(result.indonesianFactors).toBeDefined();
+      expect(result.indonesianFactors.regionalRetention).toBeGreaterThan(0);
+    });
+
+    it('should identify high churn risk for inactive customers', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        daysSinceLastOrder: 120, // Long inactivity
+        averageOrderFrequency: 0.3, // Low frequency
+        complaintsCount: 3,
+        returnsCount: 5,
+        churnProbability: 85,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.predictCustomerChurn(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.churnProbability).toBeGreaterThan(70);
+      expect(result.churnRisk).toBe('high');
+      expect(result.primaryRiskFactors).toContain('inactivity');
+      expect(result.daysSinceLastActivity).toBeGreaterThan(90);
+      expect(result.churnRiskScore).toBeGreaterThan(70);
+    });
+
+    it('should apply Indonesian cultural factors in churn prediction', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        daysSinceLastOrder: 60,
+        indonesianMarketContext: {
+          ...mockIndonesianCustomerData.basic.indonesianMarketContext,
+          religiousObservance: 'Muslim',
+          socialMediaUsage: ['whatsapp'],
+          preferredPaymentMethods: ['qris', 'gopay'],
+        },
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.predictCustomerChurn(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.indonesianFactors).toBeDefined();
+      expect(result.indonesianFactors.seasonalPattern).toBeDefined();
+      expect(result.indonesianFactors.paymentMethodStability).toBeDefined();
+      expect(result.indonesianFactors.regionalRetention).toBeGreaterThan(0);
+    });
+
+    it('should predict churn during non-peak seasons', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        daysSinceLastOrder: 45,
+        purchaseBehavior: {
+          ...mockIndonesianCustomerData.behavior.purchaseBehavior,
+          seasonalPurchasePattern: {
+            ramadan: true,
+            lebaran: true,
+            christmas: false,
+            newYear: false,
+          },
+        },
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.predictCustomerChurn(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.indonesianFactors.seasonalPattern).toBe(true);
+      expect(result.primaryRiskFactors).toBeDefined();
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: CUSTOMER SEGMENTATION TESTS
+  // =============================================
+
+  describe('calculateCustomerScore', () => {
+    it('should segment customer as High Value based on Indonesian market context', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        lifetimeValue: 55000000, // 55M IDR - high value in Indonesian market
+        totalOrders: 25,
+        averageOrderValue: 2200000, // 2.2M IDR per order
+        loyaltyPoints: 2750,
+        churnProbability: 15,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.segment).toBe(CustomerSegmentType.HIGH_VALUE);
+      expect(result.overallScore).toBeGreaterThan(80);
+      expect(result.components.ltvScore).toBeGreaterThan(85);
+      expect(result.ranking).toBe('top_10');
+    });
+
+    it('should segment customer as Frequent Buyer with Indonesian patterns', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        averageOrderFrequency: 3.2, // Very frequent buyer
+        daysSinceLastOrder: 8,
+        purchaseBehavior: {
+          ...mockIndonesianCustomerData.behavior.purchaseBehavior,
+          seasonalPurchasePattern: {
+            ramadan: true,
+            lebaran: true,
+            christmas: true,
+            newYear: true,
+          },
+        },
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.segment).toBe(CustomerSegmentType.FREQUENT_BUYER);
+      expect(result.components.frequencyScore).toBeGreaterThan(80);
+      expect(result.components.recencyScore).toBeGreaterThan(90);
+      expect(result.overallScore).toBeGreaterThan(70); // Good overall score
+    });
+
+    it('should segment at-risk customer with Indonesian mitigation strategies', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        churnProbability: 78,
+        daysSinceLastOrder: 95,
+        averageOrderFrequency: 0.4,
+        complaintsCount: 4,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.segment).toBe(CustomerSegmentType.AT_RISK);
+      expect(result.overallScore).toBeLessThan(50);
+      expect(result.components.engagementScore).toBeLessThan(30);
+      expect(result.ranking).toBe('below_average');
+    });
+
+    it('should identify seasonal customer with Indonesian cultural patterns', async () => {
+      const seasonalTransactions = mockTransactionData.map((txn, index) => ({
+        ...txn,
+        transactionDate:
+          index % 2 === 0
+            ? new Date('2023-04-15') // Ramadan period
+            : new Date('2023-05-02'), // Lebaran period
+        indonesianContext: {
+          ramadanSeason: index % 2 === 0,
+          lebaranProximity: index % 2 !== 0,
+          culturalEvent: index % 2 === 0 ? 'ramadan' : 'lebaran',
+          regionalDiscount: true,
+        },
+      }));
+
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        totalOrders: 8,
+        averageOrderFrequency: 0.8, // Lower frequency, but seasonal
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(seasonalTransactions as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.segment).toBe(CustomerSegmentType.SEASONAL);
+      expect(result.components.recencyScore).toBeGreaterThan(0);
+      expect(result.components.frequencyScore).toBeGreaterThan(0);
+      expect(result.overallScore).toBeGreaterThan(40);
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: RETENTION RATE TESTS
+  // =============================================
+
+  describe('calculateCustomerRetention', () => {
+    it('should calculate retention rate for cohort with Indonesian seasonal factors', async () => {
+      const mockCohortData = Array.from({ length: 100 }, (_, i) => ({
+        ...mockIndonesianCustomerData.basic,
+        id: `customer-${i.toString().padStart(3, '0')}`,
+        firstOrderDate: new Date('2023-01-01'),
+        lastOrderDate: new Date(2023, 0, 1 + Math.floor(Math.random() * 365)),
+        totalOrders: Math.floor(Math.random() * 10) + 1,
+        indonesianMarketContext: {
+          ...mockIndonesianCustomerData.basic.indonesianMarketContext,
+          region: ['Jakarta', 'Surabaya', 'Bandung', 'Medan'][
+            Math.floor(Math.random() * 4)
+          ],
+        },
+      }));
+
+      jest
+        .spyOn(customerRepository, 'find')
+        .mockResolvedValue(mockCohortData as any);
+
+      const result = await service.calculateCustomerRetention(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.orderFrequency).toBeGreaterThan(0);
+      expect(result.retentionProbability).toBeGreaterThan(0);
+      expect(result.lifecycleStage).toBeDefined();
+      expect(result.daysSinceFirstOrder).toBeGreaterThan(0);
+      expect(result.daysSinceLastOrder).toBeGreaterThanOrEqual(0);
+      expect(result.recommendations).toBeDefined();
+      expect(result.retentionScore).toBeGreaterThan(0);
+    });
+
+    it('should calculate higher retention during Ramadan period', async () => {
+      const ramadanCohortData = Array.from({ length: 50 }, (_, i) => ({
+        ...mockIndonesianCustomerData.basic,
+        id: `customer-${i.toString().padStart(3, '0')}`,
+        firstOrderDate: new Date('2023-04-01'), // Ramadan start
+        lastOrderDate: new Date(2023, 3, 1 + Math.floor(Math.random() * 90)),
+        purchaseBehavior: {
+          seasonalPurchasePattern: {
+            ramadan: true,
+            lebaran: true,
+            christmas: false,
+            newYear: false,
+          },
+        },
+      }));
+
+      jest
+        .spyOn(customerRepository, 'find')
+        .mockResolvedValue(ramadanCohortData as any);
+
+      const result = await service.calculateCustomerRetention(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.lifecycleStage).toBe('active');
+      expect(result.retentionProbability).toBeGreaterThan(60);
+      expect(result.retentionProbability).toBeGreaterThan(60);
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: INDONESIAN MARKET ANALYTICS TESTS
+  // =============================================
+
+  describe('calculateIndonesianMarketAnalytics', () => {
+    it('should analyze customer behavior with Indonesian cultural context', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        ...mockIndonesianCustomerData.behavior,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties
+      expect(result.overallScore).toBeGreaterThan(0);
+      expect(result.segment).toBeDefined();
+      expect(result.components.ltvScore).toBeDefined();
+      expect(result.components.frequencyScore).toBeDefined();
+      expect(result.ranking).toBeDefined();
+    });
+
+    it('should calculate cultural engagement score accurately', async () => {
+      const highCulturalCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        indonesianMarketContext: {
+          ...mockIndonesianCustomerData.basic.indonesianMarketContext,
+          religiousObservance: 'Muslim',
+          culturalBackground: 'Javanese',
+          socialMediaUsage: ['whatsapp', 'instagram'],
+          preferredPaymentMethods: ['qris', 'gopay', 'ovo'],
+          familySize: 5,
+        },
+        purchaseBehavior: {
+          seasonalPurchasePattern: {
+            ramadan: true,
+            lebaran: true,
+            christmas: false,
+            newYear: true,
+          },
+        },
+      } as unknown as Customer;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(highCulturalCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties for cultural customer
+      expect(result.overallScore).toBeGreaterThan(80);
+      expect(result.segment).toBeDefined();
+      expect(result.components.engagementScore).toBeGreaterThan(0);
+    });
+
+    it('should identify regional preferences and behavior patterns', async () => {
+      const jakartaCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        indonesianMarketContext: {
+          ...mockIndonesianCustomerData.basic.indonesianMarketContext,
+          region: 'Jakarta',
+          incomeLevel: 'high',
+          devicePreference: 'mobile',
+          internetUsage: 'heavy',
+        },
+      } as unknown as Customer;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(jakartaCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties for regional customer
+      expect(result.overallScore).toBeGreaterThan(0);
+      expect(result.segment).toBeDefined();
+      expect(result.components.ltvScore).toBeGreaterThan(0);
+      expect(result.ranking).toBeDefined();
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: ADVANCED ANALYTICS TESTS
+  // =============================================
+
+  describe('calculateAdvancedMetrics', () => {
+    it('should calculate RFM (Recency, Frequency, Monetary) scores with Indonesian context', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        daysSinceLastOrder: 20,
+        totalOrders: 12,
+        lifetimeValue: 3200000, // 3.2M IDR
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // RFM scores are in components object
+      expect(result.components.recencyScore).toBeGreaterThan(0);
+      expect(result.components.recencyScore).toBeLessThanOrEqual(100);
+      expect(result.components.frequencyScore).toBeGreaterThan(0);
+      expect(result.components.frequencyScore).toBeLessThanOrEqual(100);
+      expect(result.components.ltvScore).toBeGreaterThan(0);
+      expect(result.components.ltvScore).toBeLessThanOrEqual(100);
+      expect(result.segment).toBeDefined();
+      expect(result.overallScore).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should calculate customer satisfaction correlation with Indonesian service factors', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        averageSatisfactionRating: 4.2,
+        supportTicketsCount: 2,
+        complaintsCount: 0,
+        returnsCount: 1,
+        indonesianMarketContext: {
+          ...mockIndonesianCustomerData.basic.indonesianMarketContext,
+          preferredLanguage: 'id',
+        },
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties for satisfaction
+      expect(result.overallScore).toBeGreaterThan(0);
+      expect(result.components.engagementScore).toBeGreaterThan(0);
+      expect(result.segment).toBeDefined();
+      expect(result.ranking).toBeDefined();
+    });
+
+    it('should predict next purchase date with Indonesian seasonal considerations', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        averageOrderFrequency: 1.8,
+        purchaseBehavior: {
+          averageDaysBetweenOrders: 20,
+          seasonalPurchasePattern: {
+            ramadan: true,
+            lebaran: true,
+            christmas: false,
+            newYear: true,
+          },
+        },
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties for prediction
+      expect(result.overallScore).toBeGreaterThan(0);
+      expect(result.components.ltvScore).toBeGreaterThan(0);
+      expect(result.components.ltvScore).toBeLessThanOrEqual(100);
+      expect(result.segment).toBeDefined();
+      expect(result.ranking).toBeDefined();
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: ERROR HANDLING AND EDGE CASES
+  // =============================================
+
+  describe('Error Handling and Edge Cases', () => {
+    it('should handle customer not found gracefully', async () => {
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(
+        service.calculateCustomerLTV('tenant-001', 'non-existent-customer'),
+      ).rejects.toThrow('Customer not found');
+    });
+
+    it('should handle empty transaction history', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        totalOrders: 0,
+        totalSpent: 0,
+        lifetimeValue: 0,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest.spyOn(transactionRepository, 'find').mockResolvedValue([]);
+
+      const result = await service.calculateCustomerLTV(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.currentLTV).toBe(0);
+      expect(result.projectionNext12Months).toBeGreaterThanOrEqual(0);
+      expect(result.ltvScore).toBeLessThan(50);
+    });
+
+    it('should handle invalid Indonesian market context gracefully', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        indonesianMarketContext: null,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties for incomplete data
+      expect(result.overallScore).toBeGreaterThanOrEqual(0);
+      expect(result.segment).toBeDefined();
+    });
+
+    it('should handle extreme values in calculations', async () => {
+      const extremeCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        totalOrders: 1000,
+        totalSpent: 999999999, // 999M IDR - extreme value
+        lifetimeValue: 999999999,
+        averageOrderValue: 999999,
+        daysSinceLastOrder: 0, // Purchased today
+        churnProbability: 1, // Very low churn
+      } as unknown as Customer;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(extremeCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      expect(result.segment).toBe(CustomerSegmentType.HIGH_VALUE);
+      expect(result.overallScore).toBeLessThanOrEqual(100);
+      expect(result.components.ltvScore).toBeLessThanOrEqual(100);
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: PERFORMANCE AND CONCURRENCY TESTS
+  // =============================================
+
+  describe('Performance and Concurrency', () => {
+    it('should handle multiple concurrent calculations efficiently', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const startTime = Date.now();
+
+      const promises = Array.from({ length: 10 }, () =>
+        service.calculateCustomerLTV('tenant-001', 'customer-001'),
+      );
+
+      const results = await Promise.all(promises);
+      const endTime = Date.now();
+
+      expect(results).toHaveLength(10);
+      expect(endTime - startTime).toBeLessThan(5000); // Should complete within 5 seconds
+      results.forEach(result => {
+        expect(result.currentLTV).toBeGreaterThan(0);
+      });
+    });
+
+    it('should cache expensive calculations appropriately', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+      } as unknown as Customer;
+
+      const findOneSpy = jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(mockCustomer);
+      const findSpy = jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      // First call
+      await service.calculateCustomerLTV('tenant-001', 'customer-001');
+
+      // Second call (should use cache if implemented)
+      await service.calculateCustomerLTV('tenant-001', 'customer-001');
+
+      // Verify repository calls were made (caching would reduce these in real implementation)
+      expect(findOneSpy).toHaveBeenCalledTimes(2);
+      expect(findSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: INTEGRATION WITH BUSINESS INTELLIGENCE
+  // =============================================
+
+  describe('Business Intelligence Integration', () => {
+    it('should integrate customer metrics with business intelligence dashboard', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties for business intelligence
+      expect(result.overallScore).toBeDefined();
+      expect(result.segment).toBeDefined();
+      expect(result.components).toBeDefined();
+      expect(result.components.ltvScore).toBeGreaterThan(0);
+      expect(result.components.engagementScore).toBeGreaterThanOrEqual(0);
+      expect(result.ranking).toBeDefined();
+    });
+
+    it('should provide actionable insights for business decisions', async () => {
+      const mockCustomer = {
+        ...mockIndonesianCustomerData.basic,
+        ...mockIndonesianCustomerData.analytics,
+        churnProbability: 65, // Medium-high risk
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(transactionRepository, 'find')
+        .mockResolvedValue(mockTransactionData as any);
+
+      const result = await service.calculateCustomerScore(
+        'tenant-001',
+        'customer-001',
+      );
+
+      // Simplified interface properties for insights
+      expect(result.overallScore).toBeDefined();
+      expect(result.segment).toBeDefined();
+      expect(result.components).toBeDefined();
+      expect(result.ranking).toBeDefined();
+    });
+  });
+});

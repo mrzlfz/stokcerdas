@@ -9,7 +9,7 @@ import {
   TreeParent,
   TreeChildren,
 } from 'typeorm';
-import { BaseEntity } from '../../common/entities/base.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import type { Product } from './product.entity';
 
 @Entity('product_categories')
@@ -18,7 +18,8 @@ import type { Product } from './product.entity';
 @Index(['tenantId', 'parentId'])
 @Index(['tenantId', 'isActive'])
 @Index(['tenantId', 'sortOrder'])
-export class ProductCategory extends BaseEntity {
+@Index(['tenantId', 'isDeleted'])
+export class ProductCategory extends AuditableEntity {
   @Column({ type: 'varchar', length: 100 })
   name: string;
 

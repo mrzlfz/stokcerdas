@@ -1,0 +1,978 @@
+import { Injectable, Logger } from '@nestjs/common';
+import * as moment from 'moment-timezone';
+
+// Mathematical utilities for seasonality detection
+export interface FourierComponent {
+  frequency: number;
+  amplitude: number;
+  phase: number;
+  period: number;
+  significance: number;
+}
+
+export interface STLDecomposition {
+  trend: number[];
+  seasonal: number[];
+  remainder: number[];
+  seasonalStrength: number;
+  trendStrength: number;
+}
+
+export interface WaveletTransform {
+  level: number;
+  coefficients: number[];
+  frequencies: number[];
+  timeLocalization: number[];
+}
+
+@Injectable()
+export class SeasonalityAlgorithmsService {
+  private readonly logger = new Logger(SeasonalityAlgorithmsService.name);
+
+  /**
+   * Fourier Transform for frequency domain analysis
+   */
+  async performFourierAnalysis(
+    data: number[],
+    timestamps: string[],
+    maxFrequencies: number = 10,
+  ): Promise<FourierComponent[]> {
+    if (data.length < 4) {
+      return [];
+    }
+
+    const n = data.length;
+    const components: FourierComponent[] = [];
+
+    // Remove mean and trend
+    const detrended = this.detrendData(data);
+    
+    // Perform DFT (Discrete Fourier Transform)
+    for (let k = 1; k <= Math.min(maxFrequencies, Math.floor(n / 2)); k++) {
+      let real = 0;
+      let imag = 0;
+
+      for (let t = 0; t < n; t++) {
+        const angle = 2 * Math.PI * k * t / n;
+        real += detrended[t] * Math.cos(angle);
+        imag += detrended[t] * Math.sin(angle);
+      }
+
+      real = real * 2 / n;
+      imag = imag * 2 / n;
+
+      const amplitude = Math.sqrt(real * real + imag * imag);
+      const phase = Math.atan2(imag, real);
+      const period = n / k;
+
+      // Calculate significance using periodogram
+      const significance = this.calculateSignificance(amplitude, detrended);
+
+      if (significance > 0.05) { // 5% significance threshold
+        components.push({
+          frequency: k / n,
+          amplitude,
+          phase,
+          period,
+          significance,
+        });
+      }
+    }
+
+    // Sort by amplitude (strongest patterns first)
+    return components.sort((a, b) => b.amplitude - a.amplitude);
+  }
+
+  /**
+   * STL Decomposition (Seasonal and Trend decomposition using Loess)
+   */
+  async performSTLDecomposition(
+    data: number[],
+    period: number,
+    options: {
+      robust?: boolean;
+      seasonal?: number;
+      trend?: number;
+      lowpass?: number;
+    } = {},
+  ): Promise<STLDecomposition> {
+    const n = data.length;
+    
+    if (n < period * 2) {
+      throw new Error('Insufficient data for STL decomposition');
+    }
+
+    // Initialize components
+    let trend = new Array(n).fill(0);
+    let seasonal = new Array(n).fill(0);
+    let remainder = new Array(n).fill(0);
+
+    // Parameters
+    const ns = options.seasonal || 7; // Seasonal smoothing
+    const nt = options.trend || Math.ceil(1.5 * period / (1 - 1.5 / ns)); // Trend smoothing
+    const nl = options.lowpass || period; // Low-pass filter
+    const robust = options.robust !== false;
+    const maxIterations = robust ? 15 : 2;
+
+    // Initial trend estimation using moving average
+    trend = this.movingAverage(data, period);
+
+    // Iterative decomposition
+    for (let iter = 0; iter < maxIterations; iter++) {
+      // Step 1: Detrend
+      const detrended = data.map((d, i) => d - trend[i]);
+
+      // Step 2: Cycle-subseries smoothing
+      seasonal = this.seasonalSmoothing(detrended, period, ns);
+
+      // Step 3: Low-pass filtering of seasonal
+      const filteredSeasonal = this.lowPassFilter(seasonal, nl);
+
+      // Step 4: Deseasonalize
+      const deseasonalized = data.map((d, i) => d - seasonal[i]);
+
+      // Step 5: Trend smoothing
+      trend = this.loessSmoothing(deseasonalized, nt);
+
+      // Step 6: Calculate remainder
+      remainder = data.map((d, i) => d - seasonal[i] - trend[i]);
+
+      // Robust weighting (if enabled)
+      if (robust && iter < maxIterations - 1) {
+        const weights = this.calculateRobustWeights(remainder);
+        // Apply weights in next iteration
+        data = data.map((d, i) => d * weights[i]);
+      }
+    }
+
+    // Calculate strength metrics
+    const seasonalStrength = this.calculateSeasonalStrength(data, seasonal, remainder);
+    const trendStrength = this.calculateTrendStrength(data, trend, remainder);
+
+    return {
+      trend,
+      seasonal,
+      remainder,
+      seasonalStrength,
+      trendStrength,
+    };
+  }
+
+  /**
+   * Wavelet Transform for multi-scale analysis
+   */
+  async performWaveletTransform(
+    data: number[],
+    waveletType: 'haar' | 'db4' | 'mexican_hat' = 'haar',
+    levels: number = 4,
+  ): Promise<WaveletTransform[]> {
+    const transforms: WaveletTransform[] = [];
+    let currentData = [...data];
+
+    for (let level = 1; level <= levels; level++) {
+      const transform = this.discreteWaveletTransform(currentData, waveletType);
+      
+      transforms.push({
+        level,
+        coefficients: transform.detail,
+        frequencies: this.calculateWaveletFrequencies(transform.detail, level),
+        timeLocalization: this.calculateTimeLocalization(transform.detail),
+      });
+
+      currentData = transform.approximation;
+    }
+
+    return transforms;
+  }
+
+  /**
+   * X-13ARIMA-SEATS simulation (simplified version)
+   */
+  async performX13Analysis(
+    data: number[],
+    timestamps: string[],
+    options: {
+      transformation?: 'none' | 'log' | 'auto';
+      arimaModel?: { p: number; d: number; q: number };
+      seasonalPeriod?: number;
+      outlierDetection?: boolean;
+      tradingDayAdjustment?: boolean;
+      holidayAdjustment?: boolean;
+    } = {},
+  ): Promise<{
+    seasonal: number[];
+    trend: number[];
+    irregular: number[];
+    seasonalFactors: Record<string, number>;
+    outliers: { index: number; type: string; impact: number }[];
+  }> {
+    const n = data.length;
+    const period = options.seasonalPeriod || 12;
+
+    // Step 1: Data transformation
+    let transformedData = [...data];
+    if (options.transformation === 'log' || 
+        (options.transformation === 'auto' && this.shouldUseLogTransform(data))) {
+      transformedData = data.map(d => Math.log(Math.max(d, 0.001)));
+    }
+
+    // Step 2: Outlier detection
+    const outliers = options.outlierDetection ? 
+      this.detectOutliersX13(transformedData) : [];
+
+    // Step 3: RegARIMA modeling (simplified)
+    const arimaResult = this.fitARIMA(
+      transformedData,
+      options.arimaModel || { p: 1, d: 1, q: 1 },
+      period,
+    );
+
+    // Step 4: Seasonal adjustment using SEATS
+    const seatsResult = this.performSEATS(arimaResult.residuals, period);
+
+    // Step 5: Trading day and holiday adjustments
+    let adjustedSeasonal = [...seatsResult.seasonal];
+    if (options.tradingDayAdjustment) {
+      adjustedSeasonal = this.adjustForTradingDays(adjustedSeasonal, timestamps);
+    }
+    if (options.holidayAdjustment) {
+      adjustedSeasonal = this.adjustForHolidays(adjustedSeasonal, timestamps);
+    }
+
+    // Step 6: Calculate seasonal factors
+    const seasonalFactors = this.calculateSeasonalFactors(adjustedSeasonal, period);
+
+    // Transform back if needed
+    if (options.transformation === 'log') {
+      adjustedSeasonal = adjustedSeasonal.map(s => Math.exp(s));
+      seatsResult.trend = seatsResult.trend.map(t => Math.exp(t));
+      seatsResult.irregular = seatsResult.irregular.map(i => Math.exp(i));
+    }
+
+    return {
+      seasonal: adjustedSeasonal,
+      trend: seatsResult.trend,
+      irregular: seatsResult.irregular,
+      seasonalFactors,
+      outliers,
+    };
+  }
+
+  /**
+   * Autocorrelation Function (ACF) calculation
+   */
+  calculateACF(data: number[], maxLag: number): number[] {
+    const n = data.length;
+    const mean = data.reduce((sum, val) => sum + val, 0) / n;
+    const variance = data.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+    
+    const acf: number[] = [];
+    
+    for (let lag = 0; lag <= maxLag; lag++) {
+      let covariance = 0;
+      for (let i = 0; i < n - lag; i++) {
+        covariance += (data[i] - mean) * (data[i + lag] - mean);
+      }
+      covariance /= (n - lag);
+      acf.push(covariance / variance);
+    }
+    
+    return acf;
+  }
+
+  /**
+   * Partial Autocorrelation Function (PACF) calculation
+   */
+  calculatePACF(data: number[], maxLag: number): number[] {
+    const acf = this.calculateACF(data, maxLag);
+    const pacf: number[] = [1]; // PACF at lag 0 is always 1
+    
+    for (let k = 1; k <= maxLag; k++) {
+      // Yule-Walker equations
+      const matrix: number[][] = [];
+      const vector: number[] = [];
+      
+      for (let i = 0; i < k; i++) {
+        const row: number[] = [];
+        for (let j = 0; j < k; j++) {
+          row.push(acf[Math.abs(i - j)]);
+        }
+        matrix.push(row);
+        vector.push(acf[i + 1]);
+      }
+      
+      const coefficients = this.solveLinearSystem(matrix, vector);
+      pacf.push(coefficients[k - 1]);
+    }
+    
+    return pacf;
+  }
+
+  /**
+   * Spectral Density Estimation
+   */
+  calculateSpectralDensity(data: number[], frequencies: number[]): number[] {
+    const n = data.length;
+    const acf = this.calculateACF(data, Math.floor(n / 4));
+    const spectralDensity: number[] = [];
+    
+    for (const freq of frequencies) {
+      let density = acf[0];
+      for (let k = 1; k < acf.length; k++) {
+        density += 2 * acf[k] * Math.cos(2 * Math.PI * freq * k);
+      }
+      spectralDensity.push(Math.abs(density));
+    }
+    
+    return spectralDensity;
+  }
+
+  /**
+   * Indonesian Business Calendar Adjustments
+   */
+  applyIndonesianCalendarAdjustments(
+    data: number[],
+    timestamps: string[],
+    options: {
+      includeRamadan?: boolean;
+      includeNationalHolidays?: boolean;
+      includeRegionalEvents?: boolean;
+      businessType?: string;
+    } = {},
+  ): {
+    adjustedData: number[];
+    adjustmentFactors: Record<string, number>;
+    events: { date: string; event: string; impact: number }[];
+  } {
+    const adjustedData = [...data];
+    const adjustmentFactors: Record<string, number> = {};
+    const events: { date: string; event: string; impact: number }[] = [];
+
+    timestamps.forEach((timestamp, index) => {
+      const date = moment.tz(timestamp, 'Asia/Jakarta');
+      const dateStr = date.format('YYYY-MM-DD');
+      let factor = 1.0;
+
+      // Ramadan adjustments
+      if (options.includeRamadan) {
+        const ramadanFactor = this.getRamadanFactor(date, options.businessType);
+        if (ramadanFactor !== 1.0) {
+          factor *= ramadanFactor;
+          events.push({
+            date: dateStr,
+            event: 'Ramadan',
+            impact: ramadanFactor,
+          });
+        }
+      }
+
+      // National holidays
+      if (options.includeNationalHolidays) {
+        const holidayFactor = this.getIndonesianHolidayFactor(date);
+        if (holidayFactor !== 1.0) {
+          factor *= holidayFactor;
+          events.push({
+            date: dateStr,
+            event: 'National Holiday',
+            impact: holidayFactor,
+          });
+        }
+      }
+
+      // Regional events (e.g., local festivals)
+      if (options.includeRegionalEvents) {
+        const regionalFactor = this.getRegionalEventFactor(date);
+        if (regionalFactor !== 1.0) {
+          factor *= regionalFactor;
+          events.push({
+            date: dateStr,
+            event: 'Regional Event',
+            impact: regionalFactor,
+          });
+        }
+      }
+
+      adjustmentFactors[dateStr] = factor;
+      adjustedData[index] = data[index] / factor; // Normalize to remove calendar effects
+    });
+
+    return { adjustedData, adjustmentFactors, events };
+  }
+
+  // Private helper methods
+
+  private detrendData(data: number[]): number[] {
+    const n = data.length;
+    const x = Array.from({ length: n }, (_, i) => i);
+    const { slope, intercept } = this.linearRegression(x, data);
+    
+    return data.map((d, i) => d - (slope * i + intercept));
+  }
+
+  private linearRegression(x: number[], y: number[]): { slope: number; intercept: number } {
+    const n = x.length;
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = y.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+    const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    
+    return { slope, intercept };
+  }
+
+  private calculateSignificance(amplitude: number, data: number[]): number {
+    const variance = this.calculateVariance(data);
+    const testStatistic = (amplitude * amplitude * data.length) / (2 * variance);
+    // Simplified chi-squared test
+    return Math.exp(-testStatistic);
+  }
+
+  private calculateVariance(data: number[]): number {
+    const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
+    return data.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / data.length;
+  }
+
+  private movingAverage(data: number[], window: number): number[] {
+    const result: number[] = [];
+    const halfWindow = Math.floor(window / 2);
+    
+    for (let i = 0; i < data.length; i++) {
+      const start = Math.max(0, i - halfWindow);
+      const end = Math.min(data.length, i + halfWindow + 1);
+      const sum = data.slice(start, end).reduce((a, b) => a + b, 0);
+      result.push(sum / (end - start));
+    }
+    
+    return result;
+  }
+
+  private seasonalSmoothing(data: number[], period: number, bandwidth: number): number[] {
+    const n = data.length;
+    const seasonal = new Array(n).fill(0);
+    
+    // Group by seasonal position
+    for (let season = 0; season < period; season++) {
+      const indices: number[] = [];
+      const values: number[] = [];
+      
+      for (let i = season; i < n; i += period) {
+        indices.push(i);
+        values.push(data[i]);
+      }
+      
+      // Apply loess smoothing to each seasonal series
+      const smoothed = this.loessSmoothing(values, bandwidth);
+      
+      // Map back to original positions
+      indices.forEach((idx, i) => {
+        seasonal[idx] = smoothed[i];
+      });
+    }
+    
+    return seasonal;
+  }
+
+  private loessSmoothing(data: number[], bandwidth: number): number[] {
+    const n = data.length;
+    const result: number[] = [];
+    
+    for (let i = 0; i < n; i++) {
+      const weights = this.tricubeWeights(i, n, bandwidth);
+      let weightedSum = 0;
+      let weightSum = 0;
+      
+      for (let j = 0; j < n; j++) {
+        weightedSum += weights[j] * data[j];
+        weightSum += weights[j];
+      }
+      
+      result.push(weightedSum / weightSum);
+    }
+    
+    return result;
+  }
+
+  private tricubeWeights(center: number, length: number, bandwidth: number): number[] {
+    const weights: number[] = [];
+    const h = Math.ceil(bandwidth * length);
+    
+    for (let i = 0; i < length; i++) {
+      const distance = Math.abs(i - center);
+      if (distance <= h) {
+        const u = distance / h;
+        weights.push(Math.pow(1 - Math.pow(u, 3), 3));
+      } else {
+        weights.push(0);
+      }
+    }
+    
+    return weights;
+  }
+
+  private lowPassFilter(data: number[], cutoff: number): number[] {
+    // Simple Butterworth filter implementation
+    const n = data.length;
+    const filtered = [...data];
+    const alpha = 2 * Math.PI * cutoff / n;
+    
+    // Forward pass
+    for (let i = 1; i < n; i++) {
+      filtered[i] = alpha * data[i] + (1 - alpha) * filtered[i - 1];
+    }
+    
+    // Backward pass (zero-phase)
+    for (let i = n - 2; i >= 0; i--) {
+      filtered[i] = alpha * filtered[i] + (1 - alpha) * filtered[i + 1];
+    }
+    
+    return filtered;
+  }
+
+  private calculateRobustWeights(residuals: number[]): number[] {
+    const mad = this.medianAbsoluteDeviation(residuals);
+    const threshold = 6 * mad;
+    
+    return residuals.map(r => {
+      const absResidual = Math.abs(r);
+      if (absResidual <= threshold) {
+        const u = absResidual / threshold;
+        return Math.pow(1 - u * u, 2);
+      }
+      return 0;
+    });
+  }
+
+  private medianAbsoluteDeviation(data: number[]): number {
+    const median = this.median(data);
+    const deviations = data.map(d => Math.abs(d - median));
+    return this.median(deviations);
+  }
+
+  private median(data: number[]): number {
+    const sorted = [...data].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  private calculateSeasonalStrength(data: number[], seasonal: number[], remainder: number[]): number {
+    const varSeasonal = this.calculateVariance(seasonal);
+    const varRemainder = this.calculateVariance(remainder);
+    const varTotal = varSeasonal + varRemainder;
+    
+    return varTotal > 0 ? 1 - varRemainder / varTotal : 0;
+  }
+
+  private calculateTrendStrength(data: number[], trend: number[], remainder: number[]): number {
+    const detrended = data.map((d, i) => d - trend[i]);
+    const varDetrended = this.calculateVariance(detrended);
+    const varRemainder = this.calculateVariance(remainder);
+    
+    return varDetrended > 0 ? 1 - varRemainder / varDetrended : 0;
+  }
+
+  private discreteWaveletTransform(
+    data: number[],
+    waveletType: string,
+  ): { approximation: number[]; detail: number[] } {
+    // Simplified Haar wavelet transform
+    if (waveletType !== 'haar') {
+      // For now, only implement Haar
+      waveletType = 'haar';
+    }
+
+    const n = data.length;
+    const approximation: number[] = [];
+    const detail: number[] = [];
+
+    for (let i = 0; i < n - 1; i += 2) {
+      approximation.push((data[i] + data[i + 1]) / Math.sqrt(2));
+      detail.push((data[i] - data[i + 1]) / Math.sqrt(2));
+    }
+
+    // Handle odd length
+    if (n % 2 === 1) {
+      approximation.push(data[n - 1]);
+    }
+
+    return { approximation, detail };
+  }
+
+  private calculateWaveletFrequencies(coefficients: number[], level: number): number[] {
+    const n = coefficients.length;
+    const baseFreq = 0.5 / Math.pow(2, level);
+    
+    return coefficients.map((_, i) => baseFreq * (i + 1) / n);
+  }
+
+  private calculateTimeLocalization(coefficients: number[]): number[] {
+    // Time localization for wavelet coefficients
+    return coefficients.map((coef, i) => {
+      const energy = coef * coef;
+      const totalEnergy = coefficients.reduce((sum, c) => sum + c * c, 0);
+      return totalEnergy > 0 ? energy / totalEnergy : 0;
+    });
+  }
+
+  private shouldUseLogTransform(data: number[]): boolean {
+    // Check if data shows multiplicative seasonality
+    const cv = this.calculateCoefficientOfVariation(data);
+    const skewness = this.calculateSkewness(data);
+    
+    return cv > 0.5 || Math.abs(skewness) > 1;
+  }
+
+  private calculateCoefficientOfVariation(data: number[]): number {
+    const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
+    const std = Math.sqrt(this.calculateVariance(data));
+    return mean > 0 ? std / mean : 0;
+  }
+
+  private calculateSkewness(data: number[]): number {
+    const n = data.length;
+    const mean = data.reduce((sum, val) => sum + val, 0) / n;
+    const variance = this.calculateVariance(data);
+    const std = Math.sqrt(variance);
+    
+    if (std === 0) return 0;
+    
+    const sum = data.reduce((acc, val) => acc + Math.pow((val - mean) / std, 3), 0);
+    return sum / n;
+  }
+
+  private detectOutliersX13(data: number[]): { index: number; type: string; impact: number }[] {
+    const outliers: { index: number; type: string; impact: number }[] = [];
+    const n = data.length;
+    
+    // Moving window for outlier detection
+    const windowSize = Math.min(30, Math.floor(n / 3));
+    
+    for (let i = windowSize; i < n - windowSize; i++) {
+      const window = data.slice(i - windowSize, i + windowSize + 1);
+      const localMedian = this.median(window);
+      const localMAD = this.medianAbsoluteDeviation(window);
+      
+      const zscore = Math.abs(data[i] - localMedian) / (1.4826 * localMAD);
+      
+      if (zscore > 3.5) {
+        const impact = (data[i] - localMedian) / localMedian;
+        let type = 'AO'; // Additive outlier
+        
+        // Check if it's a level shift
+        if (i < n - 5) {
+          const before = data.slice(Math.max(0, i - 5), i);
+          const after = data.slice(i + 1, Math.min(n, i + 6));
+          const beforeMean = before.reduce((a, b) => a + b, 0) / before.length;
+          const afterMean = after.reduce((a, b) => a + b, 0) / after.length;
+          
+          if (Math.abs(afterMean - beforeMean) > 2 * localMAD) {
+            type = 'LS'; // Level shift
+          }
+        }
+        
+        outliers.push({ index: i, type, impact });
+      }
+    }
+    
+    return outliers;
+  }
+
+  private fitARIMA(
+    data: number[],
+    order: { p: number; d: number; q: number },
+    seasonalPeriod: number,
+  ): { residuals: number[]; coefficients: any } {
+    // Simplified ARIMA fitting
+    let workingData = [...data];
+    
+    // Differencing
+    for (let i = 0; i < order.d; i++) {
+      workingData = this.difference(workingData, 1);
+    }
+    
+    // Seasonal differencing
+    if (seasonalPeriod > 1) {
+      workingData = this.difference(workingData, seasonalPeriod);
+    }
+    
+    // Fit AR coefficients using Yule-Walker
+    const arCoefficients = this.fitAR(workingData, order.p);
+    
+    // Calculate residuals
+    const residuals = this.calculateARResiduals(workingData, arCoefficients);
+    
+    return {
+      residuals,
+      coefficients: {
+        ar: arCoefficients,
+        ma: [], // MA fitting would go here
+        seasonal: [],
+      },
+    };
+  }
+
+  private difference(data: number[], lag: number): number[] {
+    const result: number[] = [];
+    for (let i = lag; i < data.length; i++) {
+      result.push(data[i] - data[i - lag]);
+    }
+    return result;
+  }
+
+  private fitAR(data: number[], p: number): number[] {
+    if (p === 0) return [];
+    
+    const acf = this.calculateACF(data, p);
+    const matrix: number[][] = [];
+    const vector: number[] = [];
+    
+    for (let i = 0; i < p; i++) {
+      const row: number[] = [];
+      for (let j = 0; j < p; j++) {
+        row.push(acf[Math.abs(i - j)]);
+      }
+      matrix.push(row);
+      vector.push(acf[i + 1]);
+    }
+    
+    return this.solveLinearSystem(matrix, vector);
+  }
+
+  private calculateARResiduals(data: number[], coefficients: number[]): number[] {
+    const p = coefficients.length;
+    const residuals: number[] = [];
+    
+    for (let i = p; i < data.length; i++) {
+      let prediction = 0;
+      for (let j = 0; j < p; j++) {
+        prediction += coefficients[j] * data[i - j - 1];
+      }
+      residuals.push(data[i] - prediction);
+    }
+    
+    return residuals;
+  }
+
+  private performSEATS(
+    data: number[],
+    period: number,
+  ): { seasonal: number[]; trend: number[]; irregular: number[] } {
+    // Simplified SEATS (Signal Extraction in ARIMA Time Series)
+    const n = data.length;
+    
+    // Extract seasonal component using moving averages
+    const ma = this.movingAverage(data, period);
+    const detrended = data.map((d, i) => d - ma[i]);
+    
+    // Calculate seasonal indices
+    const seasonalIndices = new Array(period).fill(0);
+    const counts = new Array(period).fill(0);
+    
+    for (let i = 0; i < n; i++) {
+      const season = i % period;
+      seasonalIndices[season] += detrended[i];
+      counts[season]++;
+    }
+    
+    for (let i = 0; i < period; i++) {
+      seasonalIndices[i] /= counts[i];
+    }
+    
+    // Normalize seasonal indices
+    const meanIndex = seasonalIndices.reduce((a, b) => a + b, 0) / period;
+    for (let i = 0; i < period; i++) {
+      seasonalIndices[i] -= meanIndex;
+    }
+    
+    // Apply seasonal pattern
+    const seasonal = new Array(n);
+    for (let i = 0; i < n; i++) {
+      seasonal[i] = seasonalIndices[i % period];
+    }
+    
+    // Calculate trend (already have from MA)
+    const trend = ma;
+    
+    // Calculate irregular component
+    const irregular = data.map((d, i) => d - seasonal[i] - trend[i]);
+    
+    return { seasonal, trend, irregular };
+  }
+
+  private adjustForTradingDays(data: number[], timestamps: string[]): number[] {
+    // Adjust for different number of trading days in months
+    return data.map((value, i) => {
+      const date = moment(timestamps[i]);
+      const daysInMonth = date.daysInMonth();
+      const tradingDays = this.countTradingDays(date);
+      const avgTradingDays = 21.7; // Average trading days per month
+      
+      return value * (avgTradingDays / tradingDays);
+    });
+  }
+
+  private countTradingDays(date: moment.Moment): number {
+    const year = date.year();
+    const month = date.month();
+    const firstDay = moment([year, month, 1]);
+    const lastDay = moment([year, month + 1, 0]);
+    
+    let count = 0;
+    const current = firstDay.clone();
+    
+    while (current.isSameOrBefore(lastDay)) {
+      const dayOfWeek = current.day();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday or Saturday
+        count++;
+      }
+      current.add(1, 'day');
+    }
+    
+    return count;
+  }
+
+  private adjustForHolidays(data: number[], timestamps: string[]): number[] {
+    // Indonesian holiday adjustments
+    const holidays = this.getIndonesianHolidayDates();
+    
+    return data.map((value, i) => {
+      const date = moment(timestamps[i]);
+      const dateStr = date.format('YYYY-MM-DD');
+      
+      if (holidays[dateStr]) {
+        const holiday = holidays[dateStr];
+        return value * holiday.adjustment;
+      }
+      
+      return value;
+    });
+  }
+
+  private getIndonesianHolidayDates(): Record<string, { name: string; adjustment: number }> {
+    // This would be dynamically calculated based on lunar calendar, etc.
+    return {
+      '2024-01-01': { name: 'New Year', adjustment: 0.3 },
+      '2024-02-10': { name: 'Chinese New Year', adjustment: 0.5 },
+      '2024-04-10': { name: 'Eid al-Fitr', adjustment: 0.2 },
+      '2024-04-11': { name: 'Eid al-Fitr', adjustment: 0.2 },
+      '2024-08-17': { name: 'Independence Day', adjustment: 0.4 },
+      '2024-12-25': { name: 'Christmas', adjustment: 0.5 },
+    };
+  }
+
+  private calculateSeasonalFactors(seasonal: number[], period: number): Record<string, number> {
+    const factors: Record<string, number> = {};
+    
+    // Calculate average seasonal factor for each period
+    for (let p = 0; p < period; p++) {
+      const values: number[] = [];
+      for (let i = p; i < seasonal.length; i += period) {
+        values.push(seasonal[i]);
+      }
+      
+      const avgFactor = values.reduce((a, b) => a + b, 0) / values.length;
+      factors[`period_${p}`] = avgFactor;
+    }
+    
+    return factors;
+  }
+
+  private solveLinearSystem(matrix: number[][], vector: number[]): number[] {
+    // Gaussian elimination
+    const n = matrix.length;
+    const augmented: number[][] = matrix.map((row, i) => [...row, vector[i]]);
+    
+    // Forward elimination
+    for (let i = 0; i < n; i++) {
+      // Find pivot
+      let maxRow = i;
+      for (let k = i + 1; k < n; k++) {
+        if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+          maxRow = k;
+        }
+      }
+      
+      // Swap rows
+      [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+      
+      // Make all rows below this one 0 in current column
+      for (let k = i + 1; k < n; k++) {
+        const c = augmented[k][i] / augmented[i][i];
+        for (let j = i; j < n + 1; j++) {
+          if (i === j) {
+            augmented[k][j] = 0;
+          } else {
+            augmented[k][j] -= c * augmented[i][j];
+          }
+        }
+      }
+    }
+    
+    // Back substitution
+    const solution = new Array(n).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      solution[i] = augmented[i][n] / augmented[i][i];
+      for (let k = i - 1; k >= 0; k--) {
+        augmented[k][n] -= augmented[k][i] * solution[i];
+      }
+    }
+    
+    return solution;
+  }
+
+  private getRamadanFactor(date: moment.Moment, businessType?: string): number {
+    // Simplified Ramadan detection (would use actual Islamic calendar)
+    const ramadanPeriods = [
+      { start: '2024-03-11', end: '2024-04-09' },
+      { start: '2025-03-01', end: '2025-03-30' },
+    ];
+    
+    const dateStr = date.format('YYYY-MM-DD');
+    
+    for (const period of ramadanPeriods) {
+      if (dateStr >= period.start && dateStr <= period.end) {
+        const hour = date.hour();
+        
+        // Different factors based on business type
+        if (businessType === 'food_beverage') {
+          if (hour >= 6 && hour <= 17) {
+            return 0.4; // Reduced during fasting hours
+          } else if (hour >= 18 && hour <= 22) {
+            return 1.8; // Increased during iftar
+          }
+        } else if (businessType === 'retail') {
+          return 1.2; // Generally increased for shopping
+        }
+        
+        return 0.8; // Default reduction
+      }
+    }
+    
+    return 1.0;
+  }
+
+  private getIndonesianHolidayFactor(date: moment.Moment): number {
+    const holidays = this.getIndonesianHolidayDates();
+    const dateStr = date.format('YYYY-MM-DD');
+    
+    if (holidays[dateStr]) {
+      return holidays[dateStr].adjustment;
+    }
+    
+    return 1.0;
+  }
+
+  private getRegionalEventFactor(date: moment.Moment): number {
+    // Placeholder for regional events
+    // Would include local festivals, harvest seasons, etc.
+    const month = date.month() + 1;
+    
+    // Example: harvest season boost
+    if (month >= 3 && month <= 5) {
+      return 1.1;
+    }
+    
+    return 1.0;
+  }
+}

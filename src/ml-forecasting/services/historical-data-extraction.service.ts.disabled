@@ -1,0 +1,1265 @@
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between, MoreThan, LessThan, Raw } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+
+import {
+  InventoryTransaction,
+  TransactionType,
+} from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
+import { Order } from '../../orders/entities/order.entity';
+import { DataPipelineService, TimeSeriesDataPoint, DataPipelineConfig } from './data-pipeline.service';
+
+export interface HistoricalDataRequest {
+  tenantId: string;
+  dataTypes: ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+  dateRange: {
+    from: string;
+    to: string;
+  };
+  filters?: {
+    productIds?: string[];
+    categoryIds?: string[];
+    locationIds?: string[];
+    brandNames?: string[];
+    priceRange?: { min: number; max: number };
+    customerSegments?: string[];
+  };
+  aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly';
+  includeMetadata?: boolean;
+  validationLevel?: 'basic' | 'standard' | 'strict';
+}
+
+export interface HistoricalDataResponse {
+  requestId: string;
+  status: 'completed' | 'partial' | 'failed';
+  data: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: InventoryHistoryPoint[];
+    products?: ProductLifecyclePoint[];
+    orders?: OrderPatternPoint[];
+    external?: ExternalDataPoint[];
+  };
+  metadata: {
+    extractionTime: number;
+    recordCounts: Record<string, number>;
+    dataQuality: Record<string, number>;
+    coverage: Record<string, number>;
+    gaps: DataGap[];
+  };
+  warnings: string[];
+  recommendations: string[];
+}
+
+export interface InventoryHistoryPoint {
+  date: string;
+  productId: string;
+  locationId: string;
+  stockLevel: number;
+  stockValue: number;
+  turnoverRate: number;
+  movementType: 'in' | 'out' | 'adjustment';
+  movementReason: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ProductLifecyclePoint {
+  date: string;
+  productId: string;
+  stage: 'introduction' | 'growth' | 'maturity' | 'decline';
+  salesVelocity: number;
+  priceChanges: number;
+  promotionalActivity: boolean;
+  competitorActivity: number;
+  seasonalityFactor: number;
+  metadata?: Record<string, any>;
+}
+
+export interface OrderPatternPoint {
+  date: string;
+  orderCount: number;
+  averageOrderValue: number;
+  customerSegment: string;
+  acquisitionChannel: string;
+  fulfillmentTime: number;
+  returnRate: number;
+  profitMargin: number;
+  metadata?: Record<string, any>;
+}
+
+export interface ExternalDataPoint {
+  date: string;
+  source: string;
+  dataType: 'weather' | 'economic' | 'competitor' | 'social';
+  value: number;
+  impact: 'positive' | 'negative' | 'neutral';
+  confidence: number;
+  metadata?: Record<string, any>;
+}
+
+export interface DataGap {
+  dataType: string;
+  dateRange: { from: string; to: string };
+  severity: 'low' | 'medium' | 'high';
+  impact: string;
+  recommendation: string;
+}
+
+@Injectable()
+export class HistoricalDataExtractionService {
+  private readonly logger = new Logger(HistoricalDataExtractionService.name);
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private inventoryTransactionRepo: Repository<InventoryTransaction>,
+
+    @InjectRepository(Product)
+    private productRepo: Repository<Product>,
+
+    @InjectRepository(ProductCategory)
+    private categoryRepo: Repository<ProductCategory>,
+
+    @InjectRepository(InventoryItem)
+    private inventoryItemRepo: Repository<InventoryItem>,
+
+    @InjectRepository(Order)
+    private orderRepo: Repository<Order>,
+
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
+
+    private eventEmitter: EventEmitter2,
+    private dataPipelineService: DataPipelineService,
+  ) {}
+
+  /**
+   * PHASE 2.2.2: Enhanced Historical Data Extraction
+   * Main entry point for comprehensive historical data extraction
+   */
+  async extractHistoricalData(
+    request: HistoricalDataRequest,
+  ): Promise<HistoricalDataResponse> {
+    const startTime = Date.now();
+    const requestId = `hist_${request.tenantId}_${Date.now()}`;
+
+    this.logger.log(`Starting historical data extraction: ${requestId}`);
+
+    // Initialize response structure
+    const response: HistoricalDataResponse = {
+      requestId,
+      status: 'completed',
+      data: {},
+      metadata: {
+        extractionTime: 0,
+        recordCounts: {},
+        dataQuality: {},
+        coverage: {},
+        gaps: [],
+      },
+      warnings: [],
+      recommendations: [],
+    };
+
+    try {
+      // 1. Validate request parameters
+      await this.validateRequest(request);
+
+      // 2. Extract each requested data type
+      const extractionPromises = [];
+
+      if (request.dataTypes.includes('sales')) {
+        extractionPromises.push(
+          this.extractSalesHistory(request).then(data => {
+            response.data.sales = data;
+            response.metadata.recordCounts.sales = data.length;
+          })
+        );
+      }
+
+      if (request.dataTypes.includes('inventory')) {
+        extractionPromises.push(
+          this.extractInventoryHistory(request).then(data => {
+            response.data.inventory = data;
+            response.metadata.recordCounts.inventory = data.length;
+          })
+        );
+      }
+
+      if (request.dataTypes.includes('products')) {
+        extractionPromises.push(
+          this.extractProductLifecycleHistory(request).then(data => {
+            response.data.products = data;
+            response.metadata.recordCounts.products = data.length;
+          })
+        );
+      }
+
+      if (request.dataTypes.includes('orders')) {
+        extractionPromises.push(
+          this.extractOrderPatternHistory(request).then(data => {
+            response.data.orders = data;
+            response.metadata.recordCounts.orders = data.length;
+          })
+        );
+      }
+
+      if (request.dataTypes.includes('external')) {
+        extractionPromises.push(
+          this.extractExternalDataHistory(request).then(data => {
+            response.data.external = data;
+            response.metadata.recordCounts.external = data.length;
+          })
+        );
+      }
+
+      // Execute all extractions in parallel
+      await Promise.allSettled(extractionPromises);
+
+      // 3. Perform data quality validation
+      if (request.validationLevel !== 'basic') {
+        await this.performDataQualityValidation(response, request);
+      }
+
+      // 4. Identify data gaps and coverage
+      await this.identifyDataGaps(response, request);
+
+      // 5. Generate recommendations
+      response.recommendations = await this.generateExtractionRecommendations(response, request);
+
+      // 6. Calculate final metrics
+      response.metadata.extractionTime = Date.now() - startTime;
+      
+      // Log extraction summary
+      this.logger.log(`Historical data extraction completed: ${requestId} in ${response.metadata.extractionTime}ms`);
+
+      // Emit extraction event for monitoring
+      this.eventEmitter.emit('historical.extraction.completed', {
+        requestId,
+        tenantId: request.tenantId,
+        dataTypes: request.dataTypes,
+        recordCounts: response.metadata.recordCounts,
+        extractionTime: response.metadata.extractionTime,
+      });
+
+      return response;
+
+    } catch (error) {
+      this.logger.error(`Historical data extraction failed: ${error.message}`, error.stack);
+      
+      response.status = 'failed';
+      response.warnings.push(`Extraction failed: ${error.message}`);
+      response.metadata.extractionTime = Date.now() - startTime;
+
+      // Emit error event
+      this.eventEmitter.emit('historical.extraction.failed', {
+        requestId,
+        tenantId: request.tenantId,
+        error: error.message,
+      });
+
+      return response;
+    }
+  }
+
+  /**
+   * Extract enhanced sales history with advanced patterns
+   */
+  private async extractSalesHistory(
+    request: HistoricalDataRequest,
+  ): Promise<TimeSeriesDataPoint[]> {
+    this.logger.debug(`Extracting sales history for tenant ${request.tenantId}`);
+
+    const cacheKey = `sales_history_${request.tenantId}_${JSON.stringify(request)}`;
+    const cached = await this.cacheManager.get<TimeSeriesDataPoint[]>(cacheKey);
+
+    if (cached) {
+      this.logger.debug('Returning cached sales history');
+      return cached;
+    }
+
+    // Build comprehensive query with advanced filtering
+    const queryBuilder = this.inventoryTransactionRepo
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.product', 'product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('transaction.location', 'location')
+      .where('transaction.tenantId = :tenantId', { tenantId: request.tenantId })
+      .andWhere('transaction.type = :saleType', { saleType: TransactionType.SALE })
+      .andWhere('transaction.transactionDate BETWEEN :from AND :to', {
+        from: request.dateRange.from,
+        to: request.dateRange.to,
+      })
+      .andWhere('transaction.status = :status', { status: 'completed' });
+
+    // Apply filters
+    if (request.filters) {
+      if (request.filters.productIds?.length) {
+        queryBuilder.andWhere('transaction.productId IN (:...productIds)', {
+          productIds: request.filters.productIds,
+        });
+      }
+
+      if (request.filters.categoryIds?.length) {
+        queryBuilder.andWhere('product.categoryId IN (:...categoryIds)', {
+          categoryIds: request.filters.categoryIds,
+        });
+      }
+
+      if (request.filters.locationIds?.length) {
+        queryBuilder.andWhere('transaction.locationId IN (:...locationIds)', {
+          locationIds: request.filters.locationIds,
+        });
+      }
+
+      if (request.filters.brandNames?.length) {
+        queryBuilder.andWhere('product.brand IN (:...brandNames)', {
+          brandNames: request.filters.brandNames,
+        });
+      }
+
+      if (request.filters.priceRange) {
+        queryBuilder.andWhere('product.price BETWEEN :minPrice AND :maxPrice', {
+          minPrice: request.filters.priceRange.min,
+          maxPrice: request.filters.priceRange.max,
+        });
+      }
+    }
+
+    const transactions = await queryBuilder
+      .orderBy('transaction.transactionDate', 'ASC')
+      .getMany();
+
+    // Enhanced aggregation with metadata
+    const timeSeries = this.aggregateTransactionsWithMetadata(
+      transactions,
+      request.aggregation,
+      request.includeMetadata || false,
+    );
+
+    // Cache for 2 hours for sales data
+    await this.cacheManager.set(cacheKey, timeSeries, 7200);
+
+    this.logger.debug(`Extracted ${timeSeries.length} sales data points`);
+    return timeSeries;
+  }
+
+  /**
+   * Extract inventory movement history with stock levels
+   */
+  private async extractInventoryHistory(
+    request: HistoricalDataRequest,
+  ): Promise<InventoryHistoryPoint[]> {
+    this.logger.debug(`Extracting inventory history for tenant ${request.tenantId}`);
+
+    const cacheKey = `inventory_history_${request.tenantId}_${JSON.stringify(request)}`;
+    const cached = await this.cacheManager.get<InventoryHistoryPoint[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    // Get all inventory transactions (not just sales)
+    const queryBuilder = this.inventoryTransactionRepo
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.product', 'product')
+      .leftJoinAndSelect('transaction.inventoryItem', 'inventoryItem')
+      .where('transaction.tenantId = :tenantId', { tenantId: request.tenantId })
+      .andWhere('transaction.transactionDate BETWEEN :from AND :to', {
+        from: request.dateRange.from,
+        to: request.dateRange.to,
+      });
+
+    // Apply filters
+    if (request.filters?.productIds?.length) {
+      queryBuilder.andWhere('transaction.productId IN (:...productIds)', {
+        productIds: request.filters.productIds,
+      });
+    }
+
+    if (request.filters?.locationIds?.length) {
+      queryBuilder.andWhere('transaction.locationId IN (:...locationIds)', {
+        locationIds: request.filters.locationIds,
+      });
+    }
+
+    const transactions = await queryBuilder
+      .orderBy('transaction.transactionDate', 'ASC')
+      .getMany();
+
+    // Calculate running stock levels and turnover rates
+    const inventoryHistory = await this.calculateInventoryHistoryPoints(
+      transactions,
+      request.aggregation,
+      request.tenantId,
+    );
+
+    // Cache for 1 hour
+    await this.cacheManager.set(cacheKey, inventoryHistory, 3600);
+
+    this.logger.debug(`Extracted ${inventoryHistory.length} inventory history points`);
+    return inventoryHistory;
+  }
+
+  /**
+   * Extract product lifecycle data
+   */
+  private async extractProductLifecycleHistory(
+    request: HistoricalDataRequest,
+  ): Promise<ProductLifecyclePoint[]> {
+    this.logger.debug(`Extracting product lifecycle history for tenant ${request.tenantId}`);
+
+    const cacheKey = `product_lifecycle_${request.tenantId}_${JSON.stringify(request)}`;
+    const cached = await this.cacheManager.get<ProductLifecyclePoint[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    // Get products with their complete history
+    const products = await this.productRepo.find({
+      where: { tenantId: request.tenantId },
+      relations: ['category', 'inventoryItems'],
+    });
+
+    const lifecycleHistory: ProductLifecyclePoint[] = [];
+
+    for (const product of products) {
+      // Skip if filtering by specific products and this isn't included
+      if (request.filters?.productIds?.length && 
+          !request.filters.productIds.includes(product.id)) {
+        continue;
+      }
+
+      const productLifecycle = await this.calculateProductLifecycleStages(
+        product,
+        request.dateRange,
+        request.aggregation,
+      );
+
+      lifecycleHistory.push(...productLifecycle);
+    }
+
+    // Cache for 4 hours
+    await this.cacheManager.set(cacheKey, lifecycleHistory, 14400);
+
+    this.logger.debug(`Extracted ${lifecycleHistory.length} product lifecycle points`);
+    return lifecycleHistory;
+  }
+
+  /**
+   * Extract order pattern history
+   */
+  private async extractOrderPatternHistory(
+    request: HistoricalDataRequest,
+  ): Promise<OrderPatternPoint[]> {
+    this.logger.debug(`Extracting order pattern history for tenant ${request.tenantId}`);
+
+    const cacheKey = `order_patterns_${request.tenantId}_${JSON.stringify(request)}`;
+    const cached = await this.cacheManager.get<OrderPatternPoint[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    // Get orders with customer and fulfillment data
+    const queryBuilder = this.orderRepo
+      .createQueryBuilder('order')
+      .where('order.tenantId = :tenantId', { tenantId: request.tenantId })
+      .andWhere('order.orderDate BETWEEN :from AND :to', {
+        from: request.dateRange.from,
+        to: request.dateRange.to,
+      });
+
+    const orders = await queryBuilder
+      .orderBy('order.orderDate', 'ASC')
+      .getMany();
+
+    // Analyze order patterns
+    const orderPatterns = await this.analyzeOrderPatterns(
+      orders,
+      request.aggregation,
+    );
+
+    // Cache for 2 hours
+    await this.cacheManager.set(cacheKey, orderPatterns, 7200);
+
+    this.logger.debug(`Extracted ${orderPatterns.length} order pattern points`);
+    return orderPatterns;
+  }
+
+  /**
+   * Extract external market data
+   */
+  private async extractExternalDataHistory(
+    request: HistoricalDataRequest,
+  ): Promise<ExternalDataPoint[]> {
+    this.logger.debug(`Extracting external data history for tenant ${request.tenantId}`);
+
+    const cacheKey = `external_data_${request.tenantId}_${JSON.stringify(request)}`;
+    const cached = await this.cacheManager.get<ExternalDataPoint[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    const externalData: ExternalDataPoint[] = [];
+
+    // Integrate with Indonesian external data sources
+    try {
+      // Weather data from BMKG
+      const weatherData = await this.fetchWeatherHistory(request.dateRange);
+      externalData.push(...weatherData);
+
+      // Economic indicators from Bank Indonesia
+      const economicData = await this.fetchEconomicHistory(request.dateRange);
+      externalData.push(...economicData);
+
+      // Social media trends (if available)
+      const socialData = await this.fetchSocialTrendsHistory(request.dateRange);
+      externalData.push(...socialData);
+
+      // Competitor pricing data (if available)
+      const competitorData = await this.fetchCompetitorHistory(request.dateRange);
+      externalData.push(...competitorData);
+
+    } catch (error) {
+      this.logger.warn(`External data extraction partial failure: ${error.message}`);
+    }
+
+    // Cache for 6 hours
+    await this.cacheManager.set(cacheKey, externalData, 21600);
+
+    this.logger.debug(`Extracted ${externalData.length} external data points`);
+    return externalData;
+  }
+
+  // ========== HELPER METHODS ==========
+
+  /**
+   * Validate extraction request parameters
+   */
+  private async validateRequest(request: HistoricalDataRequest): Promise<void> {
+    if (!request.tenantId) {
+      throw new BadRequestException('Tenant ID is required');
+    }
+
+    if (!request.dataTypes || request.dataTypes.length === 0) {
+      throw new BadRequestException('At least one data type must be specified');
+    }
+
+    if (!request.dateRange || !request.dateRange.from || !request.dateRange.to) {
+      throw new BadRequestException('Date range is required');
+    }
+
+    const fromDate = new Date(request.dateRange.from);
+    const toDate = new Date(request.dateRange.to);
+
+    if (fromDate >= toDate) {
+      throw new BadRequestException('From date must be before to date');
+    }
+
+    // Check for reasonable date range (not more than 2 years)
+    const daysDiff = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysDiff > 730) {
+      throw new BadRequestException('Date range cannot exceed 2 years');
+    }
+
+    this.logger.debug(`Request validation passed for ${request.dataTypes.join(', ')}`);
+  }
+
+  /**
+   * Enhanced transaction aggregation with metadata
+   */
+  private aggregateTransactionsWithMetadata(
+    transactions: InventoryTransaction[],
+    aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly',
+    includeMetadata: boolean,
+  ): TimeSeriesDataPoint[] {
+    const aggregated: Record<string, Record<string, {
+      value: number;
+      count: number;
+      revenue: number;
+      avgPrice: number;
+      uniqueCustomers: Set<string>;
+      channels: Set<string>;
+    }>> = {};
+
+    for (const transaction of transactions) {
+      const dateKey = this.getDateKey(transaction.transactionDate, aggregation);
+      const productKey = transaction.productId;
+
+      if (!aggregated[dateKey]) {
+        aggregated[dateKey] = {};
+      }
+
+      if (!aggregated[dateKey][productKey]) {
+        aggregated[dateKey][productKey] = {
+          value: 0,
+          count: 0,
+          revenue: 0,
+          avgPrice: 0,
+          uniqueCustomers: new Set(),
+          channels: new Set(),
+        };
+      }
+
+      const qty = Math.abs(transaction.quantity);
+      const price = transaction.unitPrice || 0;
+
+      aggregated[dateKey][productKey].value += qty;
+      aggregated[dateKey][productKey].count += 1;
+      aggregated[dateKey][productKey].revenue += qty * price;
+
+      // Add metadata if available
+      if (transaction.metadata) {
+        if (transaction.metadata.customerId) {
+          aggregated[dateKey][productKey].uniqueCustomers.add(transaction.metadata.customerId);
+        }
+        if (transaction.metadata.channel) {
+          aggregated[dateKey][productKey].channels.add(transaction.metadata.channel);
+        }
+      }
+    }
+
+    const timeSeries: TimeSeriesDataPoint[] = [];
+
+    for (const [date, products] of Object.entries(aggregated)) {
+      for (const [productId, data] of Object.entries(products)) {
+        const avgPrice = data.value > 0 ? data.revenue / data.value : 0;
+        
+        const metadata: Record<string, any> = {
+          aggregation,
+          transactionCount: data.count,
+          totalRevenue: data.revenue,
+          averagePrice: avgPrice,
+        };
+
+        if (includeMetadata) {
+          metadata.uniqueCustomers = data.uniqueCustomers.size;
+          metadata.channels = Array.from(data.channels);
+          metadata.priceVariation = this.calculatePriceVariation(transactions, productId, date);
+        }
+
+        timeSeries.push({
+          date,
+          value: data.value,
+          productId,
+          locationId: transactions.find(t => t.productId === productId)?.locationId,
+          categoryId: transactions.find(t => t.productId === productId)?.product?.categoryId,
+          metadata,
+        });
+      }
+    }
+
+    return timeSeries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  /**
+   * Calculate inventory history points with running stock levels
+   */
+  private async calculateInventoryHistoryPoints(
+    transactions: InventoryTransaction[],
+    aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly',
+    tenantId: string,
+  ): Promise<InventoryHistoryPoint[]> {
+    // Group by product and location to track stock levels
+    const stockLevels: Record<string, Record<string, number>> = {};
+    const historyPoints: InventoryHistoryPoint[] = [];
+
+    // Get initial stock levels for each product-location combination
+    const inventoryItems = await this.inventoryItemRepo.find({
+      where: { tenantId },
+      relations: ['product'],
+    });
+
+    // Initialize stock levels
+    for (const item of inventoryItems) {
+      const key = `${item.productId}_${item.locationId}`;
+      stockLevels[key] = item.quantityOnHand;
+    }
+
+    // Process transactions chronologically
+    const sortedTransactions = transactions.sort(
+      (a, b) => new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
+    );
+
+    for (const transaction of sortedTransactions) {
+      const key = `${transaction.productId}_${transaction.locationId}`;
+      const dateKey = this.getDateKey(transaction.transactionDate, aggregation);
+
+      // Update running stock level
+      if (!stockLevels[key]) {
+        stockLevels[key] = 0;
+      }
+
+      const previousStock = stockLevels[key];
+      
+      // Adjust stock based on transaction type
+      switch (transaction.type) {
+        case TransactionType.SALE:
+        case TransactionType.ADJUSTMENT_OUT:
+          stockLevels[key] -= Math.abs(transaction.quantity);
+          break;
+        case TransactionType.PURCHASE:
+        case TransactionType.ADJUSTMENT_IN:
+        case TransactionType.TRANSFER_IN:
+          stockLevels[key] += Math.abs(transaction.quantity);
+          break;
+        case TransactionType.TRANSFER_OUT:
+          stockLevels[key] -= Math.abs(transaction.quantity);
+          break;
+      }
+
+      // Calculate turnover rate
+      const turnoverRate = this.calculateTurnoverRate(
+        transaction.productId,
+        transaction.locationId,
+        sortedTransactions,
+        dateKey,
+      );
+
+      historyPoints.push({
+        date: dateKey,
+        productId: transaction.productId,
+        locationId: transaction.locationId,
+        stockLevel: Math.max(0, stockLevels[key]),
+        stockValue: stockLevels[key] * (transaction.unitPrice || 0),
+        turnoverRate,
+        movementType: this.getMovementType(transaction.type),
+        movementReason: transaction.reason || 'normal_operation',
+        metadata: {
+          transactionId: transaction.id,
+          previousStock,
+          quantityChanged: Math.abs(transaction.quantity),
+          unitPrice: transaction.unitPrice,
+        },
+      });
+    }
+
+    return historyPoints;
+  }
+
+  /**
+   * Calculate product lifecycle stages
+   */
+  private async calculateProductLifecycleStages(
+    product: Product,
+    dateRange: { from: string; to: string },
+    aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly',
+  ): Promise<ProductLifecyclePoint[]> {
+    // Get sales data for the product
+    const salesTransactions = await this.inventoryTransactionRepo.find({
+      where: {
+        productId: product.id,
+        type: TransactionType.SALE,
+        transactionDate: Between(new Date(dateRange.from), new Date(dateRange.to)),
+      },
+      order: { transactionDate: 'ASC' },
+    });
+
+    const lifecyclePoints: ProductLifecyclePoint[] = [];
+    const aggregatedSales = this.aggregateByPeriod(salesTransactions, aggregation);
+
+    for (const [date, transactions] of Object.entries(aggregatedSales)) {
+      const salesVelocity = this.calculateSalesVelocity(transactions);
+      const stage = this.determineLifecycleStage(product.id, date, salesVelocity);
+      const seasonalityFactor = this.calculateSeasonalityFactor(date, product.categoryId);
+
+      lifecyclePoints.push({
+        date,
+        productId: product.id,
+        stage,
+        salesVelocity,
+        priceChanges: await this.countPriceChanges(product.id, date),
+        promotionalActivity: await this.detectPromotionalActivity(product.id, date),
+        competitorActivity: await this.getCompetitorActivity(product.categoryId, date),
+        seasonalityFactor,
+        metadata: {
+          totalSales: transactions.reduce((sum, t) => sum + Math.abs(t.quantity), 0),
+          averagePrice: this.calculateAveragePrice(transactions),
+          transactionCount: transactions.length,
+        },
+      });
+    }
+
+    return lifecyclePoints;
+  }
+
+  /**
+   * Analyze order patterns
+   */
+  private async analyzeOrderPatterns(
+    orders: Order[],
+    aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly',
+  ): Promise<OrderPatternPoint[]> {
+    const aggregatedOrders = this.aggregateOrdersByPeriod(orders, aggregation);
+    const patterns: OrderPatternPoint[] = [];
+
+    for (const [date, orderGroup] of Object.entries(aggregatedOrders)) {
+      const totalValue = orderGroup.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+      const avgOrderValue = orderGroup.length > 0 ? totalValue / orderGroup.length : 0;
+
+      patterns.push({
+        date,
+        orderCount: orderGroup.length,
+        averageOrderValue: avgOrderValue,
+        customerSegment: this.analyzeCustomerSegment(orderGroup),
+        acquisitionChannel: this.getTopAcquisitionChannel(orderGroup),
+        fulfillmentTime: this.calculateAverageFulfillmentTime(orderGroup),
+        returnRate: await this.calculateReturnRate(orderGroup),
+        profitMargin: this.calculateProfitMargin(orderGroup),
+        metadata: {
+          totalRevenue: totalValue,
+          uniqueCustomers: new Set(orderGroup.map(o => o.customerId)).size,
+          paymentMethods: [...new Set(orderGroup.map(o => o.paymentMethod).filter(Boolean))],
+        },
+      });
+    }
+
+    return patterns;
+  }
+
+  // ========== EXTERNAL DATA INTEGRATION ==========
+
+  /**
+   * Fetch weather history from BMKG
+   */
+  private async fetchWeatherHistory(
+    dateRange: { from: string; to: string }
+  ): Promise<ExternalDataPoint[]> {
+    // This would integrate with actual BMKG API
+    // For now, return simulated data
+    const weatherData: ExternalDataPoint[] = [];
+    
+    const start = new Date(dateRange.from);
+    const end = new Date(dateRange.to);
+    const current = new Date(start);
+
+    while (current <= end) {
+      weatherData.push({
+        date: current.toISOString().split('T')[0],
+        source: 'BMKG',
+        dataType: 'weather',
+        value: 25 + Math.random() * 10, // Temperature 25-35°C
+        impact: Math.random() > 0.5 ? 'positive' : 'negative',
+        confidence: 0.85,
+        metadata: {
+          temperature: 25 + Math.random() * 10,
+          humidity: 60 + Math.random() * 30,
+          rainfall: Math.random() * 100,
+        },
+      });
+      
+      current.setDate(current.getDate() + 1);
+    }
+
+    return weatherData;
+  }
+
+  /**
+   * Fetch economic indicators from Bank Indonesia
+   */
+  private async fetchEconomicHistory(
+    dateRange: { from: string; to: string }
+  ): Promise<ExternalDataPoint[]> {
+    // This would integrate with actual BI API
+    // For now, return simulated data
+    const economicData: ExternalDataPoint[] = [];
+    
+    const start = new Date(dateRange.from);
+    const end = new Date(dateRange.to);
+    const current = new Date(start);
+
+    while (current <= end) {
+      economicData.push({
+        date: current.toISOString().split('T')[0],
+        source: 'Bank_Indonesia',
+        dataType: 'economic',
+        value: 15000 + Math.random() * 1000, // IDR/USD exchange rate
+        impact: 'neutral',
+        confidence: 0.95,
+        metadata: {
+          exchangeRate: 15000 + Math.random() * 1000,
+          inflationRate: 2.5 + Math.random() * 2,
+          interestRate: 5.5 + Math.random() * 1,
+        },
+      });
+      
+      current.setMonth(current.getMonth() + 1);
+    }
+
+    return economicData;
+  }
+
+  /**
+   * Fetch social media trends
+   */
+  private async fetchSocialTrendsHistory(
+    dateRange: { from: string; to: string }
+  ): Promise<ExternalDataPoint[]> {
+    // Placeholder for social media trend integration
+    return [];
+  }
+
+  /**
+   * Fetch competitor pricing data
+   */
+  private async fetchCompetitorHistory(
+    dateRange: { from: string; to: string }
+  ): Promise<ExternalDataPoint[]> {
+    // Placeholder for competitor data integration
+    return [];
+  }
+
+  // ========== DATA QUALITY AND VALIDATION ==========
+
+  /**
+   * Perform comprehensive data quality validation
+   */
+  private async performDataQualityValidation(
+    response: HistoricalDataResponse,
+    request: HistoricalDataRequest,
+  ): Promise<void> {
+    for (const [dataType, data] of Object.entries(response.data)) {
+      if (!data || !Array.isArray(data)) continue;
+
+      const qualityScore = await this.calculateDataQuality(data, dataType);
+      response.metadata.dataQuality[dataType] = qualityScore;
+
+      if (qualityScore < 70) {
+        response.warnings.push(`Low data quality detected for ${dataType}: ${qualityScore}%`);
+      }
+
+      // Calculate coverage
+      const coverage = await this.calculateDataCoverage(data, request.dateRange);
+      response.metadata.coverage[dataType] = coverage;
+
+      if (coverage < 80) {
+        response.warnings.push(`Incomplete data coverage for ${dataType}: ${coverage}%`);
+      }
+    }
+  }
+
+  /**
+   * Identify data gaps
+   */
+  private async identifyDataGaps(
+    response: HistoricalDataResponse,
+    request: HistoricalDataRequest,
+  ): Promise<void> {
+    const gaps: DataGap[] = [];
+
+    for (const [dataType, data] of Object.entries(response.data)) {
+      if (!data || !Array.isArray(data)) continue;
+
+      const expectedCount = this.calculateExpectedDataPoints(
+        request.dateRange,
+        request.aggregation,
+      );
+      
+      const actualCount = data.length;
+      const gapPercentage = ((expectedCount - actualCount) / expectedCount) * 100;
+
+      if (gapPercentage > 10) {
+        gaps.push({
+          dataType,
+          dateRange: request.dateRange,
+          severity: gapPercentage > 50 ? 'high' : gapPercentage > 25 ? 'medium' : 'low',
+          impact: `${gapPercentage.toFixed(1)}% of expected data is missing`,
+          recommendation: this.getGapRecommendation(dataType, gapPercentage),
+        });
+      }
+    }
+
+    response.metadata.gaps = gaps;
+  }
+
+  /**
+   * Generate extraction recommendations
+   */
+  private async generateExtractionRecommendations(
+    response: HistoricalDataResponse,
+    request: HistoricalDataRequest,
+  ): Promise<string[]> {
+    const recommendations: string[] = [];
+
+    // Check extraction time
+    if (response.metadata.extractionTime > 30000) {
+      recommendations.push('Consider using more specific filters to improve extraction performance');
+    }
+
+    // Check data quality
+    const avgQuality = Object.values(response.metadata.dataQuality).reduce((a, b) => a + b, 0) / 
+                      Object.values(response.metadata.dataQuality).length;
+    
+    if (avgQuality < 80) {
+      recommendations.push('Improve data collection processes to enhance data quality');
+    }
+
+    // Check coverage
+    const avgCoverage = Object.values(response.metadata.coverage).reduce((a, b) => a + b, 0) / 
+                       Object.values(response.metadata.coverage).length;
+    
+    if (avgCoverage < 90) {
+      recommendations.push('Ensure consistent data recording across all time periods');
+    }
+
+    return recommendations;
+  }
+
+  // ========== UTILITY METHODS ==========
+
+  private getDateKey(date: Date, aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly'): string {
+    const d = new Date(date);
+    
+    switch (aggregation) {
+      case 'hourly':
+        return d.toISOString().substring(0, 13) + ':00:00.000Z';
+      case 'daily':
+        return d.toISOString().split('T')[0];
+      case 'weekly':
+        const year = d.getFullYear();
+        const week = this.getWeekNumber(d);
+        return `${year}-W${week.toString().padStart(2, '0')}`;
+      case 'monthly':
+        return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    }
+  }
+
+  private getWeekNumber(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  }
+
+  private calculatePriceVariation(
+    transactions: InventoryTransaction[],
+    productId: string,
+    date: string,
+  ): number {
+    const productTransactions = transactions.filter(
+      t => t.productId === productId && 
+      this.getDateKey(t.transactionDate, 'daily') === date
+    );
+
+    if (productTransactions.length === 0) return 0;
+
+    const prices = productTransactions.map(t => t.unitPrice || 0);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    
+    return max > 0 ? ((max - min) / max) * 100 : 0;
+  }
+
+  private calculateTurnoverRate(
+    productId: string,
+    locationId: string,
+    transactions: InventoryTransaction[],
+    dateKey: string,
+  ): number {
+    // Simplified turnover rate calculation
+    const productTransactions = transactions.filter(
+      t => t.productId === productId && 
+           t.locationId === locationId &&
+           t.type === TransactionType.SALE
+    );
+
+    const salesInPeriod = productTransactions
+      .filter(t => this.getDateKey(t.transactionDate, 'daily') === dateKey)
+      .reduce((sum, t) => sum + Math.abs(t.quantity), 0);
+
+    const avgInventory = 100; // This would be calculated from actual inventory levels
+    
+    return avgInventory > 0 ? salesInPeriod / avgInventory : 0;
+  }
+
+  private getMovementType(transactionType: TransactionType): 'in' | 'out' | 'adjustment' {
+    switch (transactionType) {
+      case TransactionType.PURCHASE:
+      case TransactionType.TRANSFER_IN:
+      case TransactionType.ADJUSTMENT_IN:
+        return 'in';
+      case TransactionType.SALE:
+      case TransactionType.TRANSFER_OUT:
+      case TransactionType.ADJUSTMENT_OUT:
+        return 'out';
+      default:
+        return 'adjustment';
+    }
+  }
+
+  private aggregateByPeriod(
+    transactions: InventoryTransaction[],
+    aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly',
+  ): Record<string, InventoryTransaction[]> {
+    const aggregated: Record<string, InventoryTransaction[]> = {};
+
+    for (const transaction of transactions) {
+      const dateKey = this.getDateKey(transaction.transactionDate, aggregation);
+      if (!aggregated[dateKey]) {
+        aggregated[dateKey] = [];
+      }
+      aggregated[dateKey].push(transaction);
+    }
+
+    return aggregated;
+  }
+
+  private calculateSalesVelocity(transactions: InventoryTransaction[]): number {
+    const totalSales = transactions.reduce((sum, t) => sum + Math.abs(t.quantity), 0);
+    return totalSales; // Simplified velocity calculation
+  }
+
+  private determineLifecycleStage(
+    productId: string,
+    date: string,
+    salesVelocity: number,
+  ): 'introduction' | 'growth' | 'maturity' | 'decline' {
+    // Simplified lifecycle stage determination
+    if (salesVelocity < 10) return 'introduction';
+    if (salesVelocity < 50) return 'growth';
+    if (salesVelocity < 100) return 'maturity';
+    return 'decline';
+  }
+
+  private calculateSeasonalityFactor(date: string, categoryId: string): number {
+    // Simplified seasonality calculation
+    const month = new Date(date).getMonth();
+    
+    // Higher sales in December (Christmas), March-April (Ramadan/Lebaran)
+    if (month === 11 || month === 2 || month === 3) {
+      return 1.5;
+    }
+    
+    return 1.0;
+  }
+
+  private async countPriceChanges(productId: string, date: string): Promise<number> {
+    // This would count actual price changes from a price history table
+    return 0; // Placeholder
+  }
+
+  private async detectPromotionalActivity(productId: string, date: string): Promise<boolean> {
+    // This would detect promotional activities from promotions table
+    return false; // Placeholder
+  }
+
+  private async getCompetitorActivity(categoryId: string, date: string): Promise<number> {
+    // This would analyze competitor activity
+    return 0; // Placeholder
+  }
+
+  private calculateAveragePrice(transactions: InventoryTransaction[]): number {
+    const prices = transactions.map(t => t.unitPrice || 0).filter(p => p > 0);
+    return prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+  }
+
+  private aggregateOrdersByPeriod(
+    orders: Order[],
+    aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly',
+  ): Record<string, Order[]> {
+    const aggregated: Record<string, Order[]> = {};
+
+    for (const order of orders) {
+      const dateKey = this.getDateKey(new Date(order.orderDate), aggregation);
+      if (!aggregated[dateKey]) {
+        aggregated[dateKey] = [];
+      }
+      aggregated[dateKey].push(order);
+    }
+
+    return aggregated;
+  }
+
+  private analyzeCustomerSegment(orders: Order[]): string {
+    // Analyze customer segments based on order patterns
+    return 'regular'; // Simplified
+  }
+
+  private getTopAcquisitionChannel(orders: Order[]): string {
+    // Get the most common acquisition channel
+    return 'organic'; // Simplified
+  }
+
+  private calculateAverageFulfillmentTime(orders: Order[]): number {
+    // Calculate average time from order to fulfillment
+    return 24; // Simplified: 24 hours
+  }
+
+  private async calculateReturnRate(orders: Order[]): Promise<number> {
+    // Calculate return rate for these orders
+    return 0.05; // Simplified: 5% return rate
+  }
+
+  private calculateProfitMargin(orders: Order[]): number {
+    // Calculate average profit margin
+    return 0.25; // Simplified: 25% margin
+  }
+
+  private async calculateDataQuality(data: any[], dataType: string): Promise<number> {
+    if (!data || data.length === 0) return 0;
+
+    let qualityScore = 100;
+    let issues = 0;
+
+    for (const item of data) {
+      if (!item.date) issues++;
+      if (dataType === 'sales' && (!item.value || item.value <= 0)) issues++;
+      if (!item.productId) issues++;
+    }
+
+    qualityScore -= (issues / data.length) * 100;
+    return Math.max(0, qualityScore);
+  }
+
+  private async calculateDataCoverage(
+    data: any[],
+    dateRange: { from: string; to: string },
+  ): Promise<number> {
+    if (!data || data.length === 0) return 0;
+
+    const expectedPeriods = this.calculateExpectedDataPoints(dateRange, 'daily');
+    const actualPeriods = new Set(data.map(item => item.date)).size;
+    
+    return Math.min(100, (actualPeriods / expectedPeriods) * 100);
+  }
+
+  private calculateExpectedDataPoints(
+    dateRange: { from: string; to: string },
+    aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly',
+  ): number {
+    const start = new Date(dateRange.from);
+    const end = new Date(dateRange.to);
+    const timeDiff = end.getTime() - start.getTime();
+
+    switch (aggregation) {
+      case 'hourly':
+        return Math.ceil(timeDiff / (1000 * 60 * 60));
+      case 'daily':
+        return Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      case 'weekly':
+        return Math.ceil(timeDiff / (1000 * 60 * 60 * 24 * 7));
+      case 'monthly':
+        return Math.ceil(timeDiff / (1000 * 60 * 60 * 24 * 30));
+    }
+  }
+
+  private getGapRecommendation(dataType: string, gapPercentage: number): string {
+    if (gapPercentage > 50) {
+      return `Critical data gap in ${dataType}. Review data collection processes immediately.`;
+    } else if (gapPercentage > 25) {
+      return `Significant data gap in ${dataType}. Consider implementing data quality monitoring.`;
+    } else {
+      return `Minor data gap in ${dataType}. Monitor for trends and implement preventive measures.`;
+    }
+  }
+}

@@ -1,10 +1,11 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixPurchaseOrderColumns1751630397490 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Add camelCase columns that match entity property names for purchase_orders
-        await queryRunner.query(`
+export class FixPurchaseOrderColumns1751630397490
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add camelCase columns that match entity property names for purchase_orders
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add supplierId column (camelCase) if missing
@@ -94,11 +95,11 @@ export class FixPurchaseOrderColumns1751630397490 implements MigrationInterface 
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Remove camelCase columns that were added
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove camelCase columns that were added
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove camelCase columns from purchase_orders table
@@ -135,6 +136,5 @@ export class FixPurchaseOrderColumns1751630397490 implements MigrationInterface 
                 END IF;
             END $$;
         `);
-    }
-
+  }
 }

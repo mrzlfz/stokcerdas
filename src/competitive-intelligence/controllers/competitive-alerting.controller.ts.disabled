@@ -1,0 +1,945 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpStatus,
+  HttpException,
+  Logger,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import { 
+  CompetitiveAlertingService, 
+  CompetitiveAlertingRequest, 
+  CompetitiveAlertingResult,
+  CompetitiveAlertType,
+  AlertPriority,
+  NotificationChannel,
+} from '../services/competitive-alerting.service';
+import { MarketplaceType, DataQuality } from '../entities/competitive-product.entity';
+
+// DTOs for API requests
+export class SetupCompetitiveAlertingDto {
+  alertConfig: {
+    alertTypes: CompetitiveAlertType[];
+    monitoringScope: {
+      products?: string[];
+      competitors?: string[];
+      marketplaces?: MarketplaceType[];
+      categories?: string[];
+      regions?: string[];
+    };
+    triggerConditions: {
+      priceThresholds?: {
+        percentageChange: number;
+        absoluteChange: number;
+        competitiveGap: number;
+        anomalyScore: number;
+      };
+      volumeThresholds?: {
+        salesVolumeChange: number;
+        inventoryChange: number;
+        marketShareChange: number;
+      };
+      qualitativeThresholds?: {
+        ratingChange: number;
+        sentimentChange: number;
+        brandMentionVolume: number;
+        socialEngagement: number;
+      };
+      timeBasedConditions?: {
+        sustainedPeriod: number;
+        frequencyLimit: number;
+        cooldownPeriod: number;
+      };
+      intelligentFilters?: {
+        noiseReduction: boolean;
+        contextualRelevance: boolean;
+        predictiveFiltering: boolean;
+        businessImpactThreshold: number;
+      };
+    };
+    notificationChannels: NotificationChannel[];
+    alertPriority: AlertPriority;
+    frequencySettings: {
+      realTime: boolean;
+      batchDelivery?: {
+        enabled: boolean;
+        frequency: 'hourly' | 'daily' | 'weekly';
+        timeOfDay?: string;
+        dayOfWeek?: number;
+      };
+      urgencyEscalation?: {
+        enabled: boolean;
+        criticalDelayMinutes: number;
+        highDelayMinutes: number;
+        mediumDelayHours: number;
+      };
+      adaptiveFrequency?: {
+        enabled: boolean;
+        learningPeriod: number;
+        adjustmentFactor: number;
+      };
+    };
+    intelligenceLevel: 'basic' | 'standard' | 'comprehensive' | 'strategic';
+    includeIndonesianContext: boolean;
+  };
+  deliveryPreferences?: {
+    quietHours?: {
+      enabled: boolean;
+      startTime: string;
+      endTime: string;
+      timezone: string;
+      exceptions: AlertPriority[];
+      weekdaysOnly: boolean;
+    };
+    escalationRules?: Array<{
+      triggerCondition: string;
+      escalationDelay: number;
+      escalationTarget: string;
+      escalationChannel: NotificationChannel;
+      maxEscalations: number;
+    }>;
+    consolidationRules?: Array<{
+      similarityThreshold: number;
+      timeWindow: number;
+      maxConsolidation: number;
+      consolidationType: 'smart_grouping' | 'time_based' | 'topic_based';
+    }>;
+    customRecipients?: Array<{
+      userId?: string;
+      email?: string;
+      phone?: string;
+      alertTypes: CompetitiveAlertType[];
+      priority: AlertPriority;
+      channels: NotificationChannel[];
+    }>;
+  };
+}
+
+export class UpdateAlertConfigDto {
+  alertTypes?: CompetitiveAlertType[];
+  triggerConditions?: {
+    priceThresholds?: {
+      percentageChange?: number;
+      absoluteChange?: number;
+      competitiveGap?: number;
+      anomalyScore?: number;
+    };
+    volumeThresholds?: {
+      salesVolumeChange?: number;
+      inventoryChange?: number;
+      marketShareChange?: number;
+    };
+    intelligentFilters?: {
+      noiseReduction?: boolean;
+      contextualRelevance?: boolean;
+      predictiveFiltering?: boolean;
+      businessImpactThreshold?: number;
+    };
+  };
+  notificationChannels?: NotificationChannel[];
+  frequencySettings?: {
+    realTime?: boolean;
+    batchDelivery?: {
+      enabled?: boolean;
+      frequency?: 'hourly' | 'daily' | 'weekly';
+      timeOfDay?: string;
+    };
+  };
+}
+
+export class AlertResponseDto {
+  alertId: string;
+  responseType: 'acknowledge' | 'investigate' | 'resolve' | 'dismiss' | 'escalate';
+  userId: string;
+  notes?: string;
+  actions?: Array<{
+    actionType: string;
+    description: string;
+    takenAt: string;
+  }>;
+  outcome?: {
+    outcomeType: 'resolved' | 'mitigated' | 'escalated' | 'no_action';
+    description: string;
+    impact?: {
+      financialImpact?: number;
+      marketImpact?: number;
+      operationalImpact?: number;
+    };
+  };
+}
+
+export class AlertFeedbackDto {
+  alertId: string;
+  feedbackType: 'accuracy' | 'relevance' | 'timeliness' | 'actionability';
+  rating: number; // 1-5
+  comments?: string;
+  suggestions?: string[];
+}
+
+export class AlertQueryDto {
+  alertTypes?: string; // comma-separated
+  priority?: AlertPriority;
+  status?: 'new' | 'acknowledged' | 'investigating' | 'resolved' | 'dismissed';
+  fromDate?: string;
+  toDate?: string;
+  businessImpactMin?: number;
+  assignee?: string;
+  page?: number;
+  limit?: number;
+}
+
+export class AlertAnalyticsQueryDto {
+  timeframe?: number; // days
+  analysisType?: 'trends' | 'patterns' | 'performance' | 'user_behavior' | 'business_impact';
+  includeComparisons?: boolean;
+  includePredictions?: boolean;
+  segmentBy?: 'alert_type' | 'priority' | 'time' | 'user' | 'business_impact';
+}
+
+export class SystemMetricsQueryDto {
+  metricTypes?: string; // comma-separated
+  timeframe?: number; // days
+  includeHistorical?: boolean;
+  includeBenchmarks?: boolean;
+  includeForecasts?: boolean;
+}
+
+@ApiTags('Competitive Alerting')
+@Controller('api/v1/competitive-intelligence/alerting')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class CompetitiveAlertingController {
+  private readonly logger = new Logger(CompetitiveAlertingController.name);
+
+  constructor(
+    private readonly competitiveAlertingService: CompetitiveAlertingService,
+  ) {}
+
+  @Post('setup')
+  @Permissions('competitive_intelligence:create', 'alerts:manage')
+  @ApiOperation({ 
+    summary: 'Setup competitive alerting system',
+    description: 'Configure and activate comprehensive competitive alerting with intelligent monitoring'
+  })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerting system setup successfully',
+    type: Object
+  })
+  @ApiResponse({ 
+    status: HttpStatus.BAD_REQUEST, 
+    description: 'Invalid alerting configuration' 
+  })
+  @ApiBody({ type: SetupCompetitiveAlertingDto })
+  async setupCompetitiveAlerting(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) setupDto: SetupCompetitiveAlertingDto,
+  ): Promise<CompetitiveAlertingResult> {
+    try {
+      this.logger.log(`Setting up competitive alerting for tenant: ${tenantId}`);
+
+      const request: CompetitiveAlertingRequest = {
+        tenantId,
+        ...setupDto,
+      };
+
+      const result = await this.competitiveAlertingService.setupCompetitiveAlerting(request);
+
+      this.logger.log(`Competitive alerting system setup completed: ${result.alertSystemId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Competitive alerting setup failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Alerting setup failed: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('systems/:alertSystemId')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get alerting system status',
+    description: 'Retrieve comprehensive status and metrics for alerting system'
+  })
+  @ApiParam({ name: 'alertSystemId', description: 'Alerting system ID' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerting system status retrieved successfully' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.NOT_FOUND, 
+    description: 'Alerting system not found' 
+  })
+  async getAlertingSystemStatus(
+    @CurrentTenant() tenantId: string,
+    @Param('alertSystemId') alertSystemId: string,
+  ) {
+    try {
+      const status = await this.competitiveAlertingService.getAlertingSystemStatus(tenantId, alertSystemId);
+
+      return {
+        success: true,
+        data: status,
+        metadata: {
+          alertSystemId,
+          retrievedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get alerting system status: ${error.message}`, error.stack);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
+      throw new HttpException(
+        `Failed to retrieve alerting system status: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Put('systems/:alertSystemId/config')
+  @Permissions('competitive_intelligence:update', 'alerts:manage')
+  @ApiOperation({ 
+    summary: 'Update alerting system configuration',
+    description: 'Modify alerting rules, thresholds, and notification settings'
+  })
+  @ApiParam({ name: 'alertSystemId', description: 'Alerting system ID' })
+  @ApiBody({ type: UpdateAlertConfigDto })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerting configuration updated successfully' 
+  })
+  async updateAlertingConfig(
+    @CurrentTenant() tenantId: string,
+    @Param('alertSystemId') alertSystemId: string,
+    @Body(ValidationPipe) updateDto: UpdateAlertConfigDto,
+  ) {
+    try {
+      const result = await this.competitiveAlertingService.updateAlertingConfig(
+        tenantId, 
+        alertSystemId, 
+        updateDto
+      );
+
+      return {
+        success: true,
+        data: result,
+        metadata: {
+          alertSystemId,
+          updatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to update alerting config: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to update alerting configuration: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('alerts')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get competitive alerts',
+    description: 'Retrieve alerts with filtering, sorting, and pagination'
+  })
+  @ApiQuery({ name: 'alertTypes', required: false, description: 'Comma-separated alert types' })
+  @ApiQuery({ name: 'priority', required: false, enum: ['critical', 'high', 'medium', 'low', 'info'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['new', 'acknowledged', 'investigating', 'resolved', 'dismissed'] })
+  @ApiQuery({ name: 'fromDate', required: false, description: 'Start date (ISO format)' })
+  @ApiQuery({ name: 'toDate', required: false, description: 'End date (ISO format)' })
+  @ApiQuery({ name: 'businessImpactMin', required: false, type: Number })
+  @ApiQuery({ name: 'assignee', required: false, description: 'Alert assignee' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerts retrieved successfully' 
+  })
+  async getAlerts(
+    @CurrentTenant() tenantId: string,
+    @Query() query: AlertQueryDto,
+  ) {
+    try {
+      const alertTypes = query.alertTypes ? query.alertTypes.split(',') as CompetitiveAlertType[] : undefined;
+      const page = Math.max(1, query.page || 1);
+      const limit = Math.min(100, Math.max(1, query.limit || 20));
+
+      const result = await this.competitiveAlertingService.getAlerts(tenantId, {
+        alertTypes,
+        priority: query.priority as AlertPriority,
+        status: query.status as any,
+        fromDate: query.fromDate,
+        toDate: query.toDate,
+        businessImpactMin: query.businessImpactMin,
+        assignee: query.assignee,
+        page,
+        limit,
+      });
+
+      return {
+        success: true,
+        data: result.alerts,
+        pagination: {
+          page,
+          limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / limit),
+        },
+        metadata: {
+          filtersApplied: Object.keys(query).length,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get alerts: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve alerts: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('alerts/:alertId')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get alert details',
+    description: 'Retrieve comprehensive details for a specific alert'
+  })
+  @ApiParam({ name: 'alertId', description: 'Alert ID' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alert details retrieved successfully' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.NOT_FOUND, 
+    description: 'Alert not found' 
+  })
+  async getAlertDetails(
+    @CurrentTenant() tenantId: string,
+    @Param('alertId') alertId: string,
+  ) {
+    try {
+      const alert = await this.competitiveAlertingService.getAlertById(tenantId, alertId);
+
+      if (!alert) {
+        throw new HttpException('Alert not found', HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        success: true,
+        data: alert,
+        metadata: {
+          alertId,
+          retrievedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get alert details: ${error.message}`, error.stack);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
+      throw new HttpException(
+        `Failed to retrieve alert details: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('alerts/:alertId/respond')
+  @Permissions('competitive_intelligence:update', 'alerts:respond')
+  @ApiOperation({ 
+    summary: 'Respond to alert',
+    description: 'Acknowledge, investigate, resolve, or dismiss an alert'
+  })
+  @ApiParam({ name: 'alertId', description: 'Alert ID' })
+  @ApiBody({ type: AlertResponseDto })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alert response recorded successfully' 
+  })
+  async respondToAlert(
+    @CurrentTenant() tenantId: string,
+    @Param('alertId') alertId: string,
+    @Body(ValidationPipe) responseDto: AlertResponseDto,
+  ) {
+    try {
+      const result = await this.competitiveAlertingService.respondToAlert(
+        tenantId, 
+        alertId, 
+        responseDto
+      );
+
+      return {
+        success: true,
+        data: result,
+        metadata: {
+          alertId,
+          responseType: responseDto.responseType,
+          respondedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to respond to alert: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to record alert response: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('alerts/:alertId/feedback')
+  @Permissions('competitive_intelligence:update')
+  @ApiOperation({ 
+    summary: 'Provide alert feedback',
+    description: 'Rate alert quality and provide feedback for system improvement'
+  })
+  @ApiParam({ name: 'alertId', description: 'Alert ID' })
+  @ApiBody({ type: AlertFeedbackDto })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alert feedback recorded successfully' 
+  })
+  async provideAlertFeedback(
+    @CurrentTenant() tenantId: string,
+    @Param('alertId') alertId: string,
+    @Body(ValidationPipe) feedbackDto: AlertFeedbackDto,
+  ) {
+    try {
+      const result = await this.competitiveAlertingService.recordAlertFeedback(
+        tenantId, 
+        alertId, 
+        feedbackDto
+      );
+
+      return {
+        success: true,
+        data: result,
+        metadata: {
+          alertId,
+          feedbackType: feedbackDto.feedbackType,
+          providedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to record alert feedback: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to record alert feedback: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('analytics')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get alerting analytics',
+    description: 'Comprehensive analytics on alert performance, patterns, and user behavior'
+  })
+  @ApiQuery({ name: 'timeframe', required: false, type: Number, description: 'Analysis timeframe in days' })
+  @ApiQuery({ name: 'analysisType', required: false, enum: ['trends', 'patterns', 'performance', 'user_behavior', 'business_impact'] })
+  @ApiQuery({ name: 'includeComparisons', required: false, type: Boolean })
+  @ApiQuery({ name: 'includePredictions', required: false, type: Boolean })
+  @ApiQuery({ name: 'segmentBy', required: false, enum: ['alert_type', 'priority', 'time', 'user', 'business_impact'] })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerting analytics retrieved successfully' 
+  })
+  async getAlertingAnalytics(
+    @CurrentTenant() tenantId: string,
+    @Query() query: AlertAnalyticsQueryDto,
+  ) {
+    try {
+      const analytics = await this.competitiveAlertingService.getAlertingAnalytics(tenantId, {
+        timeframe: query.timeframe || 30,
+        analysisType: query.analysisType,
+        includeComparisons: query.includeComparisons || false,
+        includePredictions: query.includePredictions || false,
+        segmentBy: query.segmentBy,
+      });
+
+      return {
+        success: true,
+        data: analytics,
+        metadata: {
+          timeframe: query.timeframe || 30,
+          analysisType: query.analysisType,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get alerting analytics: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve alerting analytics: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('metrics/system')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get system performance metrics',
+    description: 'Detailed system health and performance metrics'
+  })
+  @ApiQuery({ name: 'metricTypes', required: false, description: 'Comma-separated metric types' })
+  @ApiQuery({ name: 'timeframe', required: false, type: Number, description: 'Metrics timeframe in days' })
+  @ApiQuery({ name: 'includeHistorical', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeBenchmarks', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeForecasts', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'System metrics retrieved successfully' 
+  })
+  async getSystemMetrics(
+    @CurrentTenant() tenantId: string,
+    @Query() query: SystemMetricsQueryDto,
+  ) {
+    try {
+      const metricTypes = query.metricTypes ? query.metricTypes.split(',') : undefined;
+
+      const metrics = await this.competitiveAlertingService.getSystemMetrics(tenantId, {
+        metricTypes,
+        timeframe: query.timeframe || 7,
+        includeHistorical: query.includeHistorical || false,
+        includeBenchmarks: query.includeBenchmarks || false,
+        includeForecasts: query.includeForecasts || false,
+      });
+
+      return {
+        success: true,
+        data: metrics,
+        metadata: {
+          metricTypes: metricTypes?.length || 0,
+          timeframe: query.timeframe || 7,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get system metrics: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve system metrics: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('recommendations')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get optimization recommendations',
+    description: 'AI-powered recommendations for improving alerting system performance'
+  })
+  @ApiQuery({ name: 'category', required: false, enum: ['accuracy', 'relevance', 'timeliness', 'noise_reduction', 'personalization', 'automation'] })
+  @ApiQuery({ name: 'priority', required: false, enum: ['critical', 'high', 'medium', 'low'] })
+  @ApiQuery({ name: 'implementationEffort', required: false, enum: ['low', 'medium', 'high'] })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Optimization recommendations retrieved successfully' 
+  })
+  async getOptimizationRecommendations(
+    @CurrentTenant() tenantId: string,
+    @Query('category') category?: string,
+    @Query('priority') priority?: string,
+    @Query('implementationEffort') implementationEffort?: string,
+  ) {
+    try {
+      const recommendations = await this.competitiveAlertingService.getOptimizationRecommendations(tenantId, {
+        category: category as any,
+        priority: priority as any,
+        implementationEffort: implementationEffort as any,
+      });
+
+      return {
+        success: true,
+        data: recommendations,
+        metadata: {
+          category,
+          priority,
+          implementationEffort,
+          recommendationsCount: recommendations.length,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get optimization recommendations: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve optimization recommendations: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Put('systems/:alertSystemId/status')
+  @Permissions('competitive_intelligence:update', 'alerts:manage')
+  @ApiOperation({ 
+    summary: 'Update alerting system status',
+    description: 'Activate, pause, or deactivate alerting system'
+  })
+  @ApiParam({ name: 'alertSystemId', description: 'Alerting system ID' })
+  @ApiBody({ 
+    schema: { 
+      type: 'object', 
+      properties: { 
+        status: { 
+          type: 'string', 
+          enum: ['active', 'paused', 'inactive'] 
+        } 
+      } 
+    } 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerting system status updated successfully' 
+  })
+  async updateSystemStatus(
+    @CurrentTenant() tenantId: string,
+    @Param('alertSystemId') alertSystemId: string,
+    @Body('status') status: 'active' | 'paused' | 'inactive',
+  ) {
+    try {
+      const result = await this.competitiveAlertingService.updateSystemStatus(
+        tenantId, 
+        alertSystemId, 
+        status
+      );
+
+      return {
+        success: true,
+        data: result,
+        metadata: {
+          alertSystemId,
+          newStatus: status,
+          updatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to update system status: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to update system status: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Delete('systems/:alertSystemId')
+  @Permissions('competitive_intelligence:delete', 'alerts:manage')
+  @ApiOperation({ 
+    summary: 'Delete alerting system',
+    description: 'Permanently delete alerting system and its configuration'
+  })
+  @ApiParam({ name: 'alertSystemId', description: 'Alerting system ID' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerting system deleted successfully' 
+  })
+  async deleteAlertingSystem(
+    @CurrentTenant() tenantId: string,
+    @Param('alertSystemId') alertSystemId: string,
+  ) {
+    try {
+      await this.competitiveAlertingService.deleteAlertingSystem(tenantId, alertSystemId);
+
+      return {
+        success: true,
+        message: 'Alerting system deleted successfully',
+        metadata: {
+          alertSystemId,
+          deletedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to delete alerting system: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to delete alerting system: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('systems/:alertSystemId/test')
+  @Permissions('competitive_intelligence:update', 'alerts:manage')
+  @ApiOperation({ 
+    summary: 'Test alerting system',
+    description: 'Send test alerts to verify system configuration and delivery channels'
+  })
+  @ApiParam({ name: 'alertSystemId', description: 'Alerting system ID' })
+  @ApiBody({ 
+    schema: { 
+      type: 'object', 
+      properties: { 
+        testType: { 
+          type: 'string', 
+          enum: ['single_alert', 'all_channels', 'full_system'] 
+        },
+        alertType: {
+          type: 'string',
+          enum: Object.values(CompetitiveAlertType)
+        }
+      } 
+    } 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Test alerts sent successfully' 
+  })
+  async testAlertingSystem(
+    @CurrentTenant() tenantId: string,
+    @Param('alertSystemId') alertSystemId: string,
+    @Body() testConfig: {
+      testType: 'single_alert' | 'all_channels' | 'full_system';
+      alertType?: CompetitiveAlertType;
+    },
+  ) {
+    try {
+      const result = await this.competitiveAlertingService.testAlertingSystem(
+        tenantId, 
+        alertSystemId, 
+        testConfig
+      );
+
+      return {
+        success: true,
+        data: result,
+        metadata: {
+          alertSystemId,
+          testType: testConfig.testType,
+          testedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to test alerting system: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to test alerting system: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('systems')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'List alerting systems',
+    description: 'Get list of all alerting systems for the tenant'
+  })
+  @ApiQuery({ name: 'status', required: false, enum: ['active', 'paused', 'inactive'] })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Alerting systems list retrieved successfully' 
+  })
+  async listAlertingSystems(
+    @CurrentTenant() tenantId: string,
+    @Query('status') status?: 'active' | 'paused' | 'inactive',
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+  ) {
+    try {
+      const pageNum = Math.max(1, page);
+      const limitNum = Math.min(100, Math.max(1, limit));
+
+      const result = await this.competitiveAlertingService.listAlertingSystems(tenantId, {
+        status,
+        page: pageNum,
+        limit: limitNum,
+      });
+
+      return {
+        success: true,
+        data: result.systems,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: result.total,
+          totalPages: Math.ceil(result.total / limitNum),
+        },
+        metadata: {
+          statusFilter: status,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to list alerting systems: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve alerting systems: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('health')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get alerting service health',
+    description: 'Check overall health and status of the competitive alerting service'
+  })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Service health retrieved successfully' 
+  })
+  async getServiceHealth(
+    @CurrentTenant() tenantId: string,
+  ) {
+    try {
+      const health = await this.competitiveAlertingService.getServiceHealth(tenantId);
+
+      return {
+        success: true,
+        data: health,
+        metadata: {
+          checkedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get service health: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve service health: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+}

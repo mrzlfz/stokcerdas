@@ -10,6 +10,7 @@ import { ProductsService } from './services/products.service';
 import { ProductCategoriesService } from './services/product-categories.service';
 import { ProductVariantsService } from './services/product-variants.service';
 import { BarcodeService } from './services/barcode.service';
+import { ProductsOptimizedService } from './services/products-optimized.service';
 
 import { Product } from './entities/product.entity';
 import { ProductCategory } from './entities/product-category.entity';
@@ -36,11 +37,13 @@ import { AuthModule } from '../auth/auth.module';
     ProductCategoriesService,
     ProductVariantsService,
     BarcodeService,
+    ProductsOptimizedService,
   ],
   exports: [
     ProductsService,
     ProductCategoriesService,
     ProductVariantsService,
+    ProductsOptimizedService,
     TypeOrmModule,
   ],
 })

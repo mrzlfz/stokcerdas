@@ -1,0 +1,1023 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpStatus,
+  HttpException,
+  Logger,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import { 
+  MarketIntelligenceService, 
+  MarketIntelligenceRequest, 
+  MarketIntelligenceResult,
+} from '../services/market-intelligence.service';
+import { MarketplaceType, DataQuality } from '../entities/competitive-product.entity';
+
+// DTOs for API requests
+export class GenerateMarketIntelligenceDto {
+  analysisConfig: {
+    markets?: MarketplaceType[];
+    categories?: string[];
+    regions?: string[];
+    analysisDepth: 'overview' | 'standard' | 'comprehensive' | 'strategic';
+    insightTypes: ('trends' | 'opportunities' | 'threats' | 'customer_behavior' | 'market_dynamics' | 'sentiment' | 'regulatory')[];
+    includeIndonesianContext: boolean;
+    timeHorizon: 'short_term' | 'medium_term' | 'long_term' | 'all';
+    benchmarkScope: 'local' | 'regional' | 'global';
+  };
+  filterCriteria?: {
+    minMarketSize?: number;
+    growthRateThreshold?: number;
+    competitiveDensity?: 'low' | 'medium' | 'high';
+    dataQualityThreshold?: DataQuality;
+    excludeNicheMarkets?: boolean;
+  };
+  timeframe?: {
+    analysisWindow?: number;
+    forecastHorizon?: number;
+    historicalDepth?: number;
+  };
+}
+
+export class MarketOverviewQueryDto {
+  markets?: string; // comma-separated
+  regions?: string; // comma-separated
+  includeSegmentation?: boolean;
+  includeCompetitiveStructure?: boolean;
+  includeMaturityAnalysis?: boolean;
+  includeInnovationIndex?: boolean;
+}
+
+export class TrendAnalysisQueryDto {
+  trendCategories?: string; // comma-separated: technology,consumer_behavior,regulatory,economic,competitive
+  timeframe?: 'immediate' | 'short_term' | 'medium_term' | 'long_term';
+  strength?: 'weak' | 'moderate' | 'strong' | 'dominant';
+  minOpportunityScore?: number;
+  maxThreatScore?: number;
+}
+
+export class CustomerInsightsQueryDto {
+  behaviorType?: 'purchase_patterns' | 'channel_preferences' | 'decision_factors' | 'loyalty' | 'emerging_behaviors';
+  segments?: string; // comma-separated
+  includeGenerationalAnalysis?: boolean;
+  includeIndonesianSpecifics?: boolean;
+}
+
+export class OpportunityAnalysisQueryDto {
+  opportunityTypes?: string; // comma-separated
+  minMarketPotential?: number;
+  minConfidence?: number;
+  strategicFitThreshold?: number;
+  timeToRealize?: number; // max months
+}
+
+export class SentimentAnalysisQueryDto {
+  sentimentSources?: string; // comma-separated: overall,social_media,expert,news,regulatory
+  includeDrivers?: boolean;
+  includeTrends?: boolean;
+  timeframe?: number; // days
+}
+
+export class ForecastQueryDto {
+  forecastTypes?: string; // comma-separated: size,growth,trend,behavior,competitive
+  timeHorizon?: number; // months
+  confidenceLevel?: number; // minimum confidence percentage
+  includeScenarios?: boolean;
+  includeUncertainty?: boolean;
+}
+
+export class RiskAssessmentQueryDto {
+  riskCategories?: string; // comma-separated
+  minRiskScore?: number;
+  includeScenarios?: boolean;
+  includeMitigation?: boolean;
+  includeMonitoring?: boolean;
+}
+
+export class ActionableIntelligenceQueryDto {
+  actionTypes?: string; // comma-separated: immediate,short_term,strategic
+  priority?: 'critical' | 'high' | 'medium' | 'low';
+  urgency?: 'urgent' | 'soon' | 'planned' | 'future';
+  effort?: 'low' | 'medium' | 'high' | 'very_high';
+  impact?: 'low' | 'medium' | 'high' | 'transformational';
+}
+
+@ApiTags('Market Intelligence')
+@Controller('api/v1/competitive-intelligence/market-intelligence')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class MarketIntelligenceController {
+  private readonly logger = new Logger(MarketIntelligenceController.name);
+
+  constructor(
+    private readonly marketIntelligenceService: MarketIntelligenceService,
+  ) {}
+
+  @Post('generate')
+  @Permissions('competitive_intelligence:create', 'analytics:read')
+  @ApiOperation({ 
+    summary: 'Generate comprehensive market intelligence analysis',
+    description: 'Perform deep market intelligence analysis with configurable depth and scope'
+  })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Market intelligence generated successfully',
+    type: Object
+  })
+  @ApiResponse({ 
+    status: HttpStatus.BAD_REQUEST, 
+    description: 'Invalid analysis configuration' 
+  })
+  @ApiBody({ type: GenerateMarketIntelligenceDto })
+  async generateMarketIntelligence(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) generateDto: GenerateMarketIntelligenceDto,
+  ): Promise<MarketIntelligenceResult> {
+    try {
+      this.logger.log(`Starting market intelligence generation for tenant: ${tenantId}`);
+
+      const request: MarketIntelligenceRequest = {
+        tenantId,
+        ...generateDto,
+      };
+
+      const result = await this.marketIntelligenceService.generateMarketIntelligence(request);
+
+      this.logger.log(`Market intelligence generated: ${result.intelligenceId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Market intelligence generation failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Intelligence generation failed: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('overview')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market overview and structure analysis',
+    description: 'Retrieve comprehensive market overview including size, segmentation, and competitive structure'
+  })
+  @ApiQuery({ name: 'markets', required: false, description: 'Comma-separated marketplace types' })
+  @ApiQuery({ name: 'regions', required: false, description: 'Comma-separated regions' })
+  @ApiQuery({ name: 'includeSegmentation', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeCompetitiveStructure', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeMaturityAnalysis', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeInnovationIndex', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Market overview retrieved successfully' 
+  })
+  async getMarketOverview(
+    @CurrentTenant() tenantId: string,
+    @Query() query: MarketOverviewQueryDto,
+  ) {
+    try {
+      const markets = query.markets ? query.markets.split(',') as MarketplaceType[] : undefined;
+      const regions = query.regions ? query.regions.split(',') : undefined;
+
+      const overview = await this.marketIntelligenceService.generateMarketOverview({
+        tenantId,
+        analysisConfig: {
+          markets,
+          regions,
+          analysisDepth: 'standard',
+          insightTypes: ['market_dynamics'],
+          includeIndonesianContext: true,
+          timeHorizon: 'medium_term',
+          benchmarkScope: 'local',
+        },
+      });
+
+      return {
+        success: true,
+        data: overview,
+        metadata: {
+          marketsAnalyzed: markets?.length || 0,
+          regionsAnalyzed: regions?.length || 0,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get market overview: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve market overview: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('trends')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market trend analysis',
+    description: 'Analyze market trends across different categories and timeframes'
+  })
+  @ApiQuery({ name: 'trendCategories', required: false, description: 'Comma-separated trend categories' })
+  @ApiQuery({ name: 'timeframe', required: false, enum: ['immediate', 'short_term', 'medium_term', 'long_term'] })
+  @ApiQuery({ name: 'strength', required: false, enum: ['weak', 'moderate', 'strong', 'dominant'] })
+  @ApiQuery({ name: 'minOpportunityScore', required: false, type: Number })
+  @ApiQuery({ name: 'maxThreatScore', required: false, type: Number })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Trend analysis retrieved successfully' 
+  })
+  async getTrendAnalysis(
+    @CurrentTenant() tenantId: string,
+    @Query() query: TrendAnalysisQueryDto,
+  ) {
+    try {
+      const trendCategories = query.trendCategories ? query.trendCategories.split(',') : undefined;
+
+      const trends = await this.marketIntelligenceService.analyzeTrends({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'standard',
+          insightTypes: ['trends'],
+          includeIndonesianContext: true,
+          timeHorizon: query.timeframe || 'medium_term',
+          benchmarkScope: 'local',
+        },
+        filterCriteria: {
+          // Apply filters based on query parameters
+        },
+      });
+
+      // Apply client-side filtering
+      let filteredTrends = trends;
+      
+      if (query.strength) {
+        filteredTrends = filteredTrends.filter(trend => trend.strength === query.strength);
+      }
+      
+      if (query.timeframe) {
+        filteredTrends = filteredTrends.filter(trend => trend.timeframe === query.timeframe);
+      }
+      
+      if (query.minOpportunityScore) {
+        filteredTrends = filteredTrends.filter(
+          trend => trend.strategicRelevance.opportunityScore >= query.minOpportunityScore
+        );
+      }
+      
+      if (query.maxThreatScore) {
+        filteredTrends = filteredTrends.filter(
+          trend => trend.strategicRelevance.threatScore <= query.maxThreatScore
+        );
+      }
+
+      return {
+        success: true,
+        data: filteredTrends,
+        metadata: {
+          totalTrends: trends.length,
+          filteredTrends: filteredTrends.length,
+          categoriesAnalyzed: trendCategories?.length || 5,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get trend analysis: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve trend analysis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('customer-insights')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get customer behavior insights',
+    description: 'Analyze customer behavior patterns, preferences, and decision factors'
+  })
+  @ApiQuery({ name: 'behaviorType', required: false, enum: ['purchase_patterns', 'channel_preferences', 'decision_factors', 'loyalty', 'emerging_behaviors'] })
+  @ApiQuery({ name: 'segments', required: false, description: 'Comma-separated customer segments' })
+  @ApiQuery({ name: 'includeGenerationalAnalysis', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeIndonesianSpecifics', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Customer insights retrieved successfully' 
+  })
+  async getCustomerInsights(
+    @CurrentTenant() tenantId: string,
+    @Query() query: CustomerInsightsQueryDto,
+  ) {
+    try {
+      const segments = query.segments ? query.segments.split(',') : undefined;
+
+      const insights = await this.marketIntelligenceService.analyzeCustomerBehavior({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'comprehensive',
+          insightTypes: ['customer_behavior'],
+          includeIndonesianContext: query.includeIndonesianSpecifics || true,
+          timeHorizon: 'medium_term',
+          benchmarkScope: 'local',
+        },
+      });
+
+      return {
+        success: true,
+        data: insights,
+        metadata: {
+          behaviorType: query.behaviorType,
+          segmentsAnalyzed: segments?.length || 0,
+          includesGenerational: query.includeGenerationalAnalysis || false,
+          includesIndonesian: query.includeIndonesianSpecifics || true,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get customer insights: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve customer insights: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('opportunities')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market opportunity analysis',
+    description: 'Identify and analyze market opportunities with potential and risk assessment'
+  })
+  @ApiQuery({ name: 'opportunityTypes', required: false, description: 'Comma-separated opportunity types' })
+  @ApiQuery({ name: 'minMarketPotential', required: false, type: Number })
+  @ApiQuery({ name: 'minConfidence', required: false, type: Number })
+  @ApiQuery({ name: 'strategicFitThreshold', required: false, type: Number })
+  @ApiQuery({ name: 'timeToRealize', required: false, type: Number })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Market opportunities retrieved successfully' 
+  })
+  async getMarketOpportunities(
+    @CurrentTenant() tenantId: string,
+    @Query() query: OpportunityAnalysisQueryDto,
+  ) {
+    try {
+      const opportunityTypes = query.opportunityTypes ? query.opportunityTypes.split(',') : undefined;
+
+      const opportunities = await this.marketIntelligenceService.identifyMarketOpportunities({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'comprehensive',
+          insightTypes: ['opportunities'],
+          includeIndonesianContext: true,
+          timeHorizon: 'all',
+          benchmarkScope: 'regional',
+        },
+      });
+
+      // Apply filtering
+      let filteredOpportunities = opportunities;
+      
+      if (opportunityTypes) {
+        filteredOpportunities = filteredOpportunities.filter(
+          opp => opportunityTypes.includes(opp.opportunityType)
+        );
+      }
+      
+      if (query.minMarketPotential) {
+        filteredOpportunities = filteredOpportunities.filter(
+          opp => opp.marketPotential.size >= query.minMarketPotential
+        );
+      }
+      
+      if (query.minConfidence) {
+        filteredOpportunities = filteredOpportunities.filter(
+          opp => opp.marketPotential.confidence >= query.minConfidence
+        );
+      }
+      
+      if (query.strategicFitThreshold) {
+        filteredOpportunities = filteredOpportunities.filter(
+          opp => opp.strategicFit.alignmentScore >= query.strategicFitThreshold
+        );
+      }
+      
+      if (query.timeToRealize) {
+        filteredOpportunities = filteredOpportunities.filter(
+          opp => opp.marketPotential.timeToRealize <= query.timeToRealize
+        );
+      }
+
+      return {
+        success: true,
+        data: filteredOpportunities,
+        metadata: {
+          totalOpportunities: opportunities.length,
+          filteredOpportunities: filteredOpportunities.length,
+          opportunityTypesRequested: opportunityTypes?.length || 0,
+          filtersApplied: Object.keys(query).length,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get market opportunities: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve market opportunities: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('competitive-landscape')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get competitive landscape analysis',
+    description: 'Analyze competitive structure, groups, and recent market moves'
+  })
+  @ApiQuery({ name: 'includeLeaders', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeChallengers', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeRecentMoves', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeInnovation', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Competitive landscape retrieved successfully' 
+  })
+  async getCompetitiveLandscape(
+    @CurrentTenant() tenantId: string,
+    @Query('includeLeaders') includeLeaders = true,
+    @Query('includeChallengers') includeChallengers = true,
+    @Query('includeRecentMoves') includeRecentMoves = true,
+    @Query('includeInnovation') includeInnovation = true,
+  ) {
+    try {
+      const landscape = await this.marketIntelligenceService.analyzeCompetitiveLandscape({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'comprehensive',
+          insightTypes: ['market_dynamics'],
+          includeIndonesianContext: true,
+          timeHorizon: 'medium_term',
+          benchmarkScope: 'regional',
+        },
+      });
+
+      return {
+        success: true,
+        data: landscape,
+        metadata: {
+          includesLeaders: includeLeaders,
+          includesChallengers: includeChallengers,
+          includesRecentMoves: includeRecentMoves,
+          includesInnovation: includeInnovation,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get competitive landscape: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve competitive landscape: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('sentiment')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market sentiment analysis',
+    description: 'Analyze market sentiment from various sources including social media, news, and experts'
+  })
+  @ApiQuery({ name: 'sentimentSources', required: false, description: 'Comma-separated sentiment sources' })
+  @ApiQuery({ name: 'includeDrivers', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeTrends', required: false, type: Boolean })
+  @ApiQuery({ name: 'timeframe', required: false, type: Number, description: 'Analysis timeframe in days' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Sentiment analysis retrieved successfully' 
+  })
+  async getSentimentAnalysis(
+    @CurrentTenant() tenantId: string,
+    @Query() query: SentimentAnalysisQueryDto,
+  ) {
+    try {
+      const sentimentSources = query.sentimentSources ? query.sentimentSources.split(',') : undefined;
+
+      const sentiment = await this.marketIntelligenceService.analyzeSentiment({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'standard',
+          insightTypes: ['sentiment'],
+          includeIndonesianContext: true,
+          timeHorizon: 'short_term',
+          benchmarkScope: 'local',
+        },
+        timeframe: {
+          analysisWindow: query.timeframe || 30,
+          forecastHorizon: 7,
+          historicalDepth: query.timeframe || 30,
+        },
+      });
+
+      return {
+        success: true,
+        data: sentiment,
+        metadata: {
+          sentimentSources: sentimentSources?.length || 0,
+          includesDrivers: query.includeDrivers || false,
+          includesTrends: query.includeTrends || false,
+          timeframeDays: query.timeframe || 30,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get sentiment analysis: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve sentiment analysis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('forecasts')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market forecasts and projections',
+    description: 'Generate market forecasts with scenario analysis and confidence intervals'
+  })
+  @ApiQuery({ name: 'forecastTypes', required: false, description: 'Comma-separated forecast types' })
+  @ApiQuery({ name: 'timeHorizon', required: false, type: Number, description: 'Forecast horizon in months' })
+  @ApiQuery({ name: 'confidenceLevel', required: false, type: Number, description: 'Minimum confidence percentage' })
+  @ApiQuery({ name: 'includeScenarios', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeUncertainty', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Forecasts retrieved successfully' 
+  })
+  async getForecasts(
+    @CurrentTenant() tenantId: string,
+    @Query() query: ForecastQueryDto,
+  ) {
+    try {
+      const forecastTypes = query.forecastTypes ? query.forecastTypes.split(',') : undefined;
+
+      const forecasts = await this.marketIntelligenceService.generateForecasts({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'comprehensive',
+          insightTypes: ['trends', 'market_dynamics'],
+          includeIndonesianContext: true,
+          timeHorizon: 'long_term',
+          benchmarkScope: 'regional',
+        },
+        timeframe: {
+          analysisWindow: 90,
+          forecastHorizon: query.timeHorizon || 12,
+          historicalDepth: 365,
+        },
+      });
+
+      // Apply filtering
+      let filteredForecasts = forecasts;
+      
+      if (forecastTypes) {
+        filteredForecasts = filteredForecasts.filter(
+          forecast => forecastTypes.includes(forecast.forecastType)
+        );
+      }
+      
+      if (query.confidenceLevel) {
+        filteredForecasts = filteredForecasts.filter(
+          forecast => forecast.baselineScenario.confidence >= query.confidenceLevel
+        );
+      }
+
+      return {
+        success: true,
+        data: filteredForecasts,
+        metadata: {
+          totalForecasts: forecasts.length,
+          filteredForecasts: filteredForecasts.length,
+          timeHorizonMonths: query.timeHorizon || 12,
+          includesScenarios: query.includeScenarios || false,
+          includesUncertainty: query.includeUncertainty || false,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get forecasts: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve forecasts: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('risk-assessment')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get market risk assessment',
+    description: 'Comprehensive risk analysis with scenarios, mitigation strategies, and monitoring'
+  })
+  @ApiQuery({ name: 'riskCategories', required: false, description: 'Comma-separated risk categories' })
+  @ApiQuery({ name: 'minRiskScore', required: false, type: Number })
+  @ApiQuery({ name: 'includeScenarios', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeMitigation', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeMonitoring', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Risk assessment retrieved successfully' 
+  })
+  async getRiskAssessment(
+    @CurrentTenant() tenantId: string,
+    @Query() query: RiskAssessmentQueryDto,
+  ) {
+    try {
+      const riskCategories = query.riskCategories ? query.riskCategories.split(',') : undefined;
+
+      const riskAssessment = await this.marketIntelligenceService.assessMarketRisks({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'comprehensive',
+          insightTypes: ['threats', 'market_dynamics'],
+          includeIndonesianContext: true,
+          timeHorizon: 'all',
+          benchmarkScope: 'regional',
+        },
+      });
+
+      return {
+        success: true,
+        data: riskAssessment,
+        metadata: {
+          riskCategories: riskCategories?.length || 0,
+          minRiskScore: query.minRiskScore,
+          includesScenarios: query.includeScenarios || false,
+          includesMitigation: query.includeMitigation || false,
+          includesMonitoring: query.includeMonitoring || false,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get risk assessment: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve risk assessment: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('actionable-intelligence')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get actionable market intelligence',
+    description: 'Prioritized actionable insights with specific recommendations and timelines'
+  })
+  @ApiQuery({ name: 'actionTypes', required: false, description: 'Comma-separated action types' })
+  @ApiQuery({ name: 'priority', required: false, enum: ['critical', 'high', 'medium', 'low'] })
+  @ApiQuery({ name: 'urgency', required: false, enum: ['urgent', 'soon', 'planned', 'future'] })
+  @ApiQuery({ name: 'effort', required: false, enum: ['low', 'medium', 'high', 'very_high'] })
+  @ApiQuery({ name: 'impact', required: false, enum: ['low', 'medium', 'high', 'transformational'] })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Actionable intelligence retrieved successfully' 
+  })
+  async getActionableIntelligence(
+    @CurrentTenant() tenantId: string,
+    @Query() query: ActionableIntelligenceQueryDto,
+  ) {
+    try {
+      const actionTypes = query.actionTypes ? query.actionTypes.split(',') : undefined;
+
+      const actionableIntelligence = await this.marketIntelligenceService.generateActionableIntelligence({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'strategic',
+          insightTypes: ['opportunities', 'threats', 'trends', 'market_dynamics'],
+          includeIndonesianContext: true,
+          timeHorizon: 'all',
+          benchmarkScope: 'regional',
+        },
+      });
+
+      // Apply filtering
+      let filteredActions = actionableIntelligence;
+      
+      if (actionTypes) {
+        filteredActions = filteredActions.filter(
+          action => actionTypes.includes(action.actionType)
+        );
+      }
+      
+      if (query.priority) {
+        filteredActions = filteredActions.filter(action => action.priority === query.priority);
+      }
+      
+      if (query.urgency) {
+        filteredActions = filteredActions.filter(action => action.urgency === query.urgency);
+      }
+      
+      if (query.effort) {
+        filteredActions = filteredActions.filter(action => action.effort === query.effort);
+      }
+      
+      if (query.impact) {
+        filteredActions = filteredActions.filter(action => action.impact === query.impact);
+      }
+
+      return {
+        success: true,
+        data: filteredActions,
+        metadata: {
+          totalActions: actionableIntelligence.length,
+          filteredActions: filteredActions.length,
+          actionTypesRequested: actionTypes?.length || 0,
+          filtersApplied: Object.keys(query).length,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get actionable intelligence: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve actionable intelligence: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('intelligence/:intelligenceId')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get saved market intelligence by ID',
+    description: 'Retrieve a previously generated market intelligence analysis'
+  })
+  @ApiParam({ name: 'intelligenceId', description: 'Market intelligence ID' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Market intelligence retrieved successfully' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.NOT_FOUND, 
+    description: 'Intelligence not found' 
+  })
+  async getMarketIntelligenceById(
+    @CurrentTenant() tenantId: string,
+    @Param('intelligenceId') intelligenceId: string,
+  ) {
+    try {
+      const intelligence = await this.marketIntelligenceService.getIntelligenceById(tenantId, intelligenceId);
+
+      if (!intelligence) {
+        throw new HttpException('Market intelligence not found', HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        success: true,
+        data: intelligence,
+        metadata: {
+          intelligenceId,
+          retrievedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get market intelligence: ${error.message}`, error.stack);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
+      throw new HttpException(
+        `Failed to retrieve market intelligence: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('intelligence')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'List market intelligence analyses',
+    description: 'Get list of market intelligence analyses with filtering and pagination'
+  })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (default: 20)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Sort field (default: generatedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'], description: 'Sort order (default: DESC)' })
+  @ApiQuery({ name: 'analysisDepth', required: false, enum: ['overview', 'standard', 'comprehensive', 'strategic'] })
+  @ApiQuery({ name: 'timeHorizon', required: false, enum: ['short_term', 'medium_term', 'long_term', 'all'] })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Market intelligence list retrieved successfully' 
+  })
+  async listMarketIntelligence(
+    @CurrentTenant() tenantId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+    @Query('sortBy') sortBy = 'generatedAt',
+    @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
+    @Query('analysisDepth') analysisDepth?: string,
+    @Query('timeHorizon') timeHorizon?: string,
+  ) {
+    try {
+      const pageNum = Math.max(1, parseInt(page, 10));
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+
+      const result = await this.marketIntelligenceService.listIntelligence(
+        tenantId,
+        {
+          page: pageNum,
+          limit: limitNum,
+          sortBy,
+          sortOrder,
+          filters: {
+            analysisDepth: analysisDepth as any,
+            timeHorizon: timeHorizon as any,
+          }
+        }
+      );
+
+      return {
+        success: true,
+        data: result.intelligence,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: result.total,
+          totalPages: Math.ceil(result.total / limitNum),
+        },
+        metadata: {
+          sortBy,
+          sortOrder,
+          filtersApplied: !!(analysisDepth || timeHorizon),
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to list market intelligence: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve intelligence list: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('economic-context')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get economic market context',
+    description: 'Analyze economic factors affecting the market including macro and industry-specific factors'
+  })
+  @ApiQuery({ name: 'includeIndonesianContext', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeRegionalData', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeCycleAnalysis', required: false, type: Boolean })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Economic context retrieved successfully' 
+  })
+  async getEconomicContext(
+    @CurrentTenant() tenantId: string,
+    @Query('includeIndonesianContext') includeIndonesianContext = true,
+    @Query('includeRegionalData') includeRegionalData = true,
+    @Query('includeCycleAnalysis') includeCycleAnalysis = true,
+  ) {
+    try {
+      const economicContext = await this.marketIntelligenceService.analyzeEconomicContext({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'comprehensive',
+          insightTypes: ['regulatory'],
+          includeIndonesianContext,
+          timeHorizon: 'long_term',
+          benchmarkScope: 'regional',
+        },
+      });
+
+      return {
+        success: true,
+        data: economicContext,
+        metadata: {
+          includesIndonesianContext: includeIndonesianContext,
+          includesRegionalData: includeRegionalData,
+          includesCycleAnalysis: includeCycleAnalysis,
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get economic context: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve economic context: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('strategic-recommendations')
+  @Permissions('competitive_intelligence:read')
+  @ApiOperation({ 
+    summary: 'Get strategic market recommendations',
+    description: 'Generate strategic recommendations based on market intelligence insights'
+  })
+  @ApiQuery({ name: 'recommendationCategories', required: false, description: 'Comma-separated categories' })
+  @ApiQuery({ name: 'priority', required: false, enum: ['critical', 'high', 'medium', 'low'] })
+  @ApiQuery({ name: 'complexity', required: false, enum: ['low', 'medium', 'high', 'very_high'] })
+  @ApiQuery({ name: 'minImpact', required: false, type: Number, description: 'Minimum revenue impact percentage' })
+  @ApiResponse({ 
+    status: HttpStatus.OK, 
+    description: 'Strategic recommendations retrieved successfully' 
+  })
+  async getStrategicRecommendations(
+    @CurrentTenant() tenantId: string,
+    @Query('recommendationCategories') recommendationCategories?: string,
+    @Query('priority') priority?: string,
+    @Query('complexity') complexity?: string,
+    @Query('minImpact') minImpact?: number,
+  ) {
+    try {
+      const categories = recommendationCategories ? recommendationCategories.split(',') : undefined;
+
+      const recommendations = await this.marketIntelligenceService.generateStrategicRecommendations({
+        tenantId,
+        analysisConfig: {
+          analysisDepth: 'strategic',
+          insightTypes: ['opportunities', 'threats', 'trends', 'market_dynamics'],
+          includeIndonesianContext: true,
+          timeHorizon: 'all',
+          benchmarkScope: 'regional',
+        },
+      });
+
+      // Apply filtering
+      let filteredRecommendations = recommendations;
+      
+      if (categories) {
+        filteredRecommendations = filteredRecommendations.filter(
+          rec => categories.includes(rec.category)
+        );
+      }
+      
+      if (priority) {
+        filteredRecommendations = filteredRecommendations.filter(rec => rec.priority === priority);
+      }
+      
+      if (complexity) {
+        filteredRecommendations = filteredRecommendations.filter(
+          rec => rec.implementationComplexity === complexity
+        );
+      }
+      
+      if (minImpact) {
+        filteredRecommendations = filteredRecommendations.filter(
+          rec => rec.expectedImpact.revenueImpact >= minImpact
+        );
+      }
+
+      return {
+        success: true,
+        data: filteredRecommendations,
+        metadata: {
+          totalRecommendations: recommendations.length,
+          filteredRecommendations: filteredRecommendations.length,
+          categoriesRequested: categories?.length || 0,
+          filtersApplied: !!(priority || complexity || minImpact || categories),
+          generatedAt: new Date().toISOString(),
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to get strategic recommendations: ${error.message}`, error.stack);
+      throw new HttpException(
+        `Failed to retrieve strategic recommendations: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+}

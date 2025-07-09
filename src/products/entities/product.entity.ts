@@ -6,7 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { BaseEntity } from '../../common/entities/base.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { ProductCategory } from './product-category.entity';
 import { ProductVariant } from './product-variant.entity';
@@ -30,7 +30,7 @@ export enum ProductType {
 @Index(['tenantId', 'categoryId'])
 @Index(['tenantId', 'supplierId'])
 @Index(['tenantId', 'isDeleted'])
-export class Product extends BaseEntity {
+export class Product extends AuditableEntity {
   @Column({ type: 'varchar', length: 100 })
   sku: string;
 
@@ -147,12 +147,6 @@ export class Product extends BaseEntity {
 
   @Column({ type: 'timestamp', nullable: true })
   lastRestockedAt?: Date;
-
-  @Column({ type: 'boolean', default: false })
-  isDeleted: boolean;
-
-  @Column({ type: 'timestamp', nullable: true })
-  deletedAt?: Date;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, any>;

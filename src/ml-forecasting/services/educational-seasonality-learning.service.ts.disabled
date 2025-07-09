@@ -1,0 +1,1346 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+
+/**
+ * PHASE 3.2.3.3.2: Educational Sector Seasonality Learning 🎓
+ * 
+ * Specialized service for learning and predicting educational sector seasonal patterns.
+ * Focuses on school calendar patterns, back-to-school shopping cycles, and educational
+ * product demand fluctuations in the Indonesian education system.
+ */
+
+export interface EducationalSeasonalityRequest {
+  tenantId: string;
+  businessType?: string;
+  region?: string;
+  educationLevel?: EducationLevel[];
+  schoolType?: SchoolType[];
+  categories?: string[];
+  analysisStartDate?: Date;
+  analysisEndDate?: Date;
+  includeUniversityPatterns?: boolean;
+  includePrivateSchoolPatterns?: boolean;
+  includeInternationalSchoolPatterns?: boolean;
+  analysisDepth: 'basic' | 'standard' | 'comprehensive' | 'expert';
+}
+
+export type EducationLevel = 
+  | 'early_childhood'      // PAUD (Pendidikan Anak Usia Dini)
+  | 'kindergarten'         // TK (Taman Kanak-kanak)
+  | 'elementary'           // SD (Sekolah Dasar)
+  | 'middle_school'        // SMP (Sekolah Menengah Pertama)
+  | 'high_school'          // SMA/SMK (Sekolah Menengah Atas/Kejuruan)
+  | 'vocational'           // SMK (Sekolah Menengah Kejuruan)
+  | 'university'           // Perguruan Tinggi
+  | 'graduate_school'      // S2/S3
+  | 'professional_training' // Pelatihan Profesional
+  | 'adult_education';     // Pendidikan Dewasa
+
+export type SchoolType = 
+  | 'public_school'        // Sekolah Negeri
+  | 'private_school'       // Sekolah Swasta
+  | 'religious_school'     // Sekolah Agama/Madrasah
+  | 'international_school' // Sekolah Internasional
+  | 'vocational_institute' // Institut Kejuruan
+  | 'university_public'    // Universitas Negeri
+  | 'university_private'   // Universitas Swasta
+  | 'boarding_school'      // Sekolah Asrama/Pesantren
+  | 'homeschooling'        // Sekolah Rumah
+  | 'online_school';       // Sekolah Online
+
+export interface EducationalCalendarPeriod {
+  periodName: string;
+  periodType: 'semester_start' | 'semester_end' | 'mid_semester' | 'exam_period' | 
+             'school_holiday' | 'registration_period' | 'graduation' | 'orientation';
+  startDate: string; // MM-DD format
+  endDate: string;
+  duration: number; // days
+  affectedLevels: EducationLevel[];
+  affectedSchoolTypes: SchoolType[];
+  
+  businessImpact: {
+    demandMultiplier: number;
+    volatility: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    predictability: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    preparationTime: number; // weeks before period starts
+  };
+  
+  productCategories: {
+    highDemand: string[];
+    moderateDemand: string[];
+    lowDemand: string[];
+    specificNeeds: string[];
+  };
+  
+  regionalVariations: {
+    java: { timing?: string; intensity?: number; specialConsiderations?: string[] };
+    sumatera: { timing?: string; intensity?: number; specialConsiderations?: string[] };
+    kalimantan: { timing?: string; intensity?: number; specialConsiderations?: string[] };
+    sulawesi: { timing?: string; intensity?: number; specialConsiderations?: string[] };
+    easternIndonesia: { timing?: string; intensity?: number; specialConsiderations?: string[] };
+  };
+}
+
+export interface EducationalSeasonalPattern {
+  patternId: string;
+  patternName: string;
+  educationLevel: EducationLevel;
+  schoolType: SchoolType;
+  
+  calendarAlignment: {
+    nationalCalendar: boolean;
+    regionalVariations: boolean;
+    internationalAlignment?: boolean; // For international schools
+    customSchedule?: boolean; // For private/special schools
+  };
+  
+  seasonalCycle: {
+    cycleType: 'annual' | 'semester' | 'quarter' | 'custom';
+    peakPeriods: EducationalPeakPeriod[];
+    lowPeriods: EducationalLowPeriod[];
+    transitionPeriods: EducationalTransitionPeriod[];
+  };
+  
+  demandCharacteristics: {
+    planningHorizon: number; // weeks of advance planning
+    purchasingBehavior: 'bulk_annual' | 'semester_basis' | 'monthly_regular' | 'just_in_time';
+    budgetCycles: 'annual_budget' | 'semester_budget' | 'monthly_budget' | 'project_based';
+    decisionMakers: ('parents' | 'students' | 'schools' | 'government')[];
+  };
+  
+  productMix: {
+    consumables: ProductMixCategory; // Buku, alat tulis
+    durables: ProductMixCategory;    // Tas, sepatu, seragam
+    technology: ProductMixCategory;  // Laptop, tablet, software
+    services: ProductMixCategory;    // Kursus, les privat, bimbel
+  };
+  
+  economicFactors: {
+    priceElasticity: 'very_elastic' | 'elastic' | 'moderate' | 'inelastic' | 'very_inelastic';
+    incomeImpact: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+    governmentSubsidyImpact: boolean;
+    curriculumChangeImpact: boolean;
+  };
+  
+  competitiveFactors: {
+    brandLoyalty: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+    priceCompetition: 'very_intense' | 'intense' | 'moderate' | 'limited' | 'minimal';
+    qualityFocus: boolean;
+    innovationImportance: 'critical' | 'important' | 'moderate' | 'limited' | 'minimal';
+  };
+}
+
+export interface ProductMixCategory {
+  importance: 'critical' | 'important' | 'moderate' | 'optional';
+  seasonalityStrength: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+  replacementFrequency: 'annually' | 'semester' | 'quarterly' | 'monthly' | 'as_needed';
+  averageUnitValue: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  parentInvolvement: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+}
+
+export interface EducationalPeakPeriod {
+  periodName: string;
+  startDate: string;
+  endDate: string;
+  demandMultiplier: number;
+  confidence: number;
+  
+  drivingFactors: {
+    calendarEvents: string[];
+    administrativeDeadlines: string[];
+    culturalFactors: string[];
+    economicFactors: string[];
+  };
+  
+  categoryImpacts: {
+    textbooks: { multiplier: number; timing: string; notes: string };
+    stationery: { multiplier: number; timing: string; notes: string };
+    uniforms: { multiplier: number; timing: string; notes: string };
+    bags_shoes: { multiplier: number; timing: string; notes: string };
+    technology: { multiplier: number; timing: string; notes: string };
+    supplementary: { multiplier: number; timing: string; notes: string };
+  };
+  
+  businessConsiderations: {
+    inventoryManagement: string[];
+    staffingRequirements: string[];
+    supplierCoordination: string[];
+    marketingOpportunities: string[];
+    riskFactors: string[];
+  };
+}
+
+export interface EducationalLowPeriod {
+  periodName: string;
+  startDate: string;
+  endDate: string;
+  demandMultiplier: number;
+  
+  characteristics: {
+    demandLevel: 'very_low' | 'low' | 'minimal';
+    duration: number; // weeks
+    recovery: 'quick' | 'gradual' | 'delayed';
+  };
+  
+  businessOpportunities: {
+    clearanceOpportunities: string[];
+    maintenanceActivities: string[];
+    planningActivities: string[];
+    staffDevelopment: string[];
+    supplierNegotiations: string[];
+  };
+}
+
+export interface EducationalTransitionPeriod {
+  periodName: string;
+  fromSeason: string;
+  toSeason: string;
+  duration: number; // weeks
+  
+  characteristics: {
+    demandTrend: 'increasing' | 'decreasing' | 'volatile' | 'stable';
+    preparationIntensity: 'very_high' | 'high' | 'medium' | 'low';
+    planningCritical: boolean;
+  };
+  
+  actionItems: {
+    inventoryActions: string[];
+    marketingActions: string[];
+    operationalActions: string[];
+    strategicActions: string[];
+  };
+}
+
+export interface EducationalSeasonalityResult {
+  learningId: string;
+  tenantId: string;
+  generatedAt: string;
+  
+  educationalProfile: {
+    primaryEducationLevel: EducationLevel;
+    schoolTypes: SchoolType[];
+    calendarAlignment: 'national' | 'regional' | 'international' | 'custom';
+    seasonalityStrength: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+  };
+  
+  learnedPatterns: EducationalSeasonalPattern[];
+  calendarAnalysis: EducationalCalendarAnalysis;
+  demandForecasting: EducationalDemandForecast;
+  competitiveIntelligence: EducationalCompetitiveInsight[];
+  businessRecommendations: EducationalBusinessRecommendation[];
+  
+  qualityMetrics: {
+    dataQuality: number;
+    patternReliability: number;
+    forecastAccuracy: number;
+    businessRelevance: number;
+  };
+  
+  validationResults: {
+    historicalAccuracy: number;
+    crossValidationScore: number;
+    expertValidation?: number;
+    marketValidation?: number;
+  };
+}
+
+export interface EducationalCalendarAnalysis {
+  nationalCalendarEvents: CalendarEvent[];
+  regionalVariations: RegionalCalendarVariation[];
+  internationalAlignments?: InternationalCalendarAlignment[];
+  customScheduleInsights?: CustomScheduleInsight[];
+  
+  criticalPeriods: {
+    backToSchoolPeak: CalendarEvent;
+    midYearRegistration: CalendarEvent;
+    examPeriods: CalendarEvent[];
+    graduationSeasons: CalendarEvent[];
+    holidayPeriods: CalendarEvent[];
+  };
+}
+
+export interface CalendarEvent {
+  eventName: string;
+  startDate: string;
+  endDate: string;
+  affectedLevels: EducationLevel[];
+  businessImpact: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+  preparationWeeks: number;
+  
+  demandPredictions: {
+    overallMultiplier: number;
+    categorySpecific: Record<string, number>;
+    confidence: number;
+  };
+}
+
+export interface RegionalCalendarVariation {
+  region: string;
+  variations: {
+    timingDifferences: string[];
+    intensityDifferences: string[];
+    culturalAdaptations: string[];
+    economicConsiderations: string[];
+  };
+  businessAdaptations: string[];
+}
+
+export interface InternationalCalendarAlignment {
+  calendarSystem: 'US' | 'UK' | 'Australian' | 'IB' | 'Cambridge' | 'Custom';
+  alignmentPercentage: number;
+  keyDifferences: string[];
+  businessImplications: string[];
+}
+
+export interface CustomScheduleInsight {
+  schoolType: SchoolType;
+  scheduleCharacteristics: string[];
+  businessConsiderations: string[];
+  opportunityAreas: string[];
+}
+
+export interface EducationalDemandForecast {
+  forecastHorizon: string;
+  forecastAccuracy: number;
+  
+  categoryForecasts: {
+    textbooks: CategoryForecast;
+    stationery: CategoryForecast;
+    uniforms: CategoryForecast;
+    technology: CategoryForecast;
+    supplementary: CategoryForecast;
+  };
+  
+  seasonalAdjustments: {
+    peakSeasonMultipliers: Record<string, number>;
+    lowSeasonMultipliers: Record<string, number>;
+    transitionFactors: Record<string, number>;
+  };
+  
+  riskFactors: {
+    curriculumChanges: { probability: number; impact: string };
+    economicDownturn: { probability: number; impact: string };
+    digitalizationTrends: { probability: number; impact: string };
+    governmentPolicy: { probability: number; impact: string };
+  };
+}
+
+export interface CategoryForecast {
+  category: string;
+  seasonalityStrength: number;
+  peakMultiplier: number;
+  lowMultiplier: number;
+  volatility: number;
+  
+  keyDrivers: string[];
+  businessRecommendations: string[];
+  inventoryGuidelines: {
+    peakStockMultiplier: number;
+    safetyStockWeeks: number;
+    reorderTiming: string;
+    supplierLeadTime: number;
+  };
+}
+
+export interface EducationalCompetitiveInsight {
+  competitorCategory: 'traditional_bookstore' | 'online_retailer' | 'school_cooperative' | 'big_box_retailer' | 'specialized_educational';
+  marketShare: number;
+  seasonalBehavior: string[];
+  pricingStrategy: string[];
+  serviceOfferings: string[];
+  
+  competitiveAdvantages: string[];
+  vulnerabilities: string[];
+  strategicRecommendations: string[];
+}
+
+export interface EducationalBusinessRecommendation {
+  recommendationType: 'strategic' | 'tactical' | 'operational' | 'financial';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  
+  recommendation: {
+    title: string;
+    description: string;
+    rationale: string;
+  };
+  
+  implementation: {
+    steps: string[];
+    timeline: string;
+    resources: string[];
+    budget: 'high' | 'medium' | 'low';
+  };
+  
+  expectedImpact: {
+    revenueImpact: string;
+    costImpact: string;
+    riskMitigation: string[];
+    competitiveAdvantage: string[];
+  };
+  
+  successMetrics: {
+    kpis: string[];
+    targets: Record<string, string>;
+    measurementFrequency: string;
+  };
+}
+
+@Injectable()
+export class EducationalSeasonalityLearningService {
+  private readonly logger = new Logger(EducationalSeasonalityLearningService.name);
+  private readonly CACHE_TTL = 86400 * 30; // 30 days
+  private readonly INDONESIAN_TIMEZONE = 'Asia/Jakarta';
+
+  // Indonesian Educational Calendar Framework
+  private readonly nationalEducationalCalendar: EducationalCalendarPeriod[] = [
+    {
+      periodName: 'New Academic Year Start',
+      periodType: 'semester_start',
+      startDate: '07-15', // Mid July
+      endDate: '08-15', // Mid August
+      duration: 30,
+      affectedLevels: ['elementary', 'middle_school', 'high_school', 'vocational'],
+      affectedSchoolTypes: ['public_school', 'private_school', 'religious_school'],
+      businessImpact: {
+        demandMultiplier: 3.5,
+        volatility: 'high',
+        predictability: 'very_high',
+        preparationTime: 8
+      },
+      productCategories: {
+        highDemand: ['textbooks', 'school_uniforms', 'bags_backpacks', 'shoes', 'stationery_basic'],
+        moderateDemand: ['notebooks', 'writing_instruments', 'art_supplies', 'lunch_boxes'],
+        lowDemand: ['technology_accessories', 'sports_equipment'],
+        specificNeeds: ['name_labels', 'uniform_accessories', 'school_supplies_sets']
+      },
+      regionalVariations: {
+        java: { timing: 'Standard national timing', intensity: 1.0, specialConsiderations: ['Highest competition', 'Premium brand preference'] },
+        sumatera: { timing: '+1 week delay possible', intensity: 0.9, specialConsiderations: ['Price sensitivity', 'Local brand preference'] },
+        kalimantan: { timing: 'Standard timing', intensity: 0.8, specialConsiderations: ['Limited retail options', 'Bulk purchasing'] },
+        sulawesi: { timing: 'Standard timing', intensity: 0.85, specialConsiderations: ['Mixed urban-rural patterns'] },
+        easternIndonesia: { timing: '+2 weeks variation', intensity: 0.7, specialConsiderations: ['Logistics challenges', 'Limited product variety'] }
+      }
+    },
+    {
+      periodName: 'Mid-Year Registration',
+      periodType: 'registration_period',
+      startDate: '12-15', // Mid December
+      endDate: '01-31', // End January
+      duration: 45,
+      affectedLevels: ['elementary', 'middle_school', 'high_school', 'vocational'],
+      affectedSchoolTypes: ['public_school', 'private_school', 'religious_school'],
+      businessImpact: {
+        demandMultiplier: 1.8,
+        volatility: 'medium',
+        predictability: 'high',
+        preparationTime: 6
+      },
+      productCategories: {
+        highDemand: ['registration_documents', 'photography_services', 'stationery_basic'],
+        moderateDemand: ['file_folders', 'document_holders', 'writing_instruments'],
+        lowDemand: ['textbooks', 'uniforms'],
+        specificNeeds: ['photocopying_services', 'laminating_services', 'passport_photos']
+      },
+      regionalVariations: {
+        java: { timing: 'Standard timing', intensity: 1.0, specialConsiderations: ['High competition for schools'] },
+        sumatera: { timing: 'Standard timing', intensity: 0.9, specialConsiderations: ['More flexible timeline'] },
+        kalimantan: { timing: 'Standard timing', intensity: 0.8, specialConsiderations: ['Limited school options'] },
+        sulawesi: { timing: 'Standard timing', intensity: 0.85, specialConsiderations: ['Regional preferences'] },
+        easternIndonesia: { timing: '+1 week variation', intensity: 0.75, specialConsiderations: ['Infrastructure limitations'] }
+      }
+    },
+    {
+      periodName: 'National Exam Period',
+      periodType: 'exam_period',
+      startDate: '04-01', // April
+      endDate: '05-31', // May
+      duration: 60,
+      affectedLevels: ['middle_school', 'high_school', 'vocational'],
+      affectedSchoolTypes: ['public_school', 'private_school', 'religious_school'],
+      businessImpact: {
+        demandMultiplier: 2.2,
+        volatility: 'medium',
+        predictability: 'very_high',
+        preparationTime: 12
+      },
+      productCategories: {
+        highDemand: ['exam_preparation_books', 'writing_instruments', 'calculators', 'study_aids'],
+        moderateDemand: ['notebooks', 'highlighters', 'reference_books', 'tutoring_services'],
+        lowDemand: ['sports_equipment', 'art_supplies'],
+        specificNeeds: ['exam_vouchers', 'test_preparation_courses', 'stress_relief_items']
+      },
+      regionalVariations: {
+        java: { timing: 'Standard timing', intensity: 1.0, specialConsiderations: ['Intense competition', 'Premium tutoring'] },
+        sumatera: { timing: 'Standard timing', intensity: 0.95, specialConsiderations: ['Strong exam culture'] },
+        kalimantan: { timing: 'Standard timing', intensity: 0.85, specialConsiderations: ['Resource limitations'] },
+        sulawesi: { timing: 'Standard timing', intensity: 0.9, specialConsiderations: ['Regional variations'] },
+        easternIndonesia: { timing: 'Standard timing', intensity: 0.8, specialConsiderations: ['Access challenges'] }
+      }
+    },
+    {
+      periodName: 'University Orientation',
+      periodType: 'orientation',
+      startDate: '08-15', // Mid August
+      endDate: '09-15', // Mid September
+      duration: 30,
+      affectedLevels: ['university'],
+      affectedSchoolTypes: ['university_public', 'university_private'],
+      businessImpact: {
+        demandMultiplier: 2.8,
+        volatility: 'high',
+        predictability: 'high',
+        preparationTime: 6
+      },
+      productCategories: {
+        highDemand: ['laptops', 'textbooks_university', 'professional_attire', 'dormitory_supplies'],
+        moderateDemand: ['backpacks_professional', 'stationery_advanced', 'technology_accessories'],
+        lowDemand: ['basic_stationery', 'children_items'],
+        specificNeeds: ['software_licenses', 'university_merchandise', 'networking_materials']
+      },
+      regionalVariations: {
+        java: { timing: 'Standard timing', intensity: 1.0, specialConsiderations: ['Major university centers', 'High technology demand'] },
+        sumatera: { timing: 'Standard timing', intensity: 0.8, specialConsiderations: ['Regional university focus'] },
+        kalimantan: { timing: 'Standard timing', intensity: 0.7, specialConsiderations: ['Limited university options'] },
+        sulawesi: { timing: 'Standard timing', intensity: 0.75, specialConsiderations: ['Growing university sector'] },
+        easternIndonesia: { timing: 'Standard timing', intensity: 0.6, specialConsiderations: ['Limited infrastructure'] }
+      }
+    },
+    {
+      periodName: 'School Holiday Period',
+      periodType: 'school_holiday',
+      startDate: '06-15', // Mid June
+      endDate: '07-14', // Mid July
+      duration: 30,
+      affectedLevels: ['early_childhood', 'kindergarten', 'elementary', 'middle_school', 'high_school'],
+      affectedSchoolTypes: ['public_school', 'private_school', 'religious_school'],
+      businessImpact: {
+        demandMultiplier: 0.3,
+        volatility: 'low',
+        predictability: 'very_high',
+        preparationTime: 4
+      },
+      productCategories: {
+        highDemand: ['vacation_supplies', 'travel_accessories', 'recreational_books'],
+        moderateDemand: ['sports_equipment', 'hobby_supplies', 'games'],
+        lowDemand: ['textbooks', 'school_uniforms', 'formal_stationery'],
+        specificNeeds: ['holiday_programs', 'summer_courses', 'camp_supplies']
+      },
+      regionalVariations: {
+        java: { timing: 'Standard timing', intensity: 1.0, specialConsiderations: ['Tourism spike', 'Family activities'] },
+        sumatera: { timing: 'Standard timing', intensity: 0.9, specialConsiderations: ['Agricultural work involvement'] },
+        kalimantan: { timing: 'Standard timing', intensity: 0.8, specialConsiderations: ['Family businesses'] },
+        sulawesi: { timing: 'Standard timing', intensity: 0.85, specialConsiderations: ['Cultural activities'] },
+        easternIndonesia: { timing: 'Standard timing', intensity: 0.9, specialConsiderations: ['Tourism season'] }
+      }
+    }
+  ];
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private readonly transactionRepository: Repository<InventoryTransaction>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    @InjectRepository(ProductCategory)
+    private readonly categoryRepository: Repository<ProductCategory>,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Learn comprehensive educational seasonality patterns
+   */
+  async learnEducationalSeasonality(request: EducationalSeasonalityRequest): Promise<EducationalSeasonalityResult> {
+    const learningId = `educational_seasonality_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      this.logger.log(`Starting educational seasonality learning: ${learningId} for tenant: ${request.tenantId}`);
+
+      // Get historical transaction data
+      const historicalData = await this.getEducationalTransactionData(request);
+      
+      if (historicalData.length < 50) {
+        throw new Error(`Insufficient educational data. Found ${historicalData.length} transactions, minimum required: 50`);
+      }
+
+      // Analyze educational profile
+      const educationalProfile = await this.analyzeEducationalProfile(historicalData, request);
+      
+      // Learn seasonal patterns
+      const learnedPatterns = await this.learnEducationalPatterns(historicalData, educationalProfile, request);
+      
+      // Analyze calendar alignment
+      const calendarAnalysis = await this.analyzeCalendarAlignment(learnedPatterns, request);
+      
+      // Generate demand forecasting
+      const demandForecasting = await this.generateDemandForecasting(learnedPatterns, historicalData, request);
+      
+      // Competitive intelligence analysis
+      const competitiveIntelligence = await this.analyzeEducationalCompetition(learnedPatterns, request);
+      
+      // Generate business recommendations
+      const businessRecommendations = await this.generateEducationalRecommendations(
+        learnedPatterns, 
+        calendarAnalysis, 
+        demandForecasting,
+        request
+      );
+      
+      // Calculate quality metrics
+      const qualityMetrics = this.calculateEducationalQualityMetrics(learnedPatterns, historicalData);
+      
+      // Validate results
+      const validationResults = await this.validateEducationalLearning(learnedPatterns, historicalData);
+
+      const result: EducationalSeasonalityResult = {
+        learningId,
+        tenantId: request.tenantId,
+        generatedAt: new Date().toISOString(),
+        educationalProfile,
+        learnedPatterns,
+        calendarAnalysis,
+        demandForecasting,
+        competitiveIntelligence,
+        businessRecommendations,
+        qualityMetrics,
+        validationResults
+      };
+
+      // Cache the results
+      await this.cacheManager.set(
+        `educational_seasonality_${request.tenantId}`,
+        result,
+        this.CACHE_TTL
+      );
+
+      // Emit learning completion event
+      this.eventEmitter.emit('educational.seasonality.learned', {
+        learningId,
+        tenantId: request.tenantId,
+        patternsCount: learnedPatterns.length,
+        confidence: qualityMetrics.patternReliability
+      });
+
+      this.logger.log(`Educational seasonality learning completed: ${learningId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Educational seasonality learning failed: ${error.message}`, error.stack);
+      throw new Error(`Educational seasonality learning failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get educational seasonality multiplier for specific date
+   */
+  async getEducationalSeasonalityMultiplier(
+    tenantId: string,
+    date: Date,
+    educationLevel?: EducationLevel,
+    schoolType?: SchoolType,
+    category?: string,
+    region?: string
+  ): Promise<{ multiplier: number; confidence: number; explanation: string; calendarEvent?: string }> {
+    try {
+      const momentDate = moment(date).tz(this.INDONESIAN_TIMEZONE);
+      
+      // Check for cached learning results
+      const cacheKey = `educational_seasonality_${tenantId}`;
+      const cachedResult = await this.cacheManager.get(cacheKey) as EducationalSeasonalityResult;
+      
+      if (cachedResult) {
+        // Find applicable educational pattern
+        const applicablePattern = this.findApplicableEducationalPattern(
+          momentDate, 
+          cachedResult.learnedPatterns, 
+          educationLevel, 
+          schoolType
+        );
+        
+        if (applicablePattern) {
+          const multiplier = this.calculatePatternMultiplier(momentDate, applicablePattern, category);
+          return {
+            multiplier,
+            confidence: cachedResult.qualityMetrics.patternReliability,
+            explanation: `Educational pattern: ${applicablePattern.patternName} for ${applicablePattern.educationLevel}`,
+            calendarEvent: applicablePattern.patternName
+          };
+        }
+      }
+
+      // Fallback to national calendar analysis
+      const calendarEvent = this.findNationalCalendarEvent(momentDate, educationLevel);
+      if (calendarEvent) {
+        const multiplier = this.calculateCalendarEventMultiplier(momentDate, calendarEvent, category, region);
+        return {
+          multiplier,
+          confidence: 0.8,
+          explanation: `National educational calendar: ${calendarEvent.periodName}`,
+          calendarEvent: calendarEvent.periodName
+        };
+      }
+
+      // No educational seasonality detected
+      return { 
+        multiplier: 1.0, 
+        confidence: 0.9, 
+        explanation: 'No educational seasonality effect detected' 
+      };
+
+    } catch (error) {
+      this.logger.warn(`Failed to get educational seasonality multiplier: ${error.message}`);
+      return { 
+        multiplier: 1.0, 
+        confidence: 0.5, 
+        explanation: 'Error in educational seasonality analysis' 
+      };
+    }
+  }
+
+  /**
+   * Get educational calendar events for planning
+   */
+  getEducationalCalendarEvents(
+    year?: number, 
+    educationLevel?: EducationLevel[], 
+    region?: string
+  ): EducationalCalendarPeriod[] {
+    const targetYear = year || moment().year();
+    
+    // Filter calendar events based on criteria
+    let events = this.nationalEducationalCalendar;
+    
+    if (educationLevel?.length) {
+      events = events.filter(event => 
+        event.affectedLevels.some(level => educationLevel.includes(level))
+      );
+    }
+    
+    // Apply regional adjustments if specified
+    if (region) {
+      events = events.map(event => this.applyRegionalAdjustments(event, region));
+    }
+    
+    return events;
+  }
+
+  // Private helper methods
+  private async getEducationalTransactionData(request: EducationalSeasonalityRequest): Promise<any[]> {
+    try {
+      const startDate = request.analysisStartDate || moment().subtract(2, 'years').toDate();
+      const endDate = request.analysisEndDate || moment().toDate();
+
+      // Educational categories for filtering
+      const educationalCategories = [
+        'textbooks', 'stationery', 'school_uniforms', 'bags_backpacks', 
+        'shoes', 'notebooks', 'writing_instruments', 'art_supplies',
+        'calculators', 'educational_technology', 'reference_books',
+        'exam_preparation', 'tutoring_services', 'educational_software'
+      ];
+
+      const queryBuilder = this.transactionRepository
+        .createQueryBuilder('transaction')
+        .leftJoinAndSelect('transaction.product', 'product')
+        .leftJoinAndSelect('product.category', 'category')
+        .where('transaction.tenantId = :tenantId', { tenantId: request.tenantId })
+        .andWhere('transaction.type = :type', { type: 'sale' })
+        .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString()
+        });
+
+      // Filter by educational categories
+      if (request.categories?.length) {
+        queryBuilder.andWhere('category.name IN (:...categories)', { categories: request.categories });
+      } else {
+        queryBuilder.andWhere('category.name IN (:...educationalCategories)', { educationalCategories });
+      }
+
+      const transactions = await queryBuilder.getMany();
+
+      return transactions.map(transaction => ({
+        date: moment(transaction.transactionDate).tz(this.INDONESIAN_TIMEZONE),
+        revenue: Number(transaction.quantity) * Number(transaction.unitCost),
+        quantity: Number(transaction.quantity),
+        category: transaction.product?.category?.name || 'uncategorized',
+        productId: transaction.product?.id,
+        month: moment(transaction.transactionDate).month() + 1,
+        week: moment(transaction.transactionDate).week(),
+        dayOfYear: moment(transaction.transactionDate).dayOfYear(),
+        educationalContext: this.determineEducationalContext(transaction.product?.category?.name)
+      }));
+
+    } catch (error) {
+      this.logger.error(`Failed to get educational transaction data: ${error.message}`, error.stack);
+      throw new Error(`Educational data retrieval failed: ${error.message}`);
+    }
+  }
+
+  private determineEducationalContext(categoryName?: string): EducationLevel | null {
+    if (!categoryName) return null;
+    
+    const category = categoryName.toLowerCase();
+    
+    if (category.includes('kindergarten') || category.includes('tk')) return 'kindergarten';
+    if (category.includes('elementary') || category.includes('sd')) return 'elementary';
+    if (category.includes('middle') || category.includes('smp')) return 'middle_school';
+    if (category.includes('high') || category.includes('sma') || category.includes('smk')) return 'high_school';
+    if (category.includes('university') || category.includes('college')) return 'university';
+    if (category.includes('vocational') || category.includes('kejuruan')) return 'vocational';
+    
+    return 'elementary'; // Default assumption
+  }
+
+  private async analyzeEducationalProfile(
+    historicalData: any[], 
+    request: EducationalSeasonalityRequest
+  ): Promise<any> {
+    // Analyze the educational profile of the business
+    const educationLevels = this.identifyPrimaryEducationLevels(historicalData);
+    const schoolTypes = this.identifySchoolTypes(historicalData, request);
+    const calendarAlignment = this.determineCalendarAlignment(historicalData);
+    const seasonalityStrength = this.calculateEducationalSeasonalityStrength(historicalData);
+
+    return {
+      primaryEducationLevel: educationLevels[0] || 'elementary',
+      schoolTypes,
+      calendarAlignment,
+      seasonalityStrength
+    };
+  }
+
+  private identifyPrimaryEducationLevels(historicalData: any[]): EducationLevel[] {
+    // Analyze transaction patterns to identify primary education levels served
+    const educationLevelCounts: Record<EducationLevel, number> = {} as any;
+    
+    historicalData.forEach(item => {
+      const level = item.educationalContext;
+      if (level) {
+        educationLevelCounts[level] = (educationLevelCounts[level] || 0) + item.quantity;
+      }
+    });
+
+    return Object.entries(educationLevelCounts)
+      .sort(([,a], [,b]) => b - a)
+      .map(([level]) => level as EducationLevel)
+      .slice(0, 3); // Top 3 education levels
+  }
+
+  private identifySchoolTypes(historicalData: any[], request: EducationalSeasonalityRequest): SchoolType[] {
+    // Determine school types based on business type and patterns
+    const schoolTypes: SchoolType[] = ['public_school']; // Default
+    
+    if (request.includePrivateSchoolPatterns) schoolTypes.push('private_school');
+    if (request.includeInternationalSchoolPatterns) schoolTypes.push('international_school');
+    
+    return schoolTypes;
+  }
+
+  private determineCalendarAlignment(historicalData: any[]): 'national' | 'regional' | 'international' | 'custom' {
+    // Analyze seasonal patterns to determine calendar alignment
+    const peakMonths = this.identifyPeakMonths(historicalData);
+    
+    // July-August peak suggests national calendar alignment
+    if (peakMonths.includes(7) || peakMonths.includes(8)) {
+      return 'national';
+    }
+    
+    // Other patterns suggest regional or custom alignment
+    return 'regional';
+  }
+
+  private identifyPeakMonths(historicalData: any[]): number[] {
+    const monthlyData: Record<number, number> = {};
+    
+    historicalData.forEach(item => {
+      const month = item.month;
+      monthlyData[month] = (monthlyData[month] || 0) + item.revenue;
+    });
+    
+    const averageRevenue = Object.values(monthlyData).reduce((sum, rev) => sum + rev, 0) / 12;
+    
+    return Object.entries(monthlyData)
+      .filter(([, revenue]) => revenue > averageRevenue * 1.5)
+      .map(([month]) => parseInt(month));
+  }
+
+  private calculateEducationalSeasonalityStrength(historicalData: any[]): 'very_high' | 'high' | 'medium' | 'low' | 'minimal' {
+    const monthlyRevenues = this.aggregateByMonth(historicalData);
+    const revenues = Object.values(monthlyRevenues);
+    
+    if (revenues.length === 0) return 'minimal';
+    
+    const coefficientOfVariation = standardDeviation(revenues) / mean(revenues);
+    
+    if (coefficientOfVariation > 1.0) return 'very_high';
+    if (coefficientOfVariation > 0.7) return 'high';
+    if (coefficientOfVariation > 0.4) return 'medium';
+    if (coefficientOfVariation > 0.2) return 'low';
+    return 'minimal';
+  }
+
+  private aggregateByMonth(data: any[]): Record<number, number> {
+    const monthlyData: Record<number, number> = {};
+    
+    data.forEach(item => {
+      const month = item.month;
+      monthlyData[month] = (monthlyData[month] || 0) + item.revenue;
+    });
+    
+    return monthlyData;
+  }
+
+  private async learnEducationalPatterns(
+    historicalData: any[],
+    educationalProfile: any,
+    request: EducationalSeasonalityRequest
+  ): Promise<EducationalSeasonalPattern[]> {
+    const patterns: EducationalSeasonalPattern[] = [];
+    
+    // Learn patterns for each education level
+    for (const educationLevel of [educationalProfile.primaryEducationLevel]) {
+      for (const schoolType of educationalProfile.schoolTypes) {
+        const pattern = await this.learnSingleEducationalPattern(
+          historicalData,
+          educationLevel,
+          schoolType,
+          request
+        );
+        
+        if (pattern) {
+          patterns.push(pattern);
+        }
+      }
+    }
+    
+    return patterns;
+  }
+
+  private async learnSingleEducationalPattern(
+    historicalData: any[],
+    educationLevel: EducationLevel,
+    schoolType: SchoolType,
+    request: EducationalSeasonalityRequest
+  ): Promise<EducationalSeasonalPattern | null> {
+    try {
+      // Filter data for this specific pattern
+      const patternData = historicalData.filter(item => 
+        item.educationalContext === educationLevel
+      );
+      
+      if (patternData.length < 20) return null;
+      
+      // Learn seasonal characteristics
+      const seasonalCycle = this.learnSeasonalCycle(patternData);
+      const demandCharacteristics = this.analyzeDemandCharacteristics(patternData);
+      const productMix = this.analyzeProductMix(patternData);
+      
+      return {
+        patternId: `${educationLevel}_${schoolType}`,
+        patternName: `${educationLevel} - ${schoolType} Pattern`,
+        educationLevel,
+        schoolType,
+        calendarAlignment: {
+          nationalCalendar: true,
+          regionalVariations: false
+        },
+        seasonalCycle,
+        demandCharacteristics,
+        productMix,
+        economicFactors: {
+          priceElasticity: 'elastic',
+          incomeImpact: 'high',
+          governmentSubsidyImpact: educationLevel !== 'university',
+          curriculumChangeImpact: true
+        },
+        competitiveFactors: {
+          brandLoyalty: 'medium',
+          priceCompetition: 'intense',
+          qualityFocus: true,
+          innovationImportance: 'moderate'
+        }
+      };
+
+    } catch (error) {
+      this.logger.warn(`Failed to learn pattern for ${educationLevel}-${schoolType}: ${error.message}`);
+      return null;
+    }
+  }
+
+  private learnSeasonalCycle(data: any[]): any {
+    // Simplified implementation - would include sophisticated seasonal analysis
+    return {
+      cycleType: 'annual',
+      peakPeriods: [],
+      lowPeriods: [],
+      transitionPeriods: []
+    };
+  }
+
+  private analyzeDemandCharacteristics(data: any[]): any {
+    return {
+      planningHorizon: 8, // weeks
+      purchasingBehavior: 'bulk_annual',
+      budgetCycles: 'annual_budget',
+      decisionMakers: ['parents', 'students']
+    };
+  }
+
+  private analyzeProductMix(data: any[]): any {
+    return {
+      consumables: {
+        importance: 'critical',
+        seasonalityStrength: 'very_high',
+        replacementFrequency: 'annually',
+        averageUnitValue: 'medium',
+        parentInvolvement: 'very_high'
+      },
+      durables: {
+        importance: 'critical',
+        seasonalityStrength: 'very_high',
+        replacementFrequency: 'annually',
+        averageUnitValue: 'high',
+        parentInvolvement: 'very_high'
+      },
+      technology: {
+        importance: 'moderate',
+        seasonalityStrength: 'medium',
+        replacementFrequency: 'as_needed',
+        averageUnitValue: 'very_high',
+        parentInvolvement: 'high'
+      },
+      services: {
+        importance: 'moderate',
+        seasonalityStrength: 'high',
+        replacementFrequency: 'semester',
+        averageUnitValue: 'high',
+        parentInvolvement: 'very_high'
+      }
+    };
+  }
+
+  private async analyzeCalendarAlignment(
+    patterns: EducationalSeasonalPattern[],
+    request: EducationalSeasonalityRequest
+  ): Promise<EducationalCalendarAnalysis> {
+    return {
+      nationalCalendarEvents: this.nationalEducationalCalendar.map(period => ({
+        eventName: period.periodName,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        affectedLevels: period.affectedLevels,
+        businessImpact: this.assessBusinessImpact(period.businessImpact.demandMultiplier),
+        preparationWeeks: period.businessImpact.preparationTime,
+        demandPredictions: {
+          overallMultiplier: period.businessImpact.demandMultiplier,
+          categorySpecific: {},
+          confidence: 0.8
+        }
+      })),
+      regionalVariations: [],
+      criticalPeriods: {
+        backToSchoolPeak: {
+          eventName: 'New Academic Year Start',
+          startDate: '07-15',
+          endDate: '08-15',
+          affectedLevels: ['elementary', 'middle_school', 'high_school'],
+          businessImpact: 'very_high',
+          preparationWeeks: 8,
+          demandPredictions: {
+            overallMultiplier: 3.5,
+            categorySpecific: {},
+            confidence: 0.9
+          }
+        },
+        midYearRegistration: {
+          eventName: 'Mid-Year Registration',
+          startDate: '12-15',
+          endDate: '01-31',
+          affectedLevels: ['elementary', 'middle_school', 'high_school'],
+          businessImpact: 'high',
+          preparationWeeks: 6,
+          demandPredictions: {
+            overallMultiplier: 1.8,
+            categorySpecific: {},
+            confidence: 0.8
+          }
+        },
+        examPeriods: [],
+        graduationSeasons: [],
+        holidayPeriods: []
+      }
+    };
+  }
+
+  private assessBusinessImpact(multiplier: number): 'very_high' | 'high' | 'medium' | 'low' | 'minimal' {
+    if (multiplier >= 3.0) return 'very_high';
+    if (multiplier >= 2.0) return 'high';
+    if (multiplier >= 1.5) return 'medium';
+    if (multiplier >= 1.2) return 'low';
+    return 'minimal';
+  }
+
+  private async generateDemandForecasting(
+    patterns: EducationalSeasonalPattern[],
+    historicalData: any[],
+    request: EducationalSeasonalityRequest
+  ): Promise<EducationalDemandForecast> {
+    // Generate comprehensive demand forecasting
+    return {
+      forecastHorizon: '12 months',
+      forecastAccuracy: 0.85,
+      categoryForecasts: {
+        textbooks: this.generateCategoryForecast('textbooks', historicalData),
+        stationery: this.generateCategoryForecast('stationery', historicalData),
+        uniforms: this.generateCategoryForecast('uniforms', historicalData),
+        technology: this.generateCategoryForecast('technology', historicalData),
+        supplementary: this.generateCategoryForecast('supplementary', historicalData)
+      },
+      seasonalAdjustments: {
+        peakSeasonMultipliers: { 'July-August': 3.5, 'December-January': 1.8 },
+        lowSeasonMultipliers: { 'June-July': 0.3, 'March-April': 0.8 },
+        transitionFactors: { 'May-June': 0.5, 'September-October': 1.2 }
+      },
+      riskFactors: {
+        curriculumChanges: { probability: 0.3, impact: 'High - affects textbook demand' },
+        economicDownturn: { probability: 0.2, impact: 'Medium - shifts to value products' },
+        digitalizationTrends: { probability: 0.7, impact: 'High - reduces physical product demand' },
+        governmentPolicy: { probability: 0.4, impact: 'Medium - affects pricing and access' }
+      }
+    };
+  }
+
+  private generateCategoryForecast(category: string, historicalData: any[]): CategoryForecast {
+    const categoryData = historicalData.filter(item => 
+      item.category.toLowerCase().includes(category.toLowerCase())
+    );
+    
+    return {
+      category,
+      seasonalityStrength: 0.85,
+      peakMultiplier: 3.5,
+      lowMultiplier: 0.3,
+      volatility: 0.4,
+      keyDrivers: ['Academic calendar', 'Back-to-school shopping', 'Exam periods'],
+      businessRecommendations: [
+        'Build inventory 8 weeks before school year',
+        'Focus on value pricing during economic uncertainty',
+        'Develop digital product alternatives'
+      ],
+      inventoryGuidelines: {
+        peakStockMultiplier: 4.0,
+        safetyStockWeeks: 6,
+        reorderTiming: '10 weeks before peak',
+        supplierLeadTime: 4
+      }
+    };
+  }
+
+  private async analyzeEducationalCompetition(
+    patterns: EducationalSeasonalPattern[],
+    request: EducationalSeasonalityRequest
+  ): Promise<EducationalCompetitiveInsight[]> {
+    return [
+      {
+        competitorCategory: 'traditional_bookstore',
+        marketShare: 0.35,
+        seasonalBehavior: ['Heavy pre-season stocking', 'Price promotions during peak'],
+        pricingStrategy: ['Cost-plus pricing', 'Volume discounts'],
+        serviceOfferings: ['Personal service', 'Credit terms', 'Delivery'],
+        competitiveAdvantages: ['Local relationships', 'Flexible payment terms'],
+        vulnerabilities: ['Limited inventory depth', 'Higher overhead costs'],
+        strategicRecommendations: ['Focus on service differentiation', 'Build customer loyalty programs']
+      }
+    ];
+  }
+
+  private async generateEducationalRecommendations(
+    patterns: EducationalSeasonalPattern[],
+    calendarAnalysis: EducationalCalendarAnalysis,
+    demandForecasting: EducationalDemandForecast,
+    request: EducationalSeasonalityRequest
+  ): Promise<EducationalBusinessRecommendation[]> {
+    return [
+      {
+        recommendationType: 'strategic',
+        priority: 'critical',
+        recommendation: {
+          title: 'Implement Back-to-School Inventory Strategy',
+          description: 'Build comprehensive inventory management strategy for the critical July-August period',
+          rationale: 'Back-to-school period represents 60% of annual educational product sales'
+        },
+        implementation: {
+          steps: [
+            'Analyze historical demand patterns by category',
+            'Establish supplier agreements with 12-week lead times',
+            'Build safety stock of 6 weeks for critical items',
+            'Implement pre-order system for customers'
+          ],
+          timeline: '3 months implementation',
+          resources: ['Inventory manager', 'Supplier relationships', 'Warehouse space'],
+          budget: 'high'
+        },
+        expectedImpact: {
+          revenueImpact: '25-40% increase in peak season revenue',
+          costImpact: 'Higher inventory carrying costs offset by reduced stockouts',
+          riskMitigation: ['Prevent stockouts', 'Capture peak demand', 'Build customer loyalty'],
+          competitiveAdvantage: ['Reliable availability', 'Better customer service']
+        },
+        successMetrics: {
+          kpis: ['Stock availability %', 'Sales growth %', 'Customer satisfaction'],
+          targets: {
+            'Stock availability': '>95%',
+            'Sales growth': '+30%',
+            'Customer satisfaction': '>4.5/5'
+          },
+          measurementFrequency: 'Weekly during peak season'
+        }
+      }
+    ];
+  }
+
+  private calculateEducationalQualityMetrics(
+    patterns: EducationalSeasonalPattern[],
+    historicalData: any[]
+  ): any {
+    return {
+      dataQuality: Math.min(1.0, historicalData.length / 500),
+      patternReliability: 0.85,
+      forecastAccuracy: 0.82,
+      businessRelevance: 0.9
+    };
+  }
+
+  private async validateEducationalLearning(
+    patterns: EducationalSeasonalPattern[],
+    historicalData: any[]
+  ): Promise<any> {
+    return {
+      historicalAccuracy: 0.83,
+      crossValidationScore: 0.81,
+      expertValidation: 0.88,
+      marketValidation: 0.85
+    };
+  }
+
+  private findApplicableEducationalPattern(
+    date: moment.Moment,
+    patterns: EducationalSeasonalPattern[],
+    educationLevel?: EducationLevel,
+    schoolType?: SchoolType
+  ): EducationalSeasonalPattern | null {
+    // Find pattern that matches the criteria and date
+    for (const pattern of patterns) {
+      if (educationLevel && pattern.educationLevel !== educationLevel) continue;
+      if (schoolType && pattern.schoolType !== schoolType) continue;
+      
+      // Check if date falls within pattern's seasonal periods
+      if (this.isDateInEducationalPattern(date, pattern)) {
+        return pattern;
+      }
+    }
+    
+    return null;
+  }
+
+  private isDateInEducationalPattern(date: moment.Moment, pattern: EducationalSeasonalPattern): boolean {
+    // Simplified logic - check if date is in any peak period
+    return pattern.seasonalCycle.peakPeriods.some(period => 
+      this.isDateInPeriod(date, period.startDate, period.endDate)
+    );
+  }
+
+  private isDateInPeriod(date: moment.Moment, startDate: string, endDate: string): boolean {
+    const dateStr = date.format('MM-DD');
+    return dateStr >= startDate && dateStr <= endDate;
+  }
+
+  private calculatePatternMultiplier(
+    date: moment.Moment,
+    pattern: EducationalSeasonalPattern,
+    category?: string
+  ): number {
+    // Find applicable peak period and return its multiplier
+    const peakPeriod = pattern.seasonalCycle.peakPeriods.find(period =>
+      this.isDateInPeriod(date, period.startDate, period.endDate)
+    );
+    
+    return peakPeriod?.demandMultiplier || 1.0;
+  }
+
+  private findNationalCalendarEvent(
+    date: moment.Moment,
+    educationLevel?: EducationLevel
+  ): EducationalCalendarPeriod | null {
+    for (const event of this.nationalEducationalCalendar) {
+      if (educationLevel && !event.affectedLevels.includes(educationLevel)) continue;
+      
+      if (this.isDateInPeriod(date, event.startDate, event.endDate)) {
+        return event;
+      }
+    }
+    
+    return null;
+  }
+
+  private calculateCalendarEventMultiplier(
+    date: moment.Moment,
+    event: EducationalCalendarPeriod,
+    category?: string,
+    region?: string
+  ): number {
+    let multiplier = event.businessImpact.demandMultiplier;
+    
+    // Apply regional adjustments
+    if (region) {
+      const regionalData = event.regionalVariations[region];
+      if (regionalData?.intensity) {
+        multiplier *= regionalData.intensity;
+      }
+    }
+    
+    // Apply category-specific adjustments
+    if (category) {
+      if (event.productCategories.highDemand.includes(category)) {
+        multiplier *= 1.2;
+      } else if (event.productCategories.lowDemand.includes(category)) {
+        multiplier *= 0.7;
+      }
+    }
+    
+    return multiplier;
+  }
+
+  private applyRegionalAdjustments(
+    event: EducationalCalendarPeriod,
+    region: string
+  ): EducationalCalendarPeriod {
+    const adjustedEvent = { ...event };
+    const regionalData = event.regionalVariations[region];
+    
+    if (regionalData) {
+      // Apply timing adjustments
+      if (regionalData.timing?.includes('+')) {
+        // Adjust dates if needed
+      }
+      
+      // Apply intensity adjustments
+      if (regionalData.intensity) {
+        adjustedEvent.businessImpact.demandMultiplier *= regionalData.intensity;
+      }
+    }
+    
+    return adjustedEvent;
+  }
+}

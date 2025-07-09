@@ -1,0 +1,345 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
+
+import { ModelServingService } from '../../../src/ml-forecasting/services/model-serving.service';
+import { DataPipelineService } from '../../../src/ml-forecasting/services/data-pipeline.service';
+
+import { MLModel, ModelStatus } from '../../../src/ml-forecasting/entities/ml-model.entity';
+import { Prediction, PredictionType } from '../../../src/ml-forecasting/entities/prediction.entity';
+import { Product } from '../../../src/products/entities/product.entity';
+import { InventoryItem } from '../../../src/inventory/entities/inventory-item.entity';
+
+describe('ModelServingService - Enhanced Error Handling & Indonesian Localization', () => {
+  let service: ModelServingService;
+  let mlModelRepo: Repository<MLModel>;
+  let predictionRepo: Repository<Prediction>;
+  let productRepo: Repository<Product>;
+  let inventoryItemRepo: Repository<InventoryItem>;
+  let cacheManager: Cache;
+
+  // Mock repositories
+  const mockMLModelRepo = {
+    createQueryBuilder: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const mockPredictionRepo = {
+    save: jest.fn(),
+    find: jest.fn(),
+  };
+
+  const mockProductRepo = {
+    findOne: jest.fn(),
+  };
+
+  const mockInventoryItemRepo = {
+    createQueryBuilder: jest.fn(),
+  };
+
+  const mockCacheManager = {
+    get: jest.fn(),
+    set: jest.fn(),
+  };
+
+  const mockDataPipelineService = {
+    extractProductFeatures: jest.fn(),
+  };
+
+  const mockConfigService = {
+    get: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ModelServingService,
+        {
+          provide: getRepositoryToken(MLModel),
+          useValue: mockMLModelRepo,
+        },
+        {
+          provide: getRepositoryToken(Prediction),
+          useValue: mockPredictionRepo,
+        },
+        {
+          provide: getRepositoryToken(Product),
+          useValue: mockProductRepo,
+        },
+        {
+          provide: getRepositoryToken(InventoryItem),
+          useValue: mockInventoryItemRepo,
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: mockCacheManager,
+        },
+        {
+          provide: DataPipelineService,
+          useValue: mockDataPipelineService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
+      ],
+    }).compile();
+
+    service = module.get<ModelServingService>(ModelServingService);
+    mlModelRepo = module.get<Repository<MLModel>>(getRepositoryToken(MLModel));
+    predictionRepo = module.get<Repository<Prediction>>(getRepositoryToken(Prediction));
+    productRepo = module.get<Repository<Product>>(getRepositoryToken(Product));
+    inventoryItemRepo = module.get<Repository<InventoryItem>>(getRepositoryToken(InventoryItem));
+    cacheManager = module.get<Cache>(CACHE_MANAGER);
+
+    // Suppress logger warnings during tests
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation();
+    jest.spyOn(Logger.prototype, 'log').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('Enhanced Error Handling', () => {
+    const testTenantId = 'test-tenant-id';
+
+    it('should return Indonesian error message when no model found', async () => {
+      // Mock empty model query
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockMLModelRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockMLModelRepo.findOne.mockResolvedValue(null);
+
+      // Mock cache
+      mockCacheManager.get.mockResolvedValue(null);
+
+      const request = {
+        productId: 'test-product',
+        predictionType: PredictionType.DEMAND_FORECAST,
+        forecastDays: 30,
+      };
+
+      const result = await service.predict(testTenantId, request);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Model prediksi yang sesuai tidak ditemukan');
+      expect(result.actionableInsights?.recommendations).toContain(
+        'Periksa kembali data input yang diberikan'
+      );
+      expect(result.actionableInsights?.alerts).toHaveLength(1);
+      expect(result.actionableInsights?.alerts?.[0].message).toContain(
+        'Model prediksi tidak tersedia'
+      );
+    });
+
+    it('should provide fallback model when primary model not found', async () => {
+      // Mock empty specific model query but available fallback
+      const mockQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      mockMLModelRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+      // Mock fallback model
+      const fallbackModel = {
+        id: 'fallback-model',
+        tenantId: testTenantId,
+        status: ModelStatus.DEPLOYED,
+        isActive: true,
+        modelPath: '/tmp/test-model.json',
+        performance: { mape: 15 },
+        recordPrediction: jest.fn(),
+      };
+      mockMLModelRepo.findOne.mockResolvedValue(fallbackModel);
+
+      // Mock file system access (would normally be mocked with fs module)
+      const mockPrivateMethod = jest.spyOn(service as any, 'loadModel');
+      mockPrivateMethod.mockResolvedValue({
+        type: 'linear_regression',
+        weights: [1.0],
+        intercept: 0.0,
+        performance: { mape: 15 },
+      });
+
+      // Mock other dependencies
+      mockCacheManager.get.mockResolvedValue(null);
+      mockDataPipelineService.extractProductFeatures.mockResolvedValue({
+        'test-product': {
+          productFeatures: { price: 100 },
+          inventoryFeatures: { stock: 50 },
+        },
+      });
+
+      const mockPrediction = {
+        id: 'test-prediction',
+        updateConfidenceLevel: jest.fn(),
+        addActionableInsight: jest.fn(),
+        setBusinessImpact: jest.fn(),
+        complete: jest.fn(),
+      };
+      mockPredictionRepo.save.mockResolvedValue(mockPrediction);
+
+      const request = {
+        productId: 'test-product',
+        predictionType: PredictionType.DEMAND_FORECAST,
+        forecastDays: 30,
+      };
+
+      const result = await service.predict(testTenantId, request);
+
+      expect(result.success).toBe(true);
+      expect(result.predictionId).toBe('test-prediction');
+      expect(mockMLModelRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          tenantId: testTenantId,
+          status: ModelStatus.DEPLOYED,
+          isActive: true,
+        },
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+    });
+  });
+
+  describe('Real Inventory Integration', () => {
+    const testTenantId = 'test-tenant-id';
+    const testProductId = 'test-product-id';
+
+    it('should get current stock from inventory system', async () => {
+      // Mock inventory query
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({ totalStock: '150' }),
+      };
+      mockInventoryItemRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+      // Call private method directly for testing
+      const privateMethod = (service as any).getCurrentStock;
+      const stock = await privateMethod.call(service, testTenantId, testProductId);
+
+      expect(stock).toBe(150);
+      expect(mockInventoryItemRepo.createQueryBuilder).toHaveBeenCalledWith('inventory');
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith('SUM(inventory.quantityOnHand)', 'totalStock');
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith('inventory.tenantId = :tenantId', { tenantId: testTenantId });
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('inventory.productId = :productId', { productId: testProductId });
+    });
+
+    it('should return 0 when inventory query fails gracefully', async () => {
+      // Mock query failure
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockRejectedValue(new Error('Database connection error')),
+      };
+      mockInventoryItemRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+      // Call private method directly for testing
+      const privateMethod = (service as any).getCurrentStock;
+      const stock = await privateMethod.call(service, testTenantId, testProductId);
+
+      expect(stock).toBe(0);
+    });
+  });
+
+  describe('Indonesian Localization', () => {
+    it('should provide Indonesian error messages', async () => {
+      const testErrors = [
+        { input: 'No suitable model found', expected: 'Model prediksi yang sesuai tidak ditemukan' },
+        { input: 'Model file not found', expected: 'File model tidak ditemukan dalam sistem' },
+        { input: 'Database connection error', expected: 'Koneksi database bermasalah' },
+        { input: 'Unknown random error', expected: 'Terjadi kesalahan dalam sistem prediksi: Unknown random error' },
+      ];
+
+      for (const testCase of testErrors) {
+        const error = new Error(testCase.input);
+        const privateMethod = (service as any).getLocalizedErrorMessage;
+        const localizedMessage = privateMethod.call(service, error);
+
+        expect(localizedMessage).toBe(testCase.expected);
+      }
+    });
+
+    it('should provide confidence-based insights in Indonesian', async () => {
+      const mockPrediction = {
+        confidence: 0.5, // Low confidence
+        predictionType: PredictionType.DEMAND_FORECAST,
+        productId: 'test-product',
+      };
+
+      const mockModel = {
+        id: 'test-model',
+        performance: { mape: 20 },
+      };
+
+      // Call private method directly for testing
+      const privateMethod = (service as any).generateActionableInsights;
+      const insights = await privateMethod.call(service, 'test-tenant', mockPrediction, mockModel);
+
+      expect(insights.alerts).toHaveLength(1);
+      expect(insights.alerts[0].message).toContain('Prediksi memiliki tingkat kepercayaan rendah (50%)');
+      expect(insights.recommendations).toContain('Tingkatkan kualitas data dengan mencatat transaksi secara konsisten');
+    });
+
+    it('should provide high confidence insights in Indonesian', async () => {
+      const mockPrediction = {
+        confidence: 0.9, // High confidence
+        predictionType: PredictionType.DEMAND_FORECAST,
+        productId: 'test-product',
+      };
+
+      const mockModel = {
+        id: 'test-model',
+        performance: { mape: 5 },
+      };
+
+      // Call private method directly for testing
+      const privateMethod = (service as any).generateActionableInsights;
+      const insights = await privateMethod.call(service, 'test-tenant', mockPrediction, mockModel);
+
+      expect(insights.recommendations).toContain(
+        'Prediksi memiliki tingkat kepercayaan tinggi (90%) - hasil dapat diandalkan untuk pengambilan keputusan'
+      );
+    });
+  });
+
+  describe('Fallback Model Generation', () => {
+    it('should create fallback model when model file is missing', async () => {
+      const mockModel = {
+        id: 'test-model',
+        modelPath: '/non-existent-path/model.json',
+      };
+
+      // Call private method directly for testing
+      const privateMethod = (service as any).loadModel;
+      const result = await privateMethod.call(service, mockModel);
+
+      expect(result).toMatchObject({
+        type: 'linear_regression',
+        weights: [1.0],
+        intercept: 0.0,
+        lastValues: [0],
+        performance: { mape: 50 },
+      });
+    });
+  });
+});

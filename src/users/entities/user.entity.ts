@@ -1,12 +1,14 @@
 import { Entity, Column, Index, OneToMany } from 'typeorm';
 import { Exclude } from 'class-transformer';
-import { BaseEntity } from '../../common/entities/base.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
   MANAGER = 'manager',
   STAFF = 'staff',
+  CONFIG_MANAGER = 'config_manager',
+  AUDITOR = 'auditor',
 }
 
 export enum UserStatus {
@@ -19,7 +21,7 @@ export enum UserStatus {
 @Entity('users')
 @Index(['tenantId', 'email'], { unique: true })
 @Index(['tenantId', 'isDeleted'])
-export class User extends BaseEntity {
+export class User extends AuditableEntity {
   @Column({ type: 'varchar', length: 255 })
   email: string;
 
@@ -98,12 +100,6 @@ export class User extends BaseEntity {
 
   @Column({ type: 'jsonb', nullable: true })
   preferences?: Record<string, any>;
-
-  @Column({ type: 'boolean', default: false })
-  isDeleted: boolean;
-
-  @Column({ type: 'timestamp', nullable: true })
-  deletedAt?: Date;
 
   // Virtual field for full name
   get fullName(): string {

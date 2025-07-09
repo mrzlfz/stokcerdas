@@ -84,4 +84,27 @@ export class RegisterDto {
     message: 'Role harus salah satu dari: admin, manager, staff',
   })
   role?: UserRole;
+
+  @ApiProperty({
+    description: 'Business/company name',
+    example: 'Toko Makmur',
+    maxLength: 200,
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: 'Nama bisnis harus berupa string' })
+  @MaxLength(200, { message: 'Nama bisnis maksimal 200 karakter' })
+  @Transform(({ value }) => value?.trim())
+  businessName?: string;
+
+  @ApiProperty({
+    description: 'Business type',
+    example: 'retail',
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: 'Jenis bisnis harus berupa string' })
+  @MaxLength(50, { message: 'Jenis bisnis maksimal 50 karakter' })
+  @Transform(({ value }) => value?.toLowerCase()?.trim())
+  businessType?: string;
 }

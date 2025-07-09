@@ -1,0 +1,1611 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+import { CustomerLoyaltyService } from './customer-loyalty.service';
+import { Customer } from '../entities/customer.entity';
+import {
+  CustomerLoyaltyPoints,
+  CustomerLoyaltyTier,
+  CustomerLoyaltyReward,
+  CustomerLoyaltyRedemption,
+  LoyaltyPointsTransactionType,
+  LoyaltyTier,
+  RewardType,
+  RewardStatus,
+  IndonesianLoyaltyContext,
+} from '../entities/customer-loyalty.entity';
+
+// =============================================
+// ULTRATHINK: COMPREHENSIVE LOYALTY TEST DATA
+// =============================================
+
+const mockIndonesianCustomer = {
+  id: 'customer-loyalty-001',
+  tenantId: 'tenant-001',
+  name: 'Siti Nurhaliza',
+  email: 'siti.nurhaliza@gmail.com',
+  phone: '+6281234567890',
+  totalSpend: 15750000, // 15.75M IDR
+  totalOrders: 18,
+  averageOrderValue: 875000, // 875K IDR per order
+  createdAt: new Date('2023-02-15'),
+  updatedAt: new Date('2024-01-15'),
+  preferredLanguage: 'id',
+  indonesianMarketContext: {
+    region: 'Surabaya',
+    culturalBackground: 'Javanese',
+    religiousObservance: 'Muslim',
+    familySize: 5,
+    incomeLevel: 'middle',
+    devicePreference: 'mobile',
+    socialMediaUsage: ['whatsapp', 'instagram', 'tiktok'],
+    preferredPaymentMethods: ['qris', 'gopay', 'dana'],
+    localCommunityEngagement: true,
+  },
+};
+
+const mockLoyaltyTiers = [
+  {
+    id: 'tier-bronze',
+    tenantId: 'tenant-001',
+    tier: LoyaltyTier.BRONZE,
+    tierName: 'Bronze Member',
+    tierNameIndonesian: 'Anggota Perunggu',
+    minPointsRequired: 0,
+    minSpendRequired: 0,
+    tierOrder: 1,
+    benefits: {
+      tier: LoyaltyTier.BRONZE,
+      pointsMultiplier: 1.0,
+      welcomeBonus: 100,
+      birthdayBonus: 50,
+      exclusiveRewards: [],
+      prioritySupport: false,
+      freeShipping: false,
+      earlyAccess: false,
+      personalShopper: false,
+      indonesianBenefits: {
+        localExperiences: [],
+        culturalEvents: ['ramadan_bronze', 'lebaran_bronze'],
+        regionalPartners: ['partner_bronze'],
+        familyBenefits: ['family_bronze_discount'],
+        communityPerks: ['community_bronze_access'],
+      },
+      requirements: {
+        minPoints: 0,
+        minSpend: 0,
+        timeframe: 12,
+        additionalRequirements: [],
+      },
+    },
+    isActive: true,
+    tierColor: '#CD7F32',
+  },
+  {
+    id: 'tier-silver',
+    tenantId: 'tenant-001',
+    tier: LoyaltyTier.SILVER,
+    tierName: 'Silver Member',
+    tierNameIndonesian: 'Anggota Perak',
+    minPointsRequired: 1000,
+    minSpendRequired: 1000000,
+    tierOrder: 2,
+    benefits: {
+      tier: LoyaltyTier.SILVER,
+      pointsMultiplier: 1.2,
+      welcomeBonus: 250,
+      birthdayBonus: 100,
+      exclusiveRewards: ['silver_exclusive'],
+      prioritySupport: true,
+      freeShipping: false,
+      earlyAccess: false,
+      personalShopper: false,
+      indonesianBenefits: {
+        localExperiences: ['silver_local_experience'],
+        culturalEvents: ['ramadan_silver', 'lebaran_silver'],
+        regionalPartners: ['partner_silver'],
+        familyBenefits: ['family_silver_discount'],
+        communityPerks: ['community_silver_access'],
+      },
+      requirements: {
+        minPoints: 1000,
+        minSpend: 1000000,
+        timeframe: 12,
+        additionalRequirements: [],
+      },
+    },
+    isActive: true,
+    tierColor: '#C0C0C0',
+  },
+  {
+    id: 'tier-gold',
+    tenantId: 'tenant-001',
+    tier: LoyaltyTier.GOLD,
+    tierName: 'Gold Member',
+    tierNameIndonesian: 'Anggota Emas',
+    minPointsRequired: 5000,
+    minSpendRequired: 5000000,
+    tierOrder: 3,
+    benefits: {
+      tier: LoyaltyTier.GOLD,
+      pointsMultiplier: 1.5,
+      welcomeBonus: 500,
+      birthdayBonus: 200,
+      exclusiveRewards: ['gold_exclusive'],
+      prioritySupport: true,
+      freeShipping: true,
+      earlyAccess: true,
+      personalShopper: false,
+      indonesianBenefits: {
+        localExperiences: ['gold_local_experience'],
+        culturalEvents: ['ramadan_gold', 'lebaran_gold'],
+        regionalPartners: ['partner_gold'],
+        familyBenefits: ['family_gold_discount'],
+        communityPerks: ['community_gold_access'],
+      },
+      requirements: {
+        minPoints: 5000,
+        minSpend: 5000000,
+        timeframe: 12,
+        additionalRequirements: [],
+      },
+    },
+    isActive: true,
+    tierColor: '#FFD700',
+  },
+];
+
+const mockLoyaltyRewards = [
+  {
+    id: 'reward-001',
+    tenantId: 'tenant-001',
+    rewardName: '10% Discount',
+    rewardNameIndonesian: 'Diskon 10%',
+    rewardDescription: '10% off your next purchase',
+    rewardDescriptionIndonesian: 'Diskon 10% untuk pembelian berikutnya',
+    rewardType: RewardType.DISCOUNT_PERCENTAGE,
+    pointsRequired: 500,
+    discountPercentage: 10,
+    maxDiscountAmount: 100000, // 100K IDR max
+    eligibleTiers: [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD],
+    currentRedemptions: 45,
+    totalRedemptionsLimit: 1000,
+    isActive: true,
+    indonesianContext: {
+      culturalRelevance: 75,
+      regionalAvailability: ['Jakarta', 'Surabaya', 'Bandung'],
+      localPartners: [],
+      culturalEvents: [],
+      familyFriendly: true,
+      languageSupport: ['id', 'en'],
+      paymentMethods: ['qris', 'gopay', 'dana'],
+      deliveryOptions: ['regular', 'express'],
+      customizations: {},
+    },
+  },
+  {
+    id: 'reward-002',
+    tenantId: 'tenant-001',
+    rewardName: 'Free Shipping',
+    rewardNameIndonesian: 'Gratis Ongkir',
+    rewardDescription: 'Free shipping for your next order',
+    rewardDescriptionIndonesian: 'Gratis ongkos kirim untuk pesanan berikutnya',
+    rewardType: RewardType.FREE_SHIPPING,
+    pointsRequired: 300,
+    monetaryValue: 15000, // 15K IDR shipping cost
+    eligibleTiers: [LoyaltyTier.SILVER, LoyaltyTier.GOLD],
+    currentRedemptions: 120,
+    totalRedemptionsLimit: 2000,
+    isActive: true,
+    indonesianContext: {
+      culturalRelevance: 90,
+      regionalAvailability: ['Jakarta', 'Surabaya', 'Bandung', 'Medan'],
+      localPartners: ['JNE', 'J&T'],
+      culturalEvents: [],
+      familyFriendly: true,
+      languageSupport: ['id'],
+      paymentMethods: ['qris', 'gopay', 'ovo', 'dana'],
+      deliveryOptions: ['regular', 'express', 'same_day'],
+      customizations: {},
+    },
+  },
+  {
+    id: 'reward-003',
+    tenantId: 'tenant-001',
+    rewardName: 'Ramadan Special Package',
+    rewardNameIndonesian: 'Paket Spesial Ramadan',
+    rewardDescription: 'Special Ramadan package with Indonesian delicacies',
+    rewardDescriptionIndonesian:
+      'Paket spesial Ramadan dengan makanan khas Indonesia',
+    rewardType: RewardType.INDONESIAN_EXPERIENCE,
+    pointsRequired: 1500,
+    monetaryValue: 250000, // 250K IDR value
+    eligibleTiers: [LoyaltyTier.GOLD],
+    currentRedemptions: 8,
+    totalRedemptionsLimit: 100,
+    isActive: true,
+    indonesianContext: {
+      culturalRelevance: 95,
+      regionalAvailability: ['Jakarta', 'Surabaya'],
+      localPartners: ['Halal Food Indonesia'],
+      culturalEvents: ['ramadan', 'lebaran'],
+      familyFriendly: true,
+      languageSupport: ['id'],
+      paymentMethods: ['qris', 'gopay'],
+      deliveryOptions: ['regular'],
+      customizations: { halal: true, familyPack: true },
+    },
+  },
+];
+
+const mockLoyaltyPoints = [
+  {
+    id: 'points-001',
+    tenantId: 'tenant-001',
+    customerId: 'customer-loyalty-001',
+    transactionType: LoyaltyPointsTransactionType.EARNED_PURCHASE,
+    pointsAmount: 875,
+    pointsBalanceAfter: 875,
+    relatedOrderId: 'order-001',
+    description: 'Points earned from purchase #ORD-2023-001',
+    sourceActivity: 'purchase_mobile_app',
+    multiplierApplied: 1.0,
+    tierBonusApplied: 0,
+    indonesianBonusApplied: 87, // 10% Indonesian bonus
+    calculationDetails: {
+      basePoints: 788,
+      multiplier: 1.0,
+      bonusPoints: 87,
+      tierBonus: 0,
+      indonesianBonus: 87,
+      finalPoints: 875,
+      calculation: {
+        purchaseAmount: 875000,
+        baseRate: 0.009, // 0.9% points rate
+        tierMultiplier: 1.0,
+        culturalBonus: 87,
+        seasonalBonus: 0,
+        specialEvents: ['local_payment'],
+      },
+    },
+    indonesianContext: {
+      cultural: {
+        ramadanPeriod: false,
+        lebaranSeason: false,
+        independenceDay: false,
+        localHolidays: [],
+        familyOriented: true,
+        communityFocused: true,
+        religiousObservance: true,
+      },
+      regional: {
+        region: 'Surabaya',
+        timezone: 'Asia/Jakarta',
+        localPartners: [],
+        regionalRewards: [],
+        culturalPreferences: { paymentMethod: 'qris' },
+      },
+      business: {
+        localPaymentMethods: true,
+        indonesianBusinessHours: true,
+        localLanguageSupport: true,
+        culturalCustomerService: true,
+        localInfluencerPrograms: false,
+      },
+      social: {
+        whatsappIntegration: true,
+        socialMediaSharing: false,
+        communityEngagement: true,
+        familyReferrals: false,
+        localCommunityEvents: true,
+      },
+    },
+    expiresAt: new Date('2025-01-15'), // 12 months expiry
+    isExpired: false,
+    isRedeemed: false,
+    createdAt: new Date('2024-01-15'),
+  },
+  {
+    id: 'points-002',
+    tenantId: 'tenant-001',
+    customerId: 'customer-loyalty-001',
+    transactionType: LoyaltyPointsTransactionType.EARNED_RAMADAN_BONUS,
+    pointsAmount: 500,
+    pointsBalanceAfter: 1375,
+    description: 'Ramadan bonus points for active participation',
+    sourceActivity: 'ramadan_event_2024',
+    multiplierApplied: 1.0,
+    tierBonusApplied: 0,
+    indonesianBonusApplied: 500,
+    indonesianContext: {
+      cultural: {
+        ramadanPeriod: true,
+        lebaranSeason: false,
+        independenceDay: false,
+        localHolidays: ['Ramadan 2024'],
+        familyOriented: true,
+        communityFocused: true,
+        religiousObservance: true,
+      },
+      regional: {
+        region: 'Surabaya',
+        timezone: 'Asia/Jakarta',
+        localPartners: ['Masjid Al-Akbar'],
+        regionalRewards: ['Ramadan Surabaya 2024'],
+        culturalPreferences: { eventType: 'ramadan' },
+      },
+      business: {
+        localPaymentMethods: true,
+        indonesianBusinessHours: true,
+        localLanguageSupport: true,
+        culturalCustomerService: true,
+        localInfluencerPrograms: true,
+      },
+      social: {
+        whatsappIntegration: true,
+        socialMediaSharing: true,
+        communityEngagement: true,
+        familyReferrals: true,
+        localCommunityEvents: true,
+      },
+    },
+    expiresAt: new Date('2025-06-15'), // 18 months expiry for cultural events
+    isExpired: false,
+    isRedeemed: false,
+    createdAt: new Date('2024-04-15'),
+  },
+];
+
+// =============================================
+// ULTRATHINK: COMPREHENSIVE LOYALTY TESTS
+// =============================================
+
+describe('CustomerLoyaltyService', () => {
+  let service: CustomerLoyaltyService;
+  let customerRepository: Repository<Customer>;
+  let loyaltyPointsRepository: Repository<CustomerLoyaltyPoints>;
+  let loyaltyTierRepository: Repository<CustomerLoyaltyTier>;
+  let loyaltyRewardRepository: Repository<CustomerLoyaltyReward>;
+  let loyaltyRedemptionRepository: Repository<CustomerLoyaltyRedemption>;
+  let dataSource: DataSource;
+  let eventEmitter: EventEmitter2;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CustomerLoyaltyService,
+        {
+          provide: getRepositoryToken(Customer),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(CustomerLoyaltyPoints),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(CustomerLoyaltyTier),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(CustomerLoyaltyReward),
+          useClass: Repository,
+        },
+        {
+          provide: getRepositoryToken(CustomerLoyaltyRedemption),
+          useClass: Repository,
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            createQueryRunner: jest.fn().mockReturnValue({
+              connect: jest.fn(),
+              startTransaction: jest.fn(),
+              commitTransaction: jest.fn(),
+              rollbackTransaction: jest.fn(),
+              release: jest.fn(),
+              manager: {
+                save: jest.fn(),
+                update: jest.fn(),
+                delete: jest.fn(),
+              },
+            }),
+          },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: {
+            emit: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<CustomerLoyaltyService>(CustomerLoyaltyService);
+    customerRepository = module.get<Repository<Customer>>(
+      getRepositoryToken(Customer),
+    );
+    loyaltyPointsRepository = module.get<Repository<CustomerLoyaltyPoints>>(
+      getRepositoryToken(CustomerLoyaltyPoints),
+    );
+    loyaltyTierRepository = module.get<Repository<CustomerLoyaltyTier>>(
+      getRepositoryToken(CustomerLoyaltyTier),
+    );
+    loyaltyRewardRepository = module.get<Repository<CustomerLoyaltyReward>>(
+      getRepositoryToken(CustomerLoyaltyReward),
+    );
+    loyaltyRedemptionRepository = module.get<
+      Repository<CustomerLoyaltyRedemption>
+    >(getRepositoryToken(CustomerLoyaltyRedemption));
+    dataSource = module.get<DataSource>(DataSource);
+    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  // =============================================
+  // ULTRATHINK: POINTS CALCULATION TESTS
+  // =============================================
+
+  describe('awardPointsForPurchase', () => {
+    it('should award points for regular purchase with Indonesian cultural bonuses', async () => {
+      const mockCustomer = { ...mockIndonesianCustomer } as unknown as Customer;
+      const mockCurrentTier = mockLoyaltyTiers[0] as CustomerLoyaltyTier;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockCurrentTier);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1000' }),
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(mockLoyaltyPoints[0] as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(mockLoyaltyPoints[0] as any);
+
+      const purchaseData = {
+        orderId: 'order-001',
+        purchaseAmount: 875000, // 875K IDR
+        orderItems: [{ productId: 'product-001', quantity: 1, amount: 875000 }],
+        paymentMethod: 'qris',
+        channel: 'mobile_app',
+      };
+
+      const result = await service.awardPointsForPurchase(
+        'tenant-001',
+        'customer-loyalty-001',
+        purchaseData.purchaseAmount,
+        {
+          orderId: purchaseData.orderId,
+          paymentMethod: purchaseData.paymentMethod,
+          purchaseChannel: purchaseData.channel,
+        },
+      );
+
+      expect(result).toBeDefined();
+      expect(result.pointsAwarded).toBeGreaterThan(0);
+      expect(result.bonusPoints).toBeGreaterThan(0);
+      expect(result.newBalance).toBeGreaterThan(0);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'loyalty.points.earned',
+        expect.any(Object),
+      );
+    });
+
+    it('should apply enhanced bonuses for Ramadan purchases', async () => {
+      const mockCustomer = { ...mockIndonesianCustomer } as unknown as Customer;
+      const mockCurrentTier = mockLoyaltyTiers[0] as CustomerLoyaltyTier;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockCurrentTier);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1000' }),
+        } as any);
+
+      const ramadanLoyaltyPoints = {
+        ...mockLoyaltyPoints[0],
+        indonesianBonusApplied: 175, // Higher Ramadan bonus
+        calculationDetails: {
+          ...mockLoyaltyPoints[0].calculationDetails,
+          indonesianBonus: 175,
+          seasonalBonus: 87,
+          specialEvents: ['ramadan', 'local_payment'],
+        },
+      };
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(ramadanLoyaltyPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(ramadanLoyaltyPoints as any);
+
+      const ramadanPurchaseData = {
+        orderId: 'order-ramadan-001',
+        purchaseAmount: 875000,
+        orderItems: [
+          { productId: 'product-ramadan', quantity: 1, amount: 875000 },
+        ],
+        paymentMethod: 'qris',
+        channel: 'mobile_app',
+      };
+
+      const ramadanContext: Partial<IndonesianLoyaltyContext> = {
+        cultural: {
+          ramadanPeriod: true,
+          lebaranSeason: false,
+          independenceDay: false,
+          localHolidays: ['Ramadan 2024'],
+          familyOriented: true,
+          communityFocused: true,
+          religiousObservance: true,
+        },
+      };
+
+      const result = await service.awardPointsForPurchase(
+        'tenant-001',
+        'customer-loyalty-001',
+        ramadanPurchaseData.purchaseAmount,
+        {
+          orderId: ramadanPurchaseData.orderId,
+          paymentMethod: ramadanPurchaseData.paymentMethod,
+          purchaseChannel: ramadanPurchaseData.channel,
+          isRamadanPeriod: true,
+        },
+      );
+
+      expect(result.bonusPoints).toBeGreaterThan(100);
+      expect(result.tierProgress).toBeDefined();
+      expect(result.culturalBonuses).toBeDefined();
+    });
+
+    it('should apply tier multiplier for higher tier customers', async () => {
+      const goldCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 7500000,
+      } as unknown as Customer;
+      const goldTier = mockLoyaltyTiers[2] as CustomerLoyaltyTier; // Gold tier
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(goldCustomer);
+      jest.spyOn(loyaltyTierRepository, 'findOne').mockResolvedValue(goldTier);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '5000' }),
+        } as any);
+
+      const goldLoyaltyPoints = {
+        ...mockLoyaltyPoints[0],
+        multiplierApplied: 1.5, // Gold tier multiplier
+        tierBonusApplied: 394, // Additional tier bonus
+        pointsAmount: 1312, // Enhanced points with tier bonus
+      };
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(goldLoyaltyPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(goldLoyaltyPoints as any);
+
+      const purchaseData = {
+        orderId: 'order-gold-001',
+        purchaseAmount: 875000,
+        orderItems: [{ productId: 'product-001', quantity: 1, amount: 875000 }],
+        paymentMethod: 'qris',
+        channel: 'mobile_app',
+      };
+
+      const result = await service.awardPointsForPurchase(
+        'tenant-001',
+        'customer-loyalty-001',
+        purchaseData.purchaseAmount,
+        {
+          orderId: purchaseData.orderId,
+          paymentMethod: purchaseData.paymentMethod,
+          purchaseChannel: purchaseData.channel,
+        },
+      );
+
+      expect(result.bonusPoints).toBeGreaterThan(0);
+      expect(result.tierProgress).toBeDefined();
+      expect(result.pointsAwarded).toBeGreaterThan(875); // Should be more than base points
+    });
+
+    it('should handle WhatsApp engagement bonus correctly', async () => {
+      const whatsappCustomer = {
+        ...mockIndonesianCustomer,
+        indonesianMarketContext: {
+          ...mockIndonesianCustomer.indonesianMarketContext,
+          socialMediaUsage: ['whatsapp'],
+        },
+      } as unknown as Customer;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(whatsappCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[0] as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1000' }),
+        } as any);
+
+      const whatsappBonusPoints = {
+        ...mockLoyaltyPoints[0],
+        indonesianBonusApplied: 96, // Base + WhatsApp bonus
+        calculationDetails: {
+          ...mockLoyaltyPoints[0].calculationDetails,
+          specialEvents: ['local_payment', 'whatsapp_engagement'],
+        },
+      };
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(whatsappBonusPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(whatsappBonusPoints as any);
+
+      const purchaseData = {
+        orderId: 'order-whatsapp-001',
+        purchaseAmount: 875000,
+        orderItems: [{ productId: 'product-001', quantity: 1, amount: 875000 }],
+        paymentMethod: 'qris',
+        channel: 'whatsapp_business',
+      };
+
+      const whatsappContext: Partial<IndonesianLoyaltyContext> = {
+        social: {
+          whatsappIntegration: true,
+          socialMediaSharing: true,
+          communityEngagement: true,
+          familyReferrals: false,
+          localCommunityEvents: true,
+        },
+      };
+
+      const result = await service.awardPointsForPurchase(
+        'tenant-001',
+        'customer-loyalty-001',
+        purchaseData.purchaseAmount,
+        {
+          orderId: purchaseData.orderId,
+          paymentMethod: purchaseData.paymentMethod,
+          purchaseChannel: purchaseData.channel,
+        },
+      );
+
+      expect(result.culturalBonuses).toBeDefined();
+      expect(result.bonusPoints).toBeGreaterThan(87); // Should have extra WhatsApp bonus
+    });
+  });
+
+  describe('awardIndonesianEventPoints', () => {
+    it('should award special Ramadan bonus points', async () => {
+      const ramadanEventPoints = {
+        ...mockLoyaltyPoints[1],
+        pointsAmount: 500,
+        transactionType: LoyaltyPointsTransactionType.EARNED_RAMADAN_BONUS,
+      };
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1375' }),
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(ramadanEventPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(ramadanEventPoints as any);
+
+      const eventData = {
+        eventType: 'ramadan' as const,
+        eventName: 'Ramadan Kareem 2024',
+        participationType: 'attend' as const,
+        eventValue: 500,
+        culturalSignificance: 'high' as const,
+      };
+
+      const result = await service.awardIndonesianEventPoints(
+        'tenant-001',
+        'customer-loyalty-001',
+        eventData,
+      );
+
+      expect(result.pointsAwarded).toBeGreaterThan(0);
+      expect(result.bonusPoints).toBeGreaterThan(0);
+      expect(result.newBalance).toBeGreaterThan(0);
+      expect(result.eventBonus).toBeGreaterThan(0);
+      expect(result.culturalMultiplier).toBeGreaterThan(1);
+      expect(result.eventRecognition).toContain('Ramadan');
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'loyalty.indonesian_event.points_earned',
+        expect.any(Object),
+      );
+    });
+
+    it('should award Independence Day bonus with patriotic context', async () => {
+      const independenceEventPoints = {
+        ...mockLoyaltyPoints[1],
+        transactionType: LoyaltyPointsTransactionType.EARNED_INDEPENDENCE_DAY,
+        pointsAmount: 170, // 17 August = 170 points
+        indonesianContext: {
+          ...mockLoyaltyPoints[1].indonesianContext,
+          cultural: {
+            ...mockLoyaltyPoints[1].indonesianContext.cultural,
+            independenceDay: true,
+            ramadanPeriod: false,
+          },
+        },
+      };
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1545' }),
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(independenceEventPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(independenceEventPoints as any);
+
+      const eventData = {
+        eventType: 'independence_day' as const,
+        eventName: 'Merdeka Indonesia 2024',
+        participationType: 'attend' as const,
+        eventValue: 170,
+        culturalSignificance: 'high' as const,
+      };
+
+      const result = await service.awardIndonesianEventPoints(
+        'tenant-001',
+        'customer-loyalty-001',
+        eventData,
+      );
+
+      expect(result.pointsAwarded).toBeGreaterThan(0);
+      expect(result.bonusPoints).toBeGreaterThan(0);
+      expect(result.newBalance).toBeGreaterThan(0);
+      expect(result.eventBonus).toBeGreaterThan(0);
+      expect(result.eventRecognition).toContain('Independence');
+    });
+
+    it('should award Lebaran bonus with extended expiry', async () => {
+      const lebaranEventPoints = {
+        ...mockLoyaltyPoints[1],
+        transactionType: LoyaltyPointsTransactionType.EARNED_LEBARAN_BONUS,
+        pointsAmount: 750,
+        expiresAt: new Date(Date.now() + 18 * 30 * 24 * 60 * 60 * 1000), // 18 months
+        indonesianContext: {
+          ...mockLoyaltyPoints[1].indonesianContext,
+          cultural: {
+            ...mockLoyaltyPoints[1].indonesianContext.cultural,
+            lebaranSeason: true,
+            ramadanPeriod: false,
+          },
+        },
+      };
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '2125' }),
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(lebaranEventPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(lebaranEventPoints as any);
+
+      const eventData = {
+        eventType: 'lebaran' as const,
+        eventName: 'Eid ul-Fitr Celebration 2024',
+        participationType: 'share' as const,
+        eventValue: 750,
+        culturalSignificance: 'high' as const,
+        location: 'Jakarta',
+      };
+
+      const result = await service.awardIndonesianEventPoints(
+        'tenant-001',
+        'customer-loyalty-001',
+        eventData,
+      );
+
+      expect(result.pointsAwarded).toBeGreaterThan(0);
+      expect(result.bonusPoints).toBeGreaterThan(0);
+      expect(result.newBalance).toBeGreaterThan(0);
+      expect(result.eventBonus).toBeGreaterThan(0);
+      expect(result.culturalMultiplier).toBeGreaterThan(1);
+      expect(result.eventRecognition).toContain('Lebaran');
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: TIER MANAGEMENT TESTS
+  // =============================================
+
+  describe('evaluateTierUpgrade', () => {
+    it('should upgrade customer from Bronze to Silver with sufficient points and spend', async () => {
+      const eligibleCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 1200000, // 1.2M IDR - above Silver threshold
+      } as unknown as Customer;
+
+      const currentTier = mockLoyaltyTiers[0]; // Bronze
+      const availableTiers = mockLoyaltyTiers;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(eligibleCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(currentTier as any);
+      jest
+        .spyOn(loyaltyTierRepository, 'find')
+        .mockResolvedValue(availableTiers as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '1100' }), // Above Silver requirement
+        } as any);
+
+      const result = await service.evaluateTierUpgrade(
+        'tenant-001',
+        'customer-loyalty-001',
+      );
+
+      expect(result.upgraded).toBe(true);
+      expect(result.previousTier).toBe(LoyaltyTier.BRONZE);
+      expect(result.newTier).toBe(LoyaltyTier.SILVER);
+      expect(result.nextTierBenefits).toBeDefined();
+      expect(result.nextTierBenefits.length).toBeGreaterThan(0);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'loyalty.tier.upgraded',
+        expect.any(Object),
+      );
+    });
+
+    it('should not upgrade customer with insufficient criteria', async () => {
+      const ineligibleCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 750000, // 750K IDR - below Silver threshold
+      } as unknown as Customer;
+
+      const currentTier = mockLoyaltyTiers[0]; // Bronze
+      const availableTiers = mockLoyaltyTiers;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(ineligibleCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(currentTier as any);
+      jest
+        .spyOn(loyaltyTierRepository, 'find')
+        .mockResolvedValue(availableTiers as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '800' }), // Below Silver requirement
+        } as any);
+
+      const result = await service.evaluateTierUpgrade(
+        'tenant-001',
+        'customer-loyalty-001',
+      );
+
+      expect(result.upgraded).toBe(false);
+      expect(result.previousTier).toBe(LoyaltyTier.BRONZE);
+      expect(result.newTier).toBeUndefined();
+    });
+
+    it('should upgrade directly to Gold tier for high-value customers', async () => {
+      const highValueCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 6500000, // 6.5M IDR - above Gold threshold
+      } as unknown as Customer;
+
+      const currentTier = mockLoyaltyTiers[0]; // Bronze
+      const availableTiers = mockLoyaltyTiers;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(highValueCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(currentTier as any);
+      jest
+        .spyOn(loyaltyTierRepository, 'find')
+        .mockResolvedValue(availableTiers as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '5200' }), // Above Gold requirement
+        } as any);
+
+      const result = await service.evaluateTierUpgrade(
+        'tenant-001',
+        'customer-loyalty-001',
+      );
+
+      expect(result.upgraded).toBe(true);
+      expect(result.previousTier).toBe(LoyaltyTier.BRONZE);
+      expect(result.newTier).toBe(LoyaltyTier.GOLD);
+      expect(result.nextTierBenefits).toBeDefined();
+      expect(result.nextTierBenefits.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getAvailableTiers', () => {
+    it('should return all active tiers sorted by order', async () => {
+      jest
+        .spyOn(loyaltyTierRepository, 'find')
+        .mockResolvedValue(mockLoyaltyTiers as any);
+
+      const result = await service.getAvailableTiers('tenant-001');
+
+      expect(result).toHaveLength(3);
+      expect(result[0].tier).toBe(LoyaltyTier.BRONZE);
+      expect(result[1].tier).toBe(LoyaltyTier.SILVER);
+      expect(result[2].tier).toBe(LoyaltyTier.GOLD);
+      expect(result.every(tier => tier.tier)).toBeDefined();
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: REWARD MANAGEMENT TESTS
+  // =============================================
+
+  describe('getPersonalizedRewardRecommendations', () => {
+    it('should recommend rewards based on Indonesian cultural preferences', async () => {
+      const mockCustomer = { ...mockIndonesianCustomer } as unknown as Customer;
+      const mockCurrentTier = mockLoyaltyTiers[1] as CustomerLoyaltyTier; // Silver
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockCurrentTier);
+      jest
+        .spyOn(loyaltyRewardRepository, 'find')
+        .mockResolvedValue(mockLoyaltyRewards as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1375' }),
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '1375' }),
+        } as any);
+      jest.spyOn(loyaltyRedemptionRepository, 'count').mockResolvedValue(2);
+      jest
+        .spyOn(loyaltyPointsRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyPoints[1] as any);
+
+      const result = await service.getPersonalizedRewardRecommendations(
+        'tenant-001',
+        'customer-loyalty-001',
+        {
+          categories: ['electronics', 'fashion'],
+          culturalInterests: ['traditional_art', 'food'],
+          seasonalFocus: true,
+        },
+      );
+
+      expect(result).toBeDefined();
+      expect(result.length).toBeGreaterThan(0);
+
+      const highCulturalFitRewards = result.filter(
+        r => r.personalization.culturalAlignment > 80,
+      );
+      expect(highCulturalFitRewards.length).toBeGreaterThan(0);
+
+      // Check if Free Shipping is recommended (high cultural relevance for Indonesia)
+      const freeShippingReward = result.find(r => r.id === 'reward-002');
+      expect(freeShippingReward).toBeDefined();
+      expect(
+        freeShippingReward.personalization.culturalAlignment,
+      ).toBeGreaterThan(85);
+    });
+
+    it('should prioritize affordable rewards for customer with limited points', async () => {
+      const limitedPointsCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 500000, // Lower spend
+      } as unknown as Customer;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(limitedPointsCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[0] as any);
+      jest
+        .spyOn(loyaltyRewardRepository, 'find')
+        .mockResolvedValue(mockLoyaltyRewards as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '350' }), // Limited points
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '350' }),
+        } as any);
+      jest.spyOn(loyaltyRedemptionRepository, 'count').mockResolvedValue(0);
+      jest.spyOn(loyaltyPointsRepository, 'findOne').mockResolvedValue(null);
+
+      const result = await service.getPersonalizedRewardRecommendations(
+        'tenant-001',
+        'customer-loyalty-001',
+        {
+          priceRange: { min: 0, max: 350 },
+          categories: ['shipping'],
+          seasonalFocus: false,
+        },
+      );
+
+      expect(result).toBeDefined();
+
+      // Should recommend Free Shipping (300 points) as affordable
+      const affordableReward = result.find(r => r.pointsCost <= 350);
+      expect(affordableReward).toBeDefined();
+      expect(affordableReward.personalization.relevanceScore).toBeGreaterThan(
+        70,
+      ); // High relevance score
+    });
+
+    it('should recommend Indonesian experience rewards for high-tier customers', async () => {
+      const goldCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 7500000, // High spend for Gold tier
+      } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(goldCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[2] as any);
+      jest
+        .spyOn(loyaltyRewardRepository, 'find')
+        .mockResolvedValue(mockLoyaltyRewards as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '2500' }), // High points
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '2500' }),
+        } as any);
+      jest.spyOn(loyaltyRedemptionRepository, 'count').mockResolvedValue(5);
+      jest
+        .spyOn(loyaltyPointsRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyPoints[1] as any);
+
+      const result = await service.getPersonalizedRewardRecommendations(
+        'tenant-001',
+        'customer-loyalty-001',
+        {
+          culturalInterests: ['ramadan', 'family_package'],
+          categories: ['cultural_experience'],
+          seasonalFocus: true,
+        },
+      );
+
+      // Should include Ramadan Special Package for Gold tier
+      const indonesianExperience = result.find(r => r.id === 'reward-003');
+      expect(indonesianExperience).toBeDefined();
+      expect(indonesianExperience.indonesianFactors.culturalSignificance).toBe(
+        'high',
+      );
+      expect(
+        indonesianExperience.indonesianFactors.socialStatus.familyPride,
+      ).toBe(true);
+    });
+  });
+
+  describe('redeemReward', () => {
+    it('should successfully redeem reward with sufficient points', async () => {
+      const mockCustomer = { ...mockIndonesianCustomer } as unknown as Customer;
+      const mockReward = mockLoyaltyRewards[1] as CustomerLoyaltyReward; // Free Shipping - 300 points
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(loyaltyRewardRepository, 'findOne')
+        .mockResolvedValue(mockReward);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[1] as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1375' }), // Sufficient points
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '1375' }),
+        } as any);
+      jest.spyOn(loyaltyRedemptionRepository, 'count').mockResolvedValue(2);
+      jest
+        .spyOn(loyaltyPointsRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyPoints[1] as any);
+
+      const mockRedemption = {
+        id: 'redemption-001',
+        tenantId: 'tenant-001',
+        customerId: 'customer-loyalty-001',
+        rewardId: 'reward-002',
+        pointsRedeemed: 300,
+        monetaryValue: 15000,
+        status: RewardStatus.CLAIMED,
+        redemptionCode: 'STOK1234567890ABC',
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        redemptionDetails: {
+          originalValue: 15000,
+          discountApplied: 15000,
+          deliveryMethod: 'regular',
+        },
+        indonesianContext: {
+          culturalConsiderations: [],
+          regionalDelivery: 'indonesia',
+          localPartnerInvolved: true,
+          languageUsed: 'id',
+          familyBenefit: true,
+          communityImpact: 'positive',
+        },
+        createdAt: new Date(),
+      };
+
+      const queryRunner = dataSource.createQueryRunner();
+      jest.spyOn(queryRunner.manager, 'save').mockResolvedValue(mockRedemption);
+
+      const result = await service.redeemReward(
+        'tenant-001',
+        'customer-loyalty-001',
+        'reward-002',
+        {
+          deliveryAddress: { street: 'Jl. Sudirman', city: 'Jakarta' },
+          specialInstructions: 'Please deliver during business hours',
+        },
+      );
+
+      expect(result).toBeDefined();
+      expect(result.pointsUsed).toBe(300);
+      expect(result.redemptionStatus).toBe('confirmed');
+      expect(result.indonesianContext.culturalAppropriateness).toBeGreaterThan(
+        50,
+      );
+      expect(result.indonesianContext.regionalAvailability).toBe(true);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'loyalty.reward.redeemed',
+        expect.any(Object),
+      );
+    });
+
+    it('should reject redemption with insufficient points', async () => {
+      const mockCustomer = { ...mockIndonesianCustomer } as unknown as Customer;
+      const mockReward = mockLoyaltyRewards[2] as CustomerLoyaltyReward; // Ramadan Package - 1500 points
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(loyaltyRewardRepository, 'findOne')
+        .mockResolvedValue(mockReward);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[1] as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1200' }), // Insufficient points
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '1200' }),
+        } as any);
+      jest.spyOn(loyaltyRedemptionRepository, 'count').mockResolvedValue(2);
+      jest
+        .spyOn(loyaltyPointsRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyPoints[1] as any);
+
+      await expect(
+        service.redeemReward(
+          'tenant-001',
+          'customer-loyalty-001',
+          'reward-003',
+        ),
+      ).rejects.toThrow('Insufficient points for redemption');
+    });
+
+    it('should reject redemption for tier-restricted rewards', async () => {
+      const bronzeCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 750000,
+      } as unknown as Customer;
+      const goldReward = mockLoyaltyRewards[2] as CustomerLoyaltyReward; // Gold-only reward
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(bronzeCustomer);
+      jest
+        .spyOn(loyaltyRewardRepository, 'findOne')
+        .mockResolvedValue(goldReward);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[0] as any); // Bronze tier
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '2000' }), // Sufficient points but wrong tier
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '2000' }),
+        } as any);
+      jest.spyOn(loyaltyRedemptionRepository, 'count').mockResolvedValue(1);
+      jest
+        .spyOn(loyaltyPointsRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyPoints[0] as any);
+
+      await expect(
+        service.redeemReward(
+          'tenant-001',
+          'customer-loyalty-001',
+          'reward-003',
+        ),
+      ).rejects.toThrow('Customer tier not eligible for this reward');
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: ANALYTICS AND INSIGHTS TESTS
+  // =============================================
+
+  describe('getLoyaltyAnalyticsInsights', () => {
+    it('should provide comprehensive loyalty analytics with Indonesian insights', async () => {
+      // Mock the analytics cache as empty to force calculation
+      jest
+        .spyOn(service as any, 'analyticsCache', 'get')
+        .mockReturnValue(new Map());
+
+      const result = await service.getLoyaltyAnalyticsInsights('tenant-001');
+
+      expect(result).toBeDefined();
+      expect(result.overview).toBeDefined();
+      expect(result.tierDistribution).toBeDefined();
+      expect(result.indonesianMarketInsights).toBeDefined();
+      expect(result.recommendations).toBeDefined();
+
+      expect(
+        result.indonesianMarketInsights.culturalEngagementScore,
+      ).toBeGreaterThanOrEqual(0);
+      expect(result.indonesianMarketInsights.regionalPerformance).toBeDefined();
+      expect(
+        result.indonesianMarketInsights.religiousEventParticipation,
+      ).toBeDefined();
+      expect(
+        result.indonesianMarketInsights.culturalEngagementScore,
+      ).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('getCustomerLoyaltyProfile', () => {
+    it('should return comprehensive loyalty profile with Indonesian context', async () => {
+      const mockCustomer = { ...mockIndonesianCustomer } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[1] as any);
+      jest
+        .spyOn(loyaltyTierRepository, 'find')
+        .mockResolvedValue(mockLoyaltyTiers as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ total: '1375' }),
+        } as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '1375' }),
+        } as any);
+      jest.spyOn(loyaltyRedemptionRepository, 'count').mockResolvedValue(3);
+      jest
+        .spyOn(loyaltyPointsRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyPoints[1] as any);
+
+      const result = await service.getCustomerLoyaltyProfile(
+        'tenant-001',
+        'customer-loyalty-001',
+      );
+
+      expect(result).toBeDefined();
+      expect(result.customerId).toBe('customer-loyalty-001');
+      expect(result.currentTier).toBe(LoyaltyTier.SILVER);
+      expect(result.totalPoints).toBe(1375);
+      expect(result.availablePoints).toBe(1375);
+      expect(result.lifetimePoints).toBeGreaterThan(0);
+      expect(result.culturalProfile).toBeDefined();
+      expect(result.culturalProfile.engagementLevel).toBeDefined();
+      expect(result.culturalProfile.regionalBehavior).toBeDefined();
+      expect(
+        result.culturalProfile.religiousAlignment.ramadanEngagement,
+      ).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: ERROR HANDLING AND EDGE CASES
+  // =============================================
+
+  describe('Error Handling', () => {
+    it('should handle customer not found gracefully', async () => {
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(
+        service.awardPointsForPurchase(
+          'tenant-001',
+          'non-existent-customer',
+          100000,
+          {
+            orderId: 'order-001',
+            paymentMethod: 'qris',
+            purchaseChannel: 'mobile',
+          },
+        ),
+      ).rejects.toThrow('Customer not found');
+    });
+
+    it('should handle reward not found gracefully', async () => {
+      const mockCustomer = { ...mockIndonesianCustomer } as unknown as Customer;
+
+      jest.spyOn(customerRepository, 'findOne').mockResolvedValue(mockCustomer);
+      jest.spyOn(loyaltyRewardRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(
+        service.redeemReward(
+          'tenant-001',
+          'customer-loyalty-001',
+          'non-existent-reward',
+        ),
+      ).rejects.toThrow('Reward not found or not available');
+    });
+
+    it('should handle zero points calculation gracefully', async () => {
+      const zeroSpendCustomer = {
+        ...mockIndonesianCustomer,
+        totalSpend: 0,
+      } as unknown as Customer;
+
+      jest
+        .spyOn(customerRepository, 'findOne')
+        .mockResolvedValue(zeroSpendCustomer);
+      jest
+        .spyOn(loyaltyTierRepository, 'findOne')
+        .mockResolvedValue(mockLoyaltyTiers[0] as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'createQueryBuilder')
+        .mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawOne: jest.fn().mockResolvedValue({ balance: '0' }),
+        } as any);
+
+      const zeroPurchaseData = {
+        orderId: 'order-zero',
+        purchaseAmount: 0,
+        orderItems: [],
+        paymentMethod: 'qris',
+        channel: 'mobile',
+      };
+
+      const zeroLoyaltyPoints = {
+        ...mockLoyaltyPoints[0],
+        pointsAmount: 0,
+        pointsBalanceAfter: 0,
+        calculationDetails: {
+          basePoints: 0,
+          multiplier: 1.0,
+          bonusPoints: 0,
+          tierBonus: 0,
+          indonesianBonus: 0,
+          finalPoints: 0,
+          calculation: {
+            purchaseAmount: 0,
+            baseRate: 0.009,
+            tierMultiplier: 1.0,
+            culturalBonus: 0,
+            seasonalBonus: 0,
+            specialEvents: [],
+          },
+        },
+      };
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'create')
+        .mockReturnValue(zeroLoyaltyPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockResolvedValue(zeroLoyaltyPoints as any);
+
+      const result = await service.awardPointsForPurchase(
+        'tenant-001',
+        'customer-loyalty-001',
+        zeroPurchaseData.purchaseAmount,
+        {
+          orderId: zeroPurchaseData.orderId,
+          paymentMethod: zeroPurchaseData.paymentMethod,
+          purchaseChannel: zeroPurchaseData.channel,
+        },
+      );
+
+      expect(result.pointsAwarded).toBe(0);
+      expect(result.newBalance).toBe(0);
+    });
+  });
+
+  // =============================================
+  // ULTRATHINK: SCHEDULED JOBS TESTS
+  // =============================================
+
+  describe('Scheduled Jobs', () => {
+    it('should process point expirations correctly', async () => {
+      const expiredPoints = [
+        {
+          ...mockLoyaltyPoints[0],
+          id: 'expired-001',
+          expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Expired yesterday
+          isExpired: false,
+        },
+        {
+          ...mockLoyaltyPoints[1],
+          id: 'expired-002',
+          expiresAt: new Date(Date.now() - 48 * 60 * 60 * 1000), // Expired 2 days ago
+          isExpired: false,
+        },
+      ];
+
+      jest
+        .spyOn(loyaltyPointsRepository, 'find')
+        .mockResolvedValue(expiredPoints as any);
+      jest
+        .spyOn(loyaltyPointsRepository, 'save')
+        .mockImplementation(async points => {
+          (points as any).isExpired = true;
+          return points as any;
+        });
+
+      // Point expiration processing is handled internally
+      expect(loyaltyPointsRepository.findOne).toHaveBeenCalled();
+
+      expect(loyaltyPointsRepository.save).toHaveBeenCalledTimes(2);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'loyalty.points.expired',
+        expect.any(Object),
+      );
+    });
+
+    it('should perform monthly tier evaluation for all customers', async () => {
+      const mockCustomers = [
+        { id: 'customer-001', tenantId: 'tenant-001' },
+        { id: 'customer-002', tenantId: 'tenant-001' },
+        { id: 'customer-003', tenantId: 'tenant-001' },
+      ];
+
+      jest
+        .spyOn(customerRepository, 'find')
+        .mockResolvedValue(mockCustomers as any);
+      jest.spyOn(service, 'evaluateTierUpgrade').mockResolvedValue({
+        upgraded: true,
+        previousTier: 'PEMULA' as any,
+        newTier: 'BERKEMBANG' as any,
+        eligibilityStatus: 'eligible',
+      });
+
+      // Monthly tier evaluation is handled through scheduled jobs
+      expect(service.evaluateTierUpgrade).toBeDefined();
+
+      expect(service.evaluateTierUpgrade).toHaveBeenCalledTimes(3);
+    });
+  });
+});

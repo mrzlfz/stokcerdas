@@ -1,12 +1,13 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixEnterpriseSchemaPattern11751631000000 implements MigrationInterface {
+export class FixEnterpriseSchemaPattern11751631000000
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Comprehensive fix for Pattern 1: Mixed camelCase/snake_case in Enterprise Authentication tables
+    // Affected tables: departments, hierarchical_roles, permission_sets, approval_chains
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Comprehensive fix for Pattern 1: Mixed camelCase/snake_case in Enterprise Authentication tables
-        // Affected tables: departments, hierarchical_roles, permission_sets, approval_chains
-        
-        await queryRunner.query(`
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- ====================================
@@ -364,11 +365,11 @@ export class FixEnterpriseSchemaPattern11751631000000 implements MigrationInterf
                 RAISE NOTICE 'Enterprise Schema Pattern 1 fixes completed successfully';
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Rollback by removing the snake_case columns that were added
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Rollback by removing the snake_case columns that were added
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove added snake_case columns from departments
@@ -406,6 +407,5 @@ export class FixEnterpriseSchemaPattern11751631000000 implements MigrationInterf
                 RAISE NOTICE 'Enterprise Schema Pattern 1 rollback completed';
             END $$;
         `);
-    }
-
+  }
 }

@@ -1,0 +1,743 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Logger,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import {
+  DataPipelineOptimizationService,
+  OptimizationRequest,
+  OptimizationResult,
+  OptimizationAction,
+  PerformanceMetrics,
+  CachingStrategy,
+  IndexOptimization,
+  QueryOptimization,
+  OptimizationRecommendation,
+} from '../services/data-pipeline-optimization.service';
+
+// DTOs for API documentation and validation
+export class OptimizationRequestDto implements OptimizationRequest {
+  jobId: string;
+  tenantId: string;
+  optimizationType: 'query' | 'cache' | 'pipeline' | 'memory' | 'comprehensive';
+  scope: {
+    services?: string[];
+    operations?: string[];
+    dataTypes?: string[];
+    timeRange?: { from: string; to: string };
+  };
+  parameters: {
+    aggressiveness: 'conservative' | 'moderate' | 'aggressive';
+    enableCaching: boolean;
+    enableQueryOptimization: boolean;
+    enableParallelProcessing: boolean;
+    maxMemoryUsage?: number;
+    targetResponseTime?: number;
+    indonesianContext?: boolean;
+  };
+  monitoring: {
+    enableRealTimeMetrics: boolean;
+    enablePerformanceAlerts: boolean;
+    reportingInterval: number;
+  };
+}
+
+export class QuickOptimizationDto {
+  scope: string[];
+  aggressiveness: 'conservative' | 'moderate' | 'aggressive';
+  enableCaching?: boolean;
+  targetResponseTime?: number;
+}
+
+export class OptimizationPresetDto {
+  name: string;
+  description: string;
+  optimizationType: 'query' | 'cache' | 'pipeline' | 'memory' | 'comprehensive';
+  parameters: Record<string, any>;
+  useCase: string;
+  expectedImprovement: {
+    responseTime: string;
+    throughput: string;
+    memoryUsage: string;
+  };
+}
+
+export class PerformanceAnalysisDto {
+  timeRange: { from: string; to: string };
+  services?: string[];
+  metrics: ('response_time' | 'throughput' | 'memory' | 'cache_hit_ratio' | 'query_time')[];
+  includeComparison?: boolean;
+}
+
+export class CacheOptimizationDto {
+  strategy: 'aggressive' | 'balanced' | 'conservative';
+  layers: ('memory' | 'redis' | 'database')[];
+  maxSize?: number;
+  ttlStrategy?: 'fixed' | 'adaptive' | 'context_aware';
+}
+
+export class QueryOptimizationDto {
+  operation: 'analyze' | 'optimize' | 'create_indexes';
+  tables?: string[];
+  slowQueries?: boolean;
+  threshold?: number; // ms
+}
+
+export class MemoryOptimizationDto {
+  strategy: 'pooling' | 'lazy_loading' | 'compression' | 'streaming';
+  maxMemoryUsage: number; // MB
+  enableGarbageCollection?: boolean;
+}
+
+export class PerformanceMonitoringDto {
+  period: 'hour' | 'day' | 'week' | 'month';
+  services: string[];
+  alertThresholds: { metric: string; threshold: number }[];
+  includeIndonesianContext?: boolean;
+}
+
+export class OptimizationComparisonDto {
+  beforeJobId: string;
+  afterJobId: string;
+  metrics: string[];
+  includeRecommendations?: boolean;
+}
+
+@Controller('ml-forecasting/optimization')
+@ApiTags('Data Pipeline Optimization')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+export class DataPipelineOptimizationController {
+  private readonly logger = new Logger(DataPipelineOptimizationController.name);
+
+  constructor(
+    private readonly optimizationService: DataPipelineOptimizationService,
+  ) {}
+
+  @Post('optimize')
+  @ApiOperation({ 
+    summary: 'Optimize Data Pipeline Performance',
+    description: 'Comprehensive performance optimization including caching, query optimization, and memory management'
+  })
+  @ApiResponse({ status: 200, description: 'Optimization completed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid optimization request' })
+  @Permissions('ml_forecasting:optimization:write')
+  @HttpCode(HttpStatus.OK)
+  async optimizePipeline(
+    @Body() request: OptimizationRequestDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ): Promise<OptimizationResult> {
+    try {
+      this.logger.log(`Starting comprehensive optimization for tenant ${tenantId}`);
+
+      // Set tenant context
+      request.tenantId = tenantId;
+      request.jobId = request.jobId || `opt_${Date.now()}_${tenantId}`;
+
+      // Add Indonesian business context by default
+      if (request.parameters.indonesianContext === undefined) {
+        request.parameters.indonesianContext = true;
+      }
+
+      const result = await this.optimizationService.optimizePipeline(request);
+
+      this.logger.log(`Optimization completed: ${result.optimizations.length} optimizations applied`);
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Optimization failed: ${error.message}`, error.stack);
+      throw new BadRequestException(`Optimization failed: ${error.message}`);
+    }
+  }
+
+  @Post('optimize-quick')
+  @ApiOperation({ 
+    summary: 'Quick Pipeline Optimization',
+    description: 'Quick optimization with predefined settings for common use cases'
+  })
+  @ApiResponse({ status: 200, description: 'Quick optimization completed' })
+  @Permissions('ml_forecasting:optimization:write')
+  @HttpCode(HttpStatus.OK)
+  async quickOptimization(
+    @Body() dto: QuickOptimizationDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<OptimizationResult> {
+    try {
+      const request: OptimizationRequest = {
+        jobId: `quick_opt_${Date.now()}_${tenantId}`,
+        tenantId,
+        optimizationType: 'comprehensive',
+        scope: {
+          services: dto.scope,
+        },
+        parameters: {
+          aggressiveness: dto.aggressiveness,
+          enableCaching: dto.enableCaching ?? true,
+          enableQueryOptimization: true,
+          enableParallelProcessing: true,
+          targetResponseTime: dto.targetResponseTime,
+          indonesianContext: true,
+        },
+        monitoring: {
+          enableRealTimeMetrics: true,
+          enablePerformanceAlerts: true,
+          reportingInterval: 300, // 5 minutes
+        },
+      };
+
+      return await this.optimizationService.optimizePipeline(request);
+    } catch (error) {
+      this.logger.error(`Quick optimization failed: ${error.message}`);
+      throw new BadRequestException(`Quick optimization failed: ${error.message}`);
+    }
+  }
+
+  @Get('presets')
+  @ApiOperation({ 
+    summary: 'Get Optimization Presets',
+    description: 'Retrieve predefined optimization configurations for different use cases'
+  })
+  @ApiResponse({ status: 200, description: 'Optimization presets retrieved successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  async getOptimizationPresets(): Promise<OptimizationPresetDto[]> {
+    const presets: OptimizationPresetDto[] = [
+      {
+        name: 'Indonesian SMB Quick Cache',
+        description: 'Fast caching optimization for Indonesian SMB with mobile-first approach',
+        optimizationType: 'cache',
+        useCase: 'Mobile-first Indonesian SMB with limited bandwidth',
+        parameters: {
+          aggressiveness: 'moderate',
+          enableCaching: true,
+          enableQueryOptimization: true,
+          enableParallelProcessing: false,
+          maxMemoryUsage: 512, // MB
+          targetResponseTime: 500, // ms
+          indonesianContext: true,
+        },
+        expectedImprovement: {
+          responseTime: '60-80% faster',
+          throughput: '40-60% increase',
+          memoryUsage: '20-30% reduction',
+        },
+      },
+      {
+        name: 'Enterprise Performance Boost',
+        description: 'Comprehensive optimization for enterprise-level performance requirements',
+        optimizationType: 'comprehensive',
+        useCase: 'Large enterprise with high-volume data processing',
+        parameters: {
+          aggressiveness: 'aggressive',
+          enableCaching: true,
+          enableQueryOptimization: true,
+          enableParallelProcessing: true,
+          maxMemoryUsage: 2048, // MB
+          targetResponseTime: 200, // ms
+          indonesianContext: true,
+        },
+        expectedImprovement: {
+          responseTime: '70-90% faster',
+          throughput: '80-120% increase',
+          memoryUsage: '30-50% reduction',
+        },
+      },
+      {
+        name: 'Query-Heavy Workload',
+        description: 'Specialized optimization for analytics and reporting workloads',
+        optimizationType: 'query',
+        useCase: 'Analytics-heavy applications with complex queries',
+        parameters: {
+          aggressiveness: 'aggressive',
+          enableCaching: true,
+          enableQueryOptimization: true,
+          enableParallelProcessing: true,
+          maxMemoryUsage: 1024, // MB
+          targetResponseTime: 300, // ms
+          indonesianContext: true,
+        },
+        expectedImprovement: {
+          responseTime: '80-95% faster',
+          throughput: '60-100% increase',
+          memoryUsage: '25-40% reduction',
+        },
+      },
+      {
+        name: 'Memory-Constrained Environment',
+        description: 'Optimization for environments with limited memory resources',
+        optimizationType: 'memory',
+        useCase: 'Small servers or containerized deployments',
+        parameters: {
+          aggressiveness: 'conservative',
+          enableCaching: true,
+          enableQueryOptimization: true,
+          enableParallelProcessing: false,
+          maxMemoryUsage: 256, // MB
+          targetResponseTime: 800, // ms
+          indonesianContext: true,
+        },
+        expectedImprovement: {
+          responseTime: '40-60% faster',
+          throughput: '30-50% increase',
+          memoryUsage: '40-60% reduction',
+        },
+      },
+      {
+        name: 'Real-time Data Processing',
+        description: 'Optimization for real-time streaming and live data processing',
+        optimizationType: 'pipeline',
+        useCase: 'Real-time inventory tracking and live analytics',
+        parameters: {
+          aggressiveness: 'moderate',
+          enableCaching: true,
+          enableQueryOptimization: true,
+          enableParallelProcessing: true,
+          maxMemoryUsage: 1536, // MB
+          targetResponseTime: 100, // ms
+          indonesianContext: true,
+        },
+        expectedImprovement: {
+          responseTime: '70-85% faster',
+          throughput: '100-150% increase',
+          memoryUsage: '20-35% reduction',
+        },
+      },
+      {
+        name: 'Indonesian Business Hours',
+        description: 'Context-aware optimization for Indonesian business patterns and peak hours',
+        optimizationType: 'comprehensive',
+        useCase: 'Indonesian market with timezone-specific optimizations',
+        parameters: {
+          aggressiveness: 'moderate',
+          enableCaching: true,
+          enableQueryOptimization: true,
+          enableParallelProcessing: true,
+          maxMemoryUsage: 1024, // MB
+          targetResponseTime: 300, // ms
+          indonesianContext: true,
+        },
+        expectedImprovement: {
+          responseTime: '65-80% faster during peak hours',
+          throughput: '50-80% increase',
+          memoryUsage: '25-40% reduction',
+        },
+      },
+    ];
+
+    return presets;
+  }
+
+  @Post('apply-preset')
+  @ApiOperation({ 
+    summary: 'Apply Optimization Preset',
+    description: 'Apply a predefined optimization configuration'
+  })
+  @ApiResponse({ status: 200, description: 'Preset applied successfully' })
+  @Permissions('ml_forecasting:optimization:write')
+  @HttpCode(HttpStatus.OK)
+  async applyOptimizationPreset(
+    @Body() body: { presetName: string; customParameters?: Record<string, any> },
+    @CurrentTenant() tenantId: string,
+  ): Promise<OptimizationResult> {
+    try {
+      const presets = await this.getOptimizationPresets();
+      const preset = presets.find(p => p.name === body.presetName);
+
+      if (!preset) {
+        throw new BadRequestException(`Preset '${body.presetName}' not found`);
+      }
+
+      const request: OptimizationRequest = {
+        jobId: `preset_${body.presetName.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}_${tenantId}`,
+        tenantId,
+        optimizationType: preset.optimizationType,
+        scope: {
+          services: ['all'],
+        },
+        parameters: {
+          ...preset.parameters,
+          ...body.customParameters,
+          indonesianContext: true,
+        },
+        monitoring: {
+          enableRealTimeMetrics: true,
+          enablePerformanceAlerts: true,
+          reportingInterval: 300,
+        },
+      };
+
+      return await this.optimizationService.optimizePipeline(request);
+    } catch (error) {
+      this.logger.error(`Failed to apply preset: ${error.message}`);
+      throw new BadRequestException(`Failed to apply preset: ${error.message}`);
+    }
+  }
+
+  @Post('cache/optimize')
+  @ApiOperation({ 
+    summary: 'Optimize Caching Strategy',
+    description: 'Specifically optimize caching layers and strategies'
+  })
+  @ApiResponse({ status: 200, description: 'Cache optimization completed' })
+  @Permissions('ml_forecasting:optimization:write')
+  @HttpCode(HttpStatus.OK)
+  async optimizeCache(
+    @Body() dto: CacheOptimizationDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<OptimizationResult> {
+    try {
+      const request: OptimizationRequest = {
+        jobId: `cache_opt_${Date.now()}_${tenantId}`,
+        tenantId,
+        optimizationType: 'cache',
+        scope: {
+          services: ['caching'],
+        },
+        parameters: {
+          aggressiveness: dto.strategy === 'aggressive' ? 'aggressive' : 
+                         dto.strategy === 'conservative' ? 'conservative' : 'moderate',
+          enableCaching: true,
+          enableQueryOptimization: false,
+          enableParallelProcessing: false,
+          maxMemoryUsage: dto.maxSize,
+          indonesianContext: true,
+        },
+        monitoring: {
+          enableRealTimeMetrics: true,
+          enablePerformanceAlerts: true,
+          reportingInterval: 180,
+        },
+      };
+
+      return await this.optimizationService.optimizePipeline(request);
+    } catch (error) {
+      this.logger.error(`Cache optimization failed: ${error.message}`);
+      throw new BadRequestException(`Cache optimization failed: ${error.message}`);
+    }
+  }
+
+  @Post('query/optimize')
+  @ApiOperation({ 
+    summary: 'Optimize Database Queries',
+    description: 'Analyze and optimize database query performance'
+  })
+  @ApiResponse({ status: 200, description: 'Query optimization completed' })
+  @Permissions('ml_forecasting:optimization:write')
+  @HttpCode(HttpStatus.OK)
+  async optimizeQueries(
+    @Body() dto: QueryOptimizationDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<OptimizationResult> {
+    try {
+      const request: OptimizationRequest = {
+        jobId: `query_opt_${Date.now()}_${tenantId}`,
+        tenantId,
+        optimizationType: 'query',
+        scope: {
+          services: ['database'],
+          operations: dto.tables,
+        },
+        parameters: {
+          aggressiveness: 'moderate',
+          enableCaching: false,
+          enableQueryOptimization: true,
+          enableParallelProcessing: true,
+          targetResponseTime: dto.threshold,
+          indonesianContext: true,
+        },
+        monitoring: {
+          enableRealTimeMetrics: true,
+          enablePerformanceAlerts: true,
+          reportingInterval: 300,
+        },
+      };
+
+      return await this.optimizationService.optimizePipeline(request);
+    } catch (error) {
+      this.logger.error(`Query optimization failed: ${error.message}`);
+      throw new BadRequestException(`Query optimization failed: ${error.message}`);
+    }
+  }
+
+  @Post('memory/optimize')
+  @ApiOperation({ 
+    summary: 'Optimize Memory Usage',
+    description: 'Optimize memory allocation and garbage collection'
+  })
+  @ApiResponse({ status: 200, description: 'Memory optimization completed' })
+  @Permissions('ml_forecasting:optimization:write')
+  @HttpCode(HttpStatus.OK)
+  async optimizeMemory(
+    @Body() dto: MemoryOptimizationDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<OptimizationResult> {
+    try {
+      const request: OptimizationRequest = {
+        jobId: `memory_opt_${Date.now()}_${tenantId}`,
+        tenantId,
+        optimizationType: 'memory',
+        scope: {
+          services: ['memory'],
+        },
+        parameters: {
+          aggressiveness: dto.strategy === 'compression' ? 'aggressive' : 'moderate',
+          enableCaching: true,
+          enableQueryOptimization: false,
+          enableParallelProcessing: true,
+          maxMemoryUsage: dto.maxMemoryUsage,
+          indonesianContext: true,
+        },
+        monitoring: {
+          enableRealTimeMetrics: true,
+          enablePerformanceAlerts: true,
+          reportingInterval: 120,
+        },
+      };
+
+      return await this.optimizationService.optimizePipeline(request);
+    } catch (error) {
+      this.logger.error(`Memory optimization failed: ${error.message}`);
+      throw new BadRequestException(`Memory optimization failed: ${error.message}`);
+    }
+  }
+
+  @Get('performance/metrics')
+  @ApiOperation({ 
+    summary: 'Get Performance Metrics',
+    description: 'Retrieve comprehensive performance metrics and trends'
+  })
+  @ApiResponse({ status: 200, description: 'Performance metrics retrieved successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  async getPerformanceMetrics(
+    @Query() query: PerformanceAnalysisDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    metrics: PerformanceMetrics;
+    trends: any;
+    recommendations: string[];
+    indonesianContext: any;
+  }> {
+    try {
+      return await this.optimizationService.getPerformanceMetrics(tenantId, query);
+    } catch (error) {
+      this.logger.error(`Failed to retrieve performance metrics: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve performance metrics: ${error.message}`);
+    }
+  }
+
+  @Get('performance/trends')
+  @ApiOperation({ 
+    summary: 'Get Performance Trends',
+    description: 'Get historical performance trends and patterns'
+  })
+  @ApiResponse({ status: 200, description: 'Performance trends retrieved successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  async getPerformanceTrends(
+    @Query('period') period: 'hour' | 'day' | 'week' | 'month',
+    @Query('services') services: string,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    trends: any[];
+    insights: string[];
+    predictedTrends: any[];
+    indonesianBusinessInsights: any;
+  }> {
+    try {
+      const serviceList = services ? services.split(',') : undefined;
+      return await this.optimizationService.getPerformanceTrends(tenantId, period, serviceList);
+    } catch (error) {
+      this.logger.error(`Failed to retrieve performance trends: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve performance trends: ${error.message}`);
+    }
+  }
+
+  @Post('monitoring/setup')
+  @ApiOperation({ 
+    summary: 'Setup Performance Monitoring',
+    description: 'Configure real-time performance monitoring and alerts'
+  })
+  @ApiResponse({ status: 200, description: 'Performance monitoring setup completed' })
+  @Permissions('ml_forecasting:optimization:write')
+  @HttpCode(HttpStatus.OK)
+  async setupPerformanceMonitoring(
+    @Body() dto: PerformanceMonitoringDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    monitoringId: string;
+    status: string;
+    alertsConfigured: number;
+    expectedNotifications: string[];
+  }> {
+    try {
+      return await this.optimizationService.setupPerformanceMonitoring(tenantId, dto);
+    } catch (error) {
+      this.logger.error(`Failed to setup performance monitoring: ${error.message}`);
+      throw new BadRequestException(`Failed to setup performance monitoring: ${error.message}`);
+    }
+  }
+
+  @Get('monitoring/status')
+  @ApiOperation({ 
+    summary: 'Get Monitoring Status',
+    description: 'Get current status of performance monitoring systems'
+  })
+  @ApiResponse({ status: 200, description: 'Monitoring status retrieved successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  async getMonitoringStatus(
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    monitoring: any[];
+    activeAlerts: any[];
+    systemHealth: any;
+    indonesianContextStatus: any;
+  }> {
+    try {
+      return await this.optimizationService.getMonitoringStatus(tenantId);
+    } catch (error) {
+      this.logger.error(`Failed to retrieve monitoring status: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve monitoring status: ${error.message}`);
+    }
+  }
+
+  @Post('compare')
+  @ApiOperation({ 
+    summary: 'Compare Optimization Results',
+    description: 'Compare performance before and after optimization'
+  })
+  @ApiResponse({ status: 200, description: 'Optimization comparison completed' })
+  @Permissions('ml_forecasting:optimization:read')
+  @HttpCode(HttpStatus.OK)
+  async compareOptimizations(
+    @Body() dto: OptimizationComparisonDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    comparison: any;
+    insights: string[];
+    recommendations: string[];
+    indonesianBusinessImpact: any;
+  }> {
+    try {
+      return await this.optimizationService.compareOptimizations(tenantId, dto);
+    } catch (error) {
+      this.logger.error(`Failed to compare optimizations: ${error.message}`);
+      throw new BadRequestException(`Failed to compare optimizations: ${error.message}`);
+    }
+  }
+
+  @Get('recommendations')
+  @ApiOperation({ 
+    summary: 'Get Optimization Recommendations',
+    description: 'Get AI-powered optimization recommendations based on current performance'
+  })
+  @ApiResponse({ status: 200, description: 'Optimization recommendations retrieved successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  async getOptimizationRecommendations(
+    @Query('includeIndonesianContext') includeIndonesianContext: boolean = true,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    recommendations: OptimizationRecommendation[];
+    priority: string;
+    estimatedImpact: any;
+    indonesianBusinessContext: any;
+  }> {
+    try {
+      return await this.optimizationService.getOptimizationRecommendations(tenantId, includeIndonesianContext);
+    } catch (error) {
+      this.logger.error(`Failed to get optimization recommendations: ${error.message}`);
+      throw new BadRequestException(`Failed to get optimization recommendations: ${error.message}`);
+    }
+  }
+
+  @Post('health-check')
+  @ApiOperation({ 
+    summary: 'Performance Health Check',
+    description: 'Comprehensive performance health check with automated recommendations'
+  })
+  @ApiResponse({ status: 200, description: 'Health check completed successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  @HttpCode(HttpStatus.OK)
+  async performanceHealthCheck(
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    overallHealth: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+    healthScore: number;
+    issues: any[];
+    recommendations: string[];
+    indonesianOptimizations: any;
+    nextCheckScheduled: string;
+  }> {
+    try {
+      return await this.optimizationService.performanceHealthCheck(tenantId);
+    } catch (error) {
+      this.logger.error(`Performance health check failed: ${error.message}`);
+      throw new BadRequestException(`Performance health check failed: ${error.message}`);
+    }
+  }
+
+  @Get('cache/stats')
+  @ApiOperation({ 
+    summary: 'Get Cache Statistics',
+    description: 'Detailed caching performance statistics and hit ratios'
+  })
+  @ApiResponse({ status: 200, description: 'Cache statistics retrieved successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  async getCacheStatistics(
+    @Query('timeRange') timeRange: string = '24h',
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    cacheStats: any;
+    hitRatios: any;
+    memoryUsage: any;
+    recommendations: string[];
+    indonesianCacheOptimizations: any;
+  }> {
+    try {
+      return await this.optimizationService.getCacheStatistics(tenantId, timeRange);
+    } catch (error) {
+      this.logger.error(`Failed to retrieve cache statistics: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve cache statistics: ${error.message}`);
+    }
+  }
+
+  @Get('query/analysis')
+  @ApiOperation({ 
+    summary: 'Query Performance Analysis',
+    description: 'Detailed analysis of database query performance'
+  })
+  @ApiResponse({ status: 200, description: 'Query analysis completed successfully' })
+  @Permissions('ml_forecasting:optimization:read')
+  async getQueryAnalysis(
+    @Query('slowOnly') slowOnly: boolean = false,
+    @Query('threshold') threshold: number = 1000,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    queryStats: any[];
+    slowQueries: any[];
+    recommendations: string[];
+    indexSuggestions: any[];
+    indonesianQueryOptimizations: any;
+  }> {
+    try {
+      return await this.optimizationService.getQueryAnalysis(tenantId, slowOnly, threshold);
+    } catch (error) {
+      this.logger.error(`Query analysis failed: ${error.message}`);
+      throw new BadRequestException(`Query analysis failed: ${error.message}`);
+    }
+  }
+}

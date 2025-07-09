@@ -89,8 +89,9 @@ export class ModelTrainingService {
    * Start training a new model
    */
   async startTraining(
-    tenantId: string,
     request: TrainingRequest,
+    tenantId: string,
+    userId?: string,
   ): Promise<TrainingResult> {
     this.logger.log(`Starting training for model type: ${request.modelType}`);
 
@@ -135,7 +136,7 @@ export class ModelTrainingService {
           features: request.trainingConfig.features,
           target: request.trainingConfig.target,
         };
-        model.createdBy = request.userId;
+        model.createdBy = userId || request.userId;
       }
 
       model = await this.mlModelRepo.save(model);
@@ -155,7 +156,7 @@ export class ModelTrainingService {
         features: request.trainingConfig.features,
         target: request.trainingConfig.target,
       };
-      trainingJob.createdBy = request.userId;
+      trainingJob.createdBy = userId || request.userId;
 
       const savedJob = await this.trainingJobRepo.save(trainingJob);
 
@@ -957,5 +958,68 @@ except Exception as e:
         reject(new Error('Python script execution timeout'));
       }, 300000); // 5 minutes timeout
     });
+  }
+
+  /**
+   * List training jobs for a tenant
+   */
+  async listTrainingJobs(tenantId: string, limit: number): Promise<TrainingJob[]> {
+    this.logger.debug(`Getting training jobs for tenant ${tenantId}`);
+    
+    return this.trainingJobRepo.find({
+      where: { tenantId },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  /**
+   * Get training job status
+   */
+  async getTrainingStatus(jobId: string, tenantId: string): Promise<TrainingJob | null> {
+    this.logger.debug(`Getting training job status for job ${jobId}`);
+    
+    return this.trainingJobRepo.findOne({
+      where: { id: jobId, tenantId },
+    });
+  }
+
+  /**
+   * Get trained models for a tenant
+   */
+  async getTrainedModels(tenantId: string): Promise<MLModel[]> {
+    this.logger.debug(`Getting trained models for tenant ${tenantId}`);
+    
+    return this.mlModelRepo.find({
+      where: { 
+        tenantId,
+        status: ModelStatus.TRAINED,
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Deploy a trained model
+   */
+  async deployModel(modelId: string, tenantId: string): Promise<MLModel> {
+    this.logger.debug(`Deploying model ${modelId} for tenant ${tenantId}`);
+    
+    const model = await this.mlModelRepo.findOne({
+      where: { id: modelId, tenantId },
+    });
+
+    if (!model) {
+      throw new Error(`Model ${modelId} not found`);
+    }
+
+    if (model.status !== ModelStatus.TRAINED) {
+      throw new Error(`Model ${modelId} is not trained and cannot be deployed`);
+    }
+
+    model.status = ModelStatus.DEPLOYED;
+    model.deployedAt = new Date();
+    
+    return this.mlModelRepo.save(model);
   }
 }

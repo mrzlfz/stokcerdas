@@ -1,13 +1,14 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CleanupDuplicateColumns1751632695135 implements MigrationInterface {
+export class CleanupDuplicateColumns1751632695135
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // CRITICAL: Clean up duplicate columns that are confusing TypeORM
+    // Root cause: Previous migrations added snake_case columns but camelCase originals still exist
+    // Solution: Remove camelCase duplicates, keep only snake_case columns that entities expect
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // CRITICAL: Clean up duplicate columns that are confusing TypeORM
-        // Root cause: Previous migrations added snake_case columns but camelCase originals still exist
-        // Solution: Remove camelCase duplicates, keep only snake_case columns that entities expect
-        
-        await queryRunner.query(`
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- ====================================
@@ -275,14 +276,14 @@ export class CleanupDuplicateColumns1751632695135 implements MigrationInterface 
                 
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Rollback would involve recreating the camelCase columns
-        // This is complex because we'd lose the distinction between which was "original"
-        // For safety, this rollback recreates basic camelCase columns with default values
-        
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Rollback would involve recreating the camelCase columns
+    // This is complex because we'd lose the distinction between which was "original"
+    // For safety, this rollback recreates basic camelCase columns with default values
+
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Recreate basic camelCase columns for rollback (with defaults)
@@ -304,6 +305,5 @@ export class CleanupDuplicateColumns1751632695135 implements MigrationInterface 
                 RAISE NOTICE 'Rollback completed - camelCase columns restored';
             END $$;
         `);
-    }
-
+  }
 }

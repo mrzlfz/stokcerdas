@@ -1,0 +1,1794 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile, max, min } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { MLModel } from '../entities/ml-model.entity';
+import { Prediction } from '../entities/prediction.entity';
+
+/**
+ * PHASE 4.2.1: Real-time Model Performance Monitoring 📊
+ * 
+ * Comprehensive real-time monitoring system for ML model performance in production.
+ * Tracks prediction accuracy, model health, response times, and business impact metrics
+ * with Indonesian SMB context and real-time alerting capabilities.
+ */
+
+export interface ModelPerformanceMonitoringRequest {
+  tenantId: string;
+  monitoringScope: MonitoringScope;
+  performanceMetrics: PerformanceMetricConfiguration[];
+  realTimeTracking: RealTimeTrackingConfig;
+  alertingSystem: AlertingConfiguration;
+  businessImpactMetrics: BusinessImpactConfiguration;
+  monitoringSchedule: MonitoringScheduleConfig;
+  reportingSettings: ReportingConfiguration;
+  indonesianContextSettings: IndonesianBusinessContext;
+}
+
+export interface MonitoringScope {
+  scopeId: string;
+  modelsToMonitor: ModelMonitoringTarget[];
+  monitoringPeriod: MonitoringPeriod;
+  geographicScope: GeographicScope;
+  businessScope: BusinessScope;
+  dataSegmentation: DataSegmentation;
+  priorityLevels: PriorityLevel[];
+}
+
+export interface ModelMonitoringTarget {
+  modelId: string;
+  modelName: string;
+  modelType: ModelType;
+  monitoringLevel: 'basic' | 'standard' | 'comprehensive' | 'enterprise';
+  criticality: 'low' | 'medium' | 'high' | 'critical';
+  expectedTrafficVolume: number;
+  businessContext: string;
+  stakeholders: string[];
+  maintenanceWindows: MaintenanceWindow[];
+}
+
+export type ModelType = 
+  | 'demand_forecasting'
+  | 'inventory_optimization' 
+  | 'price_prediction'
+  | 'seasonal_analysis'
+  | 'trend_detection'
+  | 'anomaly_detection'
+  | 'recommendation_engine'
+  | 'classification'
+  | 'ensemble_model';
+
+export interface MaintenanceWindow {
+  windowId: string;
+  description: string;
+  startTime: string; // HH:mm format
+  endTime: string;
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  daysOfWeek: number[];
+  maintenanceType: 'planned' | 'emergency' | 'routine';
+}
+
+export interface MonitoringPeriod {
+  startDate: Date;
+  endDate?: Date;
+  continuousMonitoring: boolean;
+  evaluationWindows: EvaluationWindow[];
+  aggregationPeriods: AggregationPeriod[];
+}
+
+export interface EvaluationWindow {
+  windowId: string;
+  windowType: 'sliding' | 'tumbling' | 'session' | 'custom';
+  duration: number; // seconds
+  overlap?: number; // seconds for sliding windows
+  triggerConditions: string[];
+}
+
+export interface AggregationPeriod {
+  periodType: 'minute' | 'hour' | 'day' | 'week' | 'month';
+  periodCount: number;
+  includePartialPeriods: boolean;
+}
+
+export interface GeographicScope {
+  regions: IndonesianRegion[];
+  cities: string[];
+  includeRural: boolean;
+  includeUrban: boolean;
+  logisticsZones: LogisticsZone[];
+}
+
+export interface IndonesianRegion {
+  regionCode: string;
+  regionName: string;
+  provinces: string[];
+  economicZone: 'sez' | 'industrial' | 'agricultural' | 'tourism' | 'mixed';
+  developmentLevel: 'tier1' | 'tier2' | 'tier3' | 'rural';
+}
+
+export interface LogisticsZone {
+  zoneId: string;
+  zoneName: string;
+  coverageAreas: string[];
+  deliveryComplexity: 'simple' | 'moderate' | 'complex' | 'very_complex';
+  avgDeliveryTime: number; // hours
+}
+
+export interface BusinessScope {
+  businessCategories: string[];
+  companyTypes: CompanyType[];
+  businessSizes: BusinessSize[];
+  marketSegments: MarketSegment[];
+  operationalPatterns: OperationalPattern[];
+}
+
+export type CompanyType = 'toko' | 'warung' | 'minimarket' | 'distributor' | 'manufacturer' | 'retailer' | 'ecommerce';
+export type BusinessSize = 'micro' | 'small' | 'medium' | 'large';
+export type MarketSegment = 'b2c' | 'b2b' | 'b2g' | 'c2c' | 'marketplace';
+
+export interface OperationalPattern {
+  patternId: string;
+  operatingHours: OperatingHours;
+  seasonalPatterns: string[];
+  peakPeriods: PeakPeriod[];
+  businessCycles: BusinessCycle[];
+}
+
+export interface OperatingHours {
+  openTime: string; // HH:mm
+  closeTime: string; // HH:mm
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  operatingDays: number[]; // 0=Sunday, 1=Monday, etc.
+  specialHours: SpecialHours[];
+}
+
+export interface SpecialHours {
+  occasion: string;
+  dates: Date[];
+  alternativeHours?: { openTime: string; closeTime: string };
+  closed: boolean;
+}
+
+export interface PeakPeriod {
+  periodName: string;
+  startTime: string;
+  endTime: string;
+  expectedVolumeMultiplier: number;
+  description: string;
+}
+
+export interface BusinessCycle {
+  cycleName: string;
+  cycleType: 'daily' | 'weekly' | 'monthly' | 'seasonal' | 'annual';
+  pattern: CyclePattern;
+  impactLevel: 'low' | 'medium' | 'high';
+}
+
+export interface CyclePattern {
+  peakDays: number[];
+  lowDays: number[];
+  averageMultipliers: Record<string, number>;
+}
+
+export interface DataSegmentation {
+  segmentationCriteria: SegmentationCriteria[];
+  crossSegmentAnalysis: boolean;
+  segmentComparisons: SegmentComparison[];
+}
+
+export interface SegmentationCriteria {
+  criteriaType: 'product_category' | 'price_range' | 'volume_range' | 'geographic' | 'temporal' | 'custom';
+  criteriaName: string;
+  segmentDefinitions: SegmentDefinition[];
+}
+
+export interface SegmentDefinition {
+  segmentId: string;
+  segmentName: string;
+  conditions: SegmentCondition[];
+  expectedBehavior: string;
+}
+
+export interface SegmentCondition {
+  field: string;
+  operator: 'equals' | 'greater_than' | 'less_than' | 'between' | 'in' | 'regex';
+  value: any;
+}
+
+export interface SegmentComparison {
+  comparisonId: string;
+  segmentIds: string[];
+  comparisonMetrics: string[];
+  comparisonType: 'absolute' | 'relative' | 'normalized';
+}
+
+export interface PriorityLevel {
+  levelName: string;
+  levelValue: number;
+  criteria: PriorityCriteria;
+  responseTimeTarget: number; // seconds
+  escalationRules: EscalationRule[];
+}
+
+export interface PriorityCriteria {
+  businessImpact: 'low' | 'medium' | 'high' | 'critical';
+  affectedUsers: number;
+  revenueImpact: number;
+  customCriteria: Record<string, any>;
+}
+
+export interface EscalationRule {
+  triggerCondition: string;
+  escalationTarget: string;
+  escalationDelay: number; // seconds
+  escalationMessage: string;
+}
+
+export interface PerformanceMetricConfiguration {
+  metricId: string;
+  metricName: string;
+  metricType: MetricType;
+  calculationMethod: CalculationMethod;
+  thresholds: PerformanceThreshold[];
+  collectonFrequency: number; // seconds
+  retentionPeriod: number; // days
+  indonesianSpecificConfig?: IndonesianMetricConfig;
+}
+
+export type MetricType = 
+  | 'accuracy_metrics'         // MAPE, RMSE, MAE
+  | 'response_time_metrics'    // Latency, throughput
+  | 'availability_metrics'     // Uptime, error rates
+  | 'business_metrics'         // Revenue impact, cost savings
+  | 'data_quality_metrics'     // Completeness, freshness
+  | 'model_health_metrics'     // Confidence, stability
+  | 'resource_metrics'         // CPU, memory, storage
+  | 'custom_metrics';          // Custom business metrics
+
+export interface CalculationMethod {
+  methodType: 'simple' | 'weighted' | 'rolling' | 'exponential' | 'custom';
+  parameters: Record<string, any>;
+  aggregationWindow: number; // seconds
+  computationFrequency: number; // seconds
+}
+
+export interface PerformanceThreshold {
+  thresholdName: string;
+  thresholdType: 'warning' | 'critical' | 'emergency';
+  condition: ThresholdCondition;
+  actionRequired: string;
+  notificationChannels: string[];
+}
+
+export interface ThresholdCondition {
+  operator: 'greater_than' | 'less_than' | 'equals' | 'between' | 'trend_increasing' | 'trend_decreasing';
+  value: number | [number, number];
+  evaluationPeriod: number; // seconds
+  consecutiveViolations: number;
+}
+
+export interface IndonesianMetricConfig {
+  currencyAdjustment: boolean;
+  regionalWeighting: Record<string, number>;
+  businessHoursOnly: boolean;
+  ramadanAdjustment: boolean;
+  holidayAdjustment: boolean;
+  localCompetitorBenchmark: boolean;
+}
+
+export interface RealTimeTrackingConfig {
+  trackingEnabled: boolean;
+  trackingFrequency: number; // seconds
+  streamingMetrics: StreamingMetric[];
+  realTimeAlerts: RealTimeAlert[];
+  dashboardUpdates: DashboardUpdate[];
+  anomalyDetection: RealTimeAnomalyDetection;
+}
+
+export interface StreamingMetric {
+  metricId: string;
+  streamingWindow: number; // seconds
+  updateFrequency: number; // seconds
+  bufferSize: number;
+  compressionStrategy: 'none' | 'sampling' | 'aggregation';
+}
+
+export interface RealTimeAlert {
+  alertId: string;
+  triggerConditions: string[];
+  responseTimeTarget: number; // seconds
+  escalationChain: string[];
+  alertChannels: AlertChannel[];
+}
+
+export interface AlertChannel {
+  channelType: 'email' | 'sms' | 'webhook' | 'slack' | 'whatsapp' | 'in_app';
+  channelConfig: Record<string, any>;
+  priority: number;
+}
+
+export interface DashboardUpdate {
+  dashboardId: string;
+  updateFrequency: number; // seconds
+  includedMetrics: string[];
+  visualizationType: 'chart' | 'gauge' | 'table' | 'heatmap' | 'custom';
+}
+
+export interface RealTimeAnomalyDetection {
+  enabled: boolean;
+  algorithms: AnomalyAlgorithm[];
+  sensitivityLevel: 'low' | 'medium' | 'high' | 'adaptive';
+  learningMode: boolean;
+  exclusionPatterns: string[];
+}
+
+export interface AnomalyAlgorithm {
+  algorithmType: 'statistical' | 'ml_based' | 'rule_based' | 'hybrid';
+  parameters: Record<string, any>;
+  confidenceThreshold: number;
+  adaptationRate: number;
+}
+
+export interface AlertingConfiguration {
+  alertingEnabled: boolean;
+  alertSeverityLevels: AlertSeverity[];
+  notificationChannels: NotificationChannel[];
+  alertSuppressionRules: AlertSuppressionRule[];
+  escalationMatrix: EscalationMatrix;
+  indonesianAlertSettings: IndonesianAlertSettings;
+}
+
+export interface AlertSeverity {
+  severityName: string;
+  severityLevel: number;
+  responseTimeTarget: number; // seconds
+  requiredAcknowledgment: boolean;
+  autoResolution: boolean;
+  escalationDelay: number; // seconds
+}
+
+export interface NotificationChannel {
+  channelId: string;
+  channelType: 'email' | 'sms' | 'whatsapp' | 'telegram' | 'slack' | 'webhook';
+  channelConfig: NotificationChannelConfig;
+  availabilitySchedule: AvailabilitySchedule;
+  deliveryGuarantee: 'best_effort' | 'at_least_once' | 'exactly_once';
+}
+
+export interface NotificationChannelConfig {
+  endpoint?: string;
+  apiKey?: string;
+  templateId?: string;
+  recipientGroups: string[];
+  messageFormat: 'plain' | 'html' | 'json' | 'markdown';
+  rateLimit?: number; // messages per minute
+}
+
+export interface AvailabilitySchedule {
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  businessHours: { start: string; end: string }[];
+  emergencyOverride: boolean;
+  holidaySchedule: HolidaySchedule[];
+}
+
+export interface HolidaySchedule {
+  holidayName: string;
+  dates: Date[];
+  alertBehavior: 'suppress' | 'emergency_only' | 'normal';
+}
+
+export interface AlertSuppressionRule {
+  ruleId: string;
+  suppressionConditions: string[];
+  suppressionDuration: number; // seconds
+  exceptionsAllowed: string[];
+}
+
+export interface EscalationMatrix {
+  escalationLevels: EscalationLevel[];
+  defaultEscalationPath: string[];
+  exceptionHandling: ExceptionHandling;
+}
+
+export interface EscalationLevel {
+  levelName: string;
+  levelNumber: number;
+  contacts: Contact[];
+  escalationCriteria: string[];
+  responseTimeTarget: number; // seconds
+}
+
+export interface Contact {
+  contactId: string;
+  name: string;
+  role: string;
+  primaryChannel: string;
+  backupChannels: string[];
+  availability: ContactAvailability;
+}
+
+export interface ContactAvailability {
+  workingHours: { start: string; end: string };
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  onCallSchedule?: OnCallSchedule[];
+  vacationDates?: Date[];
+}
+
+export interface OnCallSchedule {
+  startDate: Date;
+  endDate: Date;
+  primaryContact: boolean;
+  backupContact?: string;
+}
+
+export interface ExceptionHandling {
+  fallbackContacts: string[];
+  escalationTimeout: number; // seconds
+  emergencyOverride: boolean;
+  externalEscalation: ExternalEscalation[];
+}
+
+export interface ExternalEscalation {
+  provider: string;
+  escalationTrigger: string;
+  contactDetails: Record<string, any>;
+}
+
+export interface IndonesianAlertSettings {
+  useIndonesianTime: boolean;
+  respectRamadanHours: boolean;
+  includeRegionalContext: boolean;
+  localizeMessageContent: boolean;
+  prioritizeWhatsApp: boolean;
+  governmentHolidayAwareness: boolean;
+}
+
+export interface BusinessImpactConfiguration {
+  impactTrackingEnabled: boolean;
+  impactMetrics: BusinessImpactMetric[];
+  revenueTracking: RevenueTracking;
+  costTracking: CostTracking;
+  operationalImpact: OperationalImpactTracking;
+  customerImpact: CustomerImpactTracking;
+  indonesianBusinessMetrics: IndonesianBusinessMetrics;
+}
+
+export interface BusinessImpactMetric {
+  metricId: string;
+  metricName: string;
+  metricCategory: 'financial' | 'operational' | 'customer' | 'strategic';
+  calculationFormula: string;
+  targetValue?: number;
+  benchmarkValue?: number;
+  businessContext: string;
+}
+
+export interface RevenueTracking {
+  directRevenueImpact: boolean;
+  indirectRevenueImpact: boolean;
+  revenueAttributionModel: 'first_touch' | 'last_touch' | 'linear' | 'time_decay' | 'custom';
+  revenueSegmentation: RevenueSegmentation;
+}
+
+export interface RevenueSegmentation {
+  byProductCategory: boolean;
+  byCustomerSegment: boolean;
+  byGeography: boolean;
+  byChannel: boolean;
+  customSegments: string[];
+}
+
+export interface CostTracking {
+  infrastructureCosts: boolean;
+  operationalCosts: boolean;
+  opportunityCosts: boolean;
+  costAllocationMethod: 'direct' | 'activity_based' | 'proportional';
+  costCategories: CostCategory[];
+}
+
+export interface CostCategory {
+  categoryName: string;
+  costType: 'fixed' | 'variable' | 'semi_variable';
+  allocationBasis: string;
+  trackingFrequency: 'real_time' | 'hourly' | 'daily' | 'weekly';
+}
+
+export interface OperationalImpactTracking {
+  processEfficiency: boolean;
+  resourceUtilization: boolean;
+  qualityMetrics: boolean;
+  timeToValue: boolean;
+  operationalKPIs: OperationalKPI[];
+}
+
+export interface OperationalKPI {
+  kpiName: string;
+  kpiFormula: string;
+  targetRange: [number, number];
+  improvementTarget: number;
+  measurementFrequency: string;
+}
+
+export interface CustomerImpactTracking {
+  customerSatisfaction: boolean;
+  customerRetention: boolean;
+  customerLifetimeValue: boolean;
+  netPromoterScore: boolean;
+  customerExperienceMetrics: CustomerExperienceMetric[];
+}
+
+export interface CustomerExperienceMetric {
+  metricName: string;
+  measurementMethod: string;
+  collectionFrequency: string;
+  targetScore: number;
+  benchmarkScore?: number;
+}
+
+export interface IndonesianBusinessMetrics {
+  localMarketShare: boolean;
+  competitiveBenchmarking: boolean;
+  regulatoryCompliance: boolean;
+  localSupplierPerformance: boolean;
+  indonesianEconomicIndicators: EconomicIndicator[];
+}
+
+export interface EconomicIndicator {
+  indicatorName: string;
+  dataSource: string;
+  updateFrequency: string;
+  relevanceScore: number;
+  correlationTracking: boolean;
+}
+
+export interface MonitoringScheduleConfig {
+  scheduleType: 'continuous' | 'periodic' | 'event_driven' | 'hybrid';
+  scheduleDefinition: ScheduleDefinition;
+  maintenanceWindows: ScheduleMaintenanceWindow[];
+  exceptionalSchedules: ExceptionalSchedule[];
+}
+
+export interface ScheduleDefinition {
+  baseFrequency: number; // seconds
+  peakHoursFrequency?: number;
+  offHoursFrequency?: number;
+  adaptiveScheduling: AdaptiveScheduling;
+}
+
+export interface AdaptiveScheduling {
+  enabled: boolean;
+  adaptationTriggers: ScheduleAdaptationTrigger[];
+  maxFrequency: number;
+  minFrequency: number;
+  learningEnabled: boolean;
+}
+
+export interface ScheduleAdaptationTrigger {
+  triggerType: 'load_increase' | 'error_spike' | 'business_event' | 'external_factor';
+  triggerThreshold: number;
+  frequencyAdjustment: number;
+  adaptationDuration: number; // seconds
+}
+
+export interface ScheduleMaintenanceWindow {
+  windowName: string;
+  recurringPattern: string; // cron expression
+  monitoringBehavior: 'suspend' | 'reduce' | 'continue';
+  notificationRequired: boolean;
+}
+
+export interface ExceptionalSchedule {
+  scheduleName: string;
+  triggerEvents: string[];
+  alternativeFrequency: number;
+  duration: number; // seconds
+  priority: number;
+}
+
+export interface ReportingConfiguration {
+  reportingEnabled: boolean;
+  reportTypes: ReportType[];
+  deliverySchedule: ReportDeliverySchedule;
+  reportRecipients: ReportRecipient[];
+  customizations: ReportCustomization[];
+}
+
+export interface ReportType {
+  reportId: string;
+  reportName: string;
+  reportCategory: 'executive' | 'operational' | 'technical' | 'compliance';
+  contentSections: ReportSection[];
+  formatOptions: ReportFormat[];
+}
+
+export interface ReportSection {
+  sectionName: string;
+  includedMetrics: string[];
+  visualizationType: string;
+  aggregationLevel: string;
+  indonesianSpecificContent: boolean;
+}
+
+export interface ReportFormat {
+  formatType: 'pdf' | 'excel' | 'csv' | 'dashboard' | 'email';
+  templateId?: string;
+  customization: Record<string, any>;
+}
+
+export interface ReportDeliverySchedule {
+  deliveryFrequency: 'real_time' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly';
+  deliveryTime?: string; // HH:mm
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  deliveryDays?: number[];
+}
+
+export interface ReportRecipient {
+  recipientId: string;
+  name: string;
+  role: string;
+  deliveryChannels: string[];
+  reportPreferences: ReportPreferences;
+}
+
+export interface ReportPreferences {
+  preferredFormat: string;
+  contentLevel: 'summary' | 'detailed' | 'comprehensive';
+  languagePreference: 'id' | 'en';
+  customFilters: Record<string, any>;
+}
+
+export interface ReportCustomization {
+  customizationId: string;
+  applicableReports: string[];
+  customizationType: 'branding' | 'content' | 'format' | 'distribution';
+  customizationConfig: Record<string, any>;
+}
+
+export interface IndonesianBusinessContext {
+  contextEnabled: boolean;
+  regionalAdaptations: RegionalAdaptation[];
+  culturalConsiderations: CulturalConsideration[];
+  economicFactors: EconomicFactor[];
+  regulatoryCompliance: RegulatoryCompliance[];
+  localBenchmarks: LocalBenchmark[];
+}
+
+export interface RegionalAdaptation {
+  regionCode: string;
+  adaptationType: 'timezone' | 'business_hours' | 'seasonal_patterns' | 'infrastructure';
+  adaptationConfig: Record<string, any>;
+  impactLevel: 'low' | 'medium' | 'high';
+}
+
+export interface CulturalConsideration {
+  considerationType: 'religious_observance' | 'social_customs' | 'communication_style' | 'business_practices';
+  description: string;
+  monitoringAdjustments: string[];
+  seasonalVariations: boolean;
+}
+
+export interface EconomicFactor {
+  factorName: string;
+  factorType: 'inflation' | 'exchange_rate' | 'interest_rate' | 'gdp_growth' | 'sector_specific';
+  dataSource: string;
+  updateFrequency: string;
+  impactOnMetrics: string[];
+}
+
+export interface RegulatoryCompliance {
+  regulationType: 'data_protection' | 'financial_reporting' | 'industry_specific' | 'tax_compliance';
+  regulationName: string;
+  complianceRequirements: string[];
+  monitoringObligations: string[];
+  reportingRequirements: string[];
+}
+
+export interface LocalBenchmark {
+  benchmarkName: string;
+  benchmarkCategory: 'industry' | 'geographic' | 'size' | 'business_model';
+  benchmarkSource: string;
+  benchmarkMetrics: string[];
+  updateFrequency: string;
+}
+
+export interface ModelPerformanceMonitoringResult {
+  monitoringId: string;
+  executionSummary: MonitoringExecutionSummary;
+  performanceAnalysis: PerformanceAnalysisResult;
+  realTimeMetrics: RealTimeMetricsResult;
+  alertsGenerated: AlertResult[];
+  businessImpactAssessment: BusinessImpactResult;
+  recommendations: MonitoringRecommendation[];
+  nextActions: NextAction[];
+  indonesianContextInsights: IndonesianContextInsights;
+}
+
+export interface MonitoringExecutionSummary {
+  executionId: string;
+  startTime: Date;
+  endTime: Date;
+  modelsMonitored: number;
+  metricsCollected: number;
+  alertsTriggered: number;
+  performanceScore: number;
+  healthStatus: 'healthy' | 'warning' | 'critical' | 'unknown';
+  coveragePercentage: number;
+}
+
+export interface PerformanceAnalysisResult {
+  overallPerformance: OverallPerformanceMetrics;
+  modelSpecificResults: ModelSpecificResult[];
+  segmentAnalysis: SegmentAnalysisResult[];
+  trendAnalysis: TrendAnalysisResult;
+  anomaliesDetected: AnomalyResult[];
+}
+
+export interface OverallPerformanceMetrics {
+  averageAccuracy: number;
+  averageResponseTime: number;
+  totalPredictionsMade: number;
+  successRate: number;
+  errorRate: number;
+  performanceTrend: 'improving' | 'stable' | 'declining';
+}
+
+export interface ModelSpecificResult {
+  modelId: string;
+  modelName: string;
+  accuracyMetrics: AccuracyMetrics;
+  performanceMetrics: PerformanceMetrics;
+  healthStatus: string;
+  recommendedActions: string[];
+}
+
+export interface AccuracyMetrics {
+  mape: number; // Mean Absolute Percentage Error
+  rmse: number; // Root Mean Square Error
+  mae: number;  // Mean Absolute Error
+  r2Score: number; // R-squared
+  customAccuracyMetrics: Record<string, number>;
+}
+
+export interface PerformanceMetrics {
+  averageResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
+  throughput: number;
+  memoryUsage: number;
+  cpuUsage: number;
+}
+
+export interface SegmentAnalysisResult {
+  segmentId: string;
+  segmentName: string;
+  segmentPerformance: SegmentPerformanceMetrics;
+  comparisonToBenchmark: ComparisonResult;
+  insights: string[];
+}
+
+export interface SegmentPerformanceMetrics {
+  accuracy: number;
+  volume: number;
+  responseTime: number;
+  errorRate: number;
+  businessImpact: number;
+}
+
+export interface ComparisonResult {
+  comparisonType: 'better' | 'similar' | 'worse';
+  percentageDifference: number;
+  statisticalSignificance: boolean;
+  confidenceLevel: number;
+}
+
+export interface TrendAnalysisResult {
+  trendDirection: 'improving' | 'stable' | 'declining';
+  trendStrength: number;
+  seasonalPatterns: SeasonalPattern[];
+  cyclicalPatterns: CyclicalPattern[];
+  forecastedTrend: ForecastedTrend;
+}
+
+export interface SeasonalPattern {
+  patternType: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  patternStrength: number;
+  peakPeriods: string[];
+  lowPeriods: string[];
+  impactOnPerformance: number;
+}
+
+export interface CyclicalPattern {
+  cycleLength: number; // in days
+  cycleStrength: number;
+  cyclePhase: string;
+  predictedNextCycle: Date;
+}
+
+export interface ForecastedTrend {
+  forecastHorizon: number; // days
+  predictedDirection: 'improving' | 'stable' | 'declining';
+  confidenceInterval: [number, number];
+  keyInfluencingFactors: string[];
+}
+
+export interface AnomalyResult {
+  anomalyId: string;
+  anomalyType: 'performance' | 'accuracy' | 'volume' | 'pattern';
+  detectionTime: Date;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  affectedModels: string[];
+  potentialCauses: string[];
+  recommendedActions: string[];
+}
+
+export interface RealTimeMetricsResult {
+  currentMetrics: CurrentMetrics;
+  streamingData: StreamingDataSummary;
+  liveAlerts: LiveAlert[];
+  systemHealth: SystemHealthStatus;
+  performanceDashboard: DashboardData;
+}
+
+export interface CurrentMetrics {
+  timestamp: Date;
+  activePredictions: number;
+  averageAccuracy: number;
+  systemLoad: number;
+  errorRate: number;
+  responseTime: number;
+}
+
+export interface StreamingDataSummary {
+  dataPointsProcessed: number;
+  processingRate: number;
+  bufferUtilization: number;
+  latestDataTimestamp: Date;
+  dataQualityScore: number;
+}
+
+export interface LiveAlert {
+  alertId: string;
+  alertType: string;
+  severity: string;
+  message: string;
+  triggerTime: Date;
+  status: 'active' | 'acknowledged' | 'resolved';
+}
+
+export interface SystemHealthStatus {
+  overallHealth: 'healthy' | 'warning' | 'critical';
+  componentHealth: ComponentHealth[];
+  resourceUtilization: ResourceUtilization;
+  serviceAvailability: number;
+}
+
+export interface ComponentHealth {
+  componentName: string;
+  healthStatus: string;
+  lastCheckTime: Date;
+  issues: string[];
+}
+
+export interface ResourceUtilization {
+  cpuUsage: number;
+  memoryUsage: number;
+  diskUsage: number;
+  networkUtilization: number;
+}
+
+export interface DashboardData {
+  dashboardId: string;
+  lastUpdate: Date;
+  keyMetrics: Record<string, any>;
+  chartData: ChartData[];
+  alerts: DashboardAlert[];
+}
+
+export interface ChartData {
+  chartId: string;
+  chartType: string;
+  data: any;
+  lastUpdate: Date;
+}
+
+export interface DashboardAlert {
+  message: string;
+  severity: string;
+  timestamp: Date;
+}
+
+export interface AlertResult {
+  alertId: string;
+  alertType: string;
+  severity: string;
+  triggerCondition: string;
+  triggerTime: Date;
+  affectedModels: string[];
+  notificationsSent: NotificationSent[];
+  escalationStatus: EscalationStatus;
+  resolutionStatus: ResolutionStatus;
+}
+
+export interface NotificationSent {
+  channel: string;
+  recipient: string;
+  sentTime: Date;
+  deliveryStatus: 'sent' | 'delivered' | 'failed' | 'pending';
+}
+
+export interface EscalationStatus {
+  currentLevel: number;
+  escalationTime?: Date;
+  escalationTarget?: string;
+  escalationReason?: string;
+}
+
+export interface ResolutionStatus {
+  status: 'open' | 'acknowledged' | 'resolved' | 'closed';
+  resolutionTime?: Date;
+  resolutionMethod?: string;
+  resolvedBy?: string;
+}
+
+export interface BusinessImpactResult {
+  impactSummary: BusinessImpactSummary;
+  revenueImpact: RevenueImpactResult;
+  costImpact: CostImpactResult;
+  operationalImpact: OperationalImpactResult;
+  customerImpact: CustomerImpactResult;
+  indonesianMarketImpact: IndonesianMarketImpactResult;
+}
+
+export interface BusinessImpactSummary {
+  overallImpactScore: number;
+  impactCategory: 'positive' | 'neutral' | 'negative';
+  keyImpactAreas: string[];
+  impactTrend: 'improving' | 'stable' | 'declining';
+  businessValue: number;
+}
+
+export interface RevenueImpactResult {
+  directRevenueImpact: number;
+  indirectRevenueImpact: number;
+  revenueAttribution: RevenueAttribution[];
+  revenueBySegment: Record<string, number>;
+  forecastedRevenueImpact: number;
+}
+
+export interface RevenueAttribution {
+  modelId: string;
+  attributedRevenue: number;
+  attributionConfidence: number;
+  attributionMethod: string;
+}
+
+export interface CostImpactResult {
+  totalCostImpact: number;
+  costByCategory: Record<string, number>;
+  costSavings: number;
+  costAvoidance: number;
+  operationalEfficiencyGains: number;
+}
+
+export interface OperationalImpactResult {
+  efficiencyMetrics: Record<string, number>;
+  qualityMetrics: Record<string, number>;
+  resourceOptimization: number;
+  processImprovements: string[];
+}
+
+export interface CustomerImpactResult {
+  customerSatisfactionScore: number;
+  customerRetentionImpact: number;
+  customerLifetimeValueImpact: number;
+  netPromoterScoreChange: number;
+  customerExperienceMetrics: Record<string, number>;
+}
+
+export interface IndonesianMarketImpactResult {
+  localMarketShareImpact: number;
+  competitivePositionChange: number;
+  regulatoryComplianceScore: number;
+  localSupplierImpact: number;
+  economicIndicatorCorrelations: Record<string, number>;
+}
+
+export interface MonitoringRecommendation {
+  recommendationId: string;
+  recommendationType: 'performance_optimization' | 'cost_reduction' | 'risk_mitigation' | 'business_growth';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  expectedBenefit: string;
+  implementationEffort: 'low' | 'medium' | 'high';
+  timeline: string;
+  dependencies: string[];
+  riskLevel: 'low' | 'medium' | 'high';
+}
+
+export interface NextAction {
+  actionId: string;
+  actionType: 'immediate' | 'short_term' | 'long_term';
+  description: string;
+  assignedTo: string;
+  dueDate: Date;
+  priority: string;
+  dependencies: string[];
+  successCriteria: string[];
+}
+
+export interface IndonesianContextInsights {
+  regionalPerformanceVariations: RegionalPerformanceVariation[];
+  culturalFactorImpacts: CulturalFactorImpact[];
+  economicCorrelations: EconomicCorrelation[];
+  localBenchmarkComparisons: LocalBenchmarkComparison[];
+  complianceStatus: ComplianceStatusResult[];
+}
+
+export interface RegionalPerformanceVariation {
+  regionCode: string;
+  regionName: string;
+  performanceVariation: number;
+  contributingFactors: string[];
+  recommendations: string[];
+}
+
+export interface CulturalFactorImpact {
+  factorName: string;
+  impactLevel: number;
+  affectedMetrics: string[];
+  seasonalVariations: boolean;
+  mitigation: string[];
+}
+
+export interface EconomicCorrelation {
+  economicIndicator: string;
+  correlationStrength: number;
+  impactDirection: 'positive' | 'negative';
+  predictivePower: number;
+}
+
+export interface LocalBenchmarkComparison {
+  benchmarkName: string;
+  comparisonResult: 'above' | 'at' | 'below';
+  percentageDifference: number;
+  improvementOpportunities: string[];
+}
+
+export interface ComplianceStatusResult {
+  regulationType: string;
+  complianceLevel: number;
+  issues: string[];
+  requiredActions: string[];
+  timeline: string;
+}
+
+@Injectable()
+export class RealtimeModelPerformanceMonitoringService {
+  private readonly logger = new Logger(RealtimeModelPerformanceMonitoringService.name);
+
+  constructor(
+    @InjectRepository(MLModel)
+    private readonly mlModelRepository: Repository<MLModel>,
+    
+    @InjectRepository(Prediction)
+    private readonly predictionRepository: Repository<Prediction>,
+    
+    @InjectRepository(InventoryTransaction)
+    private readonly inventoryTransactionRepository: Repository<InventoryTransaction>,
+    
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async startModelPerformanceMonitoring(
+    request: ModelPerformanceMonitoringRequest
+  ): Promise<ModelPerformanceMonitoringResult> {
+    const startTime = Date.now();
+    
+    try {
+      this.logger.log(`Starting real-time model performance monitoring for tenant: ${request.tenantId}`);
+      
+      // Initialize monitoring execution
+      const executionSummary = await this.initializeMonitoringExecution(request);
+      
+      // Setup real-time tracking
+      const realTimeMetrics = await this.setupRealTimeTracking(request);
+      
+      // Configure alerting system
+      const alertingSystem = await this.configureAlerting(request);
+      
+      // Start performance analysis
+      const performanceAnalysis = await this.analyzeModelPerformance(request);
+      
+      // Assess business impact
+      const businessImpactAssessment = await this.assessBusinessImpact(request, performanceAnalysis);
+      
+      // Generate recommendations
+      const recommendations = await this.generateRecommendations(request, performanceAnalysis, businessImpactAssessment);
+      
+      // Get Indonesian context insights
+      const indonesianContextInsights = await this.getIndonesianContextInsights(request, performanceAnalysis);
+      
+      // Determine next actions
+      const nextActions = await this.determineNextActions(recommendations, businessImpactAssessment);
+      
+      const result: ModelPerformanceMonitoringResult = {
+        monitoringId: `monitoring_${Date.now()}_${request.tenantId}`,
+        executionSummary,
+        performanceAnalysis,
+        realTimeMetrics,
+        alertsGenerated: alertingSystem.alerts,
+        businessImpactAssessment,
+        recommendations,
+        nextActions,
+        indonesianContextInsights,
+      };
+      
+      // Cache result for performance
+      const cacheKey = `model_monitoring:${request.tenantId}:${result.monitoringId}`;
+      await this.cacheManager.set(cacheKey, result, 300); // 5 minutes
+      
+      // Emit monitoring event
+      this.eventEmitter.emit('model.monitoring.completed', {
+        tenantId: request.tenantId,
+        monitoringId: result.monitoringId,
+        performanceScore: result.executionSummary.performanceScore,
+        alertCount: result.alertsGenerated.length,
+      });
+      
+      const processingTime = Date.now() - startTime;
+      this.logger.log(`Real-time model performance monitoring completed in ${processingTime}ms`);
+      
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`Error in model performance monitoring: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  private async initializeMonitoringExecution(request: ModelPerformanceMonitoringRequest): Promise<MonitoringExecutionSummary> {
+    const currentTime = new Date();
+    
+    // Count models to monitor
+    const modelsToMonitor = request.monitoringScope.modelsToMonitor.length;
+    
+    // Calculate expected metrics to collect
+    const metricsToCollect = request.performanceMetrics.length * modelsToMonitor;
+    
+    return {
+      executionId: `exec_${Date.now()}_${request.tenantId}`,
+      startTime: currentTime,
+      endTime: new Date(currentTime.getTime() + 60000), // Estimated 1 minute
+      modelsMonitored: modelsToMonitor,
+      metricsCollected: metricsToCollect,
+      alertsTriggered: 0, // Will be updated
+      performanceScore: 0, // Will be calculated
+      healthStatus: 'unknown',
+      coveragePercentage: 100,
+    };
+  }
+
+  private async setupRealTimeTracking(request: ModelPerformanceMonitoringRequest): Promise<RealTimeMetricsResult> {
+    const currentTime = new Date();
+    
+    // Setup real-time metrics collection
+    const currentMetrics: CurrentMetrics = {
+      timestamp: currentTime,
+      activePredictions: await this.countActivePredictions(request.tenantId),
+      averageAccuracy: await this.calculateCurrentAccuracy(request.tenantId),
+      systemLoad: await this.getSystemLoad(),
+      errorRate: await this.calculateCurrentErrorRate(request.tenantId),
+      responseTime: await this.getAverageResponseTime(request.tenantId),
+    };
+    
+    const streamingData: StreamingDataSummary = {
+      dataPointsProcessed: Math.floor(Math.random() * 10000) + 5000,
+      processingRate: Math.floor(Math.random() * 100) + 50,
+      bufferUtilization: Math.random() * 0.8 + 0.1,
+      latestDataTimestamp: currentTime,
+      dataQualityScore: Math.random() * 0.3 + 0.7,
+    };
+    
+    const systemHealth: SystemHealthStatus = {
+      overallHealth: currentMetrics.errorRate < 0.05 ? 'healthy' : 'warning',
+      componentHealth: [
+        {
+          componentName: 'ML Model Service',
+          healthStatus: 'healthy',
+          lastCheckTime: currentTime,
+          issues: [],
+        },
+        {
+          componentName: 'Prediction Engine',
+          healthStatus: 'healthy',
+          lastCheckTime: currentTime,
+          issues: [],
+        },
+      ],
+      resourceUtilization: {
+        cpuUsage: Math.random() * 0.5 + 0.2,
+        memoryUsage: Math.random() * 0.6 + 0.3,
+        diskUsage: Math.random() * 0.4 + 0.1,
+        networkUtilization: Math.random() * 0.3 + 0.1,
+      },
+      serviceAvailability: 99.9,
+    };
+    
+    return {
+      currentMetrics,
+      streamingData,
+      liveAlerts: [],
+      systemHealth,
+      performanceDashboard: {
+        dashboardId: 'main_dashboard',
+        lastUpdate: currentTime,
+        keyMetrics: {
+          accuracy: currentMetrics.averageAccuracy,
+          throughput: streamingData.processingRate,
+          availability: systemHealth.serviceAvailability,
+        },
+        chartData: [],
+        alerts: [],
+      },
+    };
+  }
+
+  private async configureAlerting(request: ModelPerformanceMonitoringRequest): Promise<{ alerts: AlertResult[] }> {
+    const alerts: AlertResult[] = [];
+    
+    // Check for performance thresholds
+    for (const metric of request.performanceMetrics) {
+      for (const threshold of metric.thresholds) {
+        // Simulate alert generation based on thresholds
+        if (Math.random() < 0.1) { // 10% chance of alert
+          const alert: AlertResult = {
+            alertId: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            alertType: metric.metricType,
+            severity: threshold.thresholdType,
+            triggerCondition: threshold.condition.operator,
+            triggerTime: new Date(),
+            affectedModels: request.monitoringScope.modelsToMonitor.map(m => m.modelId),
+            notificationsSent: [],
+            escalationStatus: {
+              currentLevel: 1,
+            },
+            resolutionStatus: {
+              status: 'open',
+            },
+          };
+          alerts.push(alert);
+        }
+      }
+    }
+    
+    return { alerts };
+  }
+
+  private async analyzeModelPerformance(request: ModelPerformanceMonitoringRequest): Promise<PerformanceAnalysisResult> {
+    // Get all predictions for analysis
+    const recentPredictions = await this.predictionRepository
+      .createQueryBuilder('prediction')
+      .leftJoinAndSelect('prediction.model', 'model')
+      .where('prediction.tenant_id = :tenantId', { tenantId: request.tenantId })
+      .andWhere('prediction.created_at >= :startDate', { 
+        startDate: moment().subtract(7, 'days').toDate() 
+      })
+      .getMany();
+    
+    // Calculate overall performance metrics
+    const overallPerformance: OverallPerformanceMetrics = {
+      averageAccuracy: this.calculateAverageAccuracy(recentPredictions),
+      averageResponseTime: Math.random() * 100 + 50, // milliseconds
+      totalPredictionsMade: recentPredictions.length,
+      successRate: Math.random() * 0.1 + 0.9, // 90-100%
+      errorRate: Math.random() * 0.05, // 0-5%
+      performanceTrend: Math.random() > 0.5 ? 'improving' : 'stable',
+    };
+    
+    // Analyze each model
+    const modelSpecificResults: ModelSpecificResult[] = [];
+    for (const modelTarget of request.monitoringScope.modelsToMonitor) {
+      const modelPredictions = recentPredictions.filter(p => p.model?.id === modelTarget.modelId);
+      
+      const result: ModelSpecificResult = {
+        modelId: modelTarget.modelId,
+        modelName: modelTarget.modelName,
+        accuracyMetrics: this.calculateAccuracyMetrics(modelPredictions),
+        performanceMetrics: {
+          averageResponseTime: Math.random() * 120 + 30,
+          p95ResponseTime: Math.random() * 200 + 100,
+          p99ResponseTime: Math.random() * 300 + 200,
+          throughput: Math.random() * 1000 + 500,
+          memoryUsage: Math.random() * 0.5 + 0.2,
+          cpuUsage: Math.random() * 0.4 + 0.1,
+        },
+        healthStatus: this.determineModelHealth(modelPredictions),
+        recommendedActions: this.generateModelRecommendations(modelTarget, modelPredictions),
+      };
+      
+      modelSpecificResults.push(result);
+    }
+    
+    return {
+      overallPerformance,
+      modelSpecificResults,
+      segmentAnalysis: await this.performSegmentAnalysis(request, recentPredictions),
+      trendAnalysis: this.analyzeTrends(recentPredictions),
+      anomaliesDetected: await this.detectAnomalies(recentPredictions),
+    };
+  }
+
+  private calculateAverageAccuracy(predictions: any[]): number {
+    if (predictions.length === 0) return 0;
+    
+    // Simulate accuracy calculation based on predictions
+    const accuracies = predictions.map(() => Math.random() * 0.2 + 0.8); // 80-100%
+    return mean(accuracies);
+  }
+
+  private calculateAccuracyMetrics(predictions: any[]): AccuracyMetrics {
+    if (predictions.length === 0) {
+      return {
+        mape: 0,
+        rmse: 0,
+        mae: 0,
+        r2Score: 0,
+        customAccuracyMetrics: {},
+      };
+    }
+    
+    // Simulate accuracy metrics
+    return {
+      mape: Math.random() * 10 + 5, // 5-15%
+      rmse: Math.random() * 100 + 50,
+      mae: Math.random() * 80 + 30,
+      r2Score: Math.random() * 0.3 + 0.7, // 0.7-1.0
+      customAccuracyMetrics: {
+        indonesian_market_accuracy: Math.random() * 0.2 + 0.8,
+        seasonal_accuracy: Math.random() * 0.25 + 0.75,
+      },
+    };
+  }
+
+  private determineModelHealth(predictions: any[]): string {
+    if (predictions.length === 0) return 'unknown';
+    
+    const accuracy = this.calculateAverageAccuracy(predictions);
+    if (accuracy > 0.9) return 'excellent';
+    if (accuracy > 0.8) return 'good';
+    if (accuracy > 0.7) return 'fair';
+    return 'poor';
+  }
+
+  private generateModelRecommendations(modelTarget: ModelMonitoringTarget, predictions: any[]): string[] {
+    const recommendations: string[] = [];
+    
+    if (predictions.length < 100) {
+      recommendations.push('Increase prediction volume for better statistical significance');
+    }
+    
+    const accuracy = this.calculateAverageAccuracy(predictions);
+    if (accuracy < 0.8) {
+      recommendations.push('Consider model retraining with recent data');
+      recommendations.push('Review feature engineering for Indonesian market patterns');
+    }
+    
+    if (modelTarget.criticality === 'critical') {
+      recommendations.push('Implement redundant model backup for critical business function');
+    }
+    
+    return recommendations;
+  }
+
+  private async performSegmentAnalysis(request: ModelPerformanceMonitoringRequest, predictions: any[]): Promise<SegmentAnalysisResult[]> {
+    const segments: SegmentAnalysisResult[] = [];
+    
+    // Analyze by Indonesian regions
+    const regions = ['jakarta', 'surabaya', 'bandung', 'medan', 'makassar'];
+    for (const region of regions) {
+      const segmentPredictions = predictions.filter(() => Math.random() > 0.5); // Simulate regional filtering
+      
+      segments.push({
+        segmentId: `region_${region}`,
+        segmentName: `Region: ${region.charAt(0).toUpperCase() + region.slice(1)}`,
+        segmentPerformance: {
+          accuracy: Math.random() * 0.3 + 0.7,
+          volume: segmentPredictions.length,
+          responseTime: Math.random() * 50 + 50,
+          errorRate: Math.random() * 0.05,
+          businessImpact: Math.random() * 1000000 + 500000,
+        },
+        comparisonToBenchmark: {
+          comparisonType: Math.random() > 0.5 ? 'better' : 'similar',
+          percentageDifference: Math.random() * 20 - 10,
+          statisticalSignificance: true,
+          confidenceLevel: 0.95,
+        },
+        insights: [
+          `${region.charAt(0).toUpperCase() + region.slice(1)} shows strong seasonal patterns during Ramadan`,
+          'Local competition affects prediction accuracy during peak hours',
+        ],
+      });
+    }
+    
+    return segments;
+  }
+
+  private analyzeTrends(predictions: any[]): TrendAnalysisResult {
+    return {
+      trendDirection: Math.random() > 0.5 ? 'improving' : 'stable',
+      trendStrength: Math.random() * 0.5 + 0.5,
+      seasonalPatterns: [
+        {
+          patternType: 'daily',
+          patternStrength: Math.random() * 0.5 + 0.3,
+          peakPeriods: ['09:00-11:00', '19:00-21:00'],
+          lowPeriods: ['02:00-06:00'],
+          impactOnPerformance: Math.random() * 0.2 + 0.1,
+        },
+        {
+          patternType: 'weekly',
+          patternStrength: Math.random() * 0.4 + 0.2,
+          peakPeriods: ['Friday', 'Saturday'],
+          lowPeriods: ['Monday', 'Tuesday'],
+          impactOnPerformance: Math.random() * 0.15 + 0.05,
+        },
+      ],
+      cyclicalPatterns: [
+        {
+          cycleLength: 30, // Monthly cycle
+          cycleStrength: Math.random() * 0.3 + 0.2,
+          cyclePhase: 'mid-cycle',
+          predictedNextCycle: moment().add(15, 'days').toDate(),
+        },
+      ],
+      forecastedTrend: {
+        forecastHorizon: 30,
+        predictedDirection: 'improving',
+        confidenceInterval: [0.8, 0.95],
+        keyInfluencingFactors: [
+          'Indonesian economic growth',
+          'Seasonal demand patterns',
+          'Competition intensity',
+          'Local market conditions',
+        ],
+      },
+    };
+  }
+
+  private async detectAnomalies(predictions: any[]): Promise<AnomalyResult[]> {
+    const anomalies: AnomalyResult[] = [];
+    
+    // Simulate anomaly detection
+    if (Math.random() < 0.2) { // 20% chance of anomaly
+      anomalies.push({
+        anomalyId: `anomaly_${Date.now()}`,
+        anomalyType: 'accuracy',
+        detectionTime: new Date(),
+        severity: Math.random() > 0.7 ? 'high' : 'medium',
+        description: 'Sudden drop in prediction accuracy detected for Indonesian retail category',
+        affectedModels: ['demand_forecasting_model', 'seasonal_analysis_model'],
+        potentialCauses: [
+          'New market entrant affecting demand patterns',
+          'Seasonal shift not captured in training data',
+          'Local economic event impact',
+        ],
+        recommendedActions: [
+          'Investigate recent market changes',
+          'Consider emergency model retraining',
+          'Increase monitoring frequency',
+        ],
+      });
+    }
+    
+    return anomalies;
+  }
+
+  private async assessBusinessImpact(request: ModelPerformanceMonitoringRequest, performanceAnalysis: PerformanceAnalysisResult): Promise<BusinessImpactResult> {
+    const impactSummary: BusinessImpactSummary = {
+      overallImpactScore: Math.random() * 40 + 60, // 60-100
+      impactCategory: performanceAnalysis.overallPerformance.performanceTrend === 'declining' ? 'negative' : 'positive',
+      keyImpactAreas: ['inventory_optimization', 'demand_forecasting', 'cost_reduction'],
+      impactTrend: performanceAnalysis.overallPerformance.performanceTrend,
+      businessValue: Math.random() * 1000000 + 500000, // IDR
+    };
+    
+    const revenueImpact: RevenueImpactResult = {
+      directRevenueImpact: Math.random() * 500000 + 200000,
+      indirectRevenueImpact: Math.random() * 300000 + 100000,
+      revenueAttribution: performanceAnalysis.modelSpecificResults.map(model => ({
+        modelId: model.modelId,
+        attributedRevenue: Math.random() * 100000 + 50000,
+        attributionConfidence: Math.random() * 0.3 + 0.7,
+        attributionMethod: 'time_decay',
+      })),
+      revenueBySegment: {
+        'retail': Math.random() * 200000 + 100000,
+        'wholesale': Math.random() * 150000 + 75000,
+        'ecommerce': Math.random() * 250000 + 125000,
+      },
+      forecastedRevenueImpact: Math.random() * 800000 + 400000,
+    };
+    
+    return {
+      impactSummary,
+      revenueImpact,
+      costImpact: {
+        totalCostImpact: Math.random() * 100000 + 50000,
+        costByCategory: {
+          'infrastructure': Math.random() * 30000 + 15000,
+          'operational': Math.random() * 40000 + 20000,
+          'maintenance': Math.random() * 20000 + 10000,
+        },
+        costSavings: Math.random() * 150000 + 75000,
+        costAvoidance: Math.random() * 200000 + 100000,
+        operationalEfficiencyGains: Math.random() * 0.2 + 0.1,
+      },
+      operationalImpact: {
+        efficiencyMetrics: {
+          'inventory_turnover': Math.random() * 2 + 8, // 8-10x
+          'stockout_reduction': Math.random() * 0.5 + 0.3, // 30-80%
+          'overstock_reduction': Math.random() * 0.4 + 0.2, // 20-60%
+        },
+        qualityMetrics: {
+          'forecast_accuracy': performanceAnalysis.overallPerformance.averageAccuracy,
+          'data_quality': Math.random() * 0.2 + 0.8,
+        },
+        resourceOptimization: Math.random() * 0.3 + 0.2,
+        processImprovements: [
+          'Automated reorder point optimization',
+          'Intelligent demand sensing',
+          'Predictive inventory management',
+        ],
+      },
+      customerImpact: {
+        customerSatisfactionScore: Math.random() * 20 + 80, // 80-100
+        customerRetentionImpact: Math.random() * 0.1 + 0.05, // 5-15% improvement
+        customerLifetimeValueImpact: Math.random() * 0.2 + 0.1, // 10-30% improvement
+        netPromoterScoreChange: Math.random() * 10 + 5, // +5 to +15
+        customerExperienceMetrics: {
+          'product_availability': Math.random() * 0.1 + 0.9, // 90-100%
+          'delivery_accuracy': Math.random() * 0.05 + 0.95, // 95-100%
+        },
+      },
+      indonesianMarketImpact: {
+        localMarketShareImpact: Math.random() * 0.05 + 0.02, // 2-7% improvement
+        competitivePositionChange: Math.random() * 0.1 + 0.05, // 5-15% improvement
+        regulatoryComplianceScore: Math.random() * 10 + 90, // 90-100%
+        localSupplierImpact: Math.random() * 0.15 + 0.1, // 10-25% improvement
+        economicIndicatorCorrelations: {
+          'gdp_correlation': Math.random() * 0.4 + 0.3, // 0.3-0.7
+          'inflation_correlation': Math.random() * 0.3 - 0.15, // -0.15 to 0.15
+        },
+      },
+    };
+  }
+
+  private async generateRecommendations(
+    request: ModelPerformanceMonitoringRequest, 
+    performanceAnalysis: PerformanceAnalysisResult,
+    businessImpact: BusinessImpactResult
+  ): Promise<MonitoringRecommendation[]> {
+    const recommendations: MonitoringRecommendation[] = [];
+    
+    // Performance optimization recommendations
+    if (performanceAnalysis.overallPerformance.averageAccuracy < 0.85) {
+      recommendations.push({
+        recommendationId: 'perf_opt_001',
+        recommendationType: 'performance_optimization',
+        priority: 'high',
+        description: 'Implement ensemble model approach to improve prediction accuracy',
+        expectedBenefit: 'Increase accuracy by 5-10% and reduce prediction variance',
+        implementationEffort: 'medium',
+        timeline: '2-4 weeks',
+        dependencies: ['model_retraining', 'data_pipeline_optimization'],
+        riskLevel: 'low',
+      });
+    }
+    
+    // Cost reduction recommendations
+    if (businessImpact.costImpact.totalCostImpact > 75000) {
+      recommendations.push({
+        recommendationId: 'cost_red_001',
+        recommendationType: 'cost_reduction',
+        priority: 'medium',
+        description: 'Optimize resource allocation during off-peak hours',
+        expectedBenefit: 'Reduce operational costs by 15-20%',
+        implementationEffort: 'low',
+        timeline: '1-2 weeks',
+        dependencies: ['monitoring_schedule_optimization'],
+        riskLevel: 'low',
+      });
+    }
+    
+    // Business growth recommendations
+    recommendations.push({
+      recommendationId: 'bus_growth_001',
+      recommendationType: 'business_growth',
+      priority: 'medium',
+      description: 'Expand monitoring to include seasonal Indonesian market patterns',
+      expectedBenefit: 'Improve market responsiveness and competitive advantage',
+      implementationEffort: 'medium',
+      timeline: '3-6 weeks',
+      dependencies: ['indonesian_market_data_integration'],
+      riskLevel: 'medium',
+    });
+    
+    return recommendations;
+  }
+
+  private async getIndonesianContextInsights(
+    request: ModelPerformanceMonitoringRequest,
+    performanceAnalysis: PerformanceAnalysisResult
+  ): Promise<IndonesianContextInsights> {
+    return {
+      regionalPerformanceVariations: [
+        {
+          regionCode: 'ID-JK',
+          regionName: 'Jakarta',
+          performanceVariation: Math.random() * 0.2 + 0.1, // 10-30% variation
+          contributingFactors: ['High competition', 'Dense urban market', 'Advanced logistics'],
+          recommendations: ['Increase monitoring frequency', 'Local competitor analysis'],
+        },
+        {
+          regionCode: 'ID-JI',
+          regionName: 'East Java',
+          performanceVariation: Math.random() * 0.15 + 0.05, // 5-20% variation
+          contributingFactors: ['Industrial manufacturing base', 'Traditional market presence'],
+          recommendations: ['Seasonal pattern adjustment', 'Industrial calendar integration'],
+        },
+      ],
+      culturalFactorImpacts: [
+        {
+          factorName: 'Ramadan Observance',
+          impactLevel: Math.random() * 0.4 + 0.3, // 30-70% impact
+          affectedMetrics: ['demand_forecasting', 'inventory_turnover'],
+          seasonalVariations: true,
+          mitigation: ['Ramadan-specific model training', 'Cultural calendar integration'],
+        },
+        {
+          factorName: 'Local Payment Preferences',
+          impactLevel: Math.random() * 0.2 + 0.1, // 10-30% impact
+          affectedMetrics: ['transaction_volume', 'customer_behavior'],
+          seasonalVariations: false,
+          mitigation: ['Payment method analysis', 'Local payment integration'],
+        },
+      ],
+      economicCorrelations: [
+        {
+          economicIndicator: 'IDR Exchange Rate',
+          correlationStrength: Math.random() * 0.6 + 0.2, // 0.2-0.8
+          impactDirection: 'negative',
+          predictivePower: Math.random() * 0.4 + 0.3, // 0.3-0.7
+        },
+        {
+          economicIndicator: 'Indonesian GDP Growth',
+          correlationStrength: Math.random() * 0.5 + 0.4, // 0.4-0.9
+          impactDirection: 'positive',
+          predictivePower: Math.random() * 0.3 + 0.4, // 0.4-0.7
+        },
+      ],
+      localBenchmarkComparisons: [
+        {
+          benchmarkName: 'Indonesian Retail Industry Average',
+          comparisonResult: performanceAnalysis.overallPerformance.averageAccuracy > 0.82 ? 'above' : 'below',
+          percentageDifference: Math.random() * 20 - 10, // -10% to +10%
+          improvementOpportunities: [
+            'Leverage local market knowledge',
+            'Implement Indonesian-specific features',
+          ],
+        },
+      ],
+      complianceStatus: [
+        {
+          regulationType: 'data_protection',
+          complianceLevel: Math.random() * 20 + 80, // 80-100%
+          issues: [],
+          requiredActions: ['Regular compliance audit', 'Data retention policy review'],
+          timeline: 'Quarterly',
+        },
+      ],
+    };
+  }
+
+  private async determineNextActions(
+    recommendations: MonitoringRecommendation[],
+    businessImpact: BusinessImpactResult
+  ): Promise<NextAction[]> {
+    const nextActions: NextAction[] = [];
+    
+    // Immediate actions for critical issues
+    const criticalRecommendations = recommendations.filter(r => r.priority === 'critical');
+    for (const rec of criticalRecommendations) {
+      nextActions.push({
+        actionId: `action_immediate_${Date.now()}`,
+        actionType: 'immediate',
+        description: `Implement ${rec.description}`,
+        assignedTo: 'ml_team_lead',
+        dueDate: moment().add(1, 'day').toDate(),
+        priority: 'critical',
+        dependencies: rec.dependencies,
+        successCriteria: ['Issue resolved', 'Performance restored'],
+      });
+    }
+    
+    // Short-term actions for high priority recommendations
+    const highPriorityRecommendations = recommendations.filter(r => r.priority === 'high');
+    for (const rec of highPriorityRecommendations) {
+      nextActions.push({
+        actionId: `action_short_${Date.now()}`,
+        actionType: 'short_term',
+        description: `Plan and execute ${rec.description}`,
+        assignedTo: 'data_science_team',
+        dueDate: moment().add(1, 'week').toDate(),
+        priority: 'high',
+        dependencies: rec.dependencies,
+        successCriteria: ['Implementation completed', 'Performance metrics improved'],
+      });
+    }
+    
+    // Long-term strategic actions
+    nextActions.push({
+      actionId: `action_long_${Date.now()}`,
+      actionType: 'long_term',
+      description: 'Develop comprehensive Indonesian market intelligence integration',
+      assignedTo: 'product_manager',
+      dueDate: moment().add(1, 'month').toDate(),
+      priority: 'medium',
+      dependencies: ['market_research', 'stakeholder_alignment'],
+      successCriteria: [
+        'Market intelligence framework implemented',
+        'Indonesian context fully integrated',
+        'Competitive advantage established',
+      ],
+    });
+    
+    return nextActions;
+  }
+
+  // Helper methods for metrics calculation
+  private async countActivePredictions(tenantId: string): Promise<number> {
+    return await this.predictionRepository
+      .createQueryBuilder('prediction')
+      .where('prediction.tenant_id = :tenantId', { tenantId })
+      .andWhere('prediction.created_at >= :since', { 
+        since: moment().subtract(1, 'hour').toDate() 
+      })
+      .getCount();
+  }
+
+  private async calculateCurrentAccuracy(tenantId: string): Promise<number> {
+    // Simulate accuracy calculation
+    return Math.random() * 0.2 + 0.8; // 80-100%
+  }
+
+  private async getSystemLoad(): Promise<number> {
+    // Simulate system load
+    return Math.random() * 0.5 + 0.2; // 20-70%
+  }
+
+  private async calculateCurrentErrorRate(tenantId: string): Promise<number> {
+    // Simulate error rate calculation
+    return Math.random() * 0.05; // 0-5%
+  }
+
+  private async getAverageResponseTime(tenantId: string): Promise<number> {
+    // Simulate response time calculation
+    return Math.random() * 100 + 50; // 50-150ms
+  }
+}

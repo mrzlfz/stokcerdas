@@ -14,7 +14,10 @@ import {
 } from '../entities/permission.entity';
 import { PERMISSIONS_KEY } from '../../common/decorators/permissions.decorator';
 import { User, UserRole } from '../../users/entities/user.entity';
-import { EnterpriseAuthService, EnterprisePermissionContext } from '../services/enterprise-auth.service';
+import {
+  EnterpriseAuthService,
+  EnterprisePermissionContext,
+} from '../services/enterprise-auth.service';
 
 interface AuthenticatedRequest extends Request {
   user: User;
@@ -81,12 +84,13 @@ export class EnterprisePermissionsGuard implements CanActivate {
     // Check each required permission using enterprise auth service
     for (const permission of requiredPermissions) {
       try {
-        const hasPermission = await this.enterpriseAuthService.hasEnterprisePermission(
-          user.id,
-          permission.resource,
-          permission.action,
-          permissionContext,
-        );
+        const hasPermission =
+          await this.enterpriseAuthService.hasEnterprisePermission(
+            user.id,
+            permission.resource,
+            permission.action,
+            permissionContext,
+          );
 
         if (!hasPermission) {
           const endpoint = `${request.method} ${request.url}`;
@@ -108,5 +112,4 @@ export class EnterprisePermissionsGuard implements CanActivate {
 
     return true;
   }
-
 }

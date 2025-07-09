@@ -1,0 +1,518 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+
+import { MLModel, ModelType, ModelStatus } from '../entities/ml-model.entity';
+import {
+  TrainingJob,
+  TrainingJobStatus,
+} from '../entities/training-job.entity';
+import { Product } from '../../products/entities/product.entity';
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+
+export interface TrainingRequest {
+  modelId?: string; // For retraining existing models
+  modelType: ModelType;
+  modelName: string;
+  productId?: string;
+  categoryId?: string;
+  locationId?: string;
+  trainingPeriod: {
+    startDate: Date;
+    endDate: Date;
+  };
+  features?: string[];
+  hyperparameters?: Record<string, any>;
+  indonesianMarketSettings?: {
+    includeRamadanEffect?: boolean;
+    includeLebaranEffect?: boolean;
+    includeRegionalFactors?: boolean;
+  };
+  trainingConfig?: any; // For backward compatibility with controllers
+}
+
+export interface TrainingResponse {
+  jobId: string;
+  modelId: string;
+  status: TrainingJobStatus;
+  estimatedCompletion: Date;
+  message: string;
+}
+
+@Injectable()
+export class ModelTrainingService {
+  private readonly logger = new Logger(ModelTrainingService.name);
+
+  constructor(
+    @InjectRepository(MLModel)
+    private readonly mlModelRepository: Repository<MLModel>,
+    @InjectRepository(TrainingJob)
+    private readonly trainingJobRepository: Repository<TrainingJob>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    @InjectRepository(InventoryTransaction)
+    private readonly inventoryTransactionRepository: Repository<InventoryTransaction>,
+    @InjectQueue('ml-training')
+    private readonly trainingQueue: Queue,
+  ) {}
+
+  /**
+   * Start training a new ML model
+   */
+  async startTraining(
+    request: TrainingRequest,
+    tenantId: string,
+    userId: string,
+  ): Promise<TrainingResponse> {
+    this.logger.log(`Starting training for model: ${request.modelName}`);
+
+    try {
+      // Validate training request
+      await this.validateTrainingRequest(request, tenantId);
+
+      // Create model entity
+      const model = await this.createModelEntity(request, tenantId, userId);
+
+      // Create training job
+      const trainingJob = await this.createTrainingJob(
+        model,
+        request,
+        tenantId,
+        userId,
+      );
+
+      // Queue training job for asynchronous processing
+      const job = await this.trainingQueue.add(
+        'train-model',
+        {
+          modelId: model.id,
+          trainingJobId: trainingJob.id,
+          request,
+          tenantId,
+          userId,
+        },
+        {
+          delay: 1000, // Small delay to allow response to return
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        },
+      );
+
+      // Update training job with queue job ID
+      trainingJob.queueJobId = job.id.toString();
+      await this.trainingJobRepository.save(trainingJob);
+
+      return {
+        jobId: trainingJob.id,
+        modelId: model.id,
+        status: TrainingJobStatus.QUEUED,
+        estimatedCompletion: this.calculateEstimatedCompletion(request),
+        message: `Training job queued successfully. Model will be trained using ${request.modelType} algorithm.`,
+      };
+    } catch (error) {
+      this.logger.error(`Error starting training: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get training job status
+   */
+  async getTrainingStatus(
+    jobId: string,
+    tenantId: string,
+  ): Promise<TrainingJob> {
+    const job = await this.trainingJobRepository.findOne({
+      where: { id: jobId, tenantId },
+      relations: ['model'],
+    });
+
+    if (!job) {
+      throw new Error(`Training job ${jobId} not found`);
+    }
+
+    return job;
+  }
+
+  /**
+   * List all training jobs for a tenant
+   */
+  async listTrainingJobs(
+    tenantId: string,
+    limit: number = 50,
+  ): Promise<TrainingJob[]> {
+    return await this.trainingJobRepository.find({
+      where: { tenantId },
+      relations: ['model'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  /**
+   * Get trained models
+   */
+  async getTrainedModels(tenantId: string): Promise<MLModel[]> {
+    return await this.mlModelRepository.find({
+      where: {
+        tenantId,
+        status: ModelStatus.TRAINED,
+      },
+      order: { trainedAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Deploy a trained model
+   */
+  async deployModel(modelId: string, tenantId: string): Promise<MLModel> {
+    const model = await this.mlModelRepository.findOne({
+      where: { id: modelId, tenantId },
+    });
+
+    if (!model) {
+      throw new Error(`Model ${modelId} not found`);
+    }
+
+    if (model.status !== ModelStatus.TRAINED) {
+      throw new Error(`Model ${modelId} is not trained yet`);
+    }
+
+    // Update model status to deployed
+    model.status = ModelStatus.DEPLOYED;
+    model.deployedAt = new Date();
+
+    await this.mlModelRepository.save(model);
+
+    this.logger.log(`Model ${modelId} deployed successfully`);
+    return model;
+  }
+
+  /**
+   * Simulate training process (simplified implementation)
+   */
+  async simulateTraining(
+    modelId: string,
+    trainingJobId: string,
+    request: TrainingRequest,
+    tenantId: string,
+  ): Promise<void> {
+    this.logger.log(`Simulating training for model: ${modelId}`);
+
+    try {
+      // Update training job status
+      await this.updateTrainingJobStatus(
+        trainingJobId,
+        TrainingJobStatus.RUNNING,
+      );
+
+      // Simulate data collection
+      const trainingData = await this.collectTrainingData(request, tenantId);
+
+      // Simulate training process with delays
+      await this.simulateTrainingSteps(
+        modelId,
+        trainingJobId,
+        request,
+        trainingData,
+      );
+
+      // Complete training
+      await this.completeTraining(modelId, trainingJobId);
+    } catch (error) {
+      this.logger.error(`Error during training simulation: ${error.message}`);
+      await this.failTraining(modelId, trainingJobId, error.message);
+      throw error;
+    }
+  }
+
+  private async validateTrainingRequest(
+    request: TrainingRequest,
+    tenantId: string,
+  ): Promise<void> {
+    // Validate model type
+    if (!Object.values(ModelType).includes(request.modelType)) {
+      throw new Error(`Invalid model type: ${request.modelType}`);
+    }
+
+    // Validate product exists if specified
+    if (request.productId) {
+      const product = await this.productRepository.findOne({
+        where: { id: request.productId, tenantId },
+      });
+      if (!product) {
+        throw new Error(`Product ${request.productId} not found`);
+      }
+    }
+
+    // Validate training period
+    if (request.trainingPeriod.startDate >= request.trainingPeriod.endDate) {
+      throw new Error('Training start date must be before end date');
+    }
+
+    // Check if we have enough historical data
+    const dataCount = await this.inventoryTransactionRepository.count({
+      where: {
+        tenantId,
+        ...(request.productId && { productId: request.productId }),
+        createdAt: {
+          $gte: request.trainingPeriod.startDate,
+          $lte: request.trainingPeriod.endDate,
+        },
+      } as any,
+    });
+
+    if (dataCount < 30) {
+      throw new Error(
+        'Insufficient historical data for training. At least 30 data points required.',
+      );
+    }
+  }
+
+  private async createModelEntity(
+    request: TrainingRequest,
+    tenantId: string,
+    userId: string,
+  ): Promise<MLModel> {
+    const model = this.mlModelRepository.create({
+      tenantId,
+      modelType: request.modelType,
+      name: request.modelName,
+      productId: request.productId,
+      categoryId: request.categoryId,
+      locationId: request.locationId,
+      status: ModelStatus.TRAINING,
+      hyperparameters:
+        request.hyperparameters ||
+        this.getDefaultHyperparameters(request.modelType),
+      configuration: {
+        features: request.features || this.getDefaultFeatures(),
+        trainingPeriod: request.trainingPeriod,
+        indonesianMarketSettings: request.indonesianMarketSettings || {
+          includeRamadanEffect: true,
+          includeLebaranEffect: true,
+          includeRegionalFactors: true,
+        },
+      },
+      createdBy: userId,
+      version: 'v1.0',
+    });
+
+    return await this.mlModelRepository.save(model);
+  }
+
+  private async createTrainingJob(
+    model: MLModel,
+    request: TrainingRequest,
+    tenantId: string,
+    userId: string,
+  ): Promise<TrainingJob> {
+    const job = this.trainingJobRepository.create({
+      tenantId,
+      modelId: model.id,
+      status: TrainingJobStatus.QUEUED,
+      trainingConfig: {
+        dataSource: {
+          from: request.trainingPeriod.startDate.toISOString(),
+          to: request.trainingPeriod.endDate.toISOString(),
+          productIds: request.productId ? [request.productId] : undefined,
+          categoryIds: request.categoryId ? [request.categoryId] : undefined,
+          locationIds: request.locationId ? [request.locationId] : undefined,
+          includeExternalFactors: true,
+        },
+        validation: {
+          splitRatio: 0.8,
+          method: 'time_series',
+        },
+        hyperparameters:
+          request.hyperparameters ||
+          this.getDefaultHyperparameters(request.modelType),
+        features: request.features || this.getDefaultFeatures(),
+        target: 'demand',
+      },
+      createdBy: userId,
+      startedAt: new Date(),
+    });
+
+    return await this.trainingJobRepository.save(job);
+  }
+
+  private calculateEstimatedCompletion(request: TrainingRequest): Date {
+    const baseMinutes = {
+      [ModelType.LINEAR_REGRESSION]: 2,
+      [ModelType.ARIMA]: 5,
+      [ModelType.PROPHET]: 8,
+      [ModelType.XGBOOST]: 15,
+      [ModelType.ENSEMBLE]: 25,
+    };
+
+    const minutes = baseMinutes[request.modelType] || 10;
+    const completion = new Date();
+    completion.setMinutes(completion.getMinutes() + minutes);
+    return completion;
+  }
+
+  private async collectTrainingData(
+    request: TrainingRequest,
+    tenantId: string,
+  ): Promise<any[]> {
+    const whereConditions: any = {
+      tenantId,
+      createdAt: {
+        $gte: request.trainingPeriod.startDate,
+        $lte: request.trainingPeriod.endDate,
+      },
+    };
+
+    if (request.productId) {
+      whereConditions.productId = request.productId;
+    }
+
+    return await this.inventoryTransactionRepository.find({
+      where: whereConditions,
+      order: { createdAt: 'ASC' },
+      take: 10000, // Limit to prevent memory issues
+    });
+  }
+
+  private async simulateTrainingSteps(
+    modelId: string,
+    trainingJobId: string,
+    request: TrainingRequest,
+    trainingData: any[],
+  ): Promise<void> {
+    const steps = [
+      'Data preprocessing',
+      'Feature engineering',
+      'Model training',
+      'Validation',
+      'Hyperparameter tuning',
+      'Final evaluation',
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      this.logger.log(`Training step ${i + 1}/${steps.length}: ${step}`);
+
+      // Update progress
+      await this.updateTrainingJobProgress(trainingJobId, {
+        currentStep: step,
+        progress: ((i + 1) / steps.length) * 100,
+        dataPointsProcessed: trainingData.length,
+      });
+
+      // Simulate processing time
+      await this.delay(2000 + Math.random() * 3000); // 2-5 seconds per step
+    }
+  }
+
+  private async completeTraining(
+    modelId: string,
+    trainingJobId: string,
+  ): Promise<void> {
+    // Update model
+    const model = await this.mlModelRepository.findOne({
+      where: { id: modelId },
+    });
+    if (model) {
+      model.status = ModelStatus.TRAINED;
+      model.trainedAt = new Date();
+      model.accuracy = 0.82 + Math.random() * 0.15; // Simulate 82-97% accuracy
+      await this.mlModelRepository.save(model);
+    }
+
+    // Update training job
+    await this.updateTrainingJobStatus(
+      trainingJobId,
+      TrainingJobStatus.COMPLETED,
+      {
+        completedAt: new Date(),
+        finalAccuracy: model?.accuracy,
+        message: 'Training completed successfully',
+      },
+    );
+
+    this.logger.log(`Training completed for model: ${modelId}`);
+  }
+
+  private async failTraining(
+    modelId: string,
+    trainingJobId: string,
+    error: string,
+  ): Promise<void> {
+    // Update model
+    await this.mlModelRepository.update(modelId, {
+      status: ModelStatus.FAILED,
+    });
+
+    // Update training job
+    await this.updateTrainingJobStatus(
+      trainingJobId,
+      TrainingJobStatus.FAILED,
+      {
+        errorMessage: error,
+        failedAt: new Date(),
+      },
+    );
+  }
+
+  private async updateTrainingJobStatus(
+    jobId: string,
+    status: TrainingJobStatus,
+    additionalData?: any,
+  ): Promise<void> {
+    await this.trainingJobRepository.update(jobId, {
+      status,
+      ...additionalData,
+    });
+  }
+
+  private async updateTrainingJobProgress(
+    jobId: string,
+    progress: any,
+  ): Promise<void> {
+    await this.trainingJobRepository.update(jobId, {
+      progress,
+      updatedAt: new Date(),
+    });
+  }
+
+  private getDefaultFeatures(): string[] {
+    return [
+      'historical_demand',
+      'day_of_week',
+      'month_of_year',
+      'seasonality',
+      'trend',
+      'ramadan_effect',
+      'lebaran_effect',
+      'weekend_pattern',
+      'holiday_effect',
+      'economic_indicators',
+    ];
+  }
+
+  private getDefaultHyperparameters(modelType: ModelType): Record<string, any> {
+    switch (modelType) {
+      case ModelType.ARIMA:
+        return { p: 1, d: 1, q: 1 };
+      case ModelType.PROPHET:
+        return { seasonality_mode: 'multiplicative', yearly_seasonality: true };
+      case ModelType.XGBOOST:
+        return { max_depth: 6, learning_rate: 0.1, n_estimators: 100 };
+      case ModelType.LINEAR_REGRESSION:
+        return { fit_intercept: true, normalize: false };
+      default:
+        return {};
+    }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}

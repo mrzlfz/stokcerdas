@@ -1,10 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddMissingColumns1751628867303 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Add supplierId column to products table if it exists
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add supplierId column to products table if it exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'products') THEN
@@ -13,8 +12,8 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
             END $$;
         `);
 
-        // Add is_deleted column to automation_schedule table if it exists
-        await queryRunner.query(`
+    // Add is_deleted column to automation_schedule table if it exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'automation_schedule') THEN
@@ -23,8 +22,8 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
             END $$;
         `);
 
-        // Add is_deleted column to department table if it exists
-        await queryRunner.query(`
+    // Add is_deleted column to department table if it exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'department') THEN
@@ -33,8 +32,8 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
             END $$;
         `);
 
-        // Add foreign key constraint for supplierId if suppliers table exists
-        await queryRunner.query(`
+    // Add foreign key constraint for supplierId if suppliers table exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'suppliers') 
@@ -45,11 +44,11 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Remove foreign key constraint if products table exists
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove foreign key constraint if products table exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'products') THEN
@@ -58,8 +57,8 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
             END $$;
         `);
 
-        // Remove supplierId column from products table if it exists
-        await queryRunner.query(`
+    // Remove supplierId column from products table if it exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'products') THEN
@@ -68,8 +67,8 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
             END $$;
         `);
 
-        // Remove is_deleted column from automation_schedule table if it exists
-        await queryRunner.query(`
+    // Remove is_deleted column from automation_schedule table if it exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'automation_schedule') THEN
@@ -78,8 +77,8 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
             END $$;
         `);
 
-        // Remove is_deleted column from department table if it exists
-        await queryRunner.query(`
+    // Remove is_deleted column from department table if it exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'department') THEN
@@ -87,6 +86,5 @@ export class AddMissingColumns1751628867303 implements MigrationInterface {
                 END IF;
             END $$;
         `);
-    }
-
+  }
 }

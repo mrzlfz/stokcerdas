@@ -1,0 +1,2588 @@
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
+
+import { Customer, CustomerSegment, CustomerType } from '../entities/customer.entity';
+import { CustomerTransaction } from '../entities/customer-transaction.entity';
+
+export enum SegmentationType {
+  RFM = 'rfm',
+  BEHAVIORAL = 'behavioral',
+  DEMOGRAPHIC = 'demographic',
+  PURCHASE_PATTERN = 'purchase_pattern',
+  GEOGRAPHIC = 'geographic',
+  VALUE_BASED = 'value_based',
+  LIFECYCLE = 'lifecycle',
+  HYBRID = 'hybrid',
+}
+
+export enum IndonesianBusinessContext {
+  RAMADAN_SHOPPER = 'ramadan_shopper',
+  LEBARAN_BULK_BUYER = 'lebaran_bulk_buyer',
+  JAKARTA_PREMIUM = 'jakarta_premium',
+  BANDUNG_CREATIVE = 'bandung_creative',
+  SURABAYA_TRADITIONAL = 'surabaya_traditional',
+  UMKM_MICRO = 'umkm_micro',
+  UMKM_SMALL = 'umkm_small',
+  UMKM_MEDIUM = 'umkm_medium',
+  ENTERPRISE_CORPORATE = 'enterprise_corporate',
+  DIGITAL_NATIVE = 'digital_native',
+  TRADITIONAL_BUYER = 'traditional_buyer',
+  MOBILE_FIRST = 'mobile_first',
+  MULTICHANNEL_ADVANCED = 'multichannel_advanced',
+}
+
+export interface RFMSegmentationResult {
+  customerId: string;
+  recencyScore: number; // 1-5 scale
+  frequencyScore: number; // 1-5 scale  
+  monetaryScore: number; // 1-5 scale
+  rfmSegment: string; // e.g., "555" for top customers
+  rfmLabel: string; // Human-readable label
+  segmentDescription: string;
+  actionRecommendations: string[];
+  lastCalculated: Date;
+}
+
+export interface BehavioralSegmentationResult {
+  customerId: string;
+  behavioralCluster: string;
+  clusterCharacteristics: {
+    purchaseFrequencyPattern: 'regular' | 'seasonal' | 'opportunistic' | 'one_time';
+    priceConsciousness: 'premium' | 'value' | 'discount_hunter' | 'price_insensitive';
+    channelPreference: 'online_only' | 'offline_only' | 'omnichannel' | 'mobile_first';
+    productExploration: 'brand_loyal' | 'category_explorer' | 'deal_seeker' | 'variety_seeker';
+    engagementLevel: 'highly_engaged' | 'moderately_engaged' | 'passive' | 'dormant';
+  };
+  behavioralTrends: {
+    purchaseFrequencyTrend: 'increasing' | 'stable' | 'decreasing';
+    spendingTrend: 'increasing' | 'stable' | 'decreasing';
+    categoryDiversificationTrend: 'expanding' | 'stable' | 'narrowing';
+  };
+  predictedBehaviorChanges: string[];
+  segmentStability: number; // 0-100 likelihood to stay in segment
+}
+
+export interface DemographicSegmentationResult {
+  customerId: string;
+  demographicSegment: string;
+  characteristics: {
+    ageGroup: 'gen_z' | 'millennial' | 'gen_x' | 'boomer' | 'unknown';
+    businessType: CustomerType;
+    geographicTier: 'tier_1' | 'tier_2' | 'tier_3' | 'rural';
+    economicSegment: 'low_income' | 'middle_income' | 'high_income' | 'ultra_high';
+    digitalMaturity: 'digital_native' | 'digital_adopter' | 'digital_immigrant' | 'offline_only';
+  };
+  indonesianContext: {
+    regionBehavior: IndonesianBusinessContext[];
+    culturalAlignment: number; // 0-100 alignment with Indonesian business patterns
+    localMarketPosition: 'leading' | 'following' | 'emerging' | 'traditional';
+  };
+  marketingRecommendations: string[];
+}
+
+export interface PurchasePatternSegmentationResult {
+  customerId: string;
+  patternSegment: string;
+  purchasePatterns: {
+    seasonality: {
+      isSeasonalBuyer: boolean;
+      peakSeasons: string[]; // e.g., ['ramadan', 'lebaran', 'christmas']
+      seasonalityStrength: number; // 0-100
+    };
+    categoryAffinity: {
+      primaryCategories: string[];
+      categoryLoyalty: number; // 0-100
+      crossCategoryPurchasing: number; // 0-100
+    };
+    timingPatterns: {
+      preferredOrderDays: string[]; // ['monday', 'friday']
+      preferredOrderHours: number[]; // [9, 14, 20]
+      orderFrequencyPattern: 'regular' | 'irregular' | 'burst' | 'declining';
+    };
+    paymentBehavior: {
+      preferredPaymentMethods: string[];
+      paymentMethodLoyalty: number; // 0-100
+      creditWorthiness: 'excellent' | 'good' | 'fair' | 'poor';
+    };
+  };
+  futureOrderPredictions: {
+    nextOrderProbability: number; // 0-100
+    predictedOrderValue: number;
+    predictedCategories: string[];
+    recommendedOfferTypes: string[];
+  };
+}
+
+export interface GeographicSegmentationResult {
+  customerId: string;
+  geographicSegment: string;
+  locationAnalysis: {
+    primaryCity: string;
+    cityTier: 'tier_1' | 'tier_2' | 'tier_3' | 'rural';
+    regionBehavior: {
+      spendingPattern: 'jakarta_premium' | 'bandung_creative' | 'surabaya_traditional' | 'regional_standard';
+      logisticsPreference: 'same_day' | 'next_day' | 'standard' | 'economy';
+      culturalInfluence: number; // 0-100 how much local culture affects purchasing
+    };
+  };
+  distanceBasedInsights: {
+    deliveryZone: 'urban_core' | 'suburban' | 'remote' | 'very_remote';
+    shippingCostSensitivity: number; // 0-100
+    deliverySpeedImportance: number; // 0-100
+  };
+  regionalRecommendations: string[];
+}
+
+export interface HybridSegmentationResult {
+  customerId: string;
+  hybridSegment: string;
+  segmentComposition: {
+    rfmWeight: number; // 0-1
+    behavioralWeight: number; // 0-1
+    demographicWeight: number; // 0-1
+    geographicWeight: number; // 0-1
+    purchasePatternWeight: number; // 0-1
+  };
+  compositeScore: number; // 0-100 overall customer value score
+  primarySegmentDrivers: string[]; // Main factors determining segment
+  segmentCharacteristics: {
+    valueLevel: 'vip' | 'high_value' | 'medium_value' | 'developing' | 'low_value';
+    loyaltyLevel: 'champion' | 'loyal' | 'potential_loyal' | 'at_risk' | 'dormant';
+    growthPotential: 'high_growth' | 'steady_growth' | 'stable' | 'declining' | 'churning';
+  };
+  strategicRecommendations: string[];
+  investmentPriority: 'high' | 'medium' | 'low' | 'minimal';
+}
+
+export interface SegmentMigrationTracking {
+  customerId: string;
+  migrationHistory: Array<{
+    fromSegment: string;
+    toSegment: string;
+    migrationDate: Date;
+    migrationTrigger: string;
+    migrationReason: string;
+    businessImpact: 'positive' | 'negative' | 'neutral';
+  }>;
+  migrationPatterns: {
+    migrationFrequency: number; // Migrations per year
+    segmentStability: number; // 0-100 how stable customer is in segments
+    upwardMobility: number; // -100 to 100 trend toward better segments
+    churnRisk: number; // 0-100 risk of leaving entirely
+  };
+  predictedNextMigration: {
+    targetSegment: string;
+    probability: number; // 0-100
+    estimatedTimeframe: number; // Days
+    triggeringFactors: string[];
+  };
+}
+
+export interface SegmentPerformanceAnalytics {
+  segmentName: string;
+  segmentType: SegmentationType;
+  performanceMetrics: {
+    customerCount: number;
+    totalRevenue: number;
+    averageCustomerValue: number;
+    retentionRate: number;
+    churnRate: number;
+    growthRate: number; // Month-over-month
+    profitability: number;
+    acquisitionCost: number;
+    lifetimeValue: number;
+  };
+  behaviorInsights: {
+    averageOrderValue: number;
+    purchaseFrequency: number;
+    categoryPreferences: Array<{ category: string; percentage: number }>;
+    channelPreferences: Array<{ channel: string; percentage: number }>;
+    seasonalPatterns: Array<{ season: string; impact: number }>;
+  };
+  businessImpact: {
+    revenueContribution: number; // Percentage of total revenue
+    profitContribution: number; // Percentage of total profit
+    strategicImportance: 'critical' | 'important' | 'moderate' | 'low';
+    investmentRecommendation: 'increase' | 'maintain' | 'reduce' | 'eliminate';
+  };
+  competitivePosition: {
+    marketShare: number; // Within this segment
+    competitiveAdvantage: string[];
+    threats: string[];
+    opportunities: string[];
+  };
+}
+
+@Injectable()
+export class CustomerSegmentationEngineService {
+  private readonly logger = new Logger(CustomerSegmentationEngineService.name);
+
+  // Segmentation algorithm weights for Indonesian market
+  private readonly INDONESIAN_SEGMENT_WEIGHTS = {
+    rfm: 0.25,
+    behavioral: 0.25,
+    demographic: 0.20,
+    geographic: 0.15,
+    purchasePattern: 0.15,
+  };
+
+  // Indonesian business context scoring
+  private readonly INDONESIAN_CULTURAL_FACTORS = {
+    ramadanImpact: 0.3,
+    regionalDifferences: 0.25,
+    digitalAdoption: 0.2,
+    paymentPreferences: 0.15,
+    socialInfluence: 0.1,
+  };
+
+  constructor(
+    @InjectRepository(Customer)
+    private readonly customerRepository: Repository<Customer>,
+    @InjectRepository(CustomerTransaction)
+    private readonly customerTransactionRepository: Repository<CustomerTransaction>,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  /**
+   * Perform comprehensive RFM (Recency, Frequency, Monetary) segmentation
+   * with Indonesian business context adjustments
+   */
+  async performRFMSegmentation(
+    tenantId: string,
+    customerId?: string
+  ): Promise<RFMSegmentationResult[]> {
+    try {
+      this.logger.debug(`Performing RFM segmentation for tenant ${tenantId}`);
+
+      const whereClause = customerId ? 'AND c.id = $2' : '';
+      const params = customerId ? [tenantId, customerId] : [tenantId];
+
+      // Calculate RFM scores with Indonesian business calendar considerations
+      const rfmQuery = `
+        WITH customer_rfm_base AS (
+          SELECT 
+            c.id as customer_id,
+            c.full_name,
+            c.created_at,
+            
+            -- Recency Score (1-5, 5 is most recent)
+            CASE 
+              WHEN MAX(ct.transaction_date) IS NULL THEN 1
+              WHEN EXTRACT(DAY FROM (CURRENT_DATE - MAX(ct.transaction_date))) <= 30 THEN 5
+              WHEN EXTRACT(DAY FROM (CURRENT_DATE - MAX(ct.transaction_date))) <= 90 THEN 4
+              WHEN EXTRACT(DAY FROM (CURRENT_DATE - MAX(ct.transaction_date))) <= 180 THEN 3
+              WHEN EXTRACT(DAY FROM (CURRENT_DATE - MAX(ct.transaction_date))) <= 365 THEN 2
+              ELSE 1
+            END as recency_score,
+            
+            -- Frequency Score (1-5, 5 is most frequent) - Adjusted for Indonesian buying patterns
+            CASE 
+              WHEN COUNT(ct.id) >= 20 THEN 5  -- Very frequent (adjusted for Indonesian SMB patterns)
+              WHEN COUNT(ct.id) >= 10 THEN 4  -- Frequent
+              WHEN COUNT(ct.id) >= 5 THEN 3   -- Regular
+              WHEN COUNT(ct.id) >= 2 THEN 2   -- Occasional
+              ELSE 1                          -- One-time
+            END as frequency_score,
+            
+            -- Monetary Score (1-5, 5 is highest value) - Indonesian Rupiah scale
+            CASE 
+              WHEN COALESCE(SUM(ct.total_amount), 0) >= 100000000 THEN 5  -- 100M+ IDR (Premium)
+              WHEN COALESCE(SUM(ct.total_amount), 0) >= 50000000 THEN 4   -- 50-100M IDR (High Value)
+              WHEN COALESCE(SUM(ct.total_amount), 0) >= 20000000 THEN 3   -- 20-50M IDR (Medium Value)
+              WHEN COALESCE(SUM(ct.total_amount), 0) >= 5000000 THEN 2    -- 5-20M IDR (Standard Value)
+              ELSE 1                                                      -- <5M IDR (Low Value)
+            END as monetary_score,
+            
+            -- Raw metrics for analysis
+            MAX(ct.transaction_date) as last_transaction_date,
+            COUNT(ct.id) as total_transactions,
+            COALESCE(SUM(ct.total_amount), 0) as total_spent,
+            
+            -- Indonesian seasonal adjustment factor
+            COUNT(CASE 
+              WHEN EXTRACT(MONTH FROM ct.transaction_date) IN (3, 4, 5) THEN 1  -- Ramadan period typically
+              ELSE NULL 
+            END) as ramadan_transactions
+            
+          FROM customers c
+          LEFT JOIN customer_transactions ct ON c.id = ct.customer_id 
+            AND ct.is_deleted = false
+          WHERE c.tenant_id = $1 
+            AND c.is_deleted = false
+            ${whereClause}
+          GROUP BY c.id, c.full_name, c.created_at
+        ),
+        rfm_with_segments AS (
+          SELECT 
+            *,
+            -- Create RFM segment string (e.g., "555" for top customers)
+            CONCAT(recency_score, frequency_score, monetary_score) as rfm_segment,
+            
+            -- Calculate Indonesian cultural alignment bonus
+            CASE 
+              WHEN ramadan_transactions > 0 AND total_transactions > 0 THEN
+                LEAST(1.2, 1 + (ramadan_transactions::DECIMAL / total_transactions * 0.2))
+              ELSE 1.0
+            END as cultural_alignment_multiplier
+            
+          FROM customer_rfm_base
+        )
+        SELECT 
+          customer_id,
+          recency_score,
+          frequency_score,
+          monetary_score,
+          rfm_segment,
+          last_transaction_date,
+          total_transactions,
+          total_spent,
+          cultural_alignment_multiplier,
+          
+          -- RFM Label Assignment with Indonesian context
+          CASE 
+            WHEN rfm_segment IN ('555', '554', '544', '545', '454', '455') THEN 'VIP Champion'
+            WHEN rfm_segment IN ('543', '553', '551', '552', '541', '542') THEN 'Loyal Customer'
+            WHEN rfm_segment IN ('533', '534', '535', '443', '444', '445') THEN 'Potential Loyalist'
+            WHEN rfm_segment IN ('431', '432', '441', '442', '531', '532') THEN 'New Customer'
+            WHEN rfm_segment IN ('421', '422', '423', '521', '522', '523') THEN 'Promising'
+            WHEN rfm_segment IN ('411', '412', '413', '511', '512', '513') THEN 'Needs Attention'
+            WHEN rfm_segment IN ('331', '332', '333', '341', '342', '343') THEN 'At Risk'
+            WHEN rfm_segment IN ('321', '322', '323', '311', '312', '313') THEN 'Cannot Lose Them'
+            WHEN rfm_segment IN ('231', '232', '233', '241', '242', '243') THEN 'Hibernating'
+            WHEN rfm_segment IN ('221', '222', '223', '211', '212', '213') THEN 'Price Sensitive'
+            ELSE 'Lost Customer'
+          END as rfm_label
+          
+        FROM rfm_with_segments
+        ORDER BY rfm_segment DESC, total_spent DESC
+      `;
+
+      const rfmResults = await this.dataSource.query(rfmQuery, params);
+
+      // Transform results and add recommendations
+      const segmentationResults: RFMSegmentationResult[] = rfmResults.map(row => ({
+        customerId: row.customer_id,
+        recencyScore: parseInt(row.recency_score),
+        frequencyScore: parseInt(row.frequency_score),
+        monetaryScore: parseInt(row.monetary_score),
+        rfmSegment: row.rfm_segment,
+        rfmLabel: row.rfm_label,
+        segmentDescription: this.getRFMSegmentDescription(row.rfm_label),
+        actionRecommendations: this.getRFMActionRecommendations(row.rfm_label, parseFloat(row.cultural_alignment_multiplier)),
+        lastCalculated: new Date(),
+      }));
+
+      this.logger.debug(`RFM segmentation completed for ${segmentationResults.length} customers`);
+      return segmentationResults;
+
+    } catch (error) {
+      this.logger.error(`Failed to perform RFM segmentation: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform advanced behavioral segmentation using machine learning clustering
+   */
+  async performBehavioralSegmentation(
+    tenantId: string,
+    customerId?: string
+  ): Promise<BehavioralSegmentationResult[]> {
+    try {
+      this.logger.debug(`Performing behavioral segmentation for tenant ${tenantId}`);
+
+      const whereClause = customerId ? 'AND c.id = $2' : '';
+      const params = customerId ? [tenantId, customerId] : [tenantId];
+
+      // Advanced behavioral analysis query
+      const behavioralQuery = `
+        WITH customer_behavior_metrics AS (
+          SELECT 
+            c.id as customer_id,
+            
+            -- Purchase Frequency Pattern Analysis
+            CASE 
+              WHEN COUNT(ct.id) = 0 THEN 'one_time'
+              WHEN STDDEV(EXTRACT(DAY FROM (ct.transaction_date - LAG(ct.transaction_date) OVER (
+                PARTITION BY c.id ORDER BY ct.transaction_date
+              )))) < 7 THEN 'regular'
+              WHEN COUNT(DISTINCT EXTRACT(MONTH FROM ct.transaction_date)) < 
+                   COUNT(ct.id) / 3.0 THEN 'seasonal'
+              ELSE 'opportunistic'
+            END as purchase_frequency_pattern,
+            
+            -- Price Consciousness Analysis (based on discount usage and price points)
+            CASE 
+              WHEN AVG(ct.total_amount) > 10000000 AND 
+                   AVG(COALESCE(ct.discount_amount, 0)) / NULLIF(AVG(ct.total_amount), 0) < 0.05 THEN 'price_insensitive'
+              WHEN AVG(ct.total_amount) > 5000000 THEN 'premium'
+              WHEN AVG(COALESCE(ct.discount_amount, 0)) / NULLIF(AVG(ct.total_amount), 0) > 0.2 THEN 'discount_hunter'
+              ELSE 'value'
+            END as price_consciousness,
+            
+            -- Channel Preference Analysis
+            CASE 
+              WHEN COUNT(DISTINCT ct.channel) = 1 THEN
+                CASE 
+                  WHEN MAX(ct.channel) ILIKE '%mobile%' THEN 'mobile_first'
+                  WHEN MAX(ct.channel) ILIKE '%online%' THEN 'online_only'
+                  ELSE 'offline_only'
+                END
+              WHEN COUNT(DISTINCT ct.channel) >= 3 THEN 'omnichannel'
+              ELSE 'online_only'
+            END as channel_preference,
+            
+            -- Product Exploration Behavior
+            CASE 
+              WHEN COUNT(DISTINCT ct.categories) = 1 THEN 'brand_loyal'
+              WHEN COUNT(DISTINCT ct.categories) >= 5 THEN 'variety_seeker'
+              WHEN AVG(COALESCE(ct.discount_amount, 0)) / NULLIF(AVG(ct.total_amount), 0) > 0.15 THEN 'deal_seeker'
+              ELSE 'category_explorer'
+            END as product_exploration,
+            
+            -- Engagement Level (based on transaction recency and frequency)
+            CASE 
+              WHEN MAX(ct.transaction_date) >= CURRENT_DATE - INTERVAL '30 days' AND 
+                   COUNT(ct.id) >= 5 THEN 'highly_engaged'
+              WHEN MAX(ct.transaction_date) >= CURRENT_DATE - INTERVAL '90 days' AND 
+                   COUNT(ct.id) >= 2 THEN 'moderately_engaged'
+              WHEN MAX(ct.transaction_date) >= CURRENT_DATE - INTERVAL '180 days' THEN 'passive'
+              ELSE 'dormant'
+            END as engagement_level,
+            
+            -- Behavioral Trends Calculation
+            -- Purchase Frequency Trend (comparing last 3 months vs previous 3 months)
+            CASE 
+              WHEN COUNT(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '90 days' THEN 1 END) >
+                   COUNT(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '180 days' 
+                              AND ct.transaction_date < CURRENT_DATE - INTERVAL '90 days' THEN 1 END) * 1.2 
+                   THEN 'increasing'
+              WHEN COUNT(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '90 days' THEN 1 END) <
+                   COUNT(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '180 days' 
+                              AND ct.transaction_date < CURRENT_DATE - INTERVAL '90 days' THEN 1 END) * 0.8 
+                   THEN 'decreasing'
+              ELSE 'stable'
+            END as purchase_frequency_trend,
+            
+            -- Spending Trend
+            CASE 
+              WHEN COALESCE(AVG(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '90 days' 
+                                     THEN ct.total_amount END), 0) >
+                   COALESCE(AVG(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '180 days' 
+                                     AND ct.transaction_date < CURRENT_DATE - INTERVAL '90 days' 
+                                     THEN ct.total_amount END), 0) * 1.15 
+                   THEN 'increasing'
+              WHEN COALESCE(AVG(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '90 days' 
+                                     THEN ct.total_amount END), 0) <
+                   COALESCE(AVG(CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '180 days' 
+                                     AND ct.transaction_date < CURRENT_DATE - INTERVAL '90 days' 
+                                     THEN ct.total_amount END), 0) * 0.85 
+                   THEN 'decreasing'
+              ELSE 'stable'
+            END as spending_trend,
+            
+            -- Category Diversification Trend
+            CASE 
+              WHEN COUNT(DISTINCT CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '90 days' 
+                                       THEN ct.categories END) >
+                   COUNT(DISTINCT CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '180 days' 
+                                       AND ct.transaction_date < CURRENT_DATE - INTERVAL '90 days' 
+                                       THEN ct.categories END) 
+                   THEN 'expanding'
+              WHEN COUNT(DISTINCT CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '90 days' 
+                                       THEN ct.categories END) <
+                   COUNT(DISTINCT CASE WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '180 days' 
+                                       AND ct.transaction_date < CURRENT_DATE - INTERVAL '90 days' 
+                                       THEN ct.categories END) 
+                   THEN 'narrowing'
+              ELSE 'stable'
+            END as category_diversification_trend,
+            
+            -- Calculate segment stability score
+            CASE 
+              WHEN COUNT(ct.id) >= 10 AND 
+                   EXTRACT(DAY FROM (CURRENT_DATE - MAX(ct.transaction_date))) <= 30 THEN 95
+              WHEN COUNT(ct.id) >= 5 AND 
+                   EXTRACT(DAY FROM (CURRENT_DATE - MAX(ct.transaction_date))) <= 60 THEN 80
+              WHEN COUNT(ct.id) >= 3 AND 
+                   EXTRACT(DAY FROM (CURRENT_DATE - MAX(ct.transaction_date))) <= 90 THEN 65
+              WHEN COUNT(ct.id) >= 2 THEN 50
+              ELSE 25
+            END as segment_stability
+            
+          FROM customers c
+          LEFT JOIN customer_transactions ct ON c.id = ct.customer_id 
+            AND ct.is_deleted = false
+          WHERE c.tenant_id = $1 
+            AND c.is_deleted = false
+            ${whereClause}
+          GROUP BY c.id
+        )
+        SELECT 
+          customer_id,
+          purchase_frequency_pattern,
+          price_consciousness,
+          channel_preference,
+          product_exploration,
+          engagement_level,
+          purchase_frequency_trend,
+          spending_trend,
+          category_diversification_trend,
+          segment_stability,
+          
+          -- Create behavioral cluster identifier
+          CONCAT(
+            SUBSTRING(purchase_frequency_pattern, 1, 1),
+            SUBSTRING(price_consciousness, 1, 1),
+            SUBSTRING(channel_preference, 1, 1),
+            SUBSTRING(engagement_level, 1, 1)
+          ) as behavioral_cluster
+          
+        FROM customer_behavior_metrics
+        ORDER BY segment_stability DESC, customer_id
+      `;
+
+      const behavioralResults = await this.dataSource.query(behavioralQuery, params);
+
+      // Transform results and add predictions
+      const segmentationResults: BehavioralSegmentationResult[] = [];
+
+      for (const row of behavioralResults) {
+        const predictedBehaviorChanges = await this.predictBehaviorChanges(
+          tenantId,
+          row.customer_id,
+          {
+            purchaseFrequencyTrend: row.purchase_frequency_trend,
+            spendingTrend: row.spending_trend,
+            categoryDiversificationTrend: row.category_diversification_trend,
+          }
+        );
+
+        segmentationResults.push({
+          customerId: row.customer_id,
+          behavioralCluster: row.behavioral_cluster,
+          clusterCharacteristics: {
+            purchaseFrequencyPattern: row.purchase_frequency_pattern,
+            priceConsciousness: row.price_consciousness,
+            channelPreference: row.channel_preference,
+            productExploration: row.product_exploration,
+            engagementLevel: row.engagement_level,
+          },
+          behavioralTrends: {
+            purchaseFrequencyTrend: row.purchase_frequency_trend,
+            spendingTrend: row.spending_trend,
+            categoryDiversificationTrend: row.category_diversification_trend,
+          },
+          predictedBehaviorChanges,
+          segmentStability: parseInt(row.segment_stability),
+        });
+      }
+
+      this.logger.debug(`Behavioral segmentation completed for ${segmentationResults.length} customers`);
+      return segmentationResults;
+
+    } catch (error) {
+      this.logger.error(`Failed to perform behavioral segmentation: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform demographic segmentation with Indonesian business context
+   */
+  async performDemographicSegmentation(
+    tenantId: string,
+    customerId?: string
+  ): Promise<DemographicSegmentationResult[]> {
+    try {
+      this.logger.debug(`Performing demographic segmentation for tenant ${tenantId}`);
+
+      const whereClause = customerId ? 'AND c.id = $2' : '';
+      const params = customerId ? [tenantId, customerId] : [tenantId];
+
+      // Advanced demographic analysis with Indonesian context
+      const demographicQuery = `
+        WITH customer_demographics AS (
+          SELECT 
+            c.id as customer_id,
+            c.customer_type,
+            c.date_of_birth,
+            c.company_name,
+            c.business_size,
+            c.addresses,
+            
+            -- Age Group Calculation
+            CASE 
+              WHEN c.date_of_birth IS NULL THEN 'unknown'
+              WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, c.date_of_birth)) BETWEEN 18 AND 27 THEN 'gen_z'
+              WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, c.date_of_birth)) BETWEEN 28 AND 43 THEN 'millennial'
+              WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, c.date_of_birth)) BETWEEN 44 AND 59 THEN 'gen_x'
+              WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, c.date_of_birth)) >= 60 THEN 'boomer'
+              ELSE 'unknown'
+            END as age_group,
+            
+            -- Geographic Tier Analysis (based on address data)
+            CASE 
+              WHEN c.addresses IS NOT NULL AND 
+                   (c.addresses::text ILIKE '%jakarta%' OR 
+                    c.addresses::text ILIKE '%surabaya%' OR 
+                    c.addresses::text ILIKE '%bandung%' OR
+                    c.addresses::text ILIKE '%medan%' OR
+                    c.addresses::text ILIKE '%semarang%') THEN 'tier_1'
+              WHEN c.addresses IS NOT NULL AND 
+                   (c.addresses::text ILIKE '%bekasi%' OR 
+                    c.addresses::text ILIKE '%tangerang%' OR 
+                    c.addresses::text ILIKE '%malang%' OR
+                    c.addresses::text ILIKE '%yogyakarta%' OR
+                    c.addresses::text ILIKE '%solo%') THEN 'tier_2'
+              WHEN c.addresses IS NOT NULL THEN 'tier_3'
+              ELSE 'rural'
+            END as geographic_tier,
+            
+            -- Economic Segment (based on spending patterns and business type)
+            CASE 
+              WHEN c.customer_type = 'corporate' OR c.business_size = 'Large' THEN 'ultra_high'
+              WHEN c.customer_type = 'business' AND c.business_size IN ('Medium', 'Small') THEN 'high_income'
+              WHEN c.customer_type = 'business' AND c.business_size = 'Micro' THEN 'middle_income'
+              ELSE 'low_income'
+            END as economic_segment,
+            
+            -- Digital Maturity Assessment
+            CASE 
+              WHEN COUNT(DISTINCT ct.channel) >= 3 AND 
+                   COUNT(ct.id) FILTER (WHERE ct.channel ILIKE '%mobile%') > 
+                   COUNT(ct.id) * 0.6 THEN 'digital_native'
+              WHEN COUNT(DISTINCT ct.channel) >= 2 AND 
+                   COUNT(ct.id) FILTER (WHERE ct.channel ILIKE '%online%') > 
+                   COUNT(ct.id) * 0.4 THEN 'digital_adopter'
+              WHEN COUNT(ct.id) FILTER (WHERE ct.channel ILIKE '%online%') > 0 THEN 'digital_immigrant'
+              ELSE 'offline_only'
+            END as digital_maturity,
+            
+            -- Indonesian Cultural Alignment Score
+            (CASE 
+              WHEN COUNT(ct.id) FILTER (WHERE EXTRACT(MONTH FROM ct.transaction_date) IN (3, 4, 5)) > 0 THEN 25 -- Ramadan shopping
+              ELSE 0 
+            END +
+            CASE 
+              WHEN c.addresses IS NOT NULL AND c.addresses::text ILIKE '%indonesia%' THEN 25 -- Indonesian address
+              ELSE 0 
+            END +
+            CASE 
+              WHEN COUNT(ct.id) FILTER (WHERE ct.payment_method IN ('gopay', 'ovo', 'dana', 'qris')) > 
+                   COUNT(ct.id) * 0.3 THEN 25 -- Uses Indonesian payment methods
+              ELSE 0 
+            END +
+            CASE 
+              WHEN COUNT(ct.id) FILTER (WHERE EXTRACT(DOW FROM ct.transaction_date) = 5) > -- Friday shopping (pre-weekend)
+                   COUNT(ct.id) * 0.2 THEN 25
+              ELSE 0 
+            END) as cultural_alignment,
+            
+            -- Local Market Position
+            CASE 
+              WHEN c.customer_type = 'corporate' AND 
+                   COALESCE(SUM(ct.total_amount), 0) > 100000000 THEN 'leading'
+              WHEN c.customer_type = 'business' AND 
+                   COALESCE(SUM(ct.total_amount), 0) > 20000000 THEN 'following'
+              WHEN COUNT(ct.id) >= 5 THEN 'emerging'
+              ELSE 'traditional'
+            END as local_market_position
+            
+          FROM customers c
+          LEFT JOIN customer_transactions ct ON c.id = ct.customer_id 
+            AND ct.is_deleted = false
+          WHERE c.tenant_id = $1 
+            AND c.is_deleted = false
+            ${whereClause}
+          GROUP BY c.id, c.customer_type, c.date_of_birth, c.company_name, 
+                   c.business_size, c.addresses
+        )
+        SELECT 
+          customer_id,
+          customer_type as business_type,
+          age_group,
+          geographic_tier,
+          economic_segment,
+          digital_maturity,
+          cultural_alignment,
+          local_market_position,
+          
+          -- Create demographic segment identifier
+          CONCAT(
+            SUBSTRING(age_group, 1, 1),
+            SUBSTRING(geographic_tier, 1, 1),
+            SUBSTRING(economic_segment, 1, 1),
+            SUBSTRING(digital_maturity, 1, 1)
+          ) as demographic_segment
+          
+        FROM customer_demographics
+        ORDER BY cultural_alignment DESC, customer_id
+      `;
+
+      const demographicResults = await this.dataSource.query(demographicQuery, params);
+
+      // Transform results and add marketing recommendations
+      const segmentationResults: DemographicSegmentationResult[] = [];
+
+      for (const row of demographicResults) {
+        const indonesianContext = await this.analyzeIndonesianBusinessContext(
+          tenantId,
+          row.customer_id,
+          row.geographic_tier,
+          parseInt(row.cultural_alignment)
+        );
+
+        const marketingRecommendations = this.generateDemographicMarketingRecommendations(
+          row.age_group,
+          row.business_type,
+          row.digital_maturity,
+          row.geographic_tier
+        );
+
+        segmentationResults.push({
+          customerId: row.customer_id,
+          demographicSegment: row.demographic_segment,
+          characteristics: {
+            ageGroup: row.age_group,
+            businessType: row.business_type,
+            geographicTier: row.geographic_tier,
+            economicSegment: row.economic_segment,
+            digitalMaturity: row.digital_maturity,
+          },
+          indonesianContext: {
+            regionBehavior: indonesianContext,
+            culturalAlignment: parseInt(row.cultural_alignment),
+            localMarketPosition: row.local_market_position,
+          },
+          marketingRecommendations,
+        });
+      }
+
+      this.logger.debug(`Demographic segmentation completed for ${segmentationResults.length} customers`);
+      return segmentationResults;
+
+    } catch (error) {
+      this.logger.error(`Failed to perform demographic segmentation: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform purchase pattern segmentation analysis
+   */
+  async performPurchasePatternSegmentation(
+    tenantId: string,
+    customerId?: string
+  ): Promise<PurchasePatternSegmentationResult[]> {
+    try {
+      this.logger.debug(`Performing purchase pattern segmentation for tenant ${tenantId}`);
+
+      const whereClause = customerId ? 'AND c.id = $2' : '';
+      const params = customerId ? [tenantId, customerId] : [tenantId];
+
+      // Complex purchase pattern analysis
+      const patternQuery = `
+        WITH customer_purchase_patterns AS (
+          SELECT 
+            c.id as customer_id,
+            
+            -- Seasonality Analysis
+            CASE 
+              WHEN STDDEV(monthly_counts.transaction_count) / 
+                   NULLIF(AVG(monthly_counts.transaction_count), 0) > 0.5 THEN true
+              ELSE false 
+            END as is_seasonal_buyer,
+            
+            -- Peak Seasons Identification
+            ARRAY_AGG(DISTINCT 
+              CASE 
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) IN (3, 4, 5) THEN 'ramadan'
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) IN (6, 7) THEN 'lebaran'
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) = 12 THEN 'christmas'
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) = 1 THEN 'new_year'
+                ELSE NULL
+              END
+            ) FILTER (WHERE 
+              CASE 
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) IN (3, 4, 5) THEN 'ramadan'
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) IN (6, 7) THEN 'lebaran'
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) = 12 THEN 'christmas'
+                WHEN EXTRACT(MONTH FROM ct.transaction_date) = 1 THEN 'new_year'
+                ELSE NULL
+              END IS NOT NULL
+            ) as peak_seasons,
+            
+            -- Category Affinity Analysis
+            ARRAY_AGG(DISTINCT category ORDER BY category_spend DESC) 
+              FILTER (WHERE category_spend > 0) as primary_categories,
+            
+            -- Category Loyalty Score (0-100)
+            CASE 
+              WHEN COUNT(DISTINCT category) = 1 THEN 100
+              WHEN COUNT(DISTINCT category) <= 3 THEN 75
+              WHEN COUNT(DISTINCT category) <= 5 THEN 50
+              ELSE 25
+            END as category_loyalty,
+            
+            -- Cross-Category Purchasing Score (0-100)
+            LEAST(100, COUNT(DISTINCT category) * 20) as cross_category_purchasing,
+            
+            -- Preferred Order Days
+            ARRAY_AGG(DISTINCT 
+              TO_CHAR(ct.transaction_date, 'Day')
+              ORDER BY day_counts.transaction_count DESC
+            ) as preferred_order_days,
+            
+            -- Preferred Order Hours
+            ARRAY_AGG(DISTINCT 
+              EXTRACT(HOUR FROM ct.transaction_date)::INTEGER
+              ORDER BY hour_counts.transaction_count DESC
+            ) as preferred_order_hours,
+            
+            -- Order Frequency Pattern
+            CASE 
+              WHEN STDDEV(day_diffs.day_diff) < 7 THEN 'regular'
+              WHEN COUNT(ct.id) = 1 THEN 'irregular'
+              WHEN COUNT(DISTINCT DATE_TRUNC('month', ct.transaction_date)) < 
+                   COUNT(ct.id) / 2.0 THEN 'burst'
+              ELSE 'declining'
+            END as order_frequency_pattern,
+            
+            -- Payment Behavior Analysis
+            ARRAY_AGG(DISTINCT ct.payment_method 
+              ORDER BY payment_method_counts.usage_count DESC
+            ) as preferred_payment_methods,
+            
+            -- Payment Method Loyalty
+            CASE 
+              WHEN COUNT(DISTINCT ct.payment_method) = 1 THEN 100
+              WHEN COUNT(DISTINCT ct.payment_method) <= 2 THEN 75
+              WHEN COUNT(DISTINCT ct.payment_method) <= 3 THEN 50
+              ELSE 25
+            END as payment_method_loyalty,
+            
+            -- Credit Worthiness Assessment
+            CASE 
+              WHEN AVG(ct.total_amount) > 20000000 AND 
+                   COUNT(ct.id) >= 10 THEN 'excellent'
+              WHEN AVG(ct.total_amount) > 10000000 AND 
+                   COUNT(ct.id) >= 5 THEN 'good'
+              WHEN AVG(ct.total_amount) > 2000000 THEN 'fair'
+              ELSE 'poor'
+            END as credit_worthiness,
+            
+            -- Future Order Predictions
+            CASE 
+              WHEN MAX(ct.transaction_date) >= CURRENT_DATE - INTERVAL '30 days' AND
+                   COUNT(ct.id) >= 3 THEN 85
+              WHEN MAX(ct.transaction_date) >= CURRENT_DATE - INTERVAL '60 days' AND
+                   COUNT(ct.id) >= 2 THEN 65
+              WHEN MAX(ct.transaction_date) >= CURRENT_DATE - INTERVAL '90 days' THEN 45
+              ELSE 20
+            END as next_order_probability,
+            
+            -- Predicted Order Value (based on trends)
+            CASE 
+              WHEN AVG(recent_orders.total_amount) > AVG(ct.total_amount) * 1.1 THEN
+                AVG(recent_orders.total_amount) * 1.05
+              WHEN AVG(recent_orders.total_amount) < AVG(ct.total_amount) * 0.9 THEN
+                AVG(recent_orders.total_amount) * 0.95
+              ELSE AVG(ct.total_amount)
+            END as predicted_order_value
+            
+          FROM customers c
+          LEFT JOIN customer_transactions ct ON c.id = ct.customer_id 
+            AND ct.is_deleted = false
+          LEFT JOIN LATERAL (
+            SELECT category, SUM(ct2.total_amount) as category_spend
+            FROM customer_transactions ct2,
+                 unnest(ct2.categories) as category
+            WHERE ct2.customer_id = c.id AND ct2.is_deleted = false
+            GROUP BY category
+          ) category_analysis ON true
+          LEFT JOIN LATERAL (
+            SELECT 
+              EXTRACT(MONTH FROM ct3.transaction_date) as month,
+              COUNT(*) as transaction_count
+            FROM customer_transactions ct3
+            WHERE ct3.customer_id = c.id AND ct3.is_deleted = false
+            GROUP BY EXTRACT(MONTH FROM ct3.transaction_date)
+          ) monthly_counts ON true
+          LEFT JOIN LATERAL (
+            SELECT 
+              TO_CHAR(ct4.transaction_date, 'Day') as day,
+              COUNT(*) as transaction_count
+            FROM customer_transactions ct4
+            WHERE ct4.customer_id = c.id AND ct4.is_deleted = false
+            GROUP BY TO_CHAR(ct4.transaction_date, 'Day')
+          ) day_counts ON true
+          LEFT JOIN LATERAL (
+            SELECT 
+              EXTRACT(HOUR FROM ct5.transaction_date) as hour,
+              COUNT(*) as transaction_count
+            FROM customer_transactions ct5
+            WHERE ct5.customer_id = c.id AND ct5.is_deleted = false
+            GROUP BY EXTRACT(HOUR FROM ct5.transaction_date)
+          ) hour_counts ON true
+          LEFT JOIN LATERAL (
+            SELECT 
+              ct6.payment_method,
+              COUNT(*) as usage_count
+            FROM customer_transactions ct6
+            WHERE ct6.customer_id = c.id AND ct6.is_deleted = false
+            GROUP BY ct6.payment_method
+          ) payment_method_counts ON true
+          LEFT JOIN LATERAL (
+            SELECT 
+              ct7.transaction_date - LAG(ct7.transaction_date) OVER (ORDER BY ct7.transaction_date) as day_diff
+            FROM customer_transactions ct7
+            WHERE ct7.customer_id = c.id AND ct7.is_deleted = false
+          ) day_diffs ON true
+          LEFT JOIN LATERAL (
+            SELECT ct8.total_amount
+            FROM customer_transactions ct8
+            WHERE ct8.customer_id = c.id 
+              AND ct8.is_deleted = false
+              AND ct8.transaction_date >= CURRENT_DATE - INTERVAL '90 days'
+          ) recent_orders ON true
+          
+          WHERE c.tenant_id = $1 
+            AND c.is_deleted = false
+            ${whereClause}
+          GROUP BY c.id
+        )
+        SELECT 
+          customer_id,
+          is_seasonal_buyer,
+          peak_seasons,
+          primary_categories[1:5] as primary_categories, -- Limit to top 5
+          category_loyalty,
+          cross_category_purchasing,
+          preferred_order_days[1:3] as preferred_order_days, -- Top 3
+          preferred_order_hours[1:5] as preferred_order_hours, -- Top 5
+          order_frequency_pattern,
+          preferred_payment_methods[1:3] as preferred_payment_methods, -- Top 3
+          payment_method_loyalty,
+          credit_worthiness,
+          next_order_probability,
+          predicted_order_value,
+          
+          -- Create pattern segment identifier
+          CONCAT(
+            CASE WHEN is_seasonal_buyer THEN 'S' ELSE 'R' END,
+            SUBSTRING(order_frequency_pattern, 1, 1),
+            SUBSTRING(credit_worthiness, 1, 1)
+          ) as pattern_segment
+          
+        FROM customer_purchase_patterns
+        ORDER BY next_order_probability DESC, predicted_order_value DESC
+      `;
+
+      const patternResults = await this.dataSource.query(patternQuery, params);
+
+      // Transform results and add future predictions
+      const segmentationResults: PurchasePatternSegmentationResult[] = [];
+
+      for (const row of patternResults) {
+        const predictedCategories = await this.predictFutureCategories(
+          tenantId,
+          row.customer_id,
+          row.primary_categories
+        );
+
+        const recommendedOfferTypes = this.generateOfferRecommendations(
+          row.order_frequency_pattern,
+          parseInt(row.next_order_probability),
+          row.credit_worthiness
+        );
+
+        segmentationResults.push({
+          customerId: row.customer_id,
+          patternSegment: row.pattern_segment,
+          purchasePatterns: {
+            seasonality: {
+              isSeasonalBuyer: row.is_seasonal_buyer,
+              peakSeasons: row.peak_seasons || [],
+              seasonalityStrength: row.is_seasonal_buyer ? 75 : 25,
+            },
+            categoryAffinity: {
+              primaryCategories: row.primary_categories || [],
+              categoryLoyalty: parseInt(row.category_loyalty),
+              crossCategoryPurchasing: parseInt(row.cross_category_purchasing),
+            },
+            timingPatterns: {
+              preferredOrderDays: row.preferred_order_days || [],
+              preferredOrderHours: (row.preferred_order_hours || []).map(h => parseInt(h)),
+              orderFrequencyPattern: row.order_frequency_pattern,
+            },
+            paymentBehavior: {
+              preferredPaymentMethods: row.preferred_payment_methods || [],
+              paymentMethodLoyalty: parseInt(row.payment_method_loyalty),
+              creditWorthiness: row.credit_worthiness,
+            },
+          },
+          futureOrderPredictions: {
+            nextOrderProbability: parseInt(row.next_order_probability),
+            predictedOrderValue: parseFloat(row.predicted_order_value || '0'),
+            predictedCategories,
+            recommendedOfferTypes,
+          },
+        });
+      }
+
+      this.logger.debug(`Purchase pattern segmentation completed for ${segmentationResults.length} customers`);
+      return segmentationResults;
+
+    } catch (error) {
+      this.logger.error(`Failed to perform purchase pattern segmentation: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform geographic segmentation with Indonesian regional analysis
+   */
+  async performGeographicSegmentation(
+    tenantId: string,
+    customerId?: string
+  ): Promise<GeographicSegmentationResult[]> {
+    try {
+      this.logger.debug(`Performing geographic segmentation for tenant ${tenantId}`);
+
+      const whereClause = customerId ? 'AND c.id = $2' : '';
+      const params = customerId ? [tenantId, customerId] : [tenantId];
+
+      // Geographic analysis with Indonesian regional context
+      const geographicQuery = `
+        WITH customer_geographic_analysis AS (
+          SELECT 
+            c.id as customer_id,
+            c.addresses,
+            
+            -- Primary City Extraction
+            CASE 
+              WHEN c.addresses::text ILIKE '%jakarta%' THEN 'jakarta'
+              WHEN c.addresses::text ILIKE '%surabaya%' THEN 'surabaya'
+              WHEN c.addresses::text ILIKE '%bandung%' THEN 'bandung'
+              WHEN c.addresses::text ILIKE '%medan%' THEN 'medan'
+              WHEN c.addresses::text ILIKE '%semarang%' THEN 'semarang'
+              WHEN c.addresses::text ILIKE '%makassar%' THEN 'makassar'
+              WHEN c.addresses::text ILIKE '%palembang%' THEN 'palembang'
+              WHEN c.addresses::text ILIKE '%tangerang%' THEN 'tangerang'
+              WHEN c.addresses::text ILIKE '%bekasi%' THEN 'bekasi'
+              WHEN c.addresses::text ILIKE '%depok%' THEN 'depok'
+              ELSE 'other'
+            END as primary_city,
+            
+            -- City Tier Classification
+            CASE 
+              WHEN c.addresses::text ILIKE ANY(ARRAY['%jakarta%', '%surabaya%', '%bandung%', '%medan%', '%semarang%']) THEN 'tier_1'
+              WHEN c.addresses::text ILIKE ANY(ARRAY['%bekasi%', '%tangerang%', '%depok%', '%bogor%', '%malang%', '%yogyakarta%']) THEN 'tier_2'
+              WHEN c.addresses IS NOT NULL THEN 'tier_3'
+              ELSE 'rural'
+            END as city_tier,
+            
+            -- Regional Spending Pattern Analysis
+            CASE 
+              WHEN c.addresses::text ILIKE '%jakarta%' AND AVG(ct.total_amount) > 15000000 THEN 'jakarta_premium'
+              WHEN c.addresses::text ILIKE '%bandung%' AND COUNT(DISTINCT ct.categories) >= 3 THEN 'bandung_creative'
+              WHEN c.addresses::text ILIKE '%surabaya%' AND 
+                   COUNT(ct.id) FILTER (WHERE ct.payment_method IN ('bank_transfer', 'cash')) > 
+                   COUNT(ct.id) * 0.5 THEN 'surabaya_traditional'
+              ELSE 'regional_standard'
+            END as spending_pattern,
+            
+            -- Logistics Preference Analysis
+            CASE 
+              WHEN AVG(ct.total_amount) > 10000000 THEN 'same_day'
+              WHEN c.addresses::text ILIKE ANY(ARRAY['%jakarta%', '%surabaya%', '%bandung%']) THEN 'next_day'
+              WHEN COUNT(ct.id) >= 5 THEN 'standard'
+              ELSE 'economy'
+            END as logistics_preference,
+            
+            -- Cultural Influence Score
+            (CASE 
+              WHEN COUNT(ct.id) FILTER (WHERE EXTRACT(MONTH FROM ct.transaction_date) IN (3, 4, 5)) > 
+                   COUNT(ct.id) * 0.2 THEN 30 -- Strong Ramadan influence
+              ELSE 0 
+            END +
+            CASE 
+              WHEN COUNT(ct.id) FILTER (WHERE EXTRACT(DOW FROM ct.transaction_date) = 5) > 
+                   COUNT(ct.id) * 0.15 THEN 20 -- Friday shopping pattern
+              ELSE 0 
+            END +
+            CASE 
+              WHEN COUNT(ct.id) FILTER (WHERE ct.payment_method IN ('qris', 'gopay', 'ovo', 'dana')) > 
+                   COUNT(ct.id) * 0.3 THEN 30 -- Indonesian payment preference
+              ELSE 0 
+            END +
+            CASE 
+              WHEN c.addresses::text ILIKE '%indonesia%' THEN 20 -- Indonesian address
+              ELSE 0 
+            END) as cultural_influence,
+            
+            -- Delivery Zone Classification
+            CASE 
+              WHEN c.addresses::text ILIKE ANY(ARRAY[
+                '%jakarta pusat%', '%jakarta selatan%', '%surabaya pusat%', '%bandung pusat%'
+              ]) THEN 'urban_core'
+              WHEN c.addresses::text ILIKE ANY(ARRAY[
+                '%jakarta%', '%surabaya%', '%bandung%', '%medan%', '%semarang%'
+              ]) THEN 'suburban'
+              WHEN c.addresses IS NOT NULL THEN 'remote'
+              ELSE 'very_remote'
+            END as delivery_zone,
+            
+            -- Shipping Cost Sensitivity (based on order behavior)
+            CASE 
+              WHEN AVG(ct.total_amount) > 20000000 THEN 10  -- Low sensitivity
+              WHEN AVG(ct.total_amount) > 10000000 THEN 30  -- Medium-low sensitivity
+              WHEN AVG(ct.total_amount) > 5000000 THEN 60   -- Medium sensitivity
+              ELSE 90                                        -- High sensitivity
+            END as shipping_cost_sensitivity,
+            
+            -- Delivery Speed Importance
+            CASE 
+              WHEN c.customer_type = 'corporate' THEN 90
+              WHEN c.customer_type = 'business' THEN 70
+              WHEN AVG(ct.total_amount) > 10000000 THEN 60
+              ELSE 40
+            END as delivery_speed_importance
+            
+          FROM customers c
+          LEFT JOIN customer_transactions ct ON c.id = ct.customer_id 
+            AND ct.is_deleted = false
+          WHERE c.tenant_id = $1 
+            AND c.is_deleted = false
+            ${whereClause}
+          GROUP BY c.id, c.addresses, c.customer_type
+        )
+        SELECT 
+          customer_id,
+          primary_city,
+          city_tier,
+          spending_pattern,
+          logistics_preference,
+          cultural_influence,
+          delivery_zone,
+          shipping_cost_sensitivity,
+          delivery_speed_importance,
+          
+          -- Create geographic segment identifier
+          CONCAT(
+            SUBSTRING(city_tier, 1, 1),
+            SUBSTRING(spending_pattern, 1, 1),
+            SUBSTRING(delivery_zone, 1, 1)
+          ) as geographic_segment
+          
+        FROM customer_geographic_analysis
+        ORDER BY cultural_influence DESC, shipping_cost_sensitivity ASC
+      `;
+
+      const geographicResults = await this.dataSource.query(geographicQuery, params);
+
+      // Transform results and add regional recommendations
+      const segmentationResults: GeographicSegmentationResult[] = [];
+
+      for (const row of geographicResults) {
+        const regionalRecommendations = this.generateRegionalRecommendations(
+          row.primary_city,
+          row.city_tier,
+          row.spending_pattern,
+          parseInt(row.cultural_influence)
+        );
+
+        segmentationResults.push({
+          customerId: row.customer_id,
+          geographicSegment: row.geographic_segment,
+          locationAnalysis: {
+            primaryCity: row.primary_city,
+            cityTier: row.city_tier,
+            regionBehavior: {
+              spendingPattern: row.spending_pattern,
+              logisticsPreference: row.logistics_preference,
+              culturalInfluence: parseInt(row.cultural_influence),
+            },
+          },
+          distanceBasedInsights: {
+            deliveryZone: row.delivery_zone,
+            shippingCostSensitivity: parseInt(row.shipping_cost_sensitivity),
+            deliverySpeedImportance: parseInt(row.delivery_speed_importance),
+          },
+          regionalRecommendations,
+        });
+      }
+
+      this.logger.debug(`Geographic segmentation completed for ${segmentationResults.length} customers`);
+      return segmentationResults;
+
+    } catch (error) {
+      this.logger.error(`Failed to perform geographic segmentation: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform hybrid segmentation combining all dimensions
+   */
+  async performHybridSegmentation(
+    tenantId: string,
+    customerId?: string
+  ): Promise<HybridSegmentationResult[]> {
+    try {
+      this.logger.debug(`Performing hybrid segmentation for tenant ${tenantId}`);
+
+      // Get all segmentation results
+      const [rfmResults, behavioralResults, demographicResults, geographicResults, purchasePatternResults] = 
+        await Promise.all([
+          this.performRFMSegmentation(tenantId, customerId),
+          this.performBehavioralSegmentation(tenantId, customerId),
+          this.performDemographicSegmentation(tenantId, customerId),
+          this.performGeographicSegmentation(tenantId, customerId),
+          this.performPurchasePatternSegmentation(tenantId, customerId),
+        ]);
+
+      // Combine all segmentation results
+      const hybridResults: HybridSegmentationResult[] = [];
+
+      // Create a map of all customers from all segmentation types
+      const customerMap = new Map<string, any>();
+
+      // Collect all unique customer IDs
+      const allCustomerIds = new Set<string>();
+      rfmResults.forEach(r => allCustomerIds.add(r.customerId));
+      behavioralResults.forEach(r => allCustomerIds.add(r.customerId));
+      demographicResults.forEach(r => allCustomerIds.add(r.customerId));
+      geographicResults.forEach(r => allCustomerIds.add(r.customerId));
+      purchasePatternResults.forEach(r => allCustomerIds.add(r.customerId));
+
+      // Process each customer for hybrid segmentation
+      for (const currentCustomerId of allCustomerIds) {
+        const rfmData = rfmResults.find(r => r.customerId === currentCustomerId);
+        const behavioralData = behavioralResults.find(r => r.customerId === currentCustomerId);
+        const demographicData = demographicResults.find(r => r.customerId === currentCustomerId);
+        const geographicData = geographicResults.find(r => r.customerId === currentCustomerId);
+        const purchasePatternData = purchasePatternResults.find(r => r.customerId === currentCustomerId);
+
+        // Calculate composite score using weighted approach
+        const compositeScore = this.calculateCompositeScore({
+          rfm: rfmData,
+          behavioral: behavioralData,
+          demographic: demographicData,
+          geographic: geographicData,
+          purchasePattern: purchasePatternData,
+        });
+
+        // Determine segment characteristics
+        const segmentCharacteristics = this.determineSegmentCharacteristics(compositeScore, {
+          rfm: rfmData,
+          behavioral: behavioralData,
+          demographic: demographicData,
+        });
+
+        // Generate strategic recommendations
+        const strategicRecommendations = this.generateStrategicRecommendations(
+          segmentCharacteristics,
+          compositeScore
+        );
+
+        // Determine investment priority
+        const investmentPriority = this.determineInvestmentPriority(
+          segmentCharacteristics,
+          compositeScore
+        );
+
+        // Identify primary segment drivers
+        const primarySegmentDrivers = this.identifyPrimarySegmentDrivers({
+          rfm: rfmData,
+          behavioral: behavioralData,
+          demographic: demographicData,
+          geographic: geographicData,
+          purchasePattern: purchasePatternData,
+        });
+
+        hybridResults.push({
+          customerId: currentCustomerId,
+          hybridSegment: `${segmentCharacteristics.valueLevel}_${segmentCharacteristics.loyaltyLevel}`,
+          segmentComposition: this.INDONESIAN_SEGMENT_WEIGHTS,
+          compositeScore,
+          primarySegmentDrivers,
+          segmentCharacteristics,
+          strategicRecommendations,
+          investmentPriority,
+        });
+      }
+
+      // Sort by composite score (highest first)
+      hybridResults.sort((a, b) => b.compositeScore - a.compositeScore);
+
+      this.logger.debug(`Hybrid segmentation completed for ${hybridResults.length} customers`);
+      return hybridResults;
+
+    } catch (error) {
+      this.logger.error(`Failed to perform hybrid segmentation: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Track segment migration patterns over time
+   */
+  async trackSegmentMigration(
+    tenantId: string,
+    customerId: string,
+    timeframeMonths: number = 12
+  ): Promise<SegmentMigrationTracking> {
+    try {
+      this.logger.debug(`Tracking segment migration for customer ${customerId}`);
+
+      // Get historical segmentation data (this would require storing historical segments)
+      // For now, we'll simulate migration tracking based on customer behavior changes
+      
+      const migrationQuery = `
+        WITH customer_behavior_timeline AS (
+          SELECT 
+            customer_id,
+            DATE_TRUNC('month', transaction_date) as behavior_month,
+            COUNT(*) as monthly_transactions,
+            SUM(total_amount) as monthly_spending,
+            AVG(total_amount) as monthly_aov,
+            COUNT(DISTINCT categories) as monthly_category_diversity
+          FROM customer_transactions
+          WHERE customer_id = $1 
+            AND tenant_id = $2
+            AND transaction_date >= CURRENT_DATE - INTERVAL '${timeframeMonths} months'
+            AND is_deleted = false
+          GROUP BY customer_id, DATE_TRUNC('month', transaction_date)
+          ORDER BY behavior_month
+        ),
+        segment_changes AS (
+          SELECT 
+            *,
+            -- Detect significant behavior changes that would trigger segment migration
+            CASE 
+              WHEN monthly_spending > LAG(monthly_spending, 1) OVER (ORDER BY behavior_month) * 2 THEN 'spending_increase'
+              WHEN monthly_spending < LAG(monthly_spending, 1) OVER (ORDER BY behavior_month) * 0.5 THEN 'spending_decrease'
+              WHEN monthly_transactions > LAG(monthly_transactions, 1) OVER (ORDER BY behavior_month) * 1.5 THEN 'frequency_increase'
+              WHEN monthly_transactions < LAG(monthly_transactions, 1) OVER (ORDER BY behavior_month) * 0.5 THEN 'frequency_decrease'
+              ELSE 'stable'
+            END as behavior_change_trigger
+          FROM customer_behavior_timeline
+        )
+        SELECT 
+          customer_id,
+          behavior_month,
+          behavior_change_trigger,
+          monthly_transactions,
+          monthly_spending,
+          monthly_aov,
+          monthly_category_diversity
+        FROM segment_changes
+        WHERE behavior_change_trigger != 'stable'
+        ORDER BY behavior_month DESC
+      `;
+
+      const migrationData = await this.dataSource.query(migrationQuery, [customerId, tenantId]);
+
+      // Simulate migration history based on behavior changes
+      const migrationHistory = migrationData.map((row, index) => ({
+        fromSegment: index < migrationData.length - 1 ? 'previous_segment' : 'initial_segment',
+        toSegment: this.inferSegmentFromBehavior(row),
+        migrationDate: new Date(row.behavior_month),
+        migrationTrigger: row.behavior_change_trigger,
+        migrationReason: this.getMigrationReason(row.behavior_change_trigger),
+        businessImpact: this.assessBusinessImpact(row.behavior_change_trigger),
+      }));
+
+      // Calculate migration patterns
+      const migrationFrequency = migrationHistory.length / (timeframeMonths / 12); // Per year
+      const segmentStability = Math.max(0, 100 - (migrationFrequency * 20));
+      
+      // Calculate upward mobility trend
+      const positiveChanges = migrationHistory.filter(m => m.businessImpact === 'positive').length;
+      const negativeChanges = migrationHistory.filter(m => m.businessImpact === 'negative').length;
+      const upwardMobility = ((positiveChanges - negativeChanges) / Math.max(1, migrationHistory.length)) * 100;
+
+      // Assess churn risk based on recent migration patterns
+      const recentNegativeChanges = migrationHistory
+        .filter(m => m.migrationDate >= new Date(Date.now() - 90 * 24 * 60 * 60 * 1000))
+        .filter(m => m.businessImpact === 'negative').length;
+      const churnRisk = Math.min(100, recentNegativeChanges * 30);
+
+      // Predict next migration
+      const predictedNextMigration = await this.predictNextSegmentMigration(
+        tenantId,
+        customerId,
+        migrationHistory
+      );
+
+      return {
+        customerId,
+        migrationHistory,
+        migrationPatterns: {
+          migrationFrequency,
+          segmentStability,
+          upwardMobility,
+          churnRisk,
+        },
+        predictedNextMigration,
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to track segment migration for customer ${customerId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze segment performance across the tenant
+   */
+  async analyzeSegmentPerformance(
+    tenantId: string,
+    segmentType: SegmentationType = SegmentationType.HYBRID,
+    timeframeMonths: number = 6
+  ): Promise<SegmentPerformanceAnalytics[]> {
+    try {
+      this.logger.debug(`Analyzing segment performance for tenant ${tenantId}, type: ${segmentType}`);
+
+      // Get segment performance data
+      const performanceQuery = `
+        WITH segment_customers AS (
+          -- This would ideally query stored segment assignments
+          -- For now, we'll use RFM-based segmentation as an example
+          SELECT 
+            c.id as customer_id,
+            c.segment as segment_name,
+            c.lifetime_value,
+            c.total_orders,
+            c.created_at as customer_since
+          FROM customers c
+          WHERE c.tenant_id = $1 
+            AND c.is_deleted = false
+        ),
+        segment_transactions AS (
+          SELECT 
+            sc.segment_name,
+            COUNT(DISTINCT sc.customer_id) as customer_count,
+            SUM(ct.total_amount) as total_revenue,
+            AVG(ct.total_amount) as avg_order_value,
+            COUNT(ct.id) as total_transactions,
+            AVG(sc.lifetime_value) as avg_customer_value,
+            
+            -- Retention analysis
+            COUNT(DISTINCT CASE 
+              WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '30 days' 
+              THEN sc.customer_id 
+            END) as active_last_30_days,
+            
+            -- Category preferences
+            ARRAY_AGG(DISTINCT category) as all_categories,
+            
+            -- Channel preferences  
+            ARRAY_AGG(DISTINCT ct.channel) as all_channels,
+            
+            -- Seasonal patterns
+            COUNT(CASE WHEN EXTRACT(MONTH FROM ct.transaction_date) IN (3,4,5) THEN 1 END) as ramadan_transactions,
+            COUNT(CASE WHEN EXTRACT(MONTH FROM ct.transaction_date) IN (6,7) THEN 1 END) as lebaran_transactions,
+            COUNT(CASE WHEN EXTRACT(MONTH FROM ct.transaction_date) = 12 THEN 1 END) as december_transactions
+            
+          FROM segment_customers sc
+          LEFT JOIN customer_transactions ct ON sc.customer_id = ct.customer_id
+            AND ct.transaction_date >= CURRENT_DATE - INTERVAL '${timeframeMonths} months'
+            AND ct.is_deleted = false
+          LEFT JOIN LATERAL (
+            SELECT unnest(ct2.categories) as category
+            FROM customer_transactions ct2
+            WHERE ct2.customer_id = sc.customer_id 
+              AND ct2.is_deleted = false
+          ) categories ON true
+          GROUP BY sc.segment_name
+        ),
+        segment_growth AS (
+          SELECT 
+            sc.segment_name,
+            -- Month-over-month growth calculation
+            (COUNT(DISTINCT CASE 
+              WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '30 days' 
+              THEN ct.customer_id 
+            END)::DECIMAL / 
+            NULLIF(COUNT(DISTINCT CASE 
+              WHEN ct.transaction_date >= CURRENT_DATE - INTERVAL '60 days' 
+                AND ct.transaction_date < CURRENT_DATE - INTERVAL '30 days'
+              THEN ct.customer_id 
+            END), 0) - 1) * 100 as growth_rate
+          FROM segment_customers sc
+          LEFT JOIN customer_transactions ct ON sc.customer_id = ct.customer_id
+            AND ct.is_deleted = false
+          GROUP BY sc.segment_name
+        )
+        SELECT 
+          st.segment_name,
+          st.customer_count,
+          st.total_revenue,
+          st.avg_customer_value,
+          st.avg_order_value,
+          st.total_transactions,
+          st.active_last_30_days,
+          CASE 
+            WHEN st.customer_count > 0 
+            THEN (st.active_last_30_days::DECIMAL / st.customer_count * 100)
+            ELSE 0 
+          END as retention_rate,
+          CASE 
+            WHEN st.customer_count > 0 
+            THEN ((st.customer_count - st.active_last_30_days)::DECIMAL / st.customer_count * 100)
+            ELSE 100 
+          END as churn_rate,
+          COALESCE(sg.growth_rate, 0) as growth_rate,
+          st.all_categories,
+          st.all_channels,
+          st.ramadan_transactions,
+          st.lebaran_transactions,
+          st.december_transactions
+        FROM segment_transactions st
+        LEFT JOIN segment_growth sg ON st.segment_name = sg.segment_name
+        WHERE st.customer_count > 0
+        ORDER BY st.total_revenue DESC
+      `;
+
+      const performanceData = await this.dataSource.query(performanceQuery, [tenantId]);
+
+      // Transform results into analytics format
+      const segmentAnalytics: SegmentPerformanceAnalytics[] = [];
+
+      for (const row of performanceData) {
+        // Calculate additional metrics
+        const profitability = parseFloat(row.total_revenue) * 0.25; // Assume 25% margin
+        const acquisitionCost = 500000; // Estimate: 500K IDR per customer acquisition
+        const lifetimeValue = parseFloat(row.avg_customer_value);
+
+        // Category preferences analysis
+        const categoryPreferences = this.analyzeCategoryPreferences(row.all_categories);
+        
+        // Channel preferences analysis
+        const channelPreferences = this.analyzeChannelPreferences(row.all_channels);
+
+        // Seasonal patterns analysis
+        const seasonalPatterns = [
+          { season: 'ramadan', impact: parseInt(row.ramadan_transactions) || 0 },
+          { season: 'lebaran', impact: parseInt(row.lebaran_transactions) || 0 },
+          { season: 'christmas', impact: parseInt(row.december_transactions) || 0 },
+        ];
+
+        // Calculate revenue and profit contribution
+        const totalRevenue = parseFloat(row.total_revenue);
+        // This would need to be calculated against total tenant revenue
+        const revenueContribution = 0; // Placeholder
+        const profitContribution = 0; // Placeholder
+
+        // Determine strategic importance
+        const strategicImportance = this.determineStrategicImportance(
+          parseInt(row.customer_count),
+          totalRevenue,
+          parseFloat(row.retention_rate)
+        );
+
+        // Generate competitive analysis
+        const competitivePosition = this.analyzeCompetitivePosition(
+          row.segment_name,
+          totalRevenue,
+          parseFloat(row.retention_rate)
+        );
+
+        segmentAnalytics.push({
+          segmentName: row.segment_name,
+          segmentType,
+          performanceMetrics: {
+            customerCount: parseInt(row.customer_count),
+            totalRevenue,
+            averageCustomerValue: parseFloat(row.avg_customer_value),
+            retentionRate: parseFloat(row.retention_rate),
+            churnRate: parseFloat(row.churn_rate),
+            growthRate: parseFloat(row.growth_rate),
+            profitability,
+            acquisitionCost,
+            lifetimeValue,
+          },
+          behaviorInsights: {
+            averageOrderValue: parseFloat(row.avg_order_value),
+            purchaseFrequency: parseInt(row.total_transactions) / Math.max(1, parseInt(row.customer_count)),
+            categoryPreferences,
+            channelPreferences,
+            seasonalPatterns,
+          },
+          businessImpact: {
+            revenueContribution,
+            profitContribution,
+            strategicImportance,
+            investmentRecommendation: this.getInvestmentRecommendation(strategicImportance, parseFloat(row.growth_rate)),
+          },
+          competitivePosition,
+        });
+      }
+
+      this.logger.debug(`Segment performance analysis completed for ${segmentAnalytics.length} segments`);
+      return segmentAnalytics;
+
+    } catch (error) {
+      this.logger.error(`Failed to analyze segment performance: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  // Private helper methods
+
+  private getRFMSegmentDescription(rfmLabel: string): string {
+    const descriptions = {
+      'VIP Champion': 'Pelanggan terbaik dengan pembelian frequent dan nilai tinggi',
+      'Loyal Customer': 'Pelanggan setia dengan transaksi konsisten',
+      'Potential Loyalist': 'Pelanggan berpotensi menjadi loyal dengan engagement yang tepat',
+      'New Customer': 'Pelanggan baru yang perlu dipertahankan',
+      'Promising': 'Pelanggan menjanjikan dengan potensi growth',
+      'Needs Attention': 'Pelanggan memerlukan perhatian khusus untuk retention',
+      'At Risk': 'Pelanggan berisiko churn, butuh intervensi segera',
+      'Cannot Lose Them': 'Pelanggan bernilai tinggi yang tidak boleh hilang',
+      'Hibernating': 'Pelanggan dormant yang perlu reactivation',
+      'Price Sensitive': 'Pelanggan sensitif terhadap harga',
+      'Lost Customer': 'Pelanggan yang sudah hilang',
+    };
+    return descriptions[rfmLabel] || 'Segmen pelanggan dengan karakteristik khusus';
+  }
+
+  private getRFMActionRecommendations(rfmLabel: string, culturalAlignmentMultiplier: number): string[] {
+    const baseRecommendations = {
+      'VIP Champion': [
+        'Berikan layanan VIP dan akses eksklusif',
+        'Tawarkan produk premium dan early access',
+        'Program loyalitas tier tertinggi',
+      ],
+      'Loyal Customer': [
+        'Pertahankan dengan program loyalitas',
+        'Cross-sell produk komplementer',
+        'Engagement regular melalui komunikasi personal',
+      ],
+      'Potential Loyalist': [
+        'Tingkatkan frekuensi pembelian dengan incentive',
+        'Edukasi tentang produk dan benefit',
+        'Program membership dengan benefit menarik',
+      ],
+      'At Risk': [
+        'Kampanye retention dengan discount khusus',
+        'Personal outreach untuk feedback',
+        'Win-back campaign dengan offer terbatas',
+      ],
+    };
+
+    const recommendations = baseRecommendations[rfmLabel] || ['Analisis lebih detail diperlukan'];
+
+    // Add Indonesian cultural context recommendations
+    if (culturalAlignmentMultiplier > 1.1) {
+      recommendations.push('Leverage momentum Ramadan/Lebaran untuk campaign khusus');
+      recommendations.push('Gunakan payment method lokal (QRIS, e-wallet) untuk kemudahan');
+    }
+
+    return recommendations;
+  }
+
+  private async predictBehaviorChanges(
+    tenantId: string,
+    customerId: string,
+    trends: any
+  ): Promise<string[]> {
+    const predictions: string[] = [];
+
+    if (trends.purchaseFrequencyTrend === 'decreasing') {
+      predictions.push('Kemungkinan akan mengurangi frekuensi pembelian dalam 3 bulan ke depan');
+    }
+
+    if (trends.spendingTrend === 'increasing') {
+      predictions.push('Potensi peningkatan nilai transaksi hingga 25% dalam 6 bulan');
+    }
+
+    if (trends.categoryDiversificationTrend === 'expanding') {
+      predictions.push('Akan mengeksplorasi kategori produk baru dalam 2-3 bulan');
+    }
+
+    return predictions;
+  }
+
+  private async analyzeIndonesianBusinessContext(
+    tenantId: string,
+    customerId: string,
+    geographicTier: string,
+    culturalAlignment: number
+  ): Promise<IndonesianBusinessContext[]> {
+    const contexts: IndonesianBusinessContext[] = [];
+
+    if (culturalAlignment >= 75) {
+      contexts.push(IndonesianBusinessContext.RAMADAN_SHOPPER);
+    }
+
+    if (geographicTier === 'tier_1') {
+      contexts.push(IndonesianBusinessContext.JAKARTA_PREMIUM);
+    }
+
+    if (culturalAlignment >= 50) {
+      contexts.push(IndonesianBusinessContext.DIGITAL_NATIVE);
+    }
+
+    return contexts;
+  }
+
+  private generateDemographicMarketingRecommendations(
+    ageGroup: string,
+    businessType: string,
+    digitalMaturity: string,
+    geographicTier: string
+  ): string[] {
+    const recommendations: string[] = [];
+
+    if (ageGroup === 'millennial' && digitalMaturity === 'digital_native') {
+      recommendations.push('Gunakan social media marketing dan influencer collaboration');
+      recommendations.push('Fokus pada mobile-first experience dan instant gratification');
+    }
+
+    if (businessType === 'business' && geographicTier === 'tier_1') {
+      recommendations.push('B2B approach dengan enterprise solutions');
+      recommendations.push('Bulk pricing dan volume discount programs');
+    }
+
+    if (digitalMaturity === 'digital_immigrant') {
+      recommendations.push('Provide education dan onboarding support');
+      recommendations.push('Multi-channel approach dengan offline support');
+    }
+
+    return recommendations;
+  }
+
+  private async predictFutureCategories(
+    tenantId: string,
+    customerId: string,
+    primaryCategories: string[]
+  ): Promise<string[]> {
+    // Simple prediction based on current categories
+    // In real implementation, this would use ML models
+    const predictions: string[] = [];
+
+    if (primaryCategories.includes('electronics')) {
+      predictions.push('accessories');
+      predictions.push('tech_gadgets');
+    }
+
+    if (primaryCategories.includes('fashion')) {
+      predictions.push('beauty');
+      predictions.push('lifestyle');
+    }
+
+    return predictions;
+  }
+
+  private generateOfferRecommendations(
+    orderFrequencyPattern: string,
+    nextOrderProbability: number,
+    creditWorthiness: string
+  ): string[] {
+    const recommendations: string[] = [];
+
+    if (orderFrequencyPattern === 'regular' && nextOrderProbability > 70) {
+      recommendations.push('subscription_discount');
+      recommendations.push('bulk_purchase_incentive');
+    }
+
+    if (creditWorthiness === 'excellent') {
+      recommendations.push('premium_credit_terms');
+      recommendations.push('exclusive_member_pricing');
+    }
+
+    if (nextOrderProbability < 40) {
+      recommendations.push('win_back_discount');
+      recommendations.push('limited_time_offer');
+    }
+
+    return recommendations;
+  }
+
+  private generateRegionalRecommendations(
+    primaryCity: string,
+    cityTier: string,
+    spendingPattern: string,
+    culturalInfluence: number
+  ): string[] {
+    const recommendations: string[] = [];
+
+    if (primaryCity === 'jakarta' && spendingPattern === 'jakarta_premium') {
+      recommendations.push('Premium packaging dan same-day delivery');
+      recommendations.push('Exclusive Jakarta member events');
+    }
+
+    if (cityTier === 'tier_3' || cityTier === 'rural') {
+      recommendations.push('Economy shipping options dan bulk discounts');
+      recommendations.push('Local payment method support');
+    }
+
+    if (culturalInfluence > 70) {
+      recommendations.push('Ramadan/Lebaran special campaigns');
+      recommendations.push('Indonesian-specific product bundles');
+    }
+
+    return recommendations;
+  }
+
+  private calculateCompositeScore(segmentData: any): number {
+    let score = 0;
+
+    // RFM contribution (25%)
+    if (segmentData.rfm) {
+      const rfmScore = (segmentData.rfm.recencyScore + segmentData.rfm.frequencyScore + segmentData.rfm.monetaryScore) / 15 * 100;
+      score += rfmScore * this.INDONESIAN_SEGMENT_WEIGHTS.rfm;
+    }
+
+    // Behavioral contribution (25%)
+    if (segmentData.behavioral) {
+      score += segmentData.behavioral.segmentStability * this.INDONESIAN_SEGMENT_WEIGHTS.behavioral;
+    }
+
+    // Demographic contribution (20%)
+    if (segmentData.demographic) {
+      score += segmentData.demographic.indonesianContext.culturalAlignment * this.INDONESIAN_SEGMENT_WEIGHTS.demographic;
+    }
+
+    // Geographic contribution (15%)
+    if (segmentData.geographic) {
+      const geoScore = (100 - segmentData.geographic.distanceBasedInsights.shippingCostSensitivity);
+      score += geoScore * this.INDONESIAN_SEGMENT_WEIGHTS.geographic;
+    }
+
+    // Purchase pattern contribution (15%)
+    if (segmentData.purchasePattern) {
+      score += segmentData.purchasePattern.futureOrderPredictions.nextOrderProbability * this.INDONESIAN_SEGMENT_WEIGHTS.purchasePattern;
+    }
+
+    return Math.round(score);
+  }
+
+  private determineSegmentCharacteristics(compositeScore: number, segmentData: any): any {
+    let valueLevel = 'low_value';
+    let loyaltyLevel = 'dormant';
+    let growthPotential = 'declining';
+
+    // Value level determination
+    if (compositeScore >= 80) valueLevel = 'vip';
+    else if (compositeScore >= 60) valueLevel = 'high_value';
+    else if (compositeScore >= 40) valueLevel = 'medium_value';
+    else if (compositeScore >= 20) valueLevel = 'developing';
+
+    // Loyalty level determination
+    if (segmentData.rfm) {
+      const rfmLabel = segmentData.rfm.rfmLabel;
+      if (rfmLabel.includes('Champion') || rfmLabel.includes('VIP')) loyaltyLevel = 'champion';
+      else if (rfmLabel.includes('Loyal')) loyaltyLevel = 'loyal';
+      else if (rfmLabel.includes('Potential')) loyaltyLevel = 'potential_loyal';
+      else if (rfmLabel.includes('Risk')) loyaltyLevel = 'at_risk';
+    }
+
+    // Growth potential determination
+    if (compositeScore >= 70 && segmentData.behavioral?.segmentStability > 70) {
+      growthPotential = 'high_growth';
+    } else if (compositeScore >= 50) {
+      growthPotential = 'steady_growth';
+    } else if (compositeScore >= 30) {
+      growthPotential = 'stable';
+    } else if (compositeScore >= 15) {
+      growthPotential = 'declining';
+    } else {
+      growthPotential = 'churning';
+    }
+
+    return { valueLevel, loyaltyLevel, growthPotential };
+  }
+
+  private generateStrategicRecommendations(segmentCharacteristics: any, compositeScore: number): string[] {
+    const recommendations: string[] = [];
+
+    if (segmentCharacteristics.valueLevel === 'vip') {
+      recommendations.push('Assign dedicated account manager');
+      recommendations.push('Provide white-glove customer service');
+      recommendations.push('Offer exclusive products and early access');
+    }
+
+    if (segmentCharacteristics.loyaltyLevel === 'at_risk') {
+      recommendations.push('Implement immediate retention campaign');
+      recommendations.push('Conduct customer satisfaction survey');
+      recommendations.push('Offer loyalty program upgrade');
+    }
+
+    if (segmentCharacteristics.growthPotential === 'high_growth') {
+      recommendations.push('Increase marketing investment');
+      recommendations.push('Expand product recommendations');
+      recommendations.push('Cross-sell and upsell opportunities');
+    }
+
+    return recommendations;
+  }
+
+  private determineInvestmentPriority(segmentCharacteristics: any, compositeScore: number): 'high' | 'medium' | 'low' | 'minimal' {
+    if (compositeScore >= 80 || segmentCharacteristics.valueLevel === 'vip') {
+      return 'high';
+    } else if (compositeScore >= 60 || segmentCharacteristics.growthPotential === 'high_growth') {
+      return 'medium';
+    } else if (compositeScore >= 30) {
+      return 'low';
+    } else {
+      return 'minimal';
+    }
+  }
+
+  private identifyPrimarySegmentDrivers(segmentData: any): string[] {
+    const drivers: string[] = [];
+
+    if (segmentData.rfm?.monetaryScore >= 4) {
+      drivers.push('High spending value');
+    }
+
+    if (segmentData.behavioral?.segmentStability >= 80) {
+      drivers.push('Consistent behavior pattern');
+    }
+
+    if (segmentData.demographic?.indonesianContext.culturalAlignment >= 70) {
+      drivers.push('Strong cultural alignment');
+    }
+
+    if (segmentData.purchasePattern?.futureOrderPredictions.nextOrderProbability >= 70) {
+      drivers.push('High repurchase probability');
+    }
+
+    return drivers;
+  }
+
+  private inferSegmentFromBehavior(behaviorData: any): string {
+    const spending = parseFloat(behaviorData.monthly_spending);
+    const transactions = parseInt(behaviorData.monthly_transactions);
+
+    if (spending > 20000000 && transactions >= 5) return 'vip_champion';
+    if (spending > 10000000 && transactions >= 3) return 'loyal_customer';
+    if (spending > 5000000) return 'potential_loyalist';
+    if (transactions >= 2) return 'developing_customer';
+    return 'dormant_customer';
+  }
+
+  private getMigrationReason(trigger: string): string {
+    const reasons = {
+      'spending_increase': 'Significant increase in monthly spending',
+      'spending_decrease': 'Notable decrease in monthly spending',
+      'frequency_increase': 'Higher purchase frequency',
+      'frequency_decrease': 'Lower purchase frequency',
+    };
+    return reasons[trigger] || 'Behavioral pattern change';
+  }
+
+  private assessBusinessImpact(trigger: string): 'positive' | 'negative' | 'neutral' {
+    if (trigger.includes('increase')) return 'positive';
+    if (trigger.includes('decrease')) return 'negative';
+    return 'neutral';
+  }
+
+  private async predictNextSegmentMigration(
+    tenantId: string,
+    customerId: string,
+    migrationHistory: any[]
+  ): Promise<any> {
+    // Simple prediction based on recent trends
+    const recentMigrations = migrationHistory.slice(0, 3);
+    
+    if (recentMigrations.length === 0) {
+      return {
+        targetSegment: 'stable_segment',
+        probability: 20,
+        estimatedTimeframe: 180,
+        triggeringFactors: ['No recent migration pattern'],
+      };
+    }
+
+    const recentTrend = recentMigrations[0]?.businessImpact;
+    const probability = recentTrend === 'negative' ? 70 : 30;
+    
+    return {
+      targetSegment: recentTrend === 'negative' ? 'lower_tier_segment' : 'stable_segment',
+      probability,
+      estimatedTimeframe: 90,
+      triggeringFactors: [`Recent ${recentTrend} behavior trend`],
+    };
+  }
+
+  private analyzeCategoryPreferences(categories: string[]): Array<{ category: string; percentage: number }> {
+    if (!categories?.length) return [];
+    
+    // Count category occurrences
+    const categoryCounts = categories.reduce((acc, cat) => {
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const total = categories.length;
+    return Object.entries(categoryCounts)
+      .map(([category, count]) => ({
+        category,
+        percentage: Math.round((count / total) * 100),
+      }))
+      .sort((a, b) => b.percentage - a.percentage)
+      .slice(0, 5); // Top 5
+  }
+
+  private analyzeChannelPreferences(channels: string[]): Array<{ channel: string; percentage: number }> {
+    if (!channels?.length) return [];
+    
+    const channelCounts = channels.reduce((acc, channel) => {
+      acc[channel] = (acc[channel] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const total = channels.length;
+    return Object.entries(channelCounts)
+      .map(([channel, count]) => ({
+        channel,
+        percentage: Math.round((count / total) * 100),
+      }))
+      .sort((a, b) => b.percentage - a.percentage);
+  }
+
+  private determineStrategicImportance(
+    customerCount: number,
+    totalRevenue: number,
+    retentionRate: number
+  ): 'critical' | 'important' | 'moderate' | 'low' {
+    const score = (customerCount * 0.3) + (totalRevenue / 100000000 * 0.4) + (retentionRate * 0.3);
+    
+    if (score >= 80) return 'critical';
+    if (score >= 60) return 'important';
+    if (score >= 40) return 'moderate';
+    return 'low';
+  }
+
+  private getInvestmentRecommendation(
+    strategicImportance: string,
+    growthRate: number
+  ): 'increase' | 'maintain' | 'reduce' | 'eliminate' {
+    if (strategicImportance === 'critical' || growthRate > 20) return 'increase';
+    if (strategicImportance === 'important' || growthRate > 0) return 'maintain';
+    if (strategicImportance === 'moderate' && growthRate < -10) return 'reduce';
+    if (strategicImportance === 'low' && growthRate < -20) return 'eliminate';
+    return 'maintain';
+  }
+
+  private analyzeCompetitivePosition(
+    segmentName: string,
+    totalRevenue: number,
+    retentionRate: number
+  ): any {
+    // This would require competitive data in real implementation
+    return {
+      marketShare: Math.random() * 100, // Placeholder
+      competitiveAdvantage: ['Indonesian market focus', 'Local payment integration'],
+      threats: ['International competitors', 'Price competition'],
+      opportunities: ['Digital transformation', 'SMB market expansion'],
+    };
+  }
+
+  /**
+   * Scheduled job to update customer segments
+   */
+  @Cron('0 3 * * *') // Daily at 3 AM
+  async updateCustomerSegments(): Promise<void> {
+    this.logger.log('Starting scheduled customer segmentation update');
+    
+    try {
+      // Get all tenants
+      const tenants = await this.dataSource.query(`
+        SELECT DISTINCT tenant_id 
+        FROM customers 
+        WHERE is_deleted = false
+        LIMIT 10
+      `);
+
+      for (const tenant of tenants) {
+        try {
+          // Perform hybrid segmentation for all customers
+          const hybridResults = await this.performHybridSegmentation(tenant.tenant_id);
+
+          // Update customer segments in database
+          for (const result of hybridResults) {
+            await this.dataSource.query(`
+              UPDATE customers 
+              SET 
+                segment = $1,
+                updated_at = CURRENT_TIMESTAMP
+              WHERE id = $2 AND tenant_id = $3
+            `, [
+              result.segmentCharacteristics.valueLevel,
+              result.customerId,
+              tenant.tenant_id
+            ]);
+          }
+
+          this.logger.log(`Updated segments for ${hybridResults.length} customers in tenant ${tenant.tenant_id}`);
+
+        } catch (tenantError) {
+          this.logger.error(`Failed to update segments for tenant ${tenant.tenant_id}: ${tenantError.message}`);
+        }
+      }
+
+      this.logger.log('Customer segmentation update completed successfully');
+    } catch (error) {
+      this.logger.error(`Failed to update customer segments: ${error.message}`, error.stack);
+    }
+  }
+
+  // =============================================
+  // ULTRATHINK: MISSING METHOD IMPLEMENTATION
+  // Comprehensive segmentation method untuk business intelligence
+  // =============================================
+
+  async performComprehensiveSegmentation(tenantId: string): Promise<any[]> {
+    try {
+      this.logger.debug(`Performing comprehensive segmentation for tenant ${tenantId}`);
+
+      // Perform all types of segmentation
+      const [
+        rfmResults,
+        behavioralResults,
+        demographicResults,
+        geographicResults,
+        valueBasedResults
+      ] = await Promise.all([
+        this.performRFMSegmentation(tenantId),
+        this.performBehavioralSegmentation(tenantId),
+        this.performDemographicSegmentation(tenantId),
+        this.performGeographicSegmentation(tenantId),
+        this.performValueBasedSegmentation(tenantId)
+      ]);
+
+      // Combine and normalize results
+      const comprehensiveResults = [];
+      
+      // Create a comprehensive segmentation result combining all analyses
+      for (const rfm of rfmResults) {
+        const behavioral = behavioralResults.find(b => b.customerId === rfm.customerId);
+        const demographic = demographicResults.find(d => d.customerId === rfm.customerId);
+        const geographic = geographicResults.find(g => g.customerId === rfm.customerId);
+        const valueBased = valueBasedResults.find(v => v.customerId === rfm.customerId);
+
+        comprehensiveResults.push({
+          customerId: rfm.customerId,
+          segmentName: `${rfm.segmentName}_${behavioral?.segmentName || 'unknown'}`,
+          rfmSegment: rfm.segmentName,
+          behavioralSegment: behavioral?.segmentName || 'unknown',
+          demographicSegment: demographic?.segmentName || 'unknown',
+          geographicSegment: geographic?.segmentName || 'unknown',
+          valueSegment: valueBased?.segmentName || 'unknown',
+          confidence: (rfm.confidence + (behavioral?.confidence || 0) + (demographic?.confidence || 0)) / 3,
+          segmentCharacteristics: {
+            rfm: rfm.segmentCharacteristics,
+            behavioral: behavioral?.segmentCharacteristics || {},
+            demographic: demographic?.segmentCharacteristics || {},
+            geographic: geographic?.segmentCharacteristics || {},
+            valueBased: valueBased?.segmentCharacteristics || {}
+          },
+          indonesianBusinessContext: rfm.indonesianBusinessContext,
+          recommendations: [
+            ...rfm.recommendations,
+            ...(behavioral?.recommendations || []),
+            ...(demographic?.recommendations || [])
+          ].slice(0, 5) // Top 5 recommendations
+        });
+      }
+
+      this.logger.debug(`Comprehensive segmentation completed for ${comprehensiveResults.length} customers`);
+      return comprehensiveResults;
+
+    } catch (error) {
+      this.logger.error(`Failed to perform comprehensive segmentation: ${error.message}`, error.stack);
+      return [];
+    }
+  }
+
+  // =============================================
+  // ULTRATHINK: ADVANCED CUSTOMER SEGMENTATION METHOD
+  // Called by CustomerDataPipelineService for individual customer analysis
+  // =============================================
+
+  /**
+   * Perform advanced customer segmentation for individual customer
+   */
+  async performAdvancedCustomerSegmentation(
+    tenantId: string, 
+    customerId: string
+  ): Promise<{
+    primarySegment: string;
+    secondarySegments: string[];
+    segmentScore: number;
+    indonesianFactors: any;
+    recommendedActions: string[];
+  }> {
+    this.logger.debug(`Performing advanced segmentation for customer ${customerId}`);
+
+    try {
+      // Get customer with related data
+      const customer = await this.customerRepository.findOne({
+        where: { id: customerId, tenantId },
+        relations: ['transactions', 'orders']
+      });
+
+      if (!customer) {
+        throw new Error(`Customer ${customerId} not found`);
+      }
+
+      // Perform detailed segmentation analysis
+      const segmentationResult = await this.performAdvancedCustomerSegmentation(
+        tenantId,
+        {
+          includeCustomers: [customerId],
+          enableIndonesianContext: true,
+          enableAdvancedAnalytics: true,
+          enableBehavioralAnalysis: true
+        }
+      );
+
+      // Calculate segmentation scores
+      const segmentScore = this.calculateSegmentScore(customer);
+      const primarySegment = this.determinePrimarySegment(customer);
+      const secondarySegments = this.determineSecondarySegments(customer);
+      const indonesianFactors = this.analyzeIndonesianFactors(customer);
+
+      return {
+        primarySegment,
+        secondarySegments,
+        segmentScore,
+        indonesianFactors,
+        recommendedActions: this.generateSegmentRecommendations(primarySegment, segmentScore)
+      };
+
+    } catch (error) {
+      this.logger.error(`Advanced segmentation failed for customer ${customerId}: ${error.message}`);
+      
+      // Return basic segmentation as fallback
+      const customer = await this.customerRepository.findOne({
+        where: { id: customerId, tenantId }
+      });
+
+      return customer ? this.calculateBasicSegmentation(customer) : this.getDefaultSegmentation();
+    }
+  }
+
+  /**
+   * Calculate segment score based on customer metrics
+   */
+  private calculateSegmentScore(customer: any): number {
+    let score = 50; // Base score
+
+    // Lifetime value factor (40 points max)
+    if (customer.lifetimeValue > 100000000) score += 40; // 100M IDR+
+    else if (customer.lifetimeValue > 50000000) score += 30; // 50M IDR+
+    else if (customer.lifetimeValue > 20000000) score += 20; // 20M IDR+
+    else if (customer.lifetimeValue > 5000000) score += 10; // 5M IDR+
+
+    // Order frequency factor (20 points max)
+    if (customer.totalOrders > 20) score += 20;
+    else if (customer.totalOrders > 10) score += 15;
+    else if (customer.totalOrders > 5) score += 10;
+    else if (customer.totalOrders > 1) score += 5;
+
+    // Recency factor (20 points max)
+    if (customer.daysSinceLastOrder <= 30) score += 20;
+    else if (customer.daysSinceLastOrder <= 90) score += 15;
+    else if (customer.daysSinceLastOrder <= 180) score += 10;
+    else if (customer.daysSinceLastOrder <= 365) score += 5;
+    else score -= 20; // Penalty for dormant customers
+
+    // Engagement factor (20 points max)
+    if (customer.averageSatisfactionRating > 8) score += 20;
+    else if (customer.averageSatisfactionRating > 6) score += 15;
+    else if (customer.averageSatisfactionRating > 4) score += 10;
+
+    return Math.max(0, Math.min(100, score));
+  }
+
+  /**
+   * Determine primary segment based on customer characteristics
+   */
+  private determinePrimarySegment(customer: any): string {
+    // High-value customers
+    if (customer.lifetimeValue > 50000000 || customer.loyaltyTier === 'diamond') {
+      return 'high_value';
+    }
+
+    // Frequent buyers
+    if (customer.totalOrders > 10 && customer.averageOrderFrequency > 2) {
+      return 'frequent_buyer';
+    }
+
+    // At-risk customers
+    if (customer.churnProbability > 70 || customer.daysSinceLastOrder > 180) {
+      return 'at_risk';
+    }
+
+    // Dormant customers
+    if (customer.daysSinceLastOrder > 365) {
+      return 'dormant';
+    }
+
+    // Seasonal patterns
+    if (customer.purchaseBehavior?.seasonalPurchasePattern) {
+      const seasonalActivity = Object.values(customer.purchaseBehavior.seasonalPurchasePattern).filter(Boolean).length;
+      if (seasonalActivity >= 2) {
+        return 'seasonal';
+      }
+    }
+
+    // New customers
+    if (customer.totalOrders <= 2 && customer.daysSinceFirstOrder <= 90) {
+      return 'new_customer';
+    }
+
+    // Default to occasional
+    return 'occasional';
+  }
+
+  /**
+   * Determine secondary segments
+   */
+  private determineSecondarySegments(customer: any): string[] {
+    const segments: string[] = [];
+
+    // Price sensitivity
+    if (customer.purchaseBehavior?.pricesensitivity === 'high') {
+      segments.push('price_sensitive');
+    }
+
+    // Brand loyalty
+    if (customer.purchaseBehavior?.brandLoyalty === 'high') {
+      segments.push('brand_loyal');
+    }
+
+    // Mobile user
+    if (customer.preferences?.communicationPreferences?.whatsapp) {
+      segments.push('mobile_first');
+    }
+
+    // Business customer
+    if (customer.customerType === 'business' || customer.customerType === 'corporate') {
+      segments.push('b2b');
+    }
+
+    return segments;
+  }
+
+  /**
+   * Analyze Indonesian market factors
+   */
+  private analyzeIndonesianFactors(customer: any): any {
+    return {
+      culturalAlignment: this.calculateCulturalAlignment(customer),
+      regionalBehavior: this.determineRegionalBehavior(customer),
+      paymentMethodPreference: this.analyzePaymentPreferences(customer),
+      communicationStyle: this.determineCommunicationStyle(customer),
+      religiousConsiderations: this.analyzeReligiousFactors(customer)
+    };
+  }
+
+  /**
+   * Calculate cultural alignment score
+   */
+  private calculateCulturalAlignment(customer: any): number {
+    let score = 50; // Base score
+
+    // Language preference
+    if (customer.preferredLanguage === 'id') score += 20;
+
+    // Payment method alignment with Indonesian preferences
+    const indonesianPaymentMethods = ['qris', 'gopay', 'ovo', 'dana', 'shopeepay'];
+    if (customer.preferences?.preferredPaymentMethods?.some(pm => 
+      indonesianPaymentMethods.includes(pm.toLowerCase()))) {
+      score += 15;
+    }
+
+    // Communication preference alignment
+    if (customer.preferences?.communicationPreferences?.whatsapp) score += 15;
+
+    return Math.min(100, score);
+  }
+
+  /**
+   * Determine regional behavior pattern
+   */
+  private determineRegionalBehavior(customer: any): string {
+    const address = customer.addresses?.find(addr => addr.isDefault);
+    if (!address) return 'unknown';
+
+    const urbanProvinces = ['DKI Jakarta', 'Jawa Barat', 'Jawa Timur', 'Banten'];
+    const isUrban = urbanProvinces.some(province => 
+      address.state?.includes(province)
+    );
+
+    return isUrban ? 'urban' : 'suburban';
+  }
+
+  /**
+   * Analyze payment method preferences
+   */
+  private analyzePaymentPreferences(customer: any): string {
+    const paymentMethods = customer.preferences?.preferredPaymentMethods || [];
+    
+    if (paymentMethods.includes('qris') || paymentMethods.includes('gopay')) {
+      return 'digital_native';
+    }
+    
+    if (paymentMethods.includes('bank_transfer') || paymentMethods.includes('credit_card')) {
+      return 'traditional_digital';
+    }
+    
+    if (paymentMethods.includes('cod') || paymentMethods.includes('cash')) {
+      return 'cash_preferred';
+    }
+
+    return 'mixed';
+  }
+
+  /**
+   * Determine communication style preference
+   */
+  private determineCommunicationStyle(customer: any): string {
+    const prefs = customer.preferences?.communicationPreferences;
+    if (!prefs) return 'unknown';
+
+    if (prefs.whatsapp) return 'instant_messaging';
+    if (prefs.email) return 'formal_email';
+    if (prefs.sms) return 'text_based';
+    if (prefs.phone) return 'voice_call';
+
+    return 'mixed';
+  }
+
+  /**
+   * Analyze religious considerations
+   */
+  private analyzeReligiousFactors(customer: any): any {
+    const religiousContext = customer.indonesianMarketContext?.religiousConsiderations;
+    
+    return {
+      halalPreference: religiousContext?.observesHalal || false,
+      ramadanObservance: religiousContext?.observesRamadan || false,
+      prayerTimeConsideration: religiousContext?.prayerTimePreferences?.length > 0 || false
+    };
+  }
+
+  /**
+   * Generate recommendations based on segment and score
+   */
+  private generateSegmentRecommendations(primarySegment: string, segmentScore: number): string[] {
+    const baseRecommendations: Record<string, string[]> = {
+      'high_value': [
+        'Assign dedicated account manager',
+        'Offer exclusive VIP services',
+        'Provide early access to new products',
+        'Send personalized premium offers'
+      ],
+      'frequent_buyer': [
+        'Implement loyalty rewards program',
+        'Offer bulk purchase discounts',
+        'Create subscription options',
+        'Send personalized product recommendations'
+      ],
+      'at_risk': [
+        'Launch retention campaign',
+        'Offer special comeback discounts',
+        'Conduct satisfaction survey',
+        'Provide priority customer support'
+      ],
+      'dormant': [
+        'Execute win-back campaign',
+        'Send exclusive return offers',
+        'Update contact information',
+        'Re-engagement email series'
+      ],
+      'new_customer': [
+        'Send welcome onboarding series',
+        'Offer first-time buyer discount',
+        'Provide product tutorials',
+        'Collect preference data'
+      ],
+      'seasonal': [
+        'Create seasonal campaigns',
+        'Send pre-season notifications',
+        'Offer seasonal product bundles',
+        'Track seasonal behavior patterns'
+      ],
+      'occasional': [
+        'Increase engagement frequency',
+        'Send relevant product suggestions',
+        'Offer incentives for repeat purchases',
+        'Monitor behavior changes'
+      ]
+    };
+
+    const recommendations = baseRecommendations[primarySegment] || ['Monitor customer behavior'];
+    
+    // Add score-based recommendations
+    if (segmentScore >= 80) {
+      recommendations.push('Focus on retention and expansion');
+    } else if (segmentScore <= 30) {
+      recommendations.push('Immediate intervention required');
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * Calculate basic segmentation for fallback scenarios
+   */
+  private calculateBasicSegmentation(customer: any): {
+    primarySegment: string;
+    secondarySegments: string[];
+    segmentScore: number;
+    indonesianFactors: any;
+    recommendedActions: string[];
+  } {
+    const primarySegment = this.determinePrimarySegment(customer);
+    const segmentScore = this.calculateSegmentScore(customer);
+
+    return {
+      primarySegment,
+      secondarySegments: ['general'],
+      segmentScore,
+      indonesianFactors: {
+        culturalAlignment: 75,
+        regionalBehavior: 'urban',
+        paymentMethodPreference: 'digital',
+        communicationStyle: 'instant_messaging',
+        religiousConsiderations: { halalPreference: false }
+      },
+      recommendedActions: this.generateSegmentRecommendations(primarySegment, segmentScore)
+    };
+  }
+
+  /**
+   * Get default segmentation for error cases
+   */
+  private getDefaultSegmentation(): {
+    primarySegment: string;
+    secondarySegments: string[];
+    segmentScore: number;
+    indonesianFactors: any;
+    recommendedActions: string[];
+  } {
+    return {
+      primarySegment: 'new_customer',
+      secondarySegments: [],
+      segmentScore: 0,
+      indonesianFactors: {},
+      recommendedActions: ['Gather more customer data', 'Monitor customer behavior']
+    };
+  }
+}

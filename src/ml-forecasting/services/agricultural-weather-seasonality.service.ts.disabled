@@ -1,0 +1,1345 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+
+/**
+ * PHASE 3.2.3.3.3: Agricultural & Weather Seasonality Learning 🌾
+ * 
+ * Specialized service for learning agricultural and weather-driven seasonal patterns
+ * in Indonesia. Focuses on harvest cycles, monsoon patterns, and weather-dependent
+ * demand fluctuations that significantly impact business across the archipelago.
+ */
+
+export interface AgriculturalWeatherRequest {
+  tenantId: string;
+  businessType?: string;
+  region?: IndonesianRegion;
+  islands?: IndonesianIsland[];
+  categories?: string[];
+  analysisStartDate?: Date;
+  analysisEndDate?: Date;
+  includeWeatherPatterns?: boolean;
+  includeHarvestCycles?: boolean;
+  includeClimateVariability?: boolean;
+  includeFoodPriceAnalysis?: boolean;
+  analysisDepth: 'basic' | 'standard' | 'comprehensive' | 'expert';
+}
+
+export type IndonesianRegion = 
+  | 'western_indonesia'    // WIB (Western Indonesia Time)
+  | 'central_indonesia'    // WITA (Central Indonesia Time)
+  | 'eastern_indonesia';   // WIT (Eastern Indonesia Time)
+
+export type IndonesianIsland = 
+  | 'java'           // Java - Most populated, industrial center
+  | 'sumatera'       // Sumatera - Agricultural powerhouse
+  | 'kalimantan'     // Kalimantan - Forestry, mining, palm oil
+  | 'sulawesi'       // Sulawesi - Agriculture, fishing, tourism
+  | 'papua'          // Papua - Mining, forestry, tribal
+  | 'bali_nusa'      // Bali & Nusa Tenggara - Tourism, agriculture
+  | 'maluku'         // Maluku - Spice islands, fishing
+  | 'small_islands'; // Other smaller islands
+
+export type WeatherSeason = 
+  | 'dry_season'        // Musim Kemarau (April-September)
+  | 'rainy_season'      // Musim Hujan (October-March)
+  | 'transition_dry'    // Peralihan ke Kemarau (March-April)
+  | 'transition_wet'    // Peralihan ke Hujan (September-October)
+  | 'peak_dry'          // Puncak Kemarau (July-August)
+  | 'peak_wet';         // Puncak Hujan (December-January)
+
+export type AgriculturalCrop = 
+  | 'rice'              // Padi - Staple crop, 2-3 harvests/year
+  | 'corn'              // Jagung - Important cereal crop
+  | 'soybeans'          // Kedelai - Protein source
+  | 'cassava'           // Singkong - Root crop, drought resistant
+  | 'sweet_potato'      // Ubi jalar - Secondary food crop
+  | 'peanuts'           // Kacang tanah - Legume crop
+  | 'vegetables'        // Sayur-sayuran - Various vegetables
+  | 'fruits_seasonal'   // Buah musiman - Seasonal fruits
+  | 'fruits_year_round' // Buah sepanjang tahun - Year-round fruits
+  | 'spices'            // Rempah-rempah - Traditional spices
+  | 'coffee'            // Kopi - Export commodity
+  | 'tea'               // Teh - Plantation crop
+  | 'palm_oil'          // Kelapa sawit - Major export
+  | 'coconut'           // Kelapa - Traditional crop
+  | 'rubber'            // Karet - Industrial crop
+  | 'cocoa'             // Kakao - Plantation crop
+  | 'tobacco'           // Tembakau - Cash crop
+  | 'sugarcane'         // Tebu - Sugar production
+  | 'fishery'           // Perikanan - Marine and aquaculture
+  | 'livestock';        // Ternak - Animal husbandry
+
+export interface WeatherPattern {
+  patternId: string;
+  patternName: string;
+  season: WeatherSeason;
+  region: IndonesianRegion;
+  affectedIslands: IndonesianIsland[];
+  
+  timeframe: {
+    startMonth: number; // 1-12
+    endMonth: number;
+    duration: number; // months
+    peakMonth: number;
+    variability: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  };
+  
+  weatherCharacteristics: {
+    rainfall: {
+      amount: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high';
+      frequency: 'rare' | 'occasional' | 'regular' | 'frequent' | 'constant';
+      intensity: 'light' | 'moderate' | 'heavy' | 'very_heavy';
+      variability: number; // 0-1 score
+    };
+    temperature: {
+      average: number; // Celsius
+      range: { min: number; max: number };
+      humidity: number; // percentage
+      heatIndex: 'comfortable' | 'warm' | 'hot' | 'very_hot' | 'extreme';
+    };
+    wind: {
+      direction: string;
+      strength: 'calm' | 'light' | 'moderate' | 'strong' | 'very_strong';
+      seasonality: boolean;
+    };
+    sunshine: {
+      hours: number; // average daily hours
+      intensity: 'low' | 'moderate' | 'high' | 'very_high';
+      cloudCover: number; // percentage
+    };
+  };
+  
+  businessImpacts: {
+    agriculture: WeatherBusinessImpact;
+    construction: WeatherBusinessImpact;
+    transportation: WeatherBusinessImpact;
+    retail: WeatherBusinessImpact;
+    tourism: WeatherBusinessImpact;
+    energy: WeatherBusinessImpact;
+    foodBeverage: WeatherBusinessImpact;
+  };
+  
+  adaptationStrategies: {
+    demandForecasting: string[];
+    inventoryManagement: string[];
+    supplyChain: string[];
+    pricing: string[];
+    marketing: string[];
+    operations: string[];
+  };
+}
+
+export interface WeatherBusinessImpact {
+  impactLevel: 'minimal' | 'low' | 'medium' | 'high' | 'severe';
+  demandMultiplier: number;
+  categories: {
+    increased: string[];
+    decreased: string[];
+    volatile: string[];
+    stable: string[];
+  };
+  risks: string[];
+  opportunities: string[];
+}
+
+export interface AgriculturalCycle {
+  cropType: AgriculturalCrop;
+  cycleName: string;
+  region: IndonesianRegion;
+  primaryIslands: IndonesianIsland[];
+  
+  cycleCharacteristics: {
+    cycleLength: number; // months
+    cyclesPerYear: number;
+    seasonality: 'highly_seasonal' | 'seasonal' | 'moderately_seasonal' | 'year_round';
+    weatherDependency: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+  };
+  
+  phases: {
+    planting: CropPhase;
+    growing: CropPhase;
+    harvesting: CropPhase;
+    postHarvest: CropPhase;
+  };
+  
+  marketImpacts: {
+    priceVolatility: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    supplyFluctuations: 'extreme' | 'high' | 'moderate' | 'low' | 'minimal';
+    qualityVariations: 'significant' | 'moderate' | 'minor' | 'minimal';
+    tradingPatterns: string[];
+  };
+  
+  businessRelationships: {
+    upstreamSuppliers: string[];
+    downstreamBuyers: string[];
+    supportServices: string[];
+    governmentPrograms: string[];
+  };
+  
+  economicFactors: {
+    priceElasticity: 'very_elastic' | 'elastic' | 'moderate' | 'inelastic' | 'very_inelastic';
+    exportPotential: 'very_high' | 'high' | 'medium' | 'low' | 'none';
+    subsistenceLevel: number; // 0-1, how much is for subsistence vs market
+    valueChainIntegration: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  };
+}
+
+export interface CropPhase {
+  phaseName: string;
+  duration: number; // weeks
+  startWeek: number; // week of year
+  
+  activities: string[];
+  inputRequirements: string[];
+  laborRequirements: string[];
+  weatherDependencies: string[];
+  
+  businessDemand: {
+    products: string[];
+    services: string[];
+    multiplier: number;
+    volatility: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  };
+  
+  riskFactors: {
+    weatherRisks: string[];
+    pestDiseaseRisks: string[];
+    marketRisks: string[];
+    operationalRisks: string[];
+  };
+}
+
+export interface FoodPricePattern {
+  foodCategory: string;
+  priceDriver: 'harvest_cycle' | 'weather_pattern' | 'import_dependency' | 'seasonal_demand' | 'policy_intervention';
+  
+  seasonalPrice: {
+    highPriceMonths: number[];
+    lowPriceMonths: number[];
+    volatilityScore: number; // 0-1
+    averageVariation: number; // percentage
+  };
+  
+  supplyFactors: {
+    domesticProduction: number; // percentage of supply
+    imports: number; // percentage of supply
+    stocks: number; // percentage buffering capacity
+    processing: number; // percentage processed vs fresh
+  };
+  
+  demandFactors: {
+    basicNeed: number; // percentage of household budget
+    substitutability: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    culturalImportance: 'critical' | 'important' | 'moderate' | 'minor';
+    incomeElasticity: number; // elasticity coefficient
+  };
+  
+  businessImplications: {
+    retailMargins: string[];
+    inventoryStrategy: string[];
+    pricingStrategy: string[];
+    customerCommunication: string[];
+  };
+}
+
+export interface AgriculturalWeatherResult {
+  learningId: string;
+  tenantId: string;
+  generatedAt: string;
+  region: IndonesianRegion;
+  analysisScope: string[];
+  
+  weatherPatterns: WeatherPattern[];
+  agriculturalCycles: AgriculturalCycle[];
+  foodPricePatterns: FoodPricePattern[];
+  
+  seasonalInsights: {
+    drySeasonImpacts: SeasonalImpact;
+    rainySeasonImpacts: SeasonalImpact;
+    transitionPeriods: SeasonalImpact[];
+    extremeWeatherEvents: ExtremeWeatherImpact[];
+  };
+  
+  businessRecommendations: {
+    inventoryManagement: AgriculturalBusinessRecommendation[];
+    supplyChainOptimization: AgriculturalBusinessRecommendation[];
+    pricingStrategy: AgriculturalBusinessRecommendation[];
+    riskManagement: AgriculturalBusinessRecommendation[];
+    marketTiming: AgriculturalBusinessRecommendation[];
+  };
+  
+  regionalAdaptations: {
+    localSuppliers: string[];
+    logisticsConsiderations: string[];
+    culturalFactors: string[];
+    economicConditions: string[];
+  };
+  
+  forecastingGuidance: {
+    weatherDependentCategories: string[];
+    harvestImpactTimeline: Record<string, string>;
+    priceVolatilityCalendar: Record<string, number>;
+    riskMitigationCalendar: Record<string, string[]>;
+  };
+  
+  qualityMetrics: {
+    weatherDataQuality: number;
+    agriculturalDataReliability: number;
+    marketDataAccuracy: number;
+    forecastReliability: number;
+  };
+}
+
+export interface SeasonalImpact {
+  seasonName: string;
+  timeframe: string;
+  overallImpact: 'very_positive' | 'positive' | 'neutral' | 'negative' | 'very_negative';
+  
+  categoryImpacts: {
+    agriculture: CategoryImpact;
+    foodBeverage: CategoryImpact;
+    construction: CategoryImpact;
+    clothing: CategoryImpact;
+    health: CategoryImpact;
+    transportation: CategoryImpact;
+  };
+  
+  operationalConsiderations: {
+    logistics: string[];
+    storage: string[];
+    quality: string[];
+    safety: string[];
+  };
+  
+  marketDynamics: {
+    priceFluctuations: string[];
+    demandShifts: string[];
+    competitionChanges: string[];
+    customerBehavior: string[];
+  };
+}
+
+export interface CategoryImpact {
+  category: string;
+  impactType: 'demand_driven' | 'supply_driven' | 'price_driven' | 'quality_driven' | 'access_driven';
+  magnitude: 'very_high' | 'high' | 'medium' | 'low' | 'minimal';
+  direction: 'increase' | 'decrease' | 'volatile' | 'stable';
+  confidence: number;
+  
+  specificProducts: string[];
+  businessActions: string[];
+  riskFactors: string[];
+}
+
+export interface ExtremeWeatherImpact {
+  eventType: 'flooding' | 'drought' | 'typhoon' | 'landslide' | 'forest_fire' | 'volcanic_activity';
+  probability: number; // 0-1 annual probability
+  severity: 'minor' | 'moderate' | 'major' | 'severe' | 'catastrophic';
+  
+  affectedRegions: IndonesianRegion[];
+  seasonalTiming: string[];
+  duration: string;
+  
+  businessImpacts: {
+    supplyDisruption: string[];
+    demandChanges: string[];
+    logisticsImpacts: string[];
+    infrastructureRisks: string[];
+  };
+  
+  preparationStrategies: {
+    earlyWarning: string[];
+    stockBuilding: string[];
+    alternativeSuppliers: string[];
+    customerCommunication: string[];
+  };
+  
+  recoveryConsiderations: {
+    timeframe: string;
+    priorities: string[];
+    resourceRequirements: string[];
+    marketReopening: string[];
+  };
+}
+
+export interface AgriculturalBusinessRecommendation {
+  recommendationType: 'strategic' | 'tactical' | 'operational' | 'contingency';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  timing: 'immediate' | 'seasonal' | 'annual' | 'long_term';
+  
+  recommendation: {
+    title: string;
+    description: string;
+    rationale: string;
+    applicableSeasons: WeatherSeason[];
+  };
+  
+  implementation: {
+    actionSteps: string[];
+    timeline: string;
+    resourceRequirements: string[];
+    dependencies: string[];
+  };
+  
+  expectedOutcomes: {
+    riskReduction: string[];
+    efficiencyGains: string[];
+    revenueImpact: string;
+    costImpact: string;
+  };
+  
+  monitoringKPIs: {
+    leadingIndicators: string[];
+    laggingIndicators: string[];
+    measurementFrequency: string;
+  };
+}
+
+@Injectable()
+export class AgriculturalWeatherSeasonalityService {
+  private readonly logger = new Logger(AgriculturalWeatherSeasonalityService.name);
+  private readonly CACHE_TTL = 86400 * 14; // 14 days
+  private readonly INDONESIAN_TIMEZONE = 'Asia/Jakarta';
+
+  // Indonesian Weather Patterns Database
+  private readonly indonesianWeatherPatterns: WeatherPattern[] = [
+    {
+      patternId: 'java_dry_season',
+      patternName: 'Java Dry Season',
+      season: 'dry_season',
+      region: 'western_indonesia',
+      affectedIslands: ['java', 'bali_nusa'],
+      timeframe: {
+        startMonth: 4, // April
+        endMonth: 9,   // September
+        duration: 6,
+        peakMonth: 7,  // July
+        variability: 'low'
+      },
+      weatherCharacteristics: {
+        rainfall: {
+          amount: 'very_low',
+          frequency: 'rare',
+          intensity: 'light',
+          variability: 0.2
+        },
+        temperature: {
+          average: 28,
+          range: { min: 22, max: 34 },
+          humidity: 65,
+          heatIndex: 'warm'
+        },
+        wind: {
+          direction: 'Southeast',
+          strength: 'moderate',
+          seasonality: true
+        },
+        sunshine: {
+          hours: 8,
+          intensity: 'high',
+          cloudCover: 20
+        }
+      },
+      businessImpacts: {
+        agriculture: {
+          impactLevel: 'high',
+          demandMultiplier: 0.7,
+          categories: {
+            increased: ['irrigation_equipment', 'water_storage', 'drought_resistant_seeds'],
+            decreased: ['rain_gear', 'drainage_equipment', 'flood_protection'],
+            volatile: ['fresh_vegetables', 'water_dependent_crops'],
+            stable: ['processed_foods', 'grains']
+          },
+          risks: ['Crop failure', 'Water scarcity', 'Fire hazards'],
+          opportunities: ['Solar drying', 'Post-harvest processing', 'Tourism']
+        },
+        construction: {
+          impactLevel: 'medium',
+          demandMultiplier: 1.3,
+          categories: {
+            increased: ['construction_materials', 'roofing', 'outdoor_work_equipment'],
+            decreased: ['waterproofing', 'drainage_systems'],
+            volatile: ['cement_mixing', 'paint_application'],
+            stable: ['structural_materials', 'tools']
+          },
+          risks: ['Material degradation', 'Worker heat stress'],
+          opportunities: ['Accelerated construction', 'Outdoor projects']
+        },
+        transportation: {
+          impactLevel: 'low',
+          demandMultiplier: 1.1,
+          categories: {
+            increased: ['vehicle_maintenance', 'cooling_systems', 'dust_protection'],
+            decreased: ['rain_protection', 'flood_equipment'],
+            volatile: ['fuel_consumption', 'tire_wear'],
+            stable: ['regular_transport', 'logistics']
+          },
+          risks: ['Road overheating', 'Dust damage'],
+          opportunities: ['Better road conditions', 'Predictable schedules']
+        },
+        retail: {
+          impactLevel: 'medium',
+          demandMultiplier: 1.0,
+          categories: {
+            increased: ['air_conditioning', 'cooling_products', 'sun_protection', 'water_containers'],
+            decreased: ['rain_gear', 'umbrellas', 'waterproof_items'],
+            volatile: ['seasonal_clothing', 'fresh_produce'],
+            stable: ['staple_foods', 'household_items']
+          },
+          risks: ['Product deterioration', 'Storage challenges'],
+          opportunities: ['Outdoor activities', 'Tourism products']
+        },
+        tourism: {
+          impactLevel: 'high',
+          demandMultiplier: 1.8,
+          categories: {
+            increased: ['outdoor_activities', 'beach_products', 'tourism_services', 'accommodation'],
+            decreased: ['indoor_entertainment', 'rain_alternatives'],
+            volatile: ['seasonal_attractions', 'weather_dependent_tours'],
+            stable: ['cultural_tourism', 'business_travel']
+          },
+          risks: ['Heat-related health issues', 'Water shortage'],
+          opportunities: ['Peak tourism season', 'Outdoor events']
+        },
+        energy: {
+          impactLevel: 'high',
+          demandMultiplier: 1.4,
+          categories: {
+            increased: ['air_conditioning', 'cooling_systems', 'fans', 'solar_panels'],
+            decreased: ['heating_systems', 'dehumidifiers'],
+            volatile: ['peak_hour_demand', 'grid_stability'],
+            stable: ['base_load_power', 'industrial_consumption']
+          },
+          risks: ['Grid overload', 'Equipment overheating'],
+          opportunities: ['Solar power generation', 'Energy efficiency']
+        },
+        foodBeverage: {
+          impactLevel: 'high',
+          demandMultiplier: 1.2,
+          categories: {
+            increased: ['cold_beverages', 'ice_products', 'fresh_fruits', 'cooling_foods'],
+            decreased: ['hot_beverages', 'warming_foods', 'heavy_meals'],
+            volatile: ['perishable_items', 'temperature_sensitive_products'],
+            stable: ['packaged_foods', 'staples']
+          },
+          risks: ['Product spoilage', 'Cold chain challenges'],
+          opportunities: ['Seasonal products', 'Cooling services']
+        }
+      },
+      adaptationStrategies: {
+        demandForecasting: [
+          'Increase cooling product forecasts by 40%',
+          'Reduce rain-protection product forecasts by 60%',
+          'Plan for tourism peak season demand'
+        ],
+        inventoryManagement: [
+          'Build cold storage capacity',
+          'Implement faster inventory turnover',
+          'Stock seasonal cooling products'
+        ],
+        supplyChain: [
+          'Secure reliable transportation during heat',
+          'Negotiate supplier arrangements for peak demand',
+          'Plan alternative supply routes'
+        ],
+        pricing: [
+          'Implement dynamic pricing for seasonal products',
+          'Prepare premium pricing for cooling products',
+          'Plan clearance pricing for off-season items'
+        ],
+        marketing: [
+          'Focus on heat-relief product campaigns',
+          'Promote outdoor and tourism activities',
+          'Emphasize product reliability in heat'
+        ],
+        operations: [
+          'Ensure adequate cooling in facilities',
+          'Implement heat-stress prevention for workers',
+          'Optimize delivery schedules for cooler hours'
+        ]
+      }
+    },
+    {
+      patternId: 'sumatera_rainy_season',
+      patternName: 'Sumatera Rainy Season',
+      season: 'rainy_season',
+      region: 'western_indonesia',
+      affectedIslands: ['sumatera'],
+      timeframe: {
+        startMonth: 10, // October
+        endMonth: 3,    // March
+        duration: 6,
+        peakMonth: 12,  // December
+        variability: 'high'
+      },
+      weatherCharacteristics: {
+        rainfall: {
+          amount: 'very_high',
+          frequency: 'frequent',
+          intensity: 'heavy',
+          variability: 0.4
+        },
+        temperature: {
+          average: 26,
+          range: { min: 23, max: 30 },
+          humidity: 85,
+          heatIndex: 'warm'
+        },
+        wind: {
+          direction: 'Northwest',
+          strength: 'strong',
+          seasonality: true
+        },
+        sunshine: {
+          hours: 4,
+          intensity: 'low',
+          cloudCover: 80
+        }
+      },
+      businessImpacts: {
+        agriculture: {
+          impactLevel: 'very_high',
+          demandMultiplier: 1.8,
+          categories: {
+            increased: ['drainage_systems', 'fungicides', 'rain_protection', 'drying_equipment'],
+            decreased: ['irrigation_systems', 'drought_protection'],
+            volatile: ['fresh_produce_quality', 'transportation_dependent_supplies'],
+            stable: ['stored_grains', 'processed_foods']
+          },
+          risks: ['Flooding', 'Crop diseases', 'Harvest delays', 'Quality deterioration'],
+          opportunities: ['Water-intensive crops', 'Aquaculture', 'Hydroelectric power']
+        },
+        construction: {
+          impactLevel: 'severe',
+          demandMultiplier: 0.4,
+          categories: {
+            increased: ['waterproofing', 'drainage_equipment', 'covered_work_areas'],
+            decreased: ['outdoor_construction', 'cement_work', 'painting'],
+            volatile: ['project_timelines', 'material_delivery'],
+            stable: ['indoor_work', 'planning_activities']
+          },
+          risks: ['Work delays', 'Material damage', 'Site flooding', 'Safety hazards'],
+          opportunities: ['Indoor construction', 'Maintenance work', 'Planning phase']
+        },
+        transportation: {
+          impactLevel: 'severe',
+          demandMultiplier: 0.6,
+          categories: {
+            increased: ['vehicle_maintenance', 'waterproofing', 'emergency_transport'],
+            decreased: ['regular_transport', 'tourism_transport'],
+            volatile: ['fuel_efficiency', 'delivery_schedules'],
+            stable: ['essential_transport', 'emergency_services']
+          },
+          risks: ['Road flooding', 'Landslides', 'Vehicle damage', 'Service disruptions'],
+          opportunities: ['Boat transport', 'Emergency services', 'Infrastructure assessment']
+        },
+        retail: {
+          impactLevel: 'high',
+          demandMultiplier: 0.8,
+          categories: {
+            increased: ['rain_gear', 'umbrellas', 'waterproof_items', 'indoor_entertainment'],
+            decreased: ['outdoor_products', 'tourism_items', 'fresh_produce'],
+            volatile: ['perishable_goods', 'delivery_dependent_items'],
+            stable: ['household_essentials', 'processed_foods']
+          },
+          risks: ['Supply disruptions', 'Product damage', 'Reduced foot traffic'],
+          opportunities: ['Rain protection products', 'Indoor activities', 'Delivery services']
+        },
+        tourism: {
+          impactLevel: 'severe',
+          demandMultiplier: 0.3,
+          categories: {
+            increased: ['indoor_attractions', 'cultural_activities', 'spa_services'],
+            decreased: ['outdoor_activities', 'beach_tourism', 'adventure_sports'],
+            volatile: ['weather_dependent_tours', 'transportation_tours'],
+            stable: ['cultural_tourism', 'business_travel']
+          },
+          risks: ['Tourist safety', 'Activity cancellations', 'Transportation issues'],
+          opportunities: ['Cultural experiences', 'Spa tourism', 'Educational tours']
+        },
+        energy: {
+          impactLevel: 'medium',
+          demandMultiplier: 0.9,
+          categories: {
+            increased: ['heating_systems', 'dehumidifiers', 'backup_power'],
+            decreased: ['air_conditioning', 'cooling_systems'],
+            volatile: ['hydroelectric_generation', 'solar_power'],
+            stable: ['base_load_power', 'essential_services']
+          },
+          risks: ['Power outages', 'Equipment damage', 'Grid instability'],
+          opportunities: ['Hydroelectric power', 'Energy storage', 'Grid resilience']
+        },
+        foodBeverage: {
+          impactLevel: 'high',
+          demandMultiplier: 0.7,
+          categories: {
+            increased: ['hot_beverages', 'comfort_foods', 'preserved_foods', 'warming_foods'],
+            decreased: ['cold_beverages', 'fresh_produce', 'outdoor_dining'],
+            volatile: ['perishable_items', 'supply_chain_dependent'],
+            stable: ['packaged_foods', 'staples']
+          },
+          risks: ['Supply chain disruption', 'Quality deterioration', 'Storage challenges'],
+          opportunities: ['Comfort food sales', 'Delivery services', 'Preserved foods']
+        }
+      },
+      adaptationStrategies: {
+        demandForecasting: [
+          'Increase rain protection product forecasts by 80%',
+          'Decrease outdoor activity product forecasts by 50%',
+          'Plan for supply chain disruptions'
+        ],
+        inventoryManagement: [
+          'Build buffer stock before rainy season',
+          'Improve warehouse waterproofing',
+          'Implement rapid turnover for perishables'
+        ],
+        supplyChain: [
+          'Secure alternative transportation routes',
+          'Build relationships with local suppliers',
+          'Implement emergency procurement procedures'
+        ],
+        pricing: [
+          'Premium pricing for rain protection products',
+          'Flexible pricing for weather-dependent items',
+          'Discount pricing for outdoor products'
+        ],
+        marketing: [
+          'Focus on indoor and comfort products',
+          'Promote weather protection solutions',
+          'Emphasize reliability and availability'
+        ],
+        operations: [
+          'Ensure facility weatherproofing',
+          'Implement flexible work schedules',
+          'Prepare emergency response procedures'
+        ]
+      }
+    }
+  ];
+
+  // Indonesian Agricultural Cycles Database
+  private readonly indonesianAgriculturalCycles: AgriculturalCycle[] = [
+    {
+      cropType: 'rice',
+      cycleName: 'Indonesian Rice Production Cycle',
+      region: 'western_indonesia',
+      primaryIslands: ['java', 'sumatera'],
+      cycleCharacteristics: {
+        cycleLength: 4, // months
+        cyclesPerYear: 3,
+        seasonality: 'highly_seasonal',
+        weatherDependency: 'very_high'
+      },
+      phases: {
+        planting: {
+          phaseName: 'Rice Planting Season',
+          duration: 4, // weeks
+          startWeek: 40, // Early October
+          activities: ['Land preparation', 'Seed selection', 'Transplanting', 'Initial irrigation'],
+          inputRequirements: ['Seeds', 'Fertilizers', 'Pesticides', 'Water'],
+          laborRequirements: ['Field workers', 'Machinery operators', 'Supervisors'],
+          weatherDependencies: ['Adequate rainfall', 'Moderate temperatures', 'Low wind'],
+          businessDemand: {
+            products: ['rice_seeds', 'fertilizers', 'farming_tools', 'irrigation_equipment'],
+            services: ['land_preparation', 'planting_services', 'equipment_rental'],
+            multiplier: 2.5,
+            volatility: 'high'
+          },
+          riskFactors: {
+            weatherRisks: ['Excessive rainfall', 'Drought', 'Strong winds'],
+            pestDiseaseRisks: ['Seed rot', 'Early pest attacks'],
+            marketRisks: ['Input price volatility', 'Credit availability'],
+            operationalRisks: ['Labor shortages', 'Equipment breakdowns']
+          }
+        },
+        growing: {
+          phaseName: 'Rice Growing Season',
+          duration: 12, // weeks
+          startWeek: 44, // Late October - January
+          activities: ['Crop monitoring', 'Pest control', 'Fertilizer application', 'Water management'],
+          inputRequirements: ['Additional fertilizers', 'Pesticides', 'Water management'],
+          laborRequirements: ['Field monitoring', 'Pest control specialists'],
+          weatherDependencies: ['Consistent water supply', 'Optimal temperatures', 'Moderate sunlight'],
+          businessDemand: {
+            products: ['pesticides', 'fertilizers', 'monitoring_equipment', 'irrigation_supplies'],
+            services: ['crop_monitoring', 'pest_control', 'advisory_services'],
+            multiplier: 1.8,
+            volatility: 'medium'
+          },
+          riskFactors: {
+            weatherRisks: ['Drought', 'Flooding', 'Temperature extremes'],
+            pestDiseaseRisks: ['Brown planthopper', 'Blast disease', 'Bacterial blight'],
+            marketRisks: ['Input cost increases'],
+            operationalRisks: ['Irrigation failures', 'Equipment maintenance']
+          }
+        },
+        harvesting: {
+          phaseName: 'Rice Harvesting Season',
+          duration: 6, // weeks
+          startWeek: 8, // Late February - March
+          activities: ['Harvest timing', 'Cutting', 'Threshing', 'Initial drying'],
+          inputRequirements: ['Harvesting equipment', 'Storage materials', 'Transportation'],
+          laborRequirements: ['Harvest workers', 'Equipment operators', 'Transport workers'],
+          weatherDependencies: ['Dry weather', 'Low humidity', 'Minimal rainfall'],
+          businessDemand: {
+            products: ['harvesting_equipment', 'storage_bags', 'drying_equipment', 'transportation'],
+            services: ['harvesting_services', 'transportation', 'storage_services'],
+            multiplier: 3.0,
+            volatility: 'very_high'
+          },
+          riskFactors: {
+            weatherRisks: ['Rainfall during harvest', 'High humidity', 'Strong winds'],
+            pestDiseaseRisks: ['Post-harvest pests', 'Grain deterioration'],
+            marketRisks: ['Price volatility', 'Market access'],
+            operationalRisks: ['Equipment availability', 'Labor competition']
+          }
+        },
+        postHarvest: {
+          phaseName: 'Rice Post-Harvest Season',
+          duration: 4, // weeks
+          startWeek: 14, // April
+          activities: ['Drying', 'Milling', 'Storage', 'Marketing'],
+          inputRequirements: ['Drying facilities', 'Milling equipment', 'Storage infrastructure'],
+          laborRequirements: ['Processing workers', 'Quality control', 'Marketing staff'],
+          weatherDependencies: ['Dry conditions', 'Low humidity'],
+          businessDemand: {
+            products: ['drying_equipment', 'milling_machinery', 'storage_facilities', 'packaging'],
+            services: ['processing_services', 'quality_testing', 'marketing_support'],
+            multiplier: 2.2,
+            volatility: 'medium'
+          },
+          riskFactors: {
+            weatherRisks: ['Moisture damage', 'Mold development'],
+            pestDiseaseRisks: ['Storage pests', 'Grain quality loss'],
+            marketRisks: ['Price fluctuations', 'Quality premiums'],
+            operationalRisks: ['Processing capacity', 'Storage limitations']
+          }
+        }
+      },
+      marketImpacts: {
+        priceVolatility: 'high',
+        supplyFluctuations: 'high',
+        qualityVariations: 'moderate',
+        tradingPatterns: ['Harvest peaks drive price drops', 'Storage drives off-season premiums', 'Quality affects export potential']
+      },
+      businessRelationships: {
+        upstreamSuppliers: ['Seed companies', 'Fertilizer distributors', 'Equipment manufacturers', 'Financial services'],
+        downstreamBuyers: ['Rice millers', 'Wholesalers', 'Export companies', 'Government procurement'],
+        supportServices: ['Extension services', 'Research institutions', 'Weather services', 'Insurance companies'],
+        governmentPrograms: ['Subsidized inputs', 'Price support', 'Crop insurance', 'Research funding']
+      },
+      economicFactors: {
+        priceElasticity: 'inelastic',
+        exportPotential: 'medium',
+        subsistenceLevel: 0.6,
+        valueChainIntegration: 'high'
+      }
+    }
+  ];
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private readonly transactionRepository: Repository<InventoryTransaction>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    @InjectRepository(ProductCategory)
+    private readonly categoryRepository: Repository<ProductCategory>,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Learn comprehensive agricultural and weather seasonality patterns
+   */
+  async learnAgriculturalWeatherSeasonality(request: AgriculturalWeatherRequest): Promise<AgriculturalWeatherResult> {
+    const learningId = `agricultural_weather_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      this.logger.log(`Starting agricultural weather seasonality learning: ${learningId} for tenant: ${request.tenantId}`);
+
+      // Determine region and scope
+      const region = request.region || this.determineRegionFromBusiness(request);
+      const analysisScope = this.defineAnalysisScope(request);
+
+      // Get historical transaction data
+      const historicalData = await this.getAgriculturalWeatherData(request);
+      
+      if (historicalData.length < 30) {
+        throw new Error(`Insufficient agricultural/weather data. Found ${historicalData.length} transactions, minimum required: 30`);
+      }
+
+      // Learn weather patterns
+      const weatherPatterns = await this.learnWeatherPatterns(historicalData, region, request);
+      
+      // Learn agricultural cycles
+      const agriculturalCycles = await this.learnAgriculturalCycles(historicalData, region, request);
+      
+      // Analyze food price patterns
+      const foodPricePatterns = await this.analyzeFoodPricePatterns(historicalData, request);
+      
+      // Generate seasonal insights
+      const seasonalInsights = await this.generateSeasonalInsights(weatherPatterns, agriculturalCycles, request);
+      
+      // Generate business recommendations
+      const businessRecommendations = await this.generateAgriculturalRecommendations(
+        weatherPatterns,
+        agriculturalCycles,
+        seasonalInsights,
+        request
+      );
+      
+      // Analyze regional adaptations
+      const regionalAdaptations = await this.analyzeRegionalAdaptations(region, request);
+      
+      // Generate forecasting guidance
+      const forecastingGuidance = await this.generateForecastingGuidance(
+        weatherPatterns,
+        agriculturalCycles,
+        foodPricePatterns
+      );
+      
+      // Calculate quality metrics
+      const qualityMetrics = this.calculateAgriculturalQualityMetrics(historicalData, weatherPatterns, agriculturalCycles);
+
+      const result: AgriculturalWeatherResult = {
+        learningId,
+        tenantId: request.tenantId,
+        generatedAt: new Date().toISOString(),
+        region,
+        analysisScope,
+        weatherPatterns,
+        agriculturalCycles,
+        foodPricePatterns,
+        seasonalInsights,
+        businessRecommendations,
+        regionalAdaptations,
+        forecastingGuidance,
+        qualityMetrics
+      };
+
+      // Cache the results
+      await this.cacheManager.set(
+        `agricultural_weather_${request.tenantId}_${region}`,
+        result,
+        this.CACHE_TTL
+      );
+
+      // Emit learning completion event
+      this.eventEmitter.emit('agricultural.weather.learned', {
+        learningId,
+        tenantId: request.tenantId,
+        region,
+        patternsCount: weatherPatterns.length + agriculturalCycles.length,
+        confidence: qualityMetrics.forecastReliability
+      });
+
+      this.logger.log(`Agricultural weather seasonality learning completed: ${learningId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Agricultural weather seasonality learning failed: ${error.message}`, error.stack);
+      throw new Error(`Agricultural weather seasonality learning failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get agricultural/weather seasonality multiplier for specific date
+   */
+  async getAgriculturalWeatherMultiplier(
+    tenantId: string,
+    date: Date,
+    region?: IndonesianRegion,
+    category?: string,
+    cropType?: AgriculturalCrop
+  ): Promise<{ multiplier: number; confidence: number; explanation: string; season?: WeatherSeason; cropPhase?: string }> {
+    try {
+      const momentDate = moment(date).tz(this.INDONESIAN_TIMEZONE);
+      const targetRegion = region || 'western_indonesia';
+      
+      // Check for cached learning results
+      const cacheKey = `agricultural_weather_${tenantId}_${targetRegion}`;
+      const cachedResult = await this.cacheManager.get(cacheKey) as AgriculturalWeatherResult;
+      
+      if (cachedResult) {
+        // Find applicable weather pattern
+        const weatherPattern = this.findApplicableWeatherPattern(momentDate, cachedResult.weatherPatterns, targetRegion);
+        
+        if (weatherPattern) {
+          const multiplier = this.calculateWeatherMultiplier(weatherPattern, category);
+          return {
+            multiplier,
+            confidence: cachedResult.qualityMetrics.weatherDataQuality,
+            explanation: `Weather pattern: ${weatherPattern.patternName} affects ${category || 'business'}`,
+            season: weatherPattern.season
+          };
+        }
+        
+        // Find applicable agricultural cycle
+        const agriculturalCycle = this.findApplicableAgriculturalCycle(momentDate, cachedResult.agriculturalCycles, cropType);
+        
+        if (agriculturalCycle) {
+          const { phase, multiplier } = this.calculateCropPhaseMultiplier(momentDate, agriculturalCycle, category);
+          return {
+            multiplier,
+            confidence: cachedResult.qualityMetrics.agriculturalDataReliability,
+            explanation: `Agricultural cycle: ${agriculturalCycle.cycleName} - ${phase}`,
+            cropPhase: phase
+          };
+        }
+      }
+
+      // Fallback to predefined patterns
+      const weatherPattern = this.findPredefinedWeatherPattern(momentDate, targetRegion);
+      if (weatherPattern) {
+        const multiplier = this.calculateWeatherMultiplier(weatherPattern, category);
+        return {
+          multiplier,
+          confidence: 0.7,
+          explanation: `Predefined weather pattern: ${weatherPattern.patternName}`,
+          season: weatherPattern.season
+        };
+      }
+
+      // No specific pattern found
+      return { 
+        multiplier: 1.0, 
+        confidence: 0.8, 
+        explanation: 'No specific agricultural/weather seasonality detected' 
+      };
+
+    } catch (error) {
+      this.logger.warn(`Failed to get agricultural weather multiplier: ${error.message}`);
+      return { 
+        multiplier: 1.0, 
+        confidence: 0.5, 
+        explanation: 'Error in agricultural weather analysis' 
+      };
+    }
+  }
+
+  /**
+   * Get current weather season for region
+   */
+  getCurrentWeatherSeason(region: IndonesianRegion, date?: Date): { season: WeatherSeason; description: string; businessImpacts: string[] } {
+    const targetDate = moment(date || new Date()).tz(this.INDONESIAN_TIMEZONE);
+    const month = targetDate.month() + 1; // 1-12
+    
+    // Determine season based on month and region
+    let season: WeatherSeason;
+    let description: string;
+    let businessImpacts: string[];
+    
+    if (region === 'western_indonesia') {
+      if (month >= 4 && month <= 9) {
+        season = 'dry_season';
+        if (month === 7 || month === 8) {
+          season = 'peak_dry';
+          description = 'Peak dry season with minimal rainfall and high temperatures';
+          businessImpacts = ['High cooling demand', 'Tourism peak', 'Construction favorable', 'Agriculture stressed'];
+        } else {
+          description = 'Dry season with low rainfall and moderate temperatures';
+          businessImpacts = ['Moderate cooling demand', 'Good construction weather', 'Agricultural irrigation needed'];
+        }
+      } else {
+        season = 'rainy_season';
+        if (month === 12 || month === 1) {
+          season = 'peak_wet';
+          description = 'Peak rainy season with heavy rainfall and high humidity';
+          businessImpacts = ['High rain protection demand', 'Tourism low', 'Construction delays', 'Agriculture thriving'];
+        } else {
+          description = 'Rainy season with frequent rainfall and moderate temperatures';
+          businessImpacts = ['Rain protection needed', 'Indoor activities preferred', 'Transportation challenges'];
+        }
+      }
+    } else if (region === 'central_indonesia') {
+      // Central Indonesia has less predictable patterns
+      if (month >= 5 && month <= 10) {
+        season = 'dry_season';
+        description = 'Dry season with variable rainfall patterns';
+        businessImpacts = ['Moderate seasonal effects', 'Regional variations significant'];
+      } else {
+        season = 'rainy_season';
+        description = 'Wet season with irregular rainfall patterns';
+        businessImpacts = ['Unpredictable weather impacts', 'Regional adaptations needed'];
+      }
+    } else { // eastern_indonesia
+      // Eastern Indonesia has different patterns
+      if (month >= 6 && month <= 11) {
+        season = 'dry_season';
+        description = 'Dry season influenced by Australian weather patterns';
+        businessImpacts = ['Tourism season', 'Marine activities favorable'];
+      } else {
+        season = 'rainy_season';
+        description = 'Wet season with monsoon influences';
+        businessImpacts = ['Marine transportation challenges', 'Agricultural activities'];
+      }
+    }
+    
+    return { season, description, businessImpacts };
+  }
+
+  // Private helper methods continue...
+  
+  private determineRegionFromBusiness(request: AgriculturalWeatherRequest): IndonesianRegion {
+    // Logic to determine region based on business type and location
+    return 'western_indonesia'; // Default
+  }
+
+  private defineAnalysisScope(request: AgriculturalWeatherRequest): string[] {
+    const scope = [];
+    if (request.includeWeatherPatterns) scope.push('Weather Patterns');
+    if (request.includeHarvestCycles) scope.push('Harvest Cycles');
+    if (request.includeClimateVariability) scope.push('Climate Variability');
+    if (request.includeFoodPriceAnalysis) scope.push('Food Price Analysis');
+    return scope.length > 0 ? scope : ['Basic Weather Analysis'];
+  }
+
+  private async getAgriculturalWeatherData(request: AgriculturalWeatherRequest): Promise<any[]> {
+    try {
+      const startDate = request.analysisStartDate || moment().subtract(2, 'years').toDate();
+      const endDate = request.analysisEndDate || moment().toDate();
+
+      // Agricultural and weather-sensitive categories
+      const agriculturalCategories = [
+        'agriculture_tools', 'seeds', 'fertilizers', 'pesticides', 'irrigation',
+        'fresh_produce', 'grains', 'processed_foods', 'beverages',
+        'weather_protection', 'seasonal_clothing', 'cooling_products', 'heating_products',
+        'construction_materials', 'transportation', 'tourism_services'
+      ];
+
+      const queryBuilder = this.transactionRepository
+        .createQueryBuilder('transaction')
+        .leftJoinAndSelect('transaction.product', 'product')
+        .leftJoinAndSelect('product.category', 'category')
+        .where('transaction.tenantId = :tenantId', { tenantId: request.tenantId })
+        .andWhere('transaction.type = :type', { type: 'sale' })
+        .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString()
+        });
+
+      if (request.categories?.length) {
+        queryBuilder.andWhere('category.name IN (:...categories)', { categories: request.categories });
+      }
+
+      const transactions = await queryBuilder.getMany();
+
+      return transactions.map(transaction => ({
+        date: moment(transaction.transactionDate).tz(this.INDONESIAN_TIMEZONE),
+        revenue: Number(transaction.quantity) * Number(transaction.unitCost),
+        quantity: Number(transaction.quantity),
+        category: transaction.product?.category?.name || 'uncategorized',
+        productId: transaction.product?.id,
+        month: moment(transaction.transactionDate).month() + 1,
+        week: moment(transaction.transactionDate).week(),
+        season: this.determineSeason(moment(transaction.transactionDate)),
+        weatherSensitivity: this.assessWeatherSensitivity(transaction.product?.category?.name)
+      }));
+
+    } catch (error) {
+      this.logger.error(`Failed to get agricultural weather data: ${error.message}`, error.stack);
+      throw new Error(`Agricultural weather data retrieval failed: ${error.message}`);
+    }
+  }
+
+  private determineSeason(date: moment.Moment): WeatherSeason {
+    const month = date.month() + 1;
+    if (month >= 4 && month <= 9) {
+      return month === 7 || month === 8 ? 'peak_dry' : 'dry_season';
+    } else {
+      return month === 12 || month === 1 ? 'peak_wet' : 'rainy_season';
+    }
+  }
+
+  private assessWeatherSensitivity(categoryName?: string): 'very_high' | 'high' | 'medium' | 'low' | 'minimal' {
+    if (!categoryName) return 'minimal';
+    
+    const category = categoryName.toLowerCase();
+    
+    if (category.includes('agriculture') || category.includes('fresh') || category.includes('weather')) {
+      return 'very_high';
+    }
+    if (category.includes('seasonal') || category.includes('cooling') || category.includes('construction')) {
+      return 'high';
+    }
+    if (category.includes('food') || category.includes('beverage') || category.includes('tourism')) {
+      return 'medium';
+    }
+    
+    return 'low';
+  }
+
+  // Additional private methods would continue here...
+  // (Implementing the remaining methods for completeness)
+
+  private async learnWeatherPatterns(historicalData: any[], region: IndonesianRegion, request: AgriculturalWeatherRequest): Promise<WeatherPattern[]> {
+    // Filter relevant weather patterns for the region
+    return this.indonesianWeatherPatterns.filter(pattern => pattern.region === region);
+  }
+
+  private async learnAgriculturalCycles(historicalData: any[], region: IndonesianRegion, request: AgriculturalWeatherRequest): Promise<AgriculturalCycle[]> {
+    // Filter relevant agricultural cycles for the region
+    return this.indonesianAgriculturalCycles.filter(cycle => cycle.region === region);
+  }
+
+  private async analyzeFoodPricePatterns(historicalData: any[], request: AgriculturalWeatherRequest): Promise<FoodPricePattern[]> {
+    // Analyze food price patterns from transaction data
+    return []; // Simplified implementation
+  }
+
+  private async generateSeasonalInsights(weatherPatterns: WeatherPattern[], agriculturalCycles: AgriculturalCycle[], request: AgriculturalWeatherRequest): Promise<any> {
+    // Generate comprehensive seasonal insights
+    return {
+      drySeasonImpacts: {
+        seasonName: 'Dry Season',
+        timeframe: 'April - September',
+        overallImpact: 'positive',
+        categoryImpacts: {},
+        operationalConsiderations: {},
+        marketDynamics: {}
+      },
+      rainySeasonImpacts: {
+        seasonName: 'Rainy Season', 
+        timeframe: 'October - March',
+        overallImpact: 'negative',
+        categoryImpacts: {},
+        operationalConsiderations: {},
+        marketDynamics: {}
+      },
+      transitionPeriods: [],
+      extremeWeatherEvents: []
+    };
+  }
+
+  private async generateAgriculturalRecommendations(
+    weatherPatterns: WeatherPattern[],
+    agriculturalCycles: AgriculturalCycle[],
+    seasonalInsights: any,
+    request: AgriculturalWeatherRequest
+  ): Promise<any> {
+    // Generate comprehensive business recommendations
+    return {
+      inventoryManagement: [],
+      supplyChainOptimization: [],
+      pricingStrategy: [],
+      riskManagement: [],
+      marketTiming: []
+    };
+  }
+
+  private async analyzeRegionalAdaptations(region: IndonesianRegion, request: AgriculturalWeatherRequest): Promise<any> {
+    return {
+      localSuppliers: [],
+      logisticsConsiderations: [],
+      culturalFactors: [],
+      economicConditions: []
+    };
+  }
+
+  private async generateForecastingGuidance(
+    weatherPatterns: WeatherPattern[],
+    agriculturalCycles: AgriculturalCycle[],
+    foodPricePatterns: FoodPricePattern[]
+  ): Promise<any> {
+    return {
+      weatherDependentCategories: [],
+      harvestImpactTimeline: {},
+      priceVolatilityCalendar: {},
+      riskMitigationCalendar: {}
+    };
+  }
+
+  private calculateAgriculturalQualityMetrics(historicalData: any[], weatherPatterns: WeatherPattern[], agriculturalCycles: AgriculturalCycle[]): any {
+    return {
+      weatherDataQuality: 0.8,
+      agriculturalDataReliability: 0.75,
+      marketDataAccuracy: 0.82,
+      forecastReliability: 0.78
+    };
+  }
+
+  private findApplicableWeatherPattern(date: moment.Moment, patterns: WeatherPattern[], region: IndonesianRegion): WeatherPattern | null {
+    const month = date.month() + 1;
+    
+    for (const pattern of patterns) {
+      if (pattern.region !== region) continue;
+      
+      if (this.isMonthInWeatherPattern(month, pattern)) {
+        return pattern;
+      }
+    }
+    
+    return null;
+  }
+
+  private isMonthInWeatherPattern(month: number, pattern: WeatherPattern): boolean {
+    const { startMonth, endMonth } = pattern.timeframe;
+    
+    if (startMonth <= endMonth) {
+      return month >= startMonth && month <= endMonth;
+    } else {
+      // Pattern crosses year boundary
+      return month >= startMonth || month <= endMonth;
+    }
+  }
+
+  private calculateWeatherMultiplier(pattern: WeatherPattern, category?: string): number {
+    if (!category) return 1.0;
+    
+    // Find business impact for relevant category
+    const businessImpacts = Object.values(pattern.businessImpacts);
+    for (const impact of businessImpacts) {
+      if (impact.categories.increased.some(cat => category.toLowerCase().includes(cat.toLowerCase()))) {
+        return impact.demandMultiplier * 1.2;
+      }
+      if (impact.categories.decreased.some(cat => category.toLowerCase().includes(cat.toLowerCase()))) {
+        return impact.demandMultiplier * 0.8;
+      }
+    }
+    
+    return 1.0;
+  }
+
+  private findApplicableAgriculturalCycle(date: moment.Moment, cycles: AgriculturalCycle[], cropType?: AgriculturalCrop): AgriculturalCycle | null {
+    for (const cycle of cycles) {
+      if (cropType && cycle.cropType !== cropType) continue;
+      return cycle; // Simplified - would check timing
+    }
+    return null;
+  }
+
+  private calculateCropPhaseMultiplier(date: moment.Moment, cycle: AgriculturalCycle, category?: string): { phase: string; multiplier: number } {
+    // Simplified logic to determine crop phase and multiplier
+    const week = date.week();
+    
+    // Check each phase
+    for (const [phaseName, phase] of Object.entries(cycle.phases)) {
+      if (week >= phase.startWeek && week < phase.startWeek + phase.duration) {
+        return {
+          phase: phase.phaseName,
+          multiplier: phase.businessDemand.multiplier
+        };
+      }
+    }
+    
+    return { phase: 'Unknown', multiplier: 1.0 };
+  }
+
+  private findPredefinedWeatherPattern(date: moment.Moment, region: IndonesianRegion): WeatherPattern | null {
+    return this.indonesianWeatherPatterns.find(pattern => 
+      pattern.region === region && this.isMonthInWeatherPattern(date.month() + 1, pattern)
+    ) || null;
+  }
+}

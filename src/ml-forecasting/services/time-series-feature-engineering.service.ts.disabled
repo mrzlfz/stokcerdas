@@ -1,0 +1,1925 @@
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+
+import { TimeSeriesDataPoint } from './data-pipeline.service';
+import {
+  InventoryHistoryPoint,
+  ProductLifecyclePoint,
+  OrderPatternPoint,
+  ExternalDataPoint,
+} from './historical-data-extraction.service';
+import { ProcessedDataPoint } from './data-transformation.service';
+
+export interface FeatureEngineeringRequest {
+  jobId: string;
+  tenantId: string;
+  data: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: InventoryHistoryPoint[];
+    products?: ProductLifecyclePoint[];
+    orders?: OrderPatternPoint[];
+    external?: ExternalDataPoint[];
+  };
+  features: FeatureConfig[];
+  windowSizes: number[]; // e.g., [7, 14, 30, 90] for weekly, bi-weekly, monthly, quarterly
+  targetVariable: string;
+  forecastHorizon: number; // number of periods to forecast
+  includeSeasonality?: boolean;
+  includeExogenous?: boolean;
+  indonesianContext?: boolean;
+}
+
+export interface FeatureConfig {
+  name: string;
+  type: 'lag' | 'rolling_stat' | 'seasonal' | 'trend' | 'cyclical' | 'exogenous' | 'derived' | 'interaction';
+  parameters: Record<string, any>;
+  applyTo: ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+  priority: number;
+  enabled: boolean;
+  description?: string;
+}
+
+export interface EngineeringResult {
+  jobId: string;
+  status: 'completed' | 'partial' | 'failed';
+  features: {
+    timeSeries: TimeSeriesFeatureSet[];
+    metadata: FeatureMetadata;
+    correlationMatrix: Record<string, Record<string, number>>;
+    importanceScores: Record<string, number>;
+  };
+  performance: {
+    processingTime: number;
+    memoryUsage: number;
+    featuresGenerated: number;
+    featuresSelected: number;
+    dataQualityScore: number;
+  };
+  insights: {
+    seasonalPatterns: SeasonalInsight[];
+    trendAnalysis: TrendInsight[];
+    anomalies: AnomalyInsight[];
+    recommendations: string[];
+  };
+  warnings: string[];
+  errors: string[];
+}
+
+export interface TimeSeriesFeatureSet {
+  timestamp: string;
+  features: Record<string, number>;
+  target?: number;
+  metadata: {
+    confidence: number;
+    seasonalComponent: number;
+    trendComponent: number;
+    noise: number;
+    anomalyScore: number;
+  };
+}
+
+export interface FeatureMetadata {
+  totalFeatures: number;
+  featureTypes: Record<string, number>;
+  missingValueRates: Record<string, number>;
+  featureStats: Record<string, FeatureStats>;
+  selectionCriteria: string[];
+}
+
+export interface FeatureStats {
+  mean: number;
+  std: number;
+  min: number;
+  max: number;
+  skewness: number;
+  kurtosis: number;
+  nullCount: number;
+  uniqueCount: number;
+}
+
+export interface SeasonalInsight {
+  pattern: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  strength: number;
+  peaks: string[];
+  troughs: string[];
+  confidence: number;
+}
+
+export interface TrendInsight {
+  direction: 'increasing' | 'decreasing' | 'stable' | 'cyclical';
+  strength: number;
+  changePoints: string[];
+  seasonalAdjusted: boolean;
+  confidence: number;
+}
+
+export interface AnomalyInsight {
+  timestamp: string;
+  value: number;
+  expected: number;
+  deviation: number;
+  type: 'point' | 'contextual' | 'collective';
+  severity: 'low' | 'medium' | 'high';
+}
+
+@Injectable()
+export class TimeSeriesFeatureEngineeringService {
+  private readonly logger = new Logger(TimeSeriesFeatureEngineeringService.name);
+
+  constructor(
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Generate comprehensive time series features for ML forecasting
+   */
+  async generateTimeSeriesFeatures(request: FeatureEngineeringRequest): Promise<EngineeringResult> {
+    const startTime = Date.now();
+    this.logger.log(`Starting time series feature engineering: ${request.jobId}`);
+
+    try {
+      // Validate request
+      this.validateFeatureRequest(request);
+
+      // Prepare data
+      const timeSeriesData = await this.prepareTimeSeriesData(request);
+
+      // Generate features by type
+      const lagFeatures = await this.generateLagFeatures(timeSeriesData, request);
+      const rollingFeatures = await this.generateRollingStatistics(timeSeriesData, request);
+      const seasonalFeatures = await this.generateSeasonalFeatures(timeSeriesData, request);
+      const trendFeatures = await this.generateTrendFeatures(timeSeriesData, request);
+      const cyclicalFeatures = await this.generateCyclicalFeatures(timeSeriesData, request);
+      const exogenousFeatures = await this.generateExogenousFeatures(timeSeriesData, request);
+      const derivedFeatures = await this.generateDerivedFeatures(timeSeriesData, request);
+      const interactionFeatures = await this.generateInteractionFeatures(timeSeriesData, request);
+
+      // Combine all features
+      const combinedFeatures = this.combineFeatures([
+        lagFeatures,
+        rollingFeatures,
+        seasonalFeatures,
+        trendFeatures,
+        cyclicalFeatures,
+        exogenousFeatures,
+        derivedFeatures,
+        interactionFeatures,
+      ]);
+
+      // Feature selection and optimization
+      const selectedFeatures = await this.performFeatureSelection(combinedFeatures, request);
+
+      // Calculate correlations and importance
+      const correlationMatrix = this.calculateCorrelationMatrix(selectedFeatures);
+      const importanceScores = await this.calculateFeatureImportance(selectedFeatures, request);
+
+      // Generate insights
+      const seasonalInsights = await this.analyzeSeasonalPatterns(timeSeriesData, request);
+      const trendInsights = await this.analyzeTrendPatterns(timeSeriesData, request);
+      const anomalies = await this.detectAnomalies(timeSeriesData, request);
+
+      // Generate metadata
+      const metadata = this.generateFeatureMetadata(selectedFeatures);
+
+      // Calculate performance metrics
+      const performance = {
+        processingTime: Date.now() - startTime,
+        memoryUsage: process.memoryUsage().heapUsed,
+        featuresGenerated: combinedFeatures.length > 0 ? Object.keys(combinedFeatures[0].features).length : 0,
+        featuresSelected: selectedFeatures.length > 0 ? Object.keys(selectedFeatures[0].features).length : 0,
+        dataQualityScore: this.calculateDataQualityScore(timeSeriesData),
+      };
+
+      // Generate recommendations
+      const recommendations = this.generateRecommendations(
+        selectedFeatures,
+        seasonalInsights,
+        trendInsights,
+        anomalies,
+        performance,
+      );
+
+      const result: EngineeringResult = {
+        jobId: request.jobId,
+        status: 'completed',
+        features: {
+          timeSeries: selectedFeatures,
+          metadata,
+          correlationMatrix,
+          importanceScores,
+        },
+        performance,
+        insights: {
+          seasonalPatterns: seasonalInsights,
+          trendAnalysis: trendInsights,
+          anomalies,
+          recommendations,
+        },
+        warnings: [],
+        errors: [],
+      };
+
+      // Cache result
+      await this.cacheManager.set(
+        `feature_engineering_${request.jobId}`,
+        result,
+        300000, // 5 minutes
+      );
+
+      // Emit completion event
+      this.eventEmitter.emit('feature.engineering.completed', {
+        tenantId: request.tenantId,
+        jobId: request.jobId,
+        featuresCount: performance.featuresSelected,
+        processingTime: performance.processingTime,
+      });
+
+      this.logger.log(`Feature engineering completed: ${request.jobId} (${performance.featuresSelected} features in ${performance.processingTime}ms)`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Feature engineering failed: ${error.message}`, error.stack);
+
+      const failedResult: EngineeringResult = {
+        jobId: request.jobId,
+        status: 'failed',
+        features: {
+          timeSeries: [],
+          metadata: {
+            totalFeatures: 0,
+            featureTypes: {},
+            missingValueRates: {},
+            featureStats: {},
+            selectionCriteria: [],
+          },
+          correlationMatrix: {},
+          importanceScores: {},
+        },
+        performance: {
+          processingTime: Date.now() - startTime,
+          memoryUsage: 0,
+          featuresGenerated: 0,
+          featuresSelected: 0,
+          dataQualityScore: 0,
+        },
+        insights: {
+          seasonalPatterns: [],
+          trendAnalysis: [],
+          anomalies: [],
+          recommendations: [],
+        },
+        warnings: [],
+        errors: [error.message],
+      };
+
+      return failedResult;
+    }
+  }
+
+  /**
+   * Get feature engineering insights for specific time series
+   */
+  async getFeatureInsights(
+    tenantId: string,
+    timeSeriesData: TimeSeriesDataPoint[],
+    targetVariable: string,
+  ): Promise<{
+    correlations: Record<string, number>;
+    importance: Record<string, number>;
+    seasonality: SeasonalInsight[];
+    trends: TrendInsight[];
+    recommendations: string[];
+  }> {
+    this.logger.log(`Generating feature insights for tenant ${tenantId}`);
+
+    const cacheKey = `feature_insights_${tenantId}_${targetVariable}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached as any;
+    }
+
+    // Quick feature analysis
+    const lagFeatures = this.generateQuickLagFeatures(timeSeriesData, [1, 7, 30]);
+    const rollingFeatures = this.generateQuickRollingFeatures(timeSeriesData, [7, 30]);
+    
+    const correlations = this.calculateQuickCorrelations(timeSeriesData, targetVariable);
+    const importance = this.calculateQuickImportance(timeSeriesData, targetVariable);
+    const seasonality = await this.quickSeasonalAnalysis(timeSeriesData);
+    const trends = await this.quickTrendAnalysis(timeSeriesData);
+    
+    const recommendations = this.generateQuickRecommendations(
+      correlations,
+      importance,
+      seasonality,
+      trends,
+    );
+
+    const insights = {
+      correlations,
+      importance,
+      seasonality,
+      trends,
+      recommendations,
+    };
+
+    // Cache for 10 minutes
+    await this.cacheManager.set(cacheKey, insights, 600000);
+
+    return insights;
+  }
+
+  /**
+   * Validate feature engineering request
+   */
+  private validateFeatureRequest(request: FeatureEngineeringRequest): void {
+    if (!request.jobId || !request.tenantId) {
+      throw new BadRequestException('Job ID and tenant ID are required');
+    }
+
+    if (!request.data || Object.keys(request.data).length === 0) {
+      throw new BadRequestException('At least one data type is required');
+    }
+
+    if (!request.features || request.features.length === 0) {
+      throw new BadRequestException('At least one feature configuration is required');
+    }
+
+    if (!request.windowSizes || request.windowSizes.length === 0) {
+      throw new BadRequestException('Window sizes are required');
+    }
+
+    if (!request.targetVariable) {
+      throw new BadRequestException('Target variable is required');
+    }
+
+    if (request.forecastHorizon <= 0) {
+      throw new BadRequestException('Forecast horizon must be positive');
+    }
+
+    // Validate window sizes
+    for (const size of request.windowSizes) {
+      if (size <= 0 || size > 365) {
+        throw new BadRequestException('Window sizes must be between 1 and 365 days');
+      }
+    }
+
+    this.logger.debug('Feature engineering request validation passed');
+  }
+
+  /**
+   * Prepare time series data for feature engineering
+   */
+  private async prepareTimeSeriesData(request: FeatureEngineeringRequest): Promise<TimeSeriesDataPoint[]> {
+    const allData: TimeSeriesDataPoint[] = [];
+
+    // Convert different data types to unified time series format
+    if (request.data.sales) {
+      allData.push(...request.data.sales);
+    }
+
+    if (request.data.inventory) {
+      for (const point of request.data.inventory) {
+        allData.push({
+          timestamp: point.date,
+          productId: point.productId,
+          value: point.stockLevel,
+          metadata: {
+            type: 'inventory',
+            locationId: point.locationId,
+            stockValue: point.stockValue,
+            turnoverRate: point.turnoverRate,
+            ...point.metadata,
+          },
+        });
+      }
+    }
+
+    if (request.data.products) {
+      for (const point of request.data.products) {
+        allData.push({
+          timestamp: point.date,
+          productId: point.productId,
+          value: point.salesVelocity,
+          metadata: {
+            type: 'product_lifecycle',
+            stage: point.stage,
+            priceChanges: point.priceChanges,
+            seasonalityFactor: point.seasonalityFactor,
+            ...point.metadata,
+          },
+        });
+      }
+    }
+
+    if (request.data.orders) {
+      for (const point of request.data.orders) {
+        allData.push({
+          timestamp: point.date,
+          productId: 'orders_aggregate',
+          value: point.averageOrderValue,
+          metadata: {
+            type: 'orders',
+            orderCount: point.orderCount,
+            customerSegment: point.customerSegment,
+            fulfillmentTime: point.fulfillmentTime,
+            ...point.metadata,
+          },
+        });
+      }
+    }
+
+    if (request.data.external) {
+      for (const point of request.data.external) {
+        allData.push({
+          timestamp: point.date,
+          productId: `external_${point.source}`,
+          value: point.value,
+          metadata: {
+            type: 'external',
+            source: point.source,
+            dataType: point.dataType,
+            impact: point.impact,
+            ...point.metadata,
+          },
+        });
+      }
+    }
+
+    // Sort by timestamp
+    allData.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // Fill missing dates if needed
+    if (allData.length > 1) {
+      const filledData = this.fillMissingDates(allData);
+      return filledData;
+    }
+
+    return allData;
+  }
+
+  /**
+   * Generate lag features
+   */
+  private async generateLagFeatures(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const lagConfig = request.features.find(f => f.type === 'lag');
+    if (!lagConfig || !lagConfig.enabled) {
+      return [];
+    }
+
+    const lags = lagConfig.parameters.lags || [1, 7, 14, 30];
+    const features: TimeSeriesFeatureSet[] = [];
+
+    for (let i = Math.max(...lags); i < data.length; i++) {
+      const point = data[i];
+      const lagFeatures: Record<string, number> = {};
+
+      for (const lag of lags) {
+        if (i >= lag) {
+          const lagPoint = data[i - lag];
+          lagFeatures[`lag_${lag}`] = lagPoint.value;
+          lagFeatures[`lag_${lag}_diff`] = point.value - lagPoint.value;
+          lagFeatures[`lag_${lag}_pct_change`] = lagPoint.value !== 0 ? (point.value - lagPoint.value) / lagPoint.value : 0;
+        }
+      }
+
+      features.push({
+        timestamp: point.timestamp,
+        features: lagFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.9,
+          seasonalComponent: 0,
+          trendComponent: 0,
+          noise: 0.1,
+          anomalyScore: 0,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate rolling statistics features
+   */
+  private async generateRollingStatistics(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const rollingConfig = request.features.find(f => f.type === 'rolling_stat');
+    if (!rollingConfig || !rollingConfig.enabled) {
+      return [];
+    }
+
+    const windows = request.windowSizes;
+    const statistics = rollingConfig.parameters.statistics || ['mean', 'std', 'min', 'max', 'median'];
+    const features: TimeSeriesFeatureSet[] = [];
+
+    for (let i = Math.max(...windows); i < data.length; i++) {
+      const point = data[i];
+      const rollingFeatures: Record<string, number> = {};
+
+      for (const window of windows) {
+        if (i >= window) {
+          const windowData = data.slice(i - window, i).map(p => p.value);
+          
+          if (statistics.includes('mean')) {
+            rollingFeatures[`rolling_mean_${window}`] = this.calculateMean(windowData);
+          }
+          if (statistics.includes('std')) {
+            rollingFeatures[`rolling_std_${window}`] = this.calculateStd(windowData);
+          }
+          if (statistics.includes('min')) {
+            rollingFeatures[`rolling_min_${window}`] = Math.min(...windowData);
+          }
+          if (statistics.includes('max')) {
+            rollingFeatures[`rolling_max_${window}`] = Math.max(...windowData);
+          }
+          if (statistics.includes('median')) {
+            rollingFeatures[`rolling_median_${window}`] = this.calculateMedian(windowData);
+          }
+          if (statistics.includes('q25')) {
+            rollingFeatures[`rolling_q25_${window}`] = this.calculateQuantile(windowData, 0.25);
+          }
+          if (statistics.includes('q75')) {
+            rollingFeatures[`rolling_q75_${window}`] = this.calculateQuantile(windowData, 0.75);
+          }
+
+          // Additional rolling features
+          rollingFeatures[`rolling_volatility_${window}`] = this.calculateStd(windowData) / this.calculateMean(windowData);
+          rollingFeatures[`rolling_trend_${window}`] = this.calculateSimpleTrend(windowData);
+          rollingFeatures[`rolling_momentum_${window}`] = (point.value - windowData[0]) / windowData[0];
+        }
+      }
+
+      features.push({
+        timestamp: point.timestamp,
+        features: rollingFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.85,
+          seasonalComponent: 0,
+          trendComponent: 0,
+          noise: 0.15,
+          anomalyScore: 0,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate seasonal features
+   */
+  private async generateSeasonalFeatures(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const seasonalConfig = request.features.find(f => f.type === 'seasonal');
+    if (!seasonalConfig || !seasonalConfig.enabled || !request.includeSeasonality) {
+      return [];
+    }
+
+    const features: TimeSeriesFeatureSet[] = [];
+
+    for (const point of data) {
+      const date = moment.tz(point.timestamp, 'Asia/Jakarta');
+      const seasonalFeatures: Record<string, number> = {};
+
+      // Time-based features
+      seasonalFeatures['hour_of_day'] = date.hour();
+      seasonalFeatures['day_of_week'] = date.day();
+      seasonalFeatures['day_of_month'] = date.date();
+      seasonalFeatures['day_of_year'] = date.dayOfYear();
+      seasonalFeatures['week_of_year'] = date.week();
+      seasonalFeatures['month'] = date.month() + 1;
+      seasonalFeatures['quarter'] = date.quarter();
+      seasonalFeatures['year'] = date.year();
+
+      // Cyclical encoding
+      seasonalFeatures['hour_sin'] = Math.sin(2 * Math.PI * date.hour() / 24);
+      seasonalFeatures['hour_cos'] = Math.cos(2 * Math.PI * date.hour() / 24);
+      seasonalFeatures['day_of_week_sin'] = Math.sin(2 * Math.PI * date.day() / 7);
+      seasonalFeatures['day_of_week_cos'] = Math.cos(2 * Math.PI * date.day() / 7);
+      seasonalFeatures['month_sin'] = Math.sin(2 * Math.PI * (date.month() + 1) / 12);
+      seasonalFeatures['month_cos'] = Math.cos(2 * Math.PI * (date.month() + 1) / 12);
+
+      // Indonesian business context
+      if (request.indonesianContext) {
+        seasonalFeatures['is_weekend'] = date.day() === 0 || date.day() === 6 ? 1 : 0;
+        seasonalFeatures['is_ramadan'] = this.isRamadan(date) ? 1 : 0;
+        seasonalFeatures['is_lebaran'] = this.isLebaran(date) ? 1 : 0;
+        seasonalFeatures['is_national_holiday'] = this.isIndonesianHoliday(date) ? 1 : 0;
+        seasonalFeatures['is_payroll_week'] = this.isPayrollWeek(date) ? 1 : 0;
+        seasonalFeatures['is_school_holiday'] = this.isSchoolHoliday(date) ? 1 : 0;
+      }
+
+      features.push({
+        timestamp: point.timestamp,
+        features: seasonalFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.95,
+          seasonalComponent: 0.8,
+          trendComponent: 0,
+          noise: 0.05,
+          anomalyScore: 0,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate trend features
+   */
+  private async generateTrendFeatures(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const trendConfig = request.features.find(f => f.type === 'trend');
+    if (!trendConfig || !trendConfig.enabled) {
+      return [];
+    }
+
+    const features: TimeSeriesFeatureSet[] = [];
+    const trendWindows = trendConfig.parameters.windows || [30, 90, 180];
+
+    for (let i = Math.max(...trendWindows); i < data.length; i++) {
+      const point = data[i];
+      const trendFeatures: Record<string, number> = {};
+
+      for (const window of trendWindows) {
+        if (i >= window) {
+          const windowData = data.slice(i - window, i);
+          const values = windowData.map(p => p.value);
+          const timestamps = windowData.map(p => new Date(p.timestamp).getTime());
+
+          // Linear trend
+          const trend = this.calculateLinearTrend(timestamps, values);
+          trendFeatures[`trend_slope_${window}`] = trend.slope;
+          trendFeatures[`trend_intercept_${window}`] = trend.intercept;
+          trendFeatures[`trend_r2_${window}`] = trend.r2;
+
+          // Trend strength
+          trendFeatures[`trend_strength_${window}`] = Math.abs(trend.slope);
+
+          // Trend direction
+          trendFeatures[`trend_direction_${window}`] = trend.slope > 0 ? 1 : (trend.slope < 0 ? -1 : 0);
+
+          // Detrended value
+          const expectedValue = trend.slope * timestamps[timestamps.length - 1] + trend.intercept;
+          trendFeatures[`detrended_value_${window}`] = point.value - expectedValue;
+        }
+      }
+
+      features.push({
+        timestamp: point.timestamp,
+        features: trendFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.8,
+          seasonalComponent: 0,
+          trendComponent: 0.9,
+          noise: 0.1,
+          anomalyScore: 0,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate cyclical features
+   */
+  private async generateCyclicalFeatures(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const cyclicalConfig = request.features.find(f => f.type === 'cyclical');
+    if (!cyclicalConfig || !cyclicalConfig.enabled) {
+      return [];
+    }
+
+    const features: TimeSeriesFeatureSet[] = [];
+    const cycles = cyclicalConfig.parameters.cycles || [7, 30, 365]; // daily, monthly, yearly cycles
+
+    for (let i = 0; i < data.length; i++) {
+      const point = data[i];
+      const cyclicalFeatures: Record<string, number> = {};
+
+      for (const cycle of cycles) {
+        const daysSinceEpoch = Math.floor(new Date(point.timestamp).getTime() / (1000 * 60 * 60 * 24));
+        const cyclePosition = (daysSinceEpoch % cycle) / cycle;
+
+        cyclicalFeatures[`cycle_${cycle}_sin`] = Math.sin(2 * Math.PI * cyclePosition);
+        cyclicalFeatures[`cycle_${cycle}_cos`] = Math.cos(2 * Math.PI * cyclePosition);
+        cyclicalFeatures[`cycle_${cycle}_position`] = cyclePosition;
+      }
+
+      features.push({
+        timestamp: point.timestamp,
+        features: cyclicalFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.85,
+          seasonalComponent: 0.7,
+          trendComponent: 0,
+          noise: 0.15,
+          anomalyScore: 0,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate exogenous features
+   */
+  private async generateExogenousFeatures(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const exogenousConfig = request.features.find(f => f.type === 'exogenous');
+    if (!exogenousConfig || !exogenousConfig.enabled || !request.includeExogenous) {
+      return [];
+    }
+
+    const features: TimeSeriesFeatureSet[] = [];
+
+    for (const point of data) {
+      const exogenousFeatures: Record<string, number> = {};
+
+      // Extract external data features
+      if (point.metadata?.type === 'external') {
+        const source = point.metadata.source;
+        const dataType = point.metadata.dataType;
+        
+        exogenousFeatures[`ext_${source}_value`] = point.value;
+        exogenousFeatures[`ext_${dataType}_indicator`] = 1;
+        
+        if (point.metadata.impact) {
+          exogenousFeatures[`ext_${source}_impact`] = point.metadata.impact;
+        }
+      }
+
+      // Economic indicators (mock implementation)
+      if (request.indonesianContext) {
+        const date = moment.tz(point.timestamp, 'Asia/Jakarta');
+        exogenousFeatures['idr_usd_rate'] = this.getMockExchangeRate(date);
+        exogenousFeatures['inflation_rate'] = this.getMockInflationRate(date);
+        exogenousFeatures['bi_rate'] = this.getMockBIRate(date);
+        exogenousFeatures['commodity_price_index'] = this.getMockCommodityIndex(date);
+      }
+
+      features.push({
+        timestamp: point.timestamp,
+        features: exogenousFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.7,
+          seasonalComponent: 0,
+          trendComponent: 0,
+          noise: 0.3,
+          anomalyScore: 0,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate derived features
+   */
+  private async generateDerivedFeatures(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const derivedConfig = request.features.find(f => f.type === 'derived');
+    if (!derivedConfig || !derivedConfig.enabled) {
+      return [];
+    }
+
+    const features: TimeSeriesFeatureSet[] = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const point = data[i];
+      const prevPoint = data[i - 1];
+      const derivedFeatures: Record<string, number> = {};
+
+      // Basic derivatives
+      derivedFeatures['first_derivative'] = point.value - prevPoint.value;
+      derivedFeatures['pct_change'] = prevPoint.value !== 0 ? (point.value - prevPoint.value) / prevPoint.value : 0;
+      derivedFeatures['log_return'] = prevPoint.value > 0 && point.value > 0 ? 
+        Math.log(point.value / prevPoint.value) : 0;
+
+      // Acceleration (second derivative)
+      if (i >= 2) {
+        const prevPrevPoint = data[i - 2];
+        const firstDeriv1 = point.value - prevPoint.value;
+        const firstDeriv2 = prevPoint.value - prevPrevPoint.value;
+        derivedFeatures['second_derivative'] = firstDeriv1 - firstDeriv2;
+      }
+
+      // Moving average ratios
+      if (i >= 7) {
+        const ma7 = this.calculateMean(data.slice(i - 7, i).map(p => p.value));
+        derivedFeatures['value_to_ma7_ratio'] = ma7 !== 0 ? point.value / ma7 : 0;
+      }
+
+      if (i >= 30) {
+        const ma30 = this.calculateMean(data.slice(i - 30, i).map(p => p.value));
+        derivedFeatures['value_to_ma30_ratio'] = ma30 !== 0 ? point.value / ma30 : 0;
+      }
+
+      // Z-score (standardized value)
+      if (i >= 30) {
+        const window = data.slice(i - 30, i).map(p => p.value);
+        const mean = this.calculateMean(window);
+        const std = this.calculateStd(window);
+        derivedFeatures['zscore_30'] = std !== 0 ? (point.value - mean) / std : 0;
+      }
+
+      features.push({
+        timestamp: point.timestamp,
+        features: derivedFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.8,
+          seasonalComponent: 0,
+          trendComponent: 0.3,
+          noise: 0.2,
+          anomalyScore: Math.abs(derivedFeatures['zscore_30'] || 0) > 2 ? 0.8 : 0.1,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Generate interaction features
+   */
+  private async generateInteractionFeatures(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    const interactionConfig = request.features.find(f => f.type === 'interaction');
+    if (!interactionConfig || !interactionConfig.enabled) {
+      return [];
+    }
+
+    const features: TimeSeriesFeatureSet[] = [];
+
+    for (let i = 30; i < data.length; i++) {
+      const point = data[i];
+      const interactionFeatures: Record<string, number> = {};
+
+      // Get recent windows for interactions
+      const window7 = data.slice(i - 7, i).map(p => p.value);
+      const window30 = data.slice(i - 30, i).map(p => p.value);
+
+      const mean7 = this.calculateMean(window7);
+      const std7 = this.calculateStd(window7);
+      const mean30 = this.calculateMean(window30);
+      const std30 = this.calculateStd(window30);
+
+      // Interaction between trend and volatility
+      const trend7 = this.calculateSimpleTrend(window7);
+      const volatility7 = std7 / mean7;
+      interactionFeatures['trend_volatility_interaction_7'] = trend7 * volatility7;
+
+      // Interaction between current value and historical average
+      interactionFeatures['value_mean_interaction'] = point.value * mean30;
+
+      // Interaction between short and long term averages
+      interactionFeatures['ma7_ma30_interaction'] = mean7 * mean30;
+      interactionFeatures['ma7_ma30_ratio'] = mean30 !== 0 ? mean7 / mean30 : 0;
+
+      // Time-based interactions
+      const date = moment.tz(point.timestamp, 'Asia/Jakarta');
+      const dayOfWeek = date.day();
+      const month = date.month() + 1;
+
+      interactionFeatures['value_dayofweek_interaction'] = point.value * dayOfWeek;
+      interactionFeatures['value_month_interaction'] = point.value * month;
+
+      // Volatility regime interaction
+      const isHighVolatility = volatility7 > this.calculateMean(window30.map((_, idx) => {
+        if (idx >= 7) {
+          const subWindow = window30.slice(idx - 7, idx);
+          return this.calculateStd(subWindow) / this.calculateMean(subWindow);
+        }
+        return 0;
+      }));
+
+      interactionFeatures['high_volatility_regime'] = isHighVolatility ? 1 : 0;
+      interactionFeatures['value_volatility_regime_interaction'] = point.value * (isHighVolatility ? 1 : 0);
+
+      features.push({
+        timestamp: point.timestamp,
+        features: interactionFeatures,
+        target: point.value,
+        metadata: {
+          confidence: 0.75,
+          seasonalComponent: 0.2,
+          trendComponent: 0.3,
+          noise: 0.25,
+          anomalyScore: 0,
+        },
+      });
+    }
+
+    return features;
+  }
+
+  /**
+   * Combine features from different feature types
+   */
+  private combineFeatures(featureSets: TimeSeriesFeatureSet[][]): TimeSeriesFeatureSet[] {
+    if (featureSets.length === 0) return [];
+
+    // Get all unique timestamps
+    const allTimestamps = new Set<string>();
+    featureSets.forEach(set => {
+      set.forEach(point => allTimestamps.add(point.timestamp));
+    });
+
+    const combinedFeatures: TimeSeriesFeatureSet[] = [];
+
+    for (const timestamp of Array.from(allTimestamps).sort()) {
+      const combinedPoint: TimeSeriesFeatureSet = {
+        timestamp,
+        features: {},
+        metadata: {
+          confidence: 0,
+          seasonalComponent: 0,
+          trendComponent: 0,
+          noise: 0,
+          anomalyScore: 0,
+        },
+      };
+
+      let totalConfidence = 0;
+      let featureCount = 0;
+
+      // Combine features from all sets for this timestamp
+      featureSets.forEach(set => {
+        const point = set.find(p => p.timestamp === timestamp);
+        if (point) {
+          Object.assign(combinedPoint.features, point.features);
+          if (point.target !== undefined) {
+            combinedPoint.target = point.target;
+          }
+          
+          totalConfidence += point.metadata.confidence;
+          combinedPoint.metadata.seasonalComponent += point.metadata.seasonalComponent;
+          combinedPoint.metadata.trendComponent += point.metadata.trendComponent;
+          combinedPoint.metadata.noise += point.metadata.noise;
+          combinedPoint.metadata.anomalyScore = Math.max(
+            combinedPoint.metadata.anomalyScore,
+            point.metadata.anomalyScore,
+          );
+          featureCount++;
+        }
+      });
+
+      if (featureCount > 0) {
+        combinedPoint.metadata.confidence = totalConfidence / featureCount;
+        combinedPoint.metadata.seasonalComponent /= featureCount;
+        combinedPoint.metadata.trendComponent /= featureCount;
+        combinedPoint.metadata.noise /= featureCount;
+      }
+
+      combinedFeatures.push(combinedPoint);
+    }
+
+    return combinedFeatures;
+  }
+
+  /**
+   * Perform feature selection
+   */
+  private async performFeatureSelection(
+    features: TimeSeriesFeatureSet[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TimeSeriesFeatureSet[]> {
+    if (features.length === 0) return features;
+
+    this.logger.log('Performing feature selection');
+
+    // Calculate correlations with target
+    const targetCorrelations: Record<string, number> = {};
+    const featureNames = Object.keys(features[0].features);
+
+    for (const featureName of featureNames) {
+      const featureValues = features.map(f => f.features[featureName] || 0);
+      const targetValues = features.map(f => f.target || 0);
+      
+      if (featureValues.some(v => !isNaN(v)) && targetValues.some(v => !isNaN(v))) {
+        targetCorrelations[featureName] = this.calculateCorrelation(featureValues, targetValues);
+      }
+    }
+
+    // Remove features with low correlation (< 0.05)
+    const correlationThreshold = 0.05;
+    const significantFeatures = featureNames.filter(name => 
+      Math.abs(targetCorrelations[name] || 0) >= correlationThreshold
+    );
+
+    // Remove highly correlated features (multicollinearity)
+    const correlationMatrix: Record<string, Record<string, number>> = {};
+    for (const feature1 of significantFeatures) {
+      correlationMatrix[feature1] = {};
+      for (const feature2 of significantFeatures) {
+        if (feature1 !== feature2) {
+          const values1 = features.map(f => f.features[feature1] || 0);
+          const values2 = features.map(f => f.features[feature2] || 0);
+          correlationMatrix[feature1][feature2] = this.calculateCorrelation(values1, values2);
+        }
+      }
+    }
+
+    // Remove one feature from highly correlated pairs
+    const multicollinearityThreshold = 0.95;
+    const selectedFeatures = new Set(significantFeatures);
+
+    for (const feature1 of significantFeatures) {
+      for (const feature2 of significantFeatures) {
+        if (feature1 !== feature2 && 
+            selectedFeatures.has(feature1) && 
+            selectedFeatures.has(feature2) &&
+            Math.abs(correlationMatrix[feature1][feature2]) > multicollinearityThreshold) {
+          
+          // Remove the feature with lower target correlation
+          const corr1 = Math.abs(targetCorrelations[feature1] || 0);
+          const corr2 = Math.abs(targetCorrelations[feature2] || 0);
+          
+          if (corr1 < corr2) {
+            selectedFeatures.delete(feature1);
+          } else {
+            selectedFeatures.delete(feature2);
+          }
+        }
+      }
+    }
+
+    // Return features with only selected columns
+    const selectedFeatureList = Array.from(selectedFeatures);
+    const filteredFeatures = features.map(point => ({
+      ...point,
+      features: Object.fromEntries(
+        selectedFeatureList.map(name => [name, point.features[name] || 0])
+      ),
+    }));
+
+    this.logger.log(`Feature selection completed: ${selectedFeatureList.length} features selected from ${featureNames.length}`);
+    return filteredFeatures;
+  }
+
+  /**
+   * Calculate correlation matrix
+   */
+  private calculateCorrelationMatrix(features: TimeSeriesFeatureSet[]): Record<string, Record<string, number>> {
+    if (features.length === 0) return {};
+
+    const featureNames = Object.keys(features[0].features);
+    const matrix: Record<string, Record<string, number>> = {};
+
+    for (const feature1 of featureNames) {
+      matrix[feature1] = {};
+      for (const feature2 of featureNames) {
+        if (feature1 === feature2) {
+          matrix[feature1][feature2] = 1.0;
+        } else {
+          const values1 = features.map(f => f.features[feature1] || 0);
+          const values2 = features.map(f => f.features[feature2] || 0);
+          matrix[feature1][feature2] = this.calculateCorrelation(values1, values2);
+        }
+      }
+    }
+
+    return matrix;
+  }
+
+  /**
+   * Calculate feature importance scores
+   */
+  private async calculateFeatureImportance(
+    features: TimeSeriesFeatureSet[],
+    request: FeatureEngineeringRequest,
+  ): Promise<Record<string, number>> {
+    if (features.length === 0) return {};
+
+    const featureNames = Object.keys(features[0].features);
+    const importance: Record<string, number> = {};
+
+    // Simple importance based on correlation with target
+    for (const featureName of featureNames) {
+      const featureValues = features.map(f => f.features[featureName] || 0);
+      const targetValues = features.map(f => f.target || 0);
+      
+      if (featureValues.some(v => !isNaN(v)) && targetValues.some(v => !isNaN(v))) {
+        importance[featureName] = Math.abs(this.calculateCorrelation(featureValues, targetValues));
+      } else {
+        importance[featureName] = 0;
+      }
+    }
+
+    return importance;
+  }
+
+  /**
+   * Analyze seasonal patterns
+   */
+  private async analyzeSeasonalPatterns(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<SeasonalInsight[]> {
+    const insights: SeasonalInsight[] = [];
+
+    // Daily pattern
+    const hourlyPattern = this.analyzeHourlyPattern(data);
+    if (hourlyPattern.strength > 0.3) {
+      insights.push({
+        pattern: 'daily',
+        strength: hourlyPattern.strength,
+        peaks: hourlyPattern.peaks,
+        troughs: hourlyPattern.troughs,
+        confidence: 0.8,
+      });
+    }
+
+    // Weekly pattern
+    const weeklyPattern = this.analyzeWeeklyPattern(data);
+    if (weeklyPattern.strength > 0.3) {
+      insights.push({
+        pattern: 'weekly',
+        strength: weeklyPattern.strength,
+        peaks: weeklyPattern.peaks,
+        troughs: weeklyPattern.troughs,
+        confidence: 0.85,
+      });
+    }
+
+    // Monthly pattern
+    const monthlyPattern = this.analyzeMonthlyPattern(data);
+    if (monthlyPattern.strength > 0.3) {
+      insights.push({
+        pattern: 'monthly',
+        strength: monthlyPattern.strength,
+        peaks: monthlyPattern.peaks,
+        troughs: monthlyPattern.troughs,
+        confidence: 0.7,
+      });
+    }
+
+    return insights;
+  }
+
+  /**
+   * Analyze trend patterns
+   */
+  private async analyzeTrendPatterns(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<TrendInsight[]> {
+    const insights: TrendInsight[] = [];
+
+    // Overall trend
+    const values = data.map(p => p.value);
+    const timestamps = data.map(p => new Date(p.timestamp).getTime());
+    const trend = this.calculateLinearTrend(timestamps, values);
+
+    let direction: 'increasing' | 'decreasing' | 'stable' | 'cyclical' = 'stable';
+    if (Math.abs(trend.slope) > 0.01) {
+      direction = trend.slope > 0 ? 'increasing' : 'decreasing';
+    }
+
+    insights.push({
+      direction,
+      strength: Math.abs(trend.slope),
+      changePoints: this.detectChangePoints(data),
+      seasonalAdjusted: false,
+      confidence: trend.r2,
+    });
+
+    return insights;
+  }
+
+  /**
+   * Detect anomalies in time series
+   */
+  private async detectAnomalies(
+    data: TimeSeriesDataPoint[],
+    request: FeatureEngineeringRequest,
+  ): Promise<AnomalyInsight[]> {
+    const anomalies: AnomalyInsight[] = [];
+    const window = 30;
+
+    for (let i = window; i < data.length; i++) {
+      const point = data[i];
+      const historicalWindow = data.slice(i - window, i);
+      const historicalValues = historicalWindow.map(p => p.value);
+      
+      const mean = this.calculateMean(historicalValues);
+      const std = this.calculateStd(historicalValues);
+      const zscore = std > 0 ? Math.abs(point.value - mean) / std : 0;
+
+      if (zscore > 3) {
+        anomalies.push({
+          timestamp: point.timestamp,
+          value: point.value,
+          expected: mean,
+          deviation: zscore,
+          type: 'point',
+          severity: zscore > 4 ? 'high' : 'medium',
+        });
+      }
+    }
+
+    return anomalies;
+  }
+
+  /**
+   * Generate feature metadata
+   */
+  private generateFeatureMetadata(features: TimeSeriesFeatureSet[]): FeatureMetadata {
+    if (features.length === 0) {
+      return {
+        totalFeatures: 0,
+        featureTypes: {},
+        missingValueRates: {},
+        featureStats: {},
+        selectionCriteria: [],
+      };
+    }
+
+    const featureNames = Object.keys(features[0].features);
+    const featureTypes: Record<string, number> = {};
+    const missingValueRates: Record<string, number> = {};
+    const featureStats: Record<string, FeatureStats> = {};
+
+    for (const featureName of featureNames) {
+      const values = features.map(f => f.features[featureName] || 0);
+      const validValues = values.filter(v => !isNaN(v) && isFinite(v));
+      
+      // Feature type classification
+      let type = 'unknown';
+      if (featureName.includes('lag_')) type = 'lag';
+      else if (featureName.includes('rolling_')) type = 'rolling';
+      else if (featureName.includes('seasonal') || featureName.includes('sin') || featureName.includes('cos')) type = 'seasonal';
+      else if (featureName.includes('trend')) type = 'trend';
+      else if (featureName.includes('cycle')) type = 'cyclical';
+      else if (featureName.includes('ext_')) type = 'exogenous';
+      else if (featureName.includes('derivative') || featureName.includes('ratio')) type = 'derived';
+      else if (featureName.includes('interaction')) type = 'interaction';
+
+      featureTypes[type] = (featureTypes[type] || 0) + 1;
+
+      // Missing value rate
+      missingValueRates[featureName] = 1 - (validValues.length / values.length);
+
+      // Feature statistics
+      if (validValues.length > 0) {
+        featureStats[featureName] = {
+          mean: this.calculateMean(validValues),
+          std: this.calculateStd(validValues),
+          min: Math.min(...validValues),
+          max: Math.max(...validValues),
+          skewness: this.calculateSkewness(validValues),
+          kurtosis: this.calculateKurtosis(validValues),
+          nullCount: values.length - validValues.length,
+          uniqueCount: new Set(validValues).size,
+        };
+      }
+    }
+
+    return {
+      totalFeatures: featureNames.length,
+      featureTypes,
+      missingValueRates,
+      featureStats,
+      selectionCriteria: [
+        'correlation_threshold_0.05',
+        'multicollinearity_threshold_0.95',
+        'feature_importance_ranking',
+      ],
+    };
+  }
+
+  /**
+   * Generate recommendations based on analysis
+   */
+  private generateRecommendations(
+    features: TimeSeriesFeatureSet[],
+    seasonalInsights: SeasonalInsight[],
+    trendInsights: TrendInsight[],
+    anomalies: AnomalyInsight[],
+    performance: any,
+  ): string[] {
+    const recommendations: string[] = [];
+
+    // Feature engineering recommendations
+    if (features.length === 0) {
+      recommendations.push('No features generated. Check data quality and feature configurations.');
+    } else if (performance.featuresSelected < 10) {
+      recommendations.push('Consider adding more feature types or reducing selection criteria for better model performance.');
+    } else if (performance.featuresSelected > 100) {
+      recommendations.push('Large number of features detected. Consider dimensionality reduction techniques.');
+    }
+
+    // Seasonal pattern recommendations
+    const strongSeasonalPatterns = seasonalInsights.filter(s => s.strength > 0.7);
+    if (strongSeasonalPatterns.length > 0) {
+      recommendations.push(`Strong seasonal patterns detected (${strongSeasonalPatterns.map(s => s.pattern).join(', ')}). Consider using seasonal forecasting models.`);
+    }
+
+    // Trend recommendations
+    const strongTrends = trendInsights.filter(t => t.strength > 0.5);
+    if (strongTrends.length > 0) {
+      recommendations.push(`Strong trend detected. Consider detrending data or using trend-aware models.`);
+    }
+
+    // Anomaly recommendations
+    if (anomalies.length > features.length * 0.05) {
+      recommendations.push('High anomaly rate detected. Consider robust preprocessing techniques.');
+    }
+
+    // Performance recommendations
+    if (performance.processingTime > 30000) {
+      recommendations.push('Feature engineering took longer than expected. Consider optimizing feature selection.');
+    }
+
+    // Data quality recommendations
+    if (performance.dataQualityScore < 0.8) {
+      recommendations.push('Low data quality score. Consider additional data cleaning steps.');
+    }
+
+    return recommendations;
+  }
+
+  // ========== HELPER METHODS ==========
+
+  private fillMissingDates(data: TimeSeriesDataPoint[]): TimeSeriesDataPoint[] {
+    if (data.length < 2) return data;
+
+    const filled: TimeSeriesDataPoint[] = [];
+    const start = moment(data[0].timestamp);
+    const end = moment(data[data.length - 1].timestamp);
+    
+    let current = start.clone();
+    let dataIndex = 0;
+
+    while (current.isSameOrBefore(end)) {
+      const currentStr = current.format('YYYY-MM-DD');
+      
+      // Find existing data point for this date
+      while (dataIndex < data.length && 
+             moment(data[dataIndex].timestamp).format('YYYY-MM-DD') < currentStr) {
+        dataIndex++;
+      }
+
+      if (dataIndex < data.length && 
+          moment(data[dataIndex].timestamp).format('YYYY-MM-DD') === currentStr) {
+        filled.push(data[dataIndex]);
+      } else {
+        // Interpolate missing value
+        const interpolatedValue = this.interpolateValue(data, current.toDate());
+        filled.push({
+          timestamp: currentStr,
+          productId: data[0].productId,
+          value: interpolatedValue,
+          metadata: { interpolated: true },
+        });
+      }
+
+      current.add(1, 'day');
+    }
+
+    return filled;
+  }
+
+  private interpolateValue(data: TimeSeriesDataPoint[], targetDate: Date): number {
+    // Simple linear interpolation
+    const targetTime = targetDate.getTime();
+    
+    let before: TimeSeriesDataPoint | null = null;
+    let after: TimeSeriesDataPoint | null = null;
+
+    for (const point of data) {
+      const pointTime = new Date(point.timestamp).getTime();
+      
+      if (pointTime <= targetTime) {
+        before = point;
+      } else if (pointTime > targetTime && !after) {
+        after = point;
+        break;
+      }
+    }
+
+    if (before && after) {
+      const beforeTime = new Date(before.timestamp).getTime();
+      const afterTime = new Date(after.timestamp).getTime();
+      const ratio = (targetTime - beforeTime) / (afterTime - beforeTime);
+      return before.value + ratio * (after.value - before.value);
+    } else if (before) {
+      return before.value;
+    } else if (after) {
+      return after.value;
+    }
+
+    return 0;
+  }
+
+  private calculateMean(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  private calculateStd(values: number[]): number {
+    if (values.length === 0) return 0;
+    const mean = this.calculateMean(values);
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    return Math.sqrt(variance);
+  }
+
+  private calculateMedian(values: number[]): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  }
+
+  private calculateQuantile(values: number[], quantile: number): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.floor(quantile * (sorted.length - 1));
+    return sorted[index];
+  }
+
+  private calculateSimpleTrend(values: number[]): number {
+    if (values.length < 2) return 0;
+    const first = values[0];
+    const last = values[values.length - 1];
+    return first !== 0 ? (last - first) / first : 0;
+  }
+
+  private calculateLinearTrend(timestamps: number[], values: number[]): { slope: number; intercept: number; r2: number } {
+    if (timestamps.length !== values.length || timestamps.length < 2) {
+      return { slope: 0, intercept: 0, r2: 0 };
+    }
+
+    const n = timestamps.length;
+    const sumX = timestamps.reduce((sum, t) => sum + t, 0);
+    const sumY = values.reduce((sum, v) => sum + v, 0);
+    const sumXY = timestamps.reduce((sum, t, i) => sum + t * values[i], 0);
+    const sumXX = timestamps.reduce((sum, t) => sum + t * t, 0);
+    const sumYY = values.reduce((sum, v) => sum + v * v, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // Calculate R²
+    const yMean = sumY / n;
+    const ssRes = values.reduce((sum, y, i) => {
+      const predicted = slope * timestamps[i] + intercept;
+      return sum + Math.pow(y - predicted, 2);
+    }, 0);
+    const ssTot = values.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0);
+    const r2 = ssTot !== 0 ? 1 - (ssRes / ssTot) : 0;
+
+    return { slope, intercept, r2 };
+  }
+
+  private calculateCorrelation(x: number[], y: number[]): number {
+    if (x.length !== y.length || x.length === 0) return 0;
+
+    const n = x.length;
+    const sumX = x.reduce((sum, val) => sum + val, 0);
+    const sumY = y.reduce((sum, val) => sum + val, 0);
+    const sumXY = x.reduce((sum, val, i) => sum + val * y[i], 0);
+    const sumXX = x.reduce((sum, val) => sum + val * val, 0);
+    const sumYY = y.reduce((sum, val) => sum + val * val, 0);
+
+    const numerator = n * sumXY - sumX * sumY;
+    const denominator = Math.sqrt((n * sumXX - sumX * sumX) * (n * sumYY - sumY * sumY));
+
+    return denominator !== 0 ? numerator / denominator : 0;
+  }
+
+  private calculateSkewness(values: number[]): number {
+    const n = values.length;
+    if (n < 3) return 0;
+
+    const mean = this.calculateMean(values);
+    const std = this.calculateStd(values);
+    
+    if (std === 0) return 0;
+
+    const sumCubed = values.reduce((sum, val) => sum + Math.pow((val - mean) / std, 3), 0);
+    return (n / ((n - 1) * (n - 2))) * sumCubed;
+  }
+
+  private calculateKurtosis(values: number[]): number {
+    const n = values.length;
+    if (n < 4) return 0;
+
+    const mean = this.calculateMean(values);
+    const std = this.calculateStd(values);
+    
+    if (std === 0) return 0;
+
+    const sumFourth = values.reduce((sum, val) => sum + Math.pow((val - mean) / std, 4), 0);
+    return ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * sumFourth - 
+           (3 * (n - 1) * (n - 1)) / ((n - 2) * (n - 3));
+  }
+
+  private calculateDataQualityScore(data: TimeSeriesDataPoint[]): number {
+    if (data.length === 0) return 0;
+
+    let score = 1.0;
+
+    // Check for missing values
+    const missingValues = data.filter(p => p.value == null || isNaN(p.value)).length;
+    score -= (missingValues / data.length) * 0.3;
+
+    // Check for outliers
+    const values = data.map(p => p.value).filter(v => v != null && !isNaN(v));
+    if (values.length > 0) {
+      const mean = this.calculateMean(values);
+      const std = this.calculateStd(values);
+      const outliers = values.filter(v => Math.abs(v - mean) > 3 * std).length;
+      score -= (outliers / values.length) * 0.2;
+    }
+
+    // Check temporal consistency
+    const timestamps = data.map(p => new Date(p.timestamp).getTime()).sort();
+    let gaps = 0;
+    for (let i = 1; i < timestamps.length; i++) {
+      const diffDays = (timestamps[i] - timestamps[i-1]) / (1000 * 60 * 60 * 24);
+      if (diffDays > 2) gaps++; // Gap larger than 2 days
+    }
+    score -= (gaps / data.length) * 0.1;
+
+    return Math.max(0, Math.min(1, score));
+  }
+
+  // ========== INDONESIAN CONTEXT HELPERS ==========
+
+  private isRamadan(date: moment.Moment): boolean {
+    // Simplified Ramadan detection (would need proper Islamic calendar)
+    const year = date.year();
+    const ramadanStart = moment.tz(`${year}-04-13`, 'Asia/Jakarta'); // Approximate
+    const ramadanEnd = ramadanStart.clone().add(30, 'days');
+    return date.isBetween(ramadanStart, ramadanEnd, 'day', '[]');
+  }
+
+  private isLebaran(date: moment.Moment): boolean {
+    // Simplified Lebaran detection
+    const year = date.year();
+    const lebaran = moment.tz(`${year}-05-13`, 'Asia/Jakarta'); // Approximate
+    return date.isSame(lebaran, 'day') || date.isSame(lebaran.clone().add(1, 'day'), 'day');
+  }
+
+  private isIndonesianHoliday(date: moment.Moment): boolean {
+    const month = date.month() + 1;
+    const day = date.date();
+    
+    // Major Indonesian holidays
+    const holidays = [
+      { month: 1, day: 1 },   // New Year
+      { month: 8, day: 17 },  // Independence Day
+      { month: 12, day: 25 }, // Christmas
+    ];
+
+    return holidays.some(h => h.month === month && h.day === day) || 
+           this.isRamadan(date) || this.isLebaran(date);
+  }
+
+  private isPayrollWeek(date: moment.Moment): boolean {
+    // Many Indonesian companies pay at end of month
+    const endOfMonth = date.clone().endOf('month');
+    const daysDiff = endOfMonth.diff(date, 'days');
+    return daysDiff <= 3; // Last 3 days of month
+  }
+
+  private isSchoolHoliday(date: moment.Moment): boolean {
+    const month = date.month() + 1;
+    // Simplified school holiday periods
+    return (month >= 6 && month <= 7) || // Mid-year break
+           (month >= 12) || (month === 1); // Year-end break
+  }
+
+  // ========== MOCK ECONOMIC DATA ==========
+
+  private getMockExchangeRate(date: moment.Moment): number {
+    // Mock IDR/USD rate with some volatility
+    const base = 15000;
+    const volatility = Math.sin(date.dayOfYear() / 365 * 2 * Math.PI) * 500;
+    return base + volatility + (Math.random() - 0.5) * 200;
+  }
+
+  private getMockInflationRate(date: moment.Moment): number {
+    // Mock inflation rate
+    return 3.5 + Math.sin(date.month() / 12 * 2 * Math.PI) * 1.5;
+  }
+
+  private getMockBIRate(date: moment.Moment): number {
+    // Mock Bank Indonesia rate
+    return 5.75 + Math.sin(date.quarter() / 4 * 2 * Math.PI) * 0.75;
+  }
+
+  private getMockCommodityIndex(date: moment.Moment): number {
+    // Mock commodity price index
+    return 100 + Math.sin(date.dayOfYear() / 365 * 2 * Math.PI) * 20;
+  }
+
+  // ========== QUICK ANALYSIS METHODS ==========
+
+  private generateQuickLagFeatures(data: TimeSeriesDataPoint[], lags: number[]): Record<string, number[]> {
+    const features: Record<string, number[]> = {};
+    
+    for (const lag of lags) {
+      features[`lag_${lag}`] = [];
+      for (let i = lag; i < data.length; i++) {
+        features[`lag_${lag}`].push(data[i - lag].value);
+      }
+    }
+
+    return features;
+  }
+
+  private generateQuickRollingFeatures(data: TimeSeriesDataPoint[], windows: number[]): Record<string, number[]> {
+    const features: Record<string, number[]> = {};
+    
+    for (const window of windows) {
+      features[`rolling_mean_${window}`] = [];
+      features[`rolling_std_${window}`] = [];
+      
+      for (let i = window; i < data.length; i++) {
+        const windowData = data.slice(i - window, i).map(p => p.value);
+        features[`rolling_mean_${window}`].push(this.calculateMean(windowData));
+        features[`rolling_std_${window}`].push(this.calculateStd(windowData));
+      }
+    }
+
+    return features;
+  }
+
+  private calculateQuickCorrelations(data: TimeSeriesDataPoint[], target: string): Record<string, number> {
+    const targetValues = data.map(p => p.value);
+    const lagFeatures = this.generateQuickLagFeatures(data, [1, 7, 30]);
+    const rollingFeatures = this.generateQuickRollingFeatures(data, [7, 30]);
+    
+    const correlations: Record<string, number> = {};
+    
+    // Calculate correlations for lag features
+    for (const [featureName, featureValues] of Object.entries(lagFeatures)) {
+      if (featureValues.length === targetValues.length) {
+        correlations[featureName] = this.calculateCorrelation(featureValues, targetValues.slice(-featureValues.length));
+      }
+    }
+    
+    // Calculate correlations for rolling features
+    for (const [featureName, featureValues] of Object.entries(rollingFeatures)) {
+      if (featureValues.length > 0) {
+        correlations[featureName] = this.calculateCorrelation(featureValues, targetValues.slice(-featureValues.length));
+      }
+    }
+
+    return correlations;
+  }
+
+  private calculateQuickImportance(data: TimeSeriesDataPoint[], target: string): Record<string, number> {
+    // For quick analysis, importance is just absolute correlation
+    const correlations = this.calculateQuickCorrelations(data, target);
+    const importance: Record<string, number> = {};
+    
+    for (const [feature, correlation] of Object.entries(correlations)) {
+      importance[feature] = Math.abs(correlation);
+    }
+
+    return importance;
+  }
+
+  private async quickSeasonalAnalysis(data: TimeSeriesDataPoint[]): Promise<SeasonalInsight[]> {
+    const insights: SeasonalInsight[] = [];
+    
+    // Quick weekly pattern analysis
+    const weeklyValues: Record<number, number[]> = {};
+    for (const point of data) {
+      const dayOfWeek = moment(point.timestamp).day();
+      if (!weeklyValues[dayOfWeek]) weeklyValues[dayOfWeek] = [];
+      weeklyValues[dayOfWeek].push(point.value);
+    }
+
+    const weeklyAvgs = Object.entries(weeklyValues).map(([day, values]) => ({
+      day: parseInt(day),
+      avg: this.calculateMean(values),
+    }));
+
+    const weeklyVariance = this.calculateStd(weeklyAvgs.map(w => w.avg));
+    const weeklyMean = this.calculateMean(weeklyAvgs.map(w => w.avg));
+    const weeklyStrength = weeklyMean > 0 ? weeklyVariance / weeklyMean : 0;
+
+    if (weeklyStrength > 0.1) {
+      const sortedDays = weeklyAvgs.sort((a, b) => b.avg - a.avg);
+      insights.push({
+        pattern: 'weekly',
+        strength: Math.min(weeklyStrength, 1),
+        peaks: [this.getDayName(sortedDays[0].day)],
+        troughs: [this.getDayName(sortedDays[sortedDays.length - 1].day)],
+        confidence: 0.7,
+      });
+    }
+
+    return insights;
+  }
+
+  private async quickTrendAnalysis(data: TimeSeriesDataPoint[]): Promise<TrendInsight[]> {
+    const insights: TrendInsight[] = [];
+    
+    if (data.length < 2) return insights;
+
+    const values = data.map(p => p.value);
+    const timestamps = data.map(p => new Date(p.timestamp).getTime());
+    const trend = this.calculateLinearTrend(timestamps, values);
+
+    let direction: 'increasing' | 'decreasing' | 'stable' | 'cyclical' = 'stable';
+    if (Math.abs(trend.slope) > 0.001) {
+      direction = trend.slope > 0 ? 'increasing' : 'decreasing';
+    }
+
+    insights.push({
+      direction,
+      strength: Math.abs(trend.slope),
+      changePoints: [], // Quick analysis doesn't detect change points
+      seasonalAdjusted: false,
+      confidence: trend.r2,
+    });
+
+    return insights;
+  }
+
+  private generateQuickRecommendations(
+    correlations: Record<string, number>,
+    importance: Record<string, number>,
+    seasonality: SeasonalInsight[],
+    trends: TrendInsight[],
+  ): string[] {
+    const recommendations: string[] = [];
+
+    // Feature recommendations
+    const strongFeatures = Object.entries(importance)
+      .filter(([_, imp]) => imp > 0.3)
+      .map(([feature, _]) => feature);
+
+    if (strongFeatures.length === 0) {
+      recommendations.push('No strongly predictive features found. Consider generating more feature types.');
+    } else {
+      recommendations.push(`Strong predictive features found: ${strongFeatures.slice(0, 3).join(', ')}`);
+    }
+
+    // Seasonality recommendations
+    if (seasonality.length > 0) {
+      recommendations.push(`Seasonal patterns detected. Consider using models that handle seasonality.`);
+    }
+
+    // Trend recommendations
+    const strongTrends = trends.filter(t => t.strength > 0.1);
+    if (strongTrends.length > 0) {
+      recommendations.push(`Trend detected. Consider detrending or using trend-aware models.`);
+    }
+
+    return recommendations;
+  }
+
+  private getDayName(dayIndex: number): string {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[dayIndex] || 'Unknown';
+  }
+
+  private analyzeHourlyPattern(data: TimeSeriesDataPoint[]): { strength: number; peaks: string[]; troughs: string[] } {
+    // Group by hour and calculate averages
+    const hourlyValues: Record<number, number[]> = {};
+    for (const point of data) {
+      const hour = moment(point.timestamp).hour();
+      if (!hourlyValues[hour]) hourlyValues[hour] = [];
+      hourlyValues[hour].push(point.value);
+    }
+
+    const hourlyAvgs = Object.entries(hourlyValues).map(([hour, values]) => ({
+      hour: parseInt(hour),
+      avg: this.calculateMean(values),
+    }));
+
+    const values = hourlyAvgs.map(h => h.avg);
+    const variance = this.calculateStd(values);
+    const mean = this.calculateMean(values);
+    const strength = mean > 0 ? variance / mean : 0;
+
+    const sorted = hourlyAvgs.sort((a, b) => b.avg - a.avg);
+    const peaks = [`${sorted[0].hour}:00`];
+    const troughs = [`${sorted[sorted.length - 1].hour}:00`];
+
+    return { strength, peaks, troughs };
+  }
+
+  private analyzeWeeklyPattern(data: TimeSeriesDataPoint[]): { strength: number; peaks: string[]; troughs: string[] } {
+    const weeklyValues: Record<number, number[]> = {};
+    for (const point of data) {
+      const dayOfWeek = moment(point.timestamp).day();
+      if (!weeklyValues[dayOfWeek]) weeklyValues[dayOfWeek] = [];
+      weeklyValues[dayOfWeek].push(point.value);
+    }
+
+    const weeklyAvgs = Object.entries(weeklyValues).map(([day, values]) => ({
+      day: parseInt(day),
+      avg: this.calculateMean(values),
+    }));
+
+    const values = weeklyAvgs.map(w => w.avg);
+    const variance = this.calculateStd(values);
+    const mean = this.calculateMean(values);
+    const strength = mean > 0 ? variance / mean : 0;
+
+    const sorted = weeklyAvgs.sort((a, b) => b.avg - a.avg);
+    const peaks = [this.getDayName(sorted[0].day)];
+    const troughs = [this.getDayName(sorted[sorted.length - 1].day)];
+
+    return { strength, peaks, troughs };
+  }
+
+  private analyzeMonthlyPattern(data: TimeSeriesDataPoint[]): { strength: number; peaks: string[]; troughs: string[] } {
+    const monthlyValues: Record<number, number[]> = {};
+    for (const point of data) {
+      const month = moment(point.timestamp).month() + 1;
+      if (!monthlyValues[month]) monthlyValues[month] = [];
+      monthlyValues[month].push(point.value);
+    }
+
+    const monthlyAvgs = Object.entries(monthlyValues).map(([month, values]) => ({
+      month: parseInt(month),
+      avg: this.calculateMean(values),
+    }));
+
+    const values = monthlyAvgs.map(m => m.avg);
+    const variance = this.calculateStd(values);
+    const mean = this.calculateMean(values);
+    const strength = mean > 0 ? variance / mean : 0;
+
+    const sorted = monthlyAvgs.sort((a, b) => b.avg - a.avg);
+    const peaks = [this.getMonthName(sorted[0].month)];
+    const troughs = [this.getMonthName(sorted[sorted.length - 1].month)];
+
+    return { strength, peaks, troughs };
+  }
+
+  private getMonthName(monthIndex: number): string {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[monthIndex - 1] || 'Unknown';
+  }
+
+  private detectChangePoints(data: TimeSeriesDataPoint[]): string[] {
+    // Simple change point detection using sliding window variance
+    const changePoints: string[] = [];
+    const windowSize = 30;
+    const threshold = 2.0; // variance ratio threshold
+
+    for (let i = windowSize; i < data.length - windowSize; i++) {
+      const beforeWindow = data.slice(i - windowSize, i).map(p => p.value);
+      const afterWindow = data.slice(i, i + windowSize).map(p => p.value);
+      
+      const beforeVariance = this.calculateStd(beforeWindow);
+      const afterVariance = this.calculateStd(afterWindow);
+      
+      if (beforeVariance > 0 && afterVariance > 0) {
+        const ratio = Math.max(beforeVariance, afterVariance) / Math.min(beforeVariance, afterVariance);
+        if (ratio > threshold) {
+          changePoints.push(data[i].timestamp);
+        }
+      }
+    }
+
+    return changePoints;
+  }
+}

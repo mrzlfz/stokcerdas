@@ -1,0 +1,1617 @@
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between, LessThan, MoreThan, In } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import * as moment from 'moment-timezone';
+
+import { CompetitiveProduct, MarketplaceType, CompetitiveProductStatus, DataQuality } from '../entities/competitive-product.entity';
+import { CompetitivePriceHistory, PriceEventType, PriceChangeReason } from '../entities/competitive-price-history.entity';
+import { CompetitiveAnalysis, AnalysisType, RiskLevel } from '../entities/competitive-analysis.entity';
+import { MarketplaceDataCollectionService } from './marketplace-data-collection.service';
+
+export interface PriceMonitoringRequest {
+  tenantId: string;
+  monitoringConfig: {
+    products?: string[]; // Product IDs to monitor
+    marketplaces?: MarketplaceType[];
+    categories?: string[];
+    brands?: string[];
+    priceRanges?: Array<{ min: number; max: number }>;
+    monitoringFrequency: 'realtime' | 'hourly' | 'daily' | 'weekly';
+    alertThresholds: {
+      priceChangePercent: number; // Alert when price change exceeds this %
+      significantDrop: number; // Alert when price drops by this % or more
+      significantIncrease: number; // Alert when price increases by this % or more
+      stockoutAlert: boolean; // Alert when product goes out of stock
+      newCompetitorAlert: boolean; // Alert when new competitor appears
+    };
+    analysisDepth: 'basic' | 'standard' | 'comprehensive';
+    includeIndonesianContext: boolean;
+  };
+  filterCriteria?: {
+    minDataQuality: DataQuality;
+    excludeInactiveProducts: boolean;
+    onlyDirectCompetitors: boolean;
+    regionFilter?: string[];
+  };
+}
+
+export interface PriceMonitoringResult {
+  monitoringId: string;
+  tenantId: string;
+  monitoringPeriod: {
+    startTime: string;
+    endTime: string;
+    duration: number; // in minutes
+  };
+  monitoredProducts: {
+    totalCount: number;
+    successfullyMonitored: number;
+    failed: number;
+    newProducts: number;
+    updatedProducts: number;
+  };
+  priceChanges: PriceChangeEvent[];
+  anomalies: PriceAnomaly[];
+  trends: PriceTrend[];
+  alerts: PriceAlert[];
+  competitiveInsights: CompetitivePriceInsight[];
+  indonesianMarketContext?: IndonesianPriceContext;
+  recommendations: PriceRecommendation[];
+  metadata: {
+    dataFreshness: number; // 0-1 score
+    confidenceLevel: number; // 0-1 score
+    coverageRate: number; // 0-1 score
+    nextMonitoringTime: string;
+  };
+}
+
+export interface PriceChangeEvent {
+  productId: string;
+  productName: string;
+  marketplace: MarketplaceType;
+  changeType: 'increase' | 'decrease' | 'stable';
+  oldPrice: number;
+  newPrice: number;
+  priceChange: number;
+  priceChangePercent: number;
+  eventType: PriceEventType;
+  reason: PriceChangeReason;
+  timestamp: string;
+  significance: 'minor' | 'moderate' | 'major' | 'critical';
+  context: {
+    marketPosition: number;
+    competitorCount: number;
+    averageMarketPrice: number;
+    isPromotion: boolean;
+    stockChange: boolean;
+    seasonalFactor?: number;
+  };
+  impact: {
+    competitiveAdvantage: 'gained' | 'lost' | 'maintained';
+    marketShareRisk: 'low' | 'medium' | 'high';
+    actionRequired: boolean;
+    urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
+  };
+}
+
+export interface PriceAnomaly {
+  type: 'sudden_drop' | 'sudden_increase' | 'unusual_pattern' | 'market_disruption' | 'data_inconsistency';
+  productId: string;
+  productName: string;
+  marketplace: MarketplaceType;
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number; // 0-1
+  detectedAt: string;
+  anomalyScore: number; // 0-100
+  potentialCauses: string[];
+  suggestedActions: string[];
+  historicalContext: {
+    typicalPriceRange: { min: number; max: number };
+    averageVolatility: number;
+    seasonalPattern: boolean;
+    previousAnomalies: number;
+  };
+  businessImpact: {
+    revenueRisk: number; // estimated impact in IDR
+    competitorAdvantage: boolean;
+    customerReaction: 'positive' | 'neutral' | 'negative';
+    marketPositionRisk: 'low' | 'medium' | 'high';
+  };
+}
+
+export interface PriceTrend {
+  productId: string;
+  productName: string;
+  marketplace: MarketplaceType;
+  trendDirection: 'upward' | 'downward' | 'stable' | 'volatile';
+  trendStrength: number; // 0-1
+  duration: number; // in days
+  priceMovement: {
+    startPrice: number;
+    currentPrice: number;
+    peakPrice: number;
+    lowestPrice: number;
+    totalChange: number;
+    totalChangePercent: number;
+  };
+  trendAnalysis: {
+    momentum: 'accelerating' | 'decelerating' | 'steady';
+    volatility: number; // 0-1
+    predictability: number; // 0-1
+    seasonalInfluence: number; // 0-1
+  };
+  forecastedMovement: {
+    nextWeekDirection: 'up' | 'down' | 'stable';
+    confidence: number; // 0-1
+    expectedPriceRange: { min: number; max: number };
+    keyFactors: string[];
+  };
+  competitiveContext: {
+    marketTrendAlignment: boolean;
+    competitorInfluence: number; // 0-1
+    marketLeadership: 'leader' | 'follower' | 'independent';
+    strategicPosition: 'offensive' | 'defensive' | 'neutral';
+  };
+}
+
+export interface PriceAlert {
+  alertId: string;
+  type: 'price_drop' | 'price_increase' | 'new_competitor' | 'stock_out' | 'market_shift' | 'anomaly_detected';
+  severity: 'info' | 'warning' | 'critical' | 'urgent';
+  productId: string;
+  productName: string;
+  marketplace: MarketplaceType;
+  title: string;
+  message: string;
+  triggeredAt: string;
+  data: Record<string, any>;
+  actionItems: Array<{
+    action: string;
+    priority: 'low' | 'medium' | 'high';
+    timeline: string;
+    estimatedImpact: string;
+  }>;
+  affectedMetrics: string[];
+  automaticResponse?: {
+    action: string;
+    status: 'pending' | 'executed' | 'failed';
+    result?: string;
+  };
+}
+
+export interface CompetitivePriceInsight {
+  category: string;
+  insights: Array<{
+    type: 'opportunity' | 'threat' | 'trend' | 'benchmark';
+    title: string;
+    description: string;
+    relevance: number; // 0-1
+    actionable: boolean;
+    metrics: Record<string, number>;
+    recommendations: string[];
+  }>;
+  marketPosition: {
+    priceRanking: number;
+    pricePercentile: number;
+    competitiveGap: number;
+    marketShareEstimate: number;
+  };
+  pricingStrategy: {
+    current: 'premium' | 'competitive' | 'value' | 'economy';
+    recommended: 'premium' | 'competitive' | 'value' | 'economy';
+    confidence: number;
+    reasoning: string[];
+  };
+  competitorAnalysis: Array<{
+    competitorName: string;
+    marketplace: MarketplaceType;
+    priceComparison: number; // % difference
+    strengthsWeaknesses: {
+      strengths: string[];
+      weaknesses: string[];
+    };
+    threatLevel: 'low' | 'medium' | 'high';
+  }>;
+}
+
+export interface IndonesianPriceContext {
+  regionalVariations: Record<string, {
+    averagePrice: number;
+    priceRange: { min: number; max: number };
+    competitiveIntensity: number;
+    marketMaturity: 'emerging' | 'growing' | 'mature';
+  }>;
+  culturalFactors: {
+    ramadanEffect: {
+      isRamadanPeriod: boolean;
+      priceInflation: number;
+      demandIncrease: number;
+      competitiveStrategy: string;
+    };
+    nationalHolidays: Array<{
+      holiday: string;
+      date: string;
+      priceImpact: number;
+      demandPattern: string;
+    }>;
+    paymentPreferences: Record<string, {
+      usage: number; // percentage
+      priceInfluence: number;
+    }>;
+  };
+  economicIndicators: {
+    inflationRate: number;
+    currencyStability: number;
+    purchasingPower: number;
+    ecommerceGrowth: number;
+  };
+  marketDynamics: {
+    onlineVsOfflinePrice: number; // % difference
+    urbanVsRuralPrice: number; // % difference
+    brandLoyalty: number; // 0-1
+    priceSensitivity: number; // 0-1
+  };
+}
+
+export interface PriceRecommendation {
+  productId: string;
+  productName: string;
+  recommendationType: 'pricing' | 'positioning' | 'promotion' | 'monitoring' | 'strategic';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  title: string;
+  description: string;
+  specificAction: string;
+  expectedImpact: {
+    revenue: number; // estimated change in IDR
+    marketShare: number; // estimated change in %
+    competitivePosition: string;
+    riskLevel: 'low' | 'medium' | 'high';
+  };
+  implementation: {
+    timeline: string;
+    resources: string[];
+    cost: number; // in IDR
+    complexity: 'low' | 'medium' | 'high';
+  };
+  successMetrics: Array<{
+    metric: string;
+    currentValue: number;
+    targetValue: number;
+    timeframe: string;
+  }>;
+  alternatives: Array<{
+    action: string;
+    tradeoffs: string[];
+    expectedImpact: number; // 0-1
+  }>;
+}
+
+@Injectable()
+export class PriceMonitoringService {
+  private readonly logger = new Logger(PriceMonitoringService.name);
+
+  constructor(
+    @InjectRepository(CompetitiveProduct)
+    private competitiveProductRepository: Repository<CompetitiveProduct>,
+    
+    @InjectRepository(CompetitivePriceHistory)
+    private priceHistoryRepository: Repository<CompetitivePriceHistory>,
+    
+    @InjectRepository(CompetitiveAnalysis)
+    private competitiveAnalysisRepository: Repository<CompetitiveAnalysis>,
+    
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
+    
+    private eventEmitter: EventEmitter2,
+    private marketplaceDataCollectionService: MarketplaceDataCollectionService,
+  ) {}
+
+  async monitorPrices(request: PriceMonitoringRequest): Promise<PriceMonitoringResult> {
+    const monitoringId = `monitoring_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = new Date();
+    
+    this.logger.log(`Starting price monitoring: ${monitoringId} for tenant: ${request.tenantId}`);
+
+    try {
+      const result: PriceMonitoringResult = {
+        monitoringId,
+        tenantId: request.tenantId,
+        monitoringPeriod: {
+          startTime: startTime.toISOString(),
+          endTime: '',
+          duration: 0,
+        },
+        monitoredProducts: {
+          totalCount: 0,
+          successfullyMonitored: 0,
+          failed: 0,
+          newProducts: 0,
+          updatedProducts: 0,
+        },
+        priceChanges: [],
+        anomalies: [],
+        trends: [],
+        alerts: [],
+        competitiveInsights: [],
+        recommendations: [],
+        metadata: {
+          dataFreshness: 0,
+          confidenceLevel: 0,
+          coverageRate: 0,
+          nextMonitoringTime: '',
+        },
+      };
+
+      // Get products to monitor
+      const productsToMonitor = await this.getProductsToMonitor(request);
+      result.monitoredProducts.totalCount = productsToMonitor.length;
+
+      this.logger.log(`Found ${productsToMonitor.length} products to monitor`);
+
+      // Monitor each product for price changes
+      for (const product of productsToMonitor) {
+        try {
+          const priceUpdate = await this.monitorProductPrice(product, request);
+          
+          if (priceUpdate) {
+            result.priceChanges.push(priceUpdate);
+            result.monitoredProducts.updatedProducts++;
+
+            // Generate alerts if significant changes detected
+            const alerts = this.generatePriceAlerts(priceUpdate, request.monitoringConfig.alertThresholds);
+            result.alerts.push(...alerts);
+          }
+          
+          result.monitoredProducts.successfullyMonitored++;
+        } catch (error) {
+          this.logger.error(`Failed to monitor product ${product.id}: ${error.message}`);
+          result.monitoredProducts.failed++;
+        }
+      }
+
+      // Analyze price anomalies
+      result.anomalies = await this.detectPriceAnomalies(
+        request.tenantId,
+        result.priceChanges,
+        request.monitoringConfig.analysisDepth,
+      );
+
+      // Analyze price trends
+      result.trends = await this.analyzePriceTrends(
+        request.tenantId,
+        productsToMonitor,
+        request.monitoringConfig.analysisDepth,
+      );
+
+      // Generate competitive insights
+      result.competitiveInsights = await this.generateCompetitiveInsights(
+        request.tenantId,
+        result.priceChanges,
+        request.monitoringConfig.analysisDepth,
+      );
+
+      // Generate Indonesian market context if requested
+      if (request.monitoringConfig.includeIndonesianContext) {
+        result.indonesianMarketContext = await this.generateIndonesianContext(
+          request.tenantId,
+          result.priceChanges,
+        );
+      }
+
+      // Generate recommendations
+      result.recommendations = await this.generatePriceRecommendations(
+        request.tenantId,
+        result.priceChanges,
+        result.anomalies,
+        result.trends,
+        request.monitoringConfig.analysisDepth,
+      );
+
+      // Calculate metadata
+      const endTime = new Date();
+      result.monitoringPeriod.endTime = endTime.toISOString();
+      result.monitoringPeriod.duration = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+      result.metadata = this.calculateMonitoringMetadata(result, request.monitoringConfig.monitoringFrequency);
+
+      // Store monitoring results
+      await this.storeMonitoringResults(request.tenantId, result);
+      
+      // Emit monitoring completed event
+      this.eventEmitter.emit('price.monitoring.completed', {
+        tenantId: request.tenantId,
+        monitoringId,
+        priceChanges: result.priceChanges.length,
+        alertsGenerated: result.alerts.length,
+        anomaliesDetected: result.anomalies.length,
+      });
+
+      this.logger.log(`Price monitoring completed: ${monitoringId}, ${result.priceChanges.length} changes detected`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Price monitoring failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  private async getProductsToMonitor(request: PriceMonitoringRequest): Promise<CompetitiveProduct[]> {
+    const whereConditions: any = { tenantId: request.tenantId };
+
+    // Apply filters
+    if (request.monitoringConfig.products?.length) {
+      whereConditions.id = In(request.monitoringConfig.products);
+    }
+
+    if (request.monitoringConfig.marketplaces?.length) {
+      whereConditions.marketplace = In(request.monitoringConfig.marketplaces);
+    }
+
+    if (request.monitoringConfig.categories?.length) {
+      whereConditions.category = In(request.monitoringConfig.categories);
+    }
+
+    if (request.monitoringConfig.brands?.length) {
+      whereConditions.brand = In(request.monitoringConfig.brands);
+    }
+
+    if (request.filterCriteria?.minDataQuality) {
+      whereConditions.dataQuality = request.filterCriteria.minDataQuality;
+    }
+
+    if (request.filterCriteria?.excludeInactiveProducts) {
+      whereConditions.status = CompetitiveProductStatus.ACTIVE;
+    }
+
+    if (request.filterCriteria?.onlyDirectCompetitors) {
+      whereConditions.isDirectCompetitor = true;
+    }
+
+    // Add monitoring enabled filter
+    whereConditions.monitoringEnabled = true;
+
+    const products = await this.competitiveProductRepository.find({
+      where: whereConditions,
+      order: { monitoringPriority: 'DESC', lastChecked: 'ASC' },
+    });
+
+    return products;
+  }
+
+  private async monitorProductPrice(
+    product: CompetitiveProduct,
+    request: PriceMonitoringRequest,
+  ): Promise<PriceChangeEvent | null> {
+    try {
+      // Collect latest price data using marketplace data collection service
+      const collectionRequest = {
+        tenantId: request.tenantId,
+        marketplace: product.marketplace,
+        collectionType: 'price_monitoring' as const,
+        targets: {
+          productIds: [product.externalProductId],
+        },
+        collectionConfig: {
+          includeImages: false,
+          includeReviews: false,
+          includeVariants: false,
+          includePriceHistory: true,
+          maxResults: 1,
+          dataQualityThreshold: DataQuality.MEDIUM,
+          respectRateLimit: true,
+          useProxies: false,
+          retryFailures: true,
+        },
+      };
+
+      const collectionResult = await this.marketplaceDataCollectionService.collectMarketplaceData(collectionRequest);
+      
+      if (collectionResult.collectedData.products.length === 0) {
+        return null;
+      }
+
+      const latestData = collectionResult.collectedData.products[0];
+      const oldPrice = Number(product.currentPrice);
+      const newPrice = latestData.currentPrice;
+
+      // Check if price changed significantly
+      const priceChange = newPrice - oldPrice;
+      const priceChangePercent = oldPrice > 0 ? (priceChange / oldPrice) * 100 : 0;
+
+      if (Math.abs(priceChangePercent) < 0.1) {
+        // Price change is insignificant (less than 0.1%)
+        return null;
+      }
+
+      // Update product with new price
+      await this.competitiveProductRepository.update(product.id, {
+        currentPrice: newPrice,
+        originalPrice: latestData.originalPrice,
+        discountPercent: latestData.discountPercent,
+        stockQuantity: latestData.stockQuantity,
+        rating: latestData.rating,
+        reviewCount: latestData.reviewCount,
+        soldCount: latestData.soldCount,
+        lastUpdated: new Date(),
+        lastChecked: new Date(),
+      });
+
+      // Create price history record
+      const priceHistoryRecord = await this.priceHistoryRepository.save({
+        tenantId: request.tenantId,
+        competitiveProductId: product.id,
+        currentPrice: newPrice,
+        previousPrice: oldPrice,
+        priceChange,
+        priceChangePercent,
+        eventType: this.determinePriceEventType(priceChange, latestData),
+        priceChangeReason: this.determinePriceChangeReason(product, latestData),
+        stockQuantity: latestData.stockQuantity,
+        inStock: latestData.stockQuantity > 0,
+        isPromotion: latestData.discountPercent > 0,
+        rating: latestData.rating,
+        reviewCount: latestData.reviewCount,
+        soldCount: latestData.soldCount,
+        detectionConfidence: 0.95,
+        dataReliability: 0.9,
+        hourOfDay: new Date().getHours(),
+        dayOfWeek: new Date().getDay(),
+        timezone: 'Asia/Jakarta',
+        recordedAt: new Date(),
+      });
+
+      // Create price change event
+      const priceChangeEvent: PriceChangeEvent = {
+        productId: product.id,
+        productName: product.name,
+        marketplace: product.marketplace,
+        changeType: priceChange > 0 ? 'increase' : priceChange < 0 ? 'decrease' : 'stable',
+        oldPrice,
+        newPrice,
+        priceChange,
+        priceChangePercent,
+        eventType: priceHistoryRecord.eventType,
+        reason: priceHistoryRecord.priceChangeReason,
+        timestamp: new Date().toISOString(),
+        significance: this.calculatePriceChangeSignificance(priceChangePercent),
+        context: await this.getPriceChangeContext(product, latestData),
+        impact: await this.assessPriceChangeImpact(product, priceChangePercent),
+      };
+
+      return priceChangeEvent;
+
+    } catch (error) {
+      this.logger.error(`Failed to monitor price for product ${product.id}: ${error.message}`);
+      return null;
+    }
+  }
+
+  private determinePriceEventType(priceChange: number, productData: any): PriceEventType {
+    if (priceChange > 0) {
+      return PriceEventType.PRICE_INCREASE;
+    } else if (priceChange < 0) {
+      if (productData.discountPercent > 0) {
+        return PriceEventType.DISCOUNT_APPLIED;
+      }
+      return PriceEventType.PRICE_DECREASE;
+    }
+
+    if (productData.stockQuantity === 0) {
+      return PriceEventType.OUT_OF_STOCK;
+    }
+
+    return PriceEventType.PRICE_DECREASE; // Default
+  }
+
+  private determinePriceChangeReason(product: CompetitiveProduct, productData: any): PriceChangeReason {
+    if (productData.discountPercent > 0) {
+      if (productData.discountPercent >= 50) {
+        return PriceChangeReason.FLASH_SALE;
+      }
+      return PriceChangeReason.PROMOTION;
+    }
+
+    if (productData.stockQuantity < 10) {
+      return PriceChangeReason.STOCK_CLEARANCE;
+    }
+
+    // Check if this is a competitive response
+    const now = moment().tz('Asia/Jakarta');
+    const isBusinessHours = now.hour() >= 9 && now.hour() <= 17;
+    const isWeekday = now.day() >= 1 && now.day() <= 5;
+
+    if (isBusinessHours && isWeekday) {
+      return PriceChangeReason.COMPETITION_RESPONSE;
+    }
+
+    return PriceChangeReason.PRICE_ADJUSTMENT;
+  }
+
+  private calculatePriceChangeSignificance(priceChangePercent: number): 'minor' | 'moderate' | 'major' | 'critical' {
+    const absChange = Math.abs(priceChangePercent);
+    
+    if (absChange >= 50) return 'critical';
+    if (absChange >= 20) return 'major';
+    if (absChange >= 5) return 'moderate';
+    return 'minor';
+  }
+
+  private async getPriceChangeContext(product: CompetitiveProduct, productData: any): Promise<any> {
+    // Get market context by looking at similar products
+    const similarProducts = await this.competitiveProductRepository.find({
+      where: {
+        tenantId: product.tenantId,
+        marketplace: product.marketplace,
+        category: product.category,
+        status: CompetitiveProductStatus.ACTIVE,
+      },
+      take: 50,
+    });
+
+    const marketPrices = similarProducts.map(p => Number(p.currentPrice));
+    const averageMarketPrice = marketPrices.reduce((sum, price) => sum + price, 0) / marketPrices.length;
+
+    // Calculate market position
+    const pricesBelow = marketPrices.filter(price => price < Number(product.currentPrice)).length;
+    const marketPosition = Math.floor((pricesBelow / marketPrices.length) * 100);
+
+    return {
+      marketPosition,
+      competitorCount: similarProducts.length,
+      averageMarketPrice,
+      isPromotion: productData.discountPercent > 0,
+      stockChange: productData.stockQuantity !== product.stockQuantity,
+      seasonalFactor: this.calculateSeasonalFactor(),
+    };
+  }
+
+  private async assessPriceChangeImpact(product: CompetitiveProduct, priceChangePercent: number): Promise<any> {
+    const absChange = Math.abs(priceChangePercent);
+    
+    // Assess competitive advantage
+    let competitiveAdvantage: 'gained' | 'lost' | 'maintained' = 'maintained';
+    if (priceChangePercent < -5) {
+      competitiveAdvantage = 'gained'; // Price drop = competitive advantage
+    } else if (priceChangePercent > 5) {
+      competitiveAdvantage = 'lost'; // Price increase = competitive disadvantage
+    }
+
+    // Assess market share risk
+    let marketShareRisk: 'low' | 'medium' | 'high' = 'low';
+    if (absChange >= 20) {
+      marketShareRisk = 'high';
+    } else if (absChange >= 10) {
+      marketShareRisk = 'medium';
+    }
+
+    // Determine if action required
+    const actionRequired = absChange >= 10 || competitiveAdvantage === 'lost';
+    
+    // Set urgency level
+    let urgencyLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
+    if (absChange >= 30) {
+      urgencyLevel = 'critical';
+    } else if (absChange >= 15) {
+      urgencyLevel = 'high';
+    } else if (absChange >= 5) {
+      urgencyLevel = 'medium';
+    }
+
+    return {
+      competitiveAdvantage,
+      marketShareRisk,
+      actionRequired,
+      urgencyLevel,
+    };
+  }
+
+  private calculateSeasonalFactor(): number {
+    const now = moment().tz('Asia/Jakarta');
+    const month = now.month() + 1; // 1-12
+    
+    // Indonesian seasonal factors
+    if (month >= 6 && month <= 8) {
+      return 1.1; // Mid-year sale season
+    }
+    if (month >= 11 || month <= 1) {
+      return 1.2; // Year-end holiday season
+    }
+    if (now.format('MM-DD') >= '03-01' && now.format('MM-DD') <= '04-30') {
+      return 1.15; // Ramadan season (approximate)
+    }
+    
+    return 1.0; // Normal season
+  }
+
+  private generatePriceAlerts(
+    priceChange: PriceChangeEvent,
+    alertThresholds: any,
+  ): PriceAlert[] {
+    const alerts: PriceAlert[] = [];
+
+    // Price change percentage alert
+    if (Math.abs(priceChange.priceChangePercent) >= alertThresholds.priceChangePercent) {
+      alerts.push({
+        alertId: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        type: priceChange.changeType === 'decrease' ? 'price_drop' : 'price_increase',
+        severity: priceChange.significance === 'critical' ? 'urgent' 
+          : priceChange.significance === 'major' ? 'critical'
+          : 'warning',
+        productId: priceChange.productId,
+        productName: priceChange.productName,
+        marketplace: priceChange.marketplace,
+        title: `Significant Price ${priceChange.changeType === 'decrease' ? 'Drop' : 'Increase'} Detected`,
+        message: `Price ${priceChange.changeType} of ${Math.abs(priceChange.priceChangePercent).toFixed(1)}% detected for ${priceChange.productName} on ${priceChange.marketplace}`,
+        triggeredAt: priceChange.timestamp,
+        data: {
+          oldPrice: priceChange.oldPrice,
+          newPrice: priceChange.newPrice,
+          change: priceChange.priceChange,
+          changePercent: priceChange.priceChangePercent,
+        },
+        actionItems: this.generateActionItems(priceChange),
+        affectedMetrics: ['price_competitiveness', 'market_position', 'potential_revenue'],
+      });
+    }
+
+    // Significant drop alert
+    if (priceChange.changeType === 'decrease' && 
+        Math.abs(priceChange.priceChangePercent) >= alertThresholds.significantDrop) {
+      alerts.push({
+        alertId: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        type: 'price_drop',
+        severity: 'critical',
+        productId: priceChange.productId,
+        productName: priceChange.productName,
+        marketplace: priceChange.marketplace,
+        title: 'Competitor Price Drop Alert',
+        message: `Competitor dropped price by ${Math.abs(priceChange.priceChangePercent).toFixed(1)}% - immediate action may be required`,
+        triggeredAt: priceChange.timestamp,
+        data: {
+          competitorAdvantage: priceChange.impact.competitiveAdvantage,
+          marketShareRisk: priceChange.impact.marketShareRisk,
+          urgencyLevel: priceChange.impact.urgencyLevel,
+        },
+        actionItems: [
+          {
+            action: 'Review pricing strategy',
+            priority: 'high',
+            timeline: '2 hours',
+            estimatedImpact: 'Maintain market competitiveness',
+          },
+          {
+            action: 'Consider price matching',
+            priority: 'medium',
+            timeline: '4 hours',
+            estimatedImpact: 'Prevent market share loss',
+          },
+        ],
+        affectedMetrics: ['competitive_position', 'market_share', 'revenue_risk'],
+      });
+    }
+
+    return alerts;
+  }
+
+  private generateActionItems(priceChange: PriceChangeEvent): Array<any> {
+    const actionItems: Array<any> = [];
+
+    if (priceChange.impact.actionRequired) {
+      if (priceChange.changeType === 'decrease') {
+        actionItems.push({
+          action: 'Evaluate competitive response',
+          priority: priceChange.impact.urgencyLevel,
+          timeline: priceChange.impact.urgencyLevel === 'critical' ? '1 hour' : '4 hours',
+          estimatedImpact: 'Maintain competitive position',
+        });
+      } else {
+        actionItems.push({
+          action: 'Assess opportunity for price increase',
+          priority: 'medium',
+          timeline: '24 hours',
+          estimatedImpact: 'Potential revenue increase',
+        });
+      }
+    }
+
+    if (priceChange.context.isPromotion) {
+      actionItems.push({
+        action: 'Monitor promotion duration and impact',
+        priority: 'medium',
+        timeline: 'Ongoing',
+        estimatedImpact: 'Strategic intelligence',
+      });
+    }
+
+    return actionItems;
+  }
+
+  private async detectPriceAnomalies(
+    tenantId: string,
+    priceChanges: PriceChangeEvent[],
+    analysisDepth: string,
+  ): Promise<PriceAnomaly[]> {
+    const anomalies: PriceAnomaly[] = [];
+
+    for (const priceChange of priceChanges) {
+      // Detect sudden price drops
+      if (priceChange.changeType === 'decrease' && Math.abs(priceChange.priceChangePercent) >= 30) {
+        anomalies.push({
+          type: 'sudden_drop',
+          productId: priceChange.productId,
+          productName: priceChange.productName,
+          marketplace: priceChange.marketplace,
+          description: `Sudden price drop of ${Math.abs(priceChange.priceChangePercent).toFixed(1)}% detected`,
+          severity: Math.abs(priceChange.priceChangePercent) >= 50 ? 'critical' : 'high',
+          confidence: 0.9,
+          detectedAt: priceChange.timestamp,
+          anomalyScore: Math.min(Math.abs(priceChange.priceChangePercent) * 2, 100),
+          potentialCauses: [
+            'Aggressive competitive pricing',
+            'Inventory clearance sale',
+            'Market disruption',
+            'Data collection error',
+          ],
+          suggestedActions: [
+            'Verify price accuracy',
+            'Analyze competitor strategy',
+            'Consider price response',
+            'Monitor market reaction',
+          ],
+          historicalContext: {
+            typicalPriceRange: { min: priceChange.oldPrice * 0.8, max: priceChange.oldPrice * 1.2 },
+            averageVolatility: 5, // 5% typical variation
+            seasonalPattern: false,
+            previousAnomalies: 0,
+          },
+          businessImpact: {
+            revenueRisk: this.calculateRevenueRisk(priceChange),
+            competitorAdvantage: true,
+            customerReaction: 'positive',
+            marketPositionRisk: 'high',
+          },
+        });
+      }
+
+      // Detect sudden price increases
+      if (priceChange.changeType === 'increase' && Math.abs(priceChange.priceChangePercent) >= 25) {
+        anomalies.push({
+          type: 'sudden_increase',
+          productId: priceChange.productId,
+          productName: priceChange.productName,
+          marketplace: priceChange.marketplace,
+          description: `Sudden price increase of ${priceChange.priceChangePercent.toFixed(1)}% detected`,
+          severity: priceChange.priceChangePercent >= 40 ? 'high' : 'medium',
+          confidence: 0.85,
+          detectedAt: priceChange.timestamp,
+          anomalyScore: Math.min(priceChange.priceChangePercent * 1.5, 100),
+          potentialCauses: [
+            'Supply shortage',
+            'Premium positioning strategy',
+            'Market correction',
+            'Temporary pricing error',
+          ],
+          suggestedActions: [
+            'Verify pricing strategy',
+            'Assess market opportunity',
+            'Monitor customer response',
+            'Check for competitor reactions',
+          ],
+          historicalContext: {
+            typicalPriceRange: { min: priceChange.oldPrice * 0.9, max: priceChange.oldPrice * 1.1 },
+            averageVolatility: 3,
+            seasonalPattern: false,
+            previousAnomalies: 0,
+          },
+          businessImpact: {
+            revenueRisk: -this.calculateRevenueRisk(priceChange), // Negative risk = opportunity
+            competitorAdvantage: false,
+            customerReaction: 'negative',
+            marketPositionRisk: 'medium',
+          },
+        });
+      }
+    }
+
+    return anomalies;
+  }
+
+  private calculateRevenueRisk(priceChange: PriceChangeEvent): number {
+    // Estimate revenue risk based on price change and market context
+    const baseRisk = Math.abs(priceChange.priceChange) * 1000; // Assume 1000 units monthly volume
+    const marketPositionMultiplier = priceChange.context.marketPosition > 50 ? 1.5 : 1.0;
+    const urgencyMultiplier = priceChange.impact.urgencyLevel === 'critical' ? 2.0 : 1.0;
+    
+    return baseRisk * marketPositionMultiplier * urgencyMultiplier;
+  }
+
+  private async analyzePriceTrends(
+    tenantId: string,
+    products: CompetitiveProduct[],
+    analysisDepth: string,
+  ): Promise<PriceTrend[]> {
+    const trends: PriceTrend[] = [];
+
+    for (const product of products.slice(0, 20)) { // Limit to top 20 for performance
+      try {
+        // Get price history for the last 30 days
+        const priceHistory = await this.priceHistoryRepository.find({
+          where: {
+            tenantId,
+            competitiveProductId: product.id,
+            recordedAt: MoreThan(moment().subtract(30, 'days').toDate()),
+          },
+          order: { recordedAt: 'ASC' },
+        });
+
+        if (priceHistory.length < 3) continue; // Need at least 3 data points
+
+        const prices = priceHistory.map(h => Number(h.currentPrice));
+        const startPrice = prices[0];
+        const currentPrice = prices[prices.length - 1];
+        const peakPrice = Math.max(...prices);
+        const lowestPrice = Math.min(...prices);
+        
+        const totalChange = currentPrice - startPrice;
+        const totalChangePercent = startPrice > 0 ? (totalChange / startPrice) * 100 : 0;
+
+        // Calculate trend direction and strength
+        const { trendDirection, trendStrength } = this.calculateTrendDirection(prices);
+        const volatility = this.calculateVolatility(prices);
+        
+        const trend: PriceTrend = {
+          productId: product.id,
+          productName: product.name,
+          marketplace: product.marketplace,
+          trendDirection,
+          trendStrength,
+          duration: priceHistory.length,
+          priceMovement: {
+            startPrice,
+            currentPrice,
+            peakPrice,
+            lowestPrice,
+            totalChange,
+            totalChangePercent,
+          },
+          trendAnalysis: {
+            momentum: this.calculateMomentum(prices),
+            volatility,
+            predictability: Math.max(0, 1 - volatility), // High volatility = low predictability
+            seasonalInfluence: this.calculateSeasonalInfluence(priceHistory),
+          },
+          forecastedMovement: {
+            nextWeekDirection: this.forecastDirection(prices),
+            confidence: Math.max(0.3, 1 - volatility),
+            expectedPriceRange: {
+              min: currentPrice * (1 - volatility),
+              max: currentPrice * (1 + volatility),
+            },
+            keyFactors: this.identifyKeyFactors(priceHistory),
+          },
+          competitiveContext: {
+            marketTrendAlignment: true, // Would compare with market trend
+            competitorInfluence: 0.7, // Estimated
+            marketLeadership: this.determineMarketLeadership(product, prices),
+            strategicPosition: this.determineStrategicPosition(totalChangePercent),
+          },
+        };
+
+        trends.push(trend);
+      } catch (error) {
+        this.logger.error(`Failed to analyze trend for product ${product.id}: ${error.message}`);
+      }
+    }
+
+    return trends;
+  }
+
+  private calculateTrendDirection(prices: number[]): { trendDirection: any; trendStrength: number } {
+    if (prices.length < 2) return { trendDirection: 'stable', trendStrength: 0 };
+
+    const firstHalf = prices.slice(0, Math.floor(prices.length / 2));
+    const secondHalf = prices.slice(Math.floor(prices.length / 2));
+    
+    const firstAvg = firstHalf.reduce((sum, p) => sum + p, 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((sum, p) => sum + p, 0) / secondHalf.length;
+    
+    const changePercent = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
+    const absChange = Math.abs(changePercent);
+    
+    let trendDirection: any = 'stable';
+    if (absChange > 5) {
+      if (absChange > 20) {
+        trendDirection = changePercent > 0 ? 'upward' : 'downward';
+      } else if (absChange > 10) {
+        trendDirection = changePercent > 0 ? 'upward' : 'downward';
+      } else {
+        trendDirection = 'volatile';
+      }
+    }
+
+    const trendStrength = Math.min(absChange / 100, 1); // Normalize to 0-1
+
+    return { trendDirection, trendStrength };
+  }
+
+  private calculateVolatility(prices: number[]): number {
+    if (prices.length < 2) return 0;
+
+    const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+    const variance = prices.reduce((sum, p) => sum + Math.pow(p - avgPrice, 2), 0) / prices.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return avgPrice > 0 ? stdDev / avgPrice : 0; // Coefficient of variation
+  }
+
+  private calculateMomentum(prices: number[]): 'accelerating' | 'decelerating' | 'steady' {
+    if (prices.length < 4) return 'steady';
+
+    const recentChanges = [];
+    for (let i = 1; i < prices.length; i++) {
+      const change = prices[i] - prices[i - 1];
+      recentChanges.push(change);
+    }
+
+    const firstHalfChanges = recentChanges.slice(0, Math.floor(recentChanges.length / 2));
+    const secondHalfChanges = recentChanges.slice(Math.floor(recentChanges.length / 2));
+
+    const firstHalfAvg = firstHalfChanges.reduce((sum, c) => sum + Math.abs(c), 0) / firstHalfChanges.length;
+    const secondHalfAvg = secondHalfChanges.reduce((sum, c) => sum + Math.abs(c), 0) / secondHalfChanges.length;
+
+    if (secondHalfAvg > firstHalfAvg * 1.2) return 'accelerating';
+    if (secondHalfAvg < firstHalfAvg * 0.8) return 'decelerating';
+    return 'steady';
+  }
+
+  private calculateSeasonalInfluence(priceHistory: CompetitivePriceHistory[]): number {
+    // Check if price changes align with Indonesian seasonal patterns
+    const ramadanInfluence = priceHistory.filter(h => h.isRamadanPeriod).length / priceHistory.length;
+    const holidayInfluence = priceHistory.filter(h => h.holidayContext).length / priceHistory.length;
+    
+    return Math.min(ramadanInfluence + holidayInfluence, 1);
+  }
+
+  private forecastDirection(prices: number[]): 'up' | 'down' | 'stable' {
+    if (prices.length < 3) return 'stable';
+
+    const recentTrend = prices.slice(-3);
+    const trend = recentTrend[2] - recentTrend[0];
+    const changePercent = recentTrend[0] > 0 ? (trend / recentTrend[0]) * 100 : 0;
+
+    if (Math.abs(changePercent) < 2) return 'stable';
+    return changePercent > 0 ? 'up' : 'down';
+  }
+
+  private identifyKeyFactors(priceHistory: CompetitivePriceHistory[]): string[] {
+    const factors: string[] = [];
+
+    const promotions = priceHistory.filter(h => h.isPromotion).length;
+    if (promotions > priceHistory.length * 0.3) {
+      factors.push('Frequent promotions');
+    }
+
+    const stockouts = priceHistory.filter(h => !h.inStock).length;
+    if (stockouts > 0) {
+      factors.push('Stock availability issues');
+    }
+
+    const ramadanRecords = priceHistory.filter(h => h.isRamadanPeriod).length;
+    if (ramadanRecords > 0) {
+      factors.push('Ramadan seasonal effect');
+    }
+
+    if (factors.length === 0) {
+      factors.push('Market dynamics');
+    }
+
+    return factors;
+  }
+
+  private determineMarketLeadership(product: CompetitiveProduct, prices: number[]): 'leader' | 'follower' | 'independent' {
+    // This would require market analysis
+    // For now, use simple heuristics
+    if (product.marketRanking && product.marketRanking <= 3) {
+      return 'leader';
+    }
+    if (product.threatLevel && product.threatLevel >= 7) {
+      return 'follower';
+    }
+    return 'independent';
+  }
+
+  private determineStrategicPosition(totalChangePercent: number): 'offensive' | 'defensive' | 'neutral' {
+    if (totalChangePercent < -10) return 'offensive'; // Aggressive price cutting
+    if (totalChangePercent > 10) return 'defensive'; // Price increases
+    return 'neutral';
+  }
+
+  private async generateCompetitiveInsights(
+    tenantId: string,
+    priceChanges: PriceChangeEvent[],
+    analysisDepth: string,
+  ): Promise<CompetitivePriceInsight[]> {
+    const insights: CompetitivePriceInsight[] = [];
+
+    // Group price changes by category
+    const categoryGroups = priceChanges.reduce((groups, change) => {
+      // Would get category from product data
+      const category = 'General'; // Placeholder
+      if (!groups[category]) groups[category] = [];
+      groups[category].push(change);
+      return groups;
+    }, {} as Record<string, PriceChangeEvent[]>);
+
+    for (const [category, categoryChanges] of Object.entries(categoryGroups)) {
+      const insights_array: any[] = [];
+
+      // Opportunity insights
+      const priceDrops = categoryChanges.filter(c => c.changeType === 'decrease');
+      if (priceDrops.length > 0) {
+        insights_array.push({
+          type: 'opportunity',
+          title: 'Pricing Opportunity Detected',
+          description: `${priceDrops.length} competitors lowered prices, creating market opportunity`,
+          relevance: Math.min(priceDrops.length / categoryChanges.length, 1),
+          actionable: true,
+          metrics: {
+            averagePriceDrop: priceDrops.reduce((sum, c) => sum + Math.abs(c.priceChangePercent), 0) / priceDrops.length,
+            affectedCompetitors: priceDrops.length,
+            marketImpact: priceDrops.reduce((sum, c) => sum + Math.abs(c.priceChange), 0),
+          },
+          recommendations: [
+            'Consider price matching for key products',
+            'Analyze competitor inventory levels',
+            'Evaluate promotional response strategies',
+          ],
+        });
+      }
+
+      // Threat insights
+      const significantChanges = categoryChanges.filter(c => c.significance === 'major' || c.significance === 'critical');
+      if (significantChanges.length > 0) {
+        insights_array.push({
+          type: 'threat',
+          title: 'Competitive Threat Alert',
+          description: `${significantChanges.length} significant price changes detected in category`,
+          relevance: Math.min(significantChanges.length / categoryChanges.length, 1),
+          actionable: true,
+          metrics: {
+            threatLevel: significantChanges.length / categoryChanges.length,
+            averageImpact: significantChanges.reduce((sum, c) => sum + Math.abs(c.priceChangePercent), 0) / significantChanges.length,
+            urgentActions: significantChanges.filter(c => c.impact.urgencyLevel === 'critical').length,
+          },
+          recommendations: [
+            'Review pricing strategy immediately',
+            'Assess competitive positioning',
+            'Consider emergency response measures',
+          ],
+        });
+      }
+
+      const insight: CompetitivePriceInsight = {
+        category,
+        insights: insights_array,
+        marketPosition: {
+          priceRanking: 0, // Would calculate from market data
+          pricePercentile: 50, // Would calculate from market data
+          competitiveGap: 0, // Would calculate from competitor comparison
+          marketShareEstimate: 0, // Would estimate from sales data
+        },
+        pricingStrategy: {
+          current: 'competitive',
+          recommended: 'competitive',
+          confidence: 0.7,
+          reasoning: ['Market positioning analysis', 'Competitive response assessment'],
+        },
+        competitorAnalysis: [], // Would populate with actual competitor data
+      };
+
+      insights.push(insight);
+    }
+
+    return insights;
+  }
+
+  private async generateIndonesianContext(
+    tenantId: string,
+    priceChanges: PriceChangeEvent[],
+  ): Promise<IndonesianPriceContext> {
+    const now = moment().tz('Asia/Jakarta');
+    const isRamadan = this.isRamadanPeriod(now);
+
+    return {
+      regionalVariations: {
+        'Jakarta': {
+          averagePrice: 250000,
+          priceRange: { min: 150000, max: 500000 },
+          competitiveIntensity: 0.8,
+          marketMaturity: 'mature',
+        },
+        'Surabaya': {
+          averagePrice: 200000,
+          priceRange: { min: 120000, max: 400000 },
+          competitiveIntensity: 0.6,
+          marketMaturity: 'growing',
+        },
+        'Medan': {
+          averagePrice: 180000,
+          priceRange: { min: 100000, max: 350000 },
+          competitiveIntensity: 0.5,
+          marketMaturity: 'growing',
+        },
+      },
+      culturalFactors: {
+        ramadanEffect: {
+          isRamadanPeriod: isRamadan,
+          priceInflation: isRamadan ? 15 : 0,
+          demandIncrease: isRamadan ? 25 : 0,
+          competitiveStrategy: isRamadan ? 'Premium positioning during high demand' : 'Standard competitive pricing',
+        },
+        nationalHolidays: this.getUpcomingHolidays(),
+        paymentPreferences: {
+          'COD': { usage: 45, priceInfluence: 5 },
+          'E-wallet': { usage: 30, priceInfluence: -2 },
+          'Bank Transfer': { usage: 15, priceInfluence: 0 },
+          'Credit Card': { usage: 10, priceInfluence: -5 },
+        },
+      },
+      economicIndicators: {
+        inflationRate: 3.2, // Current Indonesia inflation rate
+        currencyStability: 0.85,
+        purchasingPower: 0.75,
+        ecommerceGrowth: 12.5,
+      },
+      marketDynamics: {
+        onlineVsOfflinePrice: -8, // Online typically 8% cheaper
+        urbanVsRuralPrice: 15, // Urban typically 15% more expensive
+        brandLoyalty: 0.6,
+        priceSensitivity: 0.8,
+      },
+    };
+  }
+
+  private isRamadanPeriod(date: moment.Moment): boolean {
+    // Simplified Ramadan detection - would use proper Islamic calendar
+    const month = date.month() + 1;
+    const day = date.date();
+    
+    // Approximate Ramadan dates for 2024 (March 11 - April 9)
+    return (month === 3 && day >= 11) || (month === 4 && day <= 9);
+  }
+
+  private getUpcomingHolidays(): Array<any> {
+    return [
+      {
+        holiday: 'Hari Raya Idul Fitri',
+        date: '2024-04-10',
+        priceImpact: 20,
+        demandPattern: 'Spike before holiday, drop during holiday',
+      },
+      {
+        holiday: 'Independence Day',
+        date: '2024-08-17',
+        priceImpact: 5,
+        demandPattern: 'Moderate increase around holiday',
+      },
+      {
+        holiday: 'Christmas',
+        date: '2024-12-25',
+        priceImpact: 15,
+        demandPattern: 'Gradual increase through December',
+      },
+    ];
+  }
+
+  private async generatePriceRecommendations(
+    tenantId: string,
+    priceChanges: PriceChangeEvent[],
+    anomalies: PriceAnomaly[],
+    trends: PriceTrend[],
+    analysisDepth: string,
+  ): Promise<PriceRecommendation[]> {
+    const recommendations: PriceRecommendation[] = [];
+
+    // Analyze significant price drops for response recommendations
+    const significantDrops = priceChanges.filter(c => 
+      c.changeType === 'decrease' && 
+      Math.abs(c.priceChangePercent) >= 10
+    );
+
+    for (const drop of significantDrops.slice(0, 5)) { // Limit to top 5
+      recommendations.push({
+        productId: drop.productId,
+        productName: drop.productName,
+        recommendationType: 'pricing',
+        priority: drop.impact.urgencyLevel as any,
+        title: 'Competitive Price Response',
+        description: `Competitor dropped price by ${Math.abs(drop.priceChangePercent).toFixed(1)}%. Consider strategic response.`,
+        specificAction: `Evaluate price matching or alternative competitive strategy for ${drop.productName}`,
+        expectedImpact: {
+          revenue: this.estimateRevenueImpact(drop),
+          marketShare: Math.abs(drop.priceChangePercent) * 0.3, // Rough estimate
+          competitivePosition: 'Maintain competitive position',
+          riskLevel: drop.impact.marketShareRisk as any,
+        },
+        implementation: {
+          timeline: drop.impact.urgencyLevel === 'critical' ? '2 hours' : '24 hours',
+          resources: ['Pricing team', 'Product management', 'Marketing'],
+          cost: 0, // Cost of analysis and implementation
+          complexity: 'medium',
+        },
+        successMetrics: [
+          {
+            metric: 'Market share retention',
+            currentValue: 100, // Baseline
+            targetValue: 100, // Maintain
+            timeframe: '2 weeks',
+          },
+          {
+            metric: 'Price competitiveness',
+            currentValue: 50, // Percentile
+            targetValue: 70, // Improve to top 30%
+            timeframe: '1 week',
+          },
+        ],
+        alternatives: [
+          {
+            action: 'Enhance product value proposition instead of price matching',
+            tradeoffs: ['Higher complexity', 'Longer timeline', 'Requires product development'],
+            expectedImpact: 0.7,
+          },
+          {
+            action: 'Launch promotional campaign to offset competitor advantage',
+            tradeoffs: ['Marketing spend required', 'Temporary solution'],
+            expectedImpact: 0.6,
+          },
+        ],
+      });
+    }
+
+    // Analyze critical anomalies for strategic recommendations
+    const criticalAnomalies = anomalies.filter(a => a.severity === 'critical');
+    for (const anomaly of criticalAnomalies.slice(0, 3)) {
+      recommendations.push({
+        productId: anomaly.productId,
+        productName: anomaly.productName,
+        recommendationType: 'strategic',
+        priority: 'urgent',
+        title: 'Market Anomaly Response',
+        description: `Critical price anomaly detected: ${anomaly.description}`,
+        specificAction: `Investigate and respond to ${anomaly.type.replace('_', ' ')} for ${anomaly.productName}`,
+        expectedImpact: {
+          revenue: anomaly.businessImpact.revenueRisk,
+          marketShare: 5, // Estimated impact
+          competitivePosition: 'Mitigate risk exposure',
+          riskLevel: 'high',
+        },
+        implementation: {
+          timeline: '4 hours',
+          resources: ['Analysis team', 'Strategy team', 'Operations'],
+          cost: 50000, // IDR - analysis and response cost
+          complexity: 'high',
+        },
+        successMetrics: [
+          {
+            metric: 'Anomaly resolution',
+            currentValue: 0,
+            targetValue: 100,
+            timeframe: '24 hours',
+          },
+          {
+            metric: 'Market position stability',
+            currentValue: 70,
+            targetValue: 80,
+            timeframe: '1 week',
+          },
+        ],
+        alternatives: [
+          {
+            action: 'Monitor without immediate action',
+            tradeoffs: ['Lower cost', 'Higher risk', 'Potential market share loss'],
+            expectedImpact: 0.3,
+          },
+        ],
+      });
+    }
+
+    return recommendations;
+  }
+
+  private estimateRevenueImpact(priceChange: PriceChangeEvent): number {
+    // Rough estimation based on price change and assumed volume
+    const assumedMonthlyVolume = 1000; // units
+    const unitRevenueLoss = Math.abs(priceChange.priceChange);
+    const volumeImpact = Math.abs(priceChange.priceChangePercent) * 0.1; // 10% volume sensitivity per 1% price change
+    
+    return unitRevenueLoss * assumedMonthlyVolume * (1 + volumeImpact);
+  }
+
+  private calculateMonitoringMetadata(
+    result: PriceMonitoringResult,
+    frequency: string,
+  ): any {
+    const dataFreshness = result.monitoredProducts.successfullyMonitored / Math.max(result.monitoredProducts.totalCount, 1);
+    const confidenceLevel = result.priceChanges.length > 0 ? 0.8 : 0.5; // Higher confidence with more data
+    const coverageRate = result.monitoredProducts.successfullyMonitored / Math.max(result.monitoredProducts.totalCount, 1);
+    
+    // Calculate next monitoring time
+    const nextTime = moment().tz('Asia/Jakarta');
+    switch (frequency) {
+      case 'realtime':
+        nextTime.add(15, 'minutes');
+        break;
+      case 'hourly':
+        nextTime.add(1, 'hour');
+        break;
+      case 'daily':
+        nextTime.add(1, 'day');
+        break;
+      case 'weekly':
+        nextTime.add(1, 'week');
+        break;
+    }
+
+    return {
+      dataFreshness,
+      confidenceLevel,
+      coverageRate,
+      nextMonitoringTime: nextTime.toISOString(),
+    };
+  }
+
+  private async storeMonitoringResults(
+    tenantId: string,
+    result: PriceMonitoringResult,
+  ): Promise<void> {
+    try {
+      // Cache monitoring results
+      await this.cacheManager.set(
+        `monitoring_result_${result.monitoringId}`,
+        result,
+        3600, // 1 hour
+      );
+
+      // Cache latest results for tenant
+      await this.cacheManager.set(
+        `latest_monitoring_${tenantId}`,
+        {
+          monitoringId: result.monitoringId,
+          timestamp: result.monitoringPeriod.endTime,
+          summary: {
+            priceChanges: result.priceChanges.length,
+            alerts: result.alerts.length,
+            anomalies: result.anomalies.length,
+            recommendations: result.recommendations.length,
+          },
+        },
+        7200, // 2 hours
+      );
+
+      this.logger.log(`Stored monitoring results for: ${result.monitoringId}`);
+    } catch (error) {
+      this.logger.error(`Failed to store monitoring results: ${error.message}`);
+    }
+  }
+
+  // Scheduled monitoring jobs
+  @Cron(CronExpression.EVERY_HOUR)
+  async runHourlyPriceMonitoring(): Promise<void> {
+    this.logger.log('Running hourly price monitoring for all active tenants');
+    
+    try {
+      // Get all active tenants with monitoring enabled
+      const activeTenants = await this.getActiveTenantsForMonitoring();
+      
+      for (const tenantId of activeTenants) {
+        try {
+          const request: PriceMonitoringRequest = {
+            tenantId,
+            monitoringConfig: {
+              monitoringFrequency: 'hourly',
+              alertThresholds: {
+                priceChangePercent: 5,
+                significantDrop: 10,
+                significantIncrease: 15,
+                stockoutAlert: true,
+                newCompetitorAlert: true,
+              },
+              analysisDepth: 'standard',
+              includeIndonesianContext: true,
+            },
+          };
+
+          await this.monitorPrices(request);
+        } catch (error) {
+          this.logger.error(`Hourly monitoring failed for tenant ${tenantId}: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Hourly price monitoring job failed: ${error.message}`);
+    }
+  }
+
+  private async getActiveTenantsForMonitoring(): Promise<string[]> {
+    // Get distinct tenant IDs from products with monitoring enabled
+    const result = await this.competitiveProductRepository
+      .createQueryBuilder('product')
+      .select('DISTINCT product.tenantId', 'tenantId')
+      .where('product.monitoringEnabled = :enabled', { enabled: true })
+      .andWhere('product.status = :status', { status: CompetitiveProductStatus.ACTIVE })
+      .getRawMany();
+
+    return result.map(r => r.tenantId);
+  }
+
+  // Public methods for API access
+  async getMonitoringResult(monitoringId: string): Promise<PriceMonitoringResult | null> {
+    try {
+      const result = await this.cacheManager.get<PriceMonitoringResult>(`monitoring_result_${monitoringId}`);
+      return result || null;
+    } catch (error) {
+      this.logger.error(`Failed to get monitoring result: ${error.message}`);
+      return null;
+    }
+  }
+
+  async getLatestMonitoringForTenant(tenantId: string): Promise<any> {
+    try {
+      const latest = await this.cacheManager.get(`latest_monitoring_${tenantId}`);
+      return latest || null;
+    } catch (error) {
+      this.logger.error(`Failed to get latest monitoring: ${error.message}`);
+      return null;
+    }
+  }
+
+  async getPriceHistoryAnalysis(
+    tenantId: string,
+    productId: string,
+    timeRange: { from: string; to: string },
+  ): Promise<any> {
+    try {
+      const priceHistory = await this.priceHistoryRepository.find({
+        where: {
+          tenantId,
+          competitiveProductId: productId,
+          recordedAt: Between(new Date(timeRange.from), new Date(timeRange.to)),
+        },
+        order: { recordedAt: 'ASC' },
+      });
+
+      const prices = priceHistory.map(h => Number(h.currentPrice));
+      
+      return {
+        productId,
+        timeRange,
+        dataPoints: priceHistory.length,
+        priceMovement: {
+          startPrice: prices[0] || 0,
+          endPrice: prices[prices.length - 1] || 0,
+          minPrice: Math.min(...prices),
+          maxPrice: Math.max(...prices),
+          averagePrice: prices.reduce((sum, p) => sum + p, 0) / prices.length,
+        },
+        volatility: this.calculateVolatility(prices),
+        trend: this.calculateTrendDirection(prices),
+        events: priceHistory.map(h => ({
+          date: h.recordedAt,
+          price: Number(h.currentPrice),
+          eventType: h.eventType,
+          reason: h.priceChangeReason,
+          change: Number(h.priceChange || 0),
+          changePercent: Number(h.priceChangePercent || 0),
+        })),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get price history analysis: ${error.message}`);
+      throw error;
+    }
+  }
+}

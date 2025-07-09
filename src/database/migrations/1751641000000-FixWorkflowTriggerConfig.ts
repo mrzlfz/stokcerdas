@@ -1,9 +1,10 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixWorkflowTriggerConfig1751641000000 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+export class FixWorkflowTriggerConfig1751641000000
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- ========================================
@@ -122,10 +123,10 @@ export class FixWorkflowTriggerConfig1751641000000 implements MigrationInterface
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove the camelCase columns that were added
@@ -184,6 +185,5 @@ export class FixWorkflowTriggerConfig1751641000000 implements MigrationInterface
                 END IF;
             END $$;
         `);
-    }
-
+  }
 }

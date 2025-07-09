@@ -64,6 +64,9 @@ import { WhatsAppAuthService } from '../integrations/whatsapp/services/whatsapp-
 import { IntegrationLogService } from '../integrations/common/services/integration-log.service';
 import { RateLimiterService } from '../integrations/common/services/rate-limiter.service';
 import { WebhookHandlerService } from '../integrations/common/services/webhook-handler.service';
+import { ErrorHandlingService } from '../integrations/common/services/error-handling.service';
+import { RetryService } from '../integrations/common/services/retry.service';
+import { CircuitBreakerService } from '../integrations/common/services/circuit-breaker.service';
 
 @Module({
   imports: [
@@ -171,6 +174,9 @@ import { WebhookHandlerService } from '../integrations/common/services/webhook-h
     IntegrationLogService,
     RateLimiterService,
     WebhookHandlerService,
+    ErrorHandlingService,
+    RetryService,
+    CircuitBreakerService,
   ],
 
   exports: [
@@ -184,6 +190,9 @@ import { WebhookHandlerService } from '../integrations/common/services/webhook-h
     IntegrationLogService,
     RateLimiterService,
     WebhookHandlerService,
+    ErrorHandlingService,
+    RetryService,
+    CircuitBreakerService,
   ],
 })
 export class ChannelsModule {}

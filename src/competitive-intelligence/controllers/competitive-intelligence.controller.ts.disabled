@@ -1,0 +1,710 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpStatus,
+  HttpException,
+  Logger,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import { CompetitiveIntelligenceService, CompetitiveIntelligenceRequest, CompetitiveIntelligenceResult } from '../services/competitive-intelligence.service';
+import { CompetitiveProduct, MarketplaceType, CompetitiveProductStatus, DataQuality } from '../entities/competitive-product.entity';
+import { CompetitivePriceHistory, PriceEventType, PriceChangeReason } from '../entities/competitive-price-history.entity';
+import { CompetitiveAnalysis, AnalysisType, AnalysisStatus, CompetitiveAdvantage, RiskLevel } from '../entities/competitive-analysis.entity';
+
+// DTOs for API requests/responses
+export class CreateCompetitiveProductDto {
+  ourProductId?: string;
+  externalProductId: string;
+  externalSku?: string;
+  marketplace: MarketplaceType;
+  sellerId?: string;
+  sellerName?: string;
+  name: string;
+  description?: string;
+  brand?: string;
+  category?: string;
+  currentPrice: number;
+  originalPrice?: number;
+  discountPercent?: number;
+  stockQuantity?: number;
+  rating?: number;
+  reviewCount?: number;
+  shippingCost?: number;
+  isDirectCompetitor?: boolean;
+  threatLevel?: number;
+  monitoringEnabled?: boolean;
+  checkInterval?: number;
+  region?: string;
+  availableCities?: string[];
+  metadata?: Record<string, any>;
+  notes?: string;
+  internalTags?: string[];
+}
+
+export class UpdateCompetitiveProductDto {
+  name?: string;
+  description?: string;
+  brand?: string;
+  category?: string;
+  currentPrice?: number;
+  originalPrice?: number;
+  discountPercent?: number;
+  stockQuantity?: number;
+  status?: CompetitiveProductStatus;
+  rating?: number;
+  reviewCount?: number;
+  shippingCost?: number;
+  isDirectCompetitor?: boolean;
+  threatLevel?: number;
+  monitoringEnabled?: boolean;
+  checkInterval?: number;
+  region?: string;
+  availableCities?: string[];
+  metadata?: Record<string, any>;
+  notes?: string;
+  internalTags?: string[];
+}
+
+export class CompetitiveIntelligenceQueryDto {
+  marketplace?: MarketplaceType;
+  productIds?: string;
+  analysisTypes?: string;
+  timeRangeFrom?: string;
+  timeRangeTo?: string;
+  includeIndonesianContext?: boolean;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  threatLevelMin?: number;
+  threatLevelMax?: number;
+  dataQuality?: DataQuality;
+  status?: CompetitiveProductStatus;
+  region?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export class TriggerAnalysisDto {
+  productIds?: string[];
+  analysisTypes?: AnalysisType[];
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  includeIndonesianContext?: boolean;
+  forceRefresh?: boolean;
+}
+
+export class BulkMonitoringUpdateDto {
+  productIds: string[];
+  monitoringEnabled?: boolean;
+  checkInterval?: number;
+  monitoringPriority?: number;
+  internalTags?: string[];
+}
+
+@ApiTags('Competitive Intelligence')
+@Controller('api/v1/competitive-intelligence')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class CompetitiveIntelligenceController {
+  private readonly logger = new Logger(CompetitiveIntelligenceController.name);
+
+  constructor(
+    private readonly competitiveIntelligenceService: CompetitiveIntelligenceService,
+  ) {}
+
+  @Get('overview')
+  @ApiOperation({
+    summary: 'Get competitive intelligence overview',
+    description: 'Retrieve comprehensive competitive intelligence summary with key metrics and insights',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Competitive intelligence overview retrieved successfully',
+  })
+  @ApiQuery({ name: 'marketplace', required: false, enum: MarketplaceType })
+  @ApiQuery({ name: 'timeRangeFrom', required: false, type: String })
+  @ApiQuery({ name: 'timeRangeTo', required: false, type: String })
+  @ApiQuery({ name: 'includeIndonesianContext', required: false, type: Boolean })
+  @Permissions('competitive_intelligence:read')
+  async getCompetitiveIntelligenceOverview(
+    @CurrentTenant() tenantId: string,
+    @Query() query: CompetitiveIntelligenceQueryDto,
+  ): Promise<CompetitiveIntelligenceResult> {
+    try {
+      this.logger.log(`Getting competitive intelligence overview for tenant: ${tenantId}`);
+
+      const request: CompetitiveIntelligenceRequest = {
+        tenantId,
+        marketplace: query.marketplace,
+        productIds: query.productIds ? query.productIds.split(',') : undefined,
+        analysisTypes: query.analysisTypes ? query.analysisTypes.split(',') as AnalysisType[] : undefined,
+        timeRange: query.timeRangeFrom && query.timeRangeTo ? {
+          from: query.timeRangeFrom,
+          to: query.timeRangeTo,
+        } : undefined,
+        includeIndonesianContext: query.includeIndonesianContext ?? true,
+        priority: query.priority || 'medium',
+      };
+
+      const result = await this.competitiveIntelligenceService.generateCompetitiveIntelligence(request);
+
+      this.logger.log(`Competitive intelligence overview generated: ${result.competitors.length} competitors analyzed`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get competitive intelligence overview: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve competitive intelligence overview',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('analyze')
+  @ApiOperation({
+    summary: 'Trigger competitive analysis',
+    description: 'Trigger comprehensive competitive analysis for specific products or entire catalog',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Competitive analysis triggered successfully',
+  })
+  @ApiBody({ type: TriggerAnalysisDto })
+  @Permissions('competitive_intelligence:analyze')
+  async triggerCompetitiveAnalysis(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) triggerDto: TriggerAnalysisDto,
+  ): Promise<{ message: string; analysisId: string; estimatedCompletionTime: string }> {
+    try {
+      this.logger.log(`Triggering competitive analysis for tenant: ${tenantId}`);
+
+      const request: CompetitiveIntelligenceRequest = {
+        tenantId,
+        productIds: triggerDto.productIds,
+        analysisTypes: triggerDto.analysisTypes,
+        includeIndonesianContext: triggerDto.includeIndonesianContext ?? true,
+        priority: triggerDto.priority || 'medium',
+      };
+
+      const result = await this.competitiveIntelligenceService.generateCompetitiveIntelligence(request);
+
+      this.logger.log(`Competitive analysis completed for ${result.competitors.length} competitors`);
+      
+      return {
+        message: 'Competitive analysis completed successfully',
+        analysisId: `analysis_${Date.now()}`,
+        estimatedCompletionTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes from now
+      };
+    } catch (error) {
+      this.logger.error(`Failed to trigger competitive analysis: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to trigger competitive analysis',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('products')
+  @ApiOperation({
+    summary: 'Get competitive products',
+    description: 'Retrieve list of competitive products with filtering and pagination',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Competitive products retrieved successfully',
+  })
+  @ApiQuery({ name: 'marketplace', required: false, enum: MarketplaceType })
+  @ApiQuery({ name: 'status', required: false, enum: CompetitiveProductStatus })
+  @ApiQuery({ name: 'dataQuality', required: false, enum: DataQuality })
+  @ApiQuery({ name: 'threatLevelMin', required: false, type: Number })
+  @ApiQuery({ name: 'threatLevelMax', required: false, type: Number })
+  @ApiQuery({ name: 'region', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @Permissions('competitive_intelligence:read')
+  async getCompetitiveProducts(
+    @CurrentTenant() tenantId: string,
+    @Query() query: CompetitiveIntelligenceQueryDto,
+  ): Promise<{
+    products: CompetitiveProduct[];
+    total: number;
+    summary: {
+      byMarketplace: Record<MarketplaceType, number>;
+      byStatus: Record<CompetitiveProductStatus, number>;
+      byDataQuality: Record<DataQuality, number>;
+      averageThreatLevel: number;
+      highThreatCount: number;
+    };
+  }> {
+    try {
+      this.logger.log(`Getting competitive products for tenant: ${tenantId}`);
+
+      const products = await this.competitiveIntelligenceService.getCompetitiveProducts({
+        tenantId,
+        marketplace: query.marketplace,
+        status: query.status,
+        dataQuality: query.dataQuality,
+        threatLevelRange: query.threatLevelMin && query.threatLevelMax ? {
+          min: query.threatLevelMin,
+          max: query.threatLevelMax,
+        } : undefined,
+        region: query.region,
+        limit: query.limit || 50,
+        offset: query.offset || 0,
+      });
+
+      // Generate summary statistics
+      const byMarketplace = {} as Record<MarketplaceType, number>;
+      const byStatus = {} as Record<CompetitiveProductStatus, number>;
+      const byDataQuality = {} as Record<DataQuality, number>;
+      let totalThreatLevel = 0;
+      let threatLevelCount = 0;
+      let highThreatCount = 0;
+
+      products.forEach(product => {
+        byMarketplace[product.marketplace] = (byMarketplace[product.marketplace] || 0) + 1;
+        byStatus[product.status] = (byStatus[product.status] || 0) + 1;
+        byDataQuality[product.dataQuality] = (byDataQuality[product.dataQuality] || 0) + 1;
+        
+        if (product.threatLevel) {
+          totalThreatLevel += product.threatLevel;
+          threatLevelCount++;
+          if (product.threatLevel >= 7) {
+            highThreatCount++;
+          }
+        }
+      });
+
+      const summary = {
+        byMarketplace,
+        byStatus,
+        byDataQuality,
+        averageThreatLevel: threatLevelCount > 0 ? totalThreatLevel / threatLevelCount : 0,
+        highThreatCount,
+      };
+
+      this.logger.log(`Retrieved ${products.length} competitive products with summary`);
+      return {
+        products,
+        total: products.length,
+        summary,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get competitive products: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve competitive products',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('products')
+  @ApiOperation({
+    summary: 'Add competitive product',
+    description: 'Add a new competitive product for monitoring and analysis',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Competitive product added successfully',
+  })
+  @ApiBody({ type: CreateCompetitiveProductDto })
+  @Permissions('competitive_intelligence:create')
+  async createCompetitiveProduct(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) createDto: CreateCompetitiveProductDto,
+  ): Promise<CompetitiveProduct> {
+    try {
+      this.logger.log(`Creating competitive product for tenant: ${tenantId}`);
+
+      const productData = {
+        ...createDto,
+        tenantId,
+        status: CompetitiveProductStatus.ACTIVE,
+        dataQuality: DataQuality.MEDIUM,
+        monitoringEnabled: createDto.monitoringEnabled ?? true,
+        checkInterval: createDto.checkInterval || 1440, // Daily by default
+        lastChecked: new Date(),
+      };
+
+      const product = await this.competitiveIntelligenceService.createCompetitiveProduct(productData);
+
+      this.logger.log(`Competitive product created with ID: ${product.id}`);
+      return product;
+    } catch (error) {
+      this.logger.error(`Failed to create competitive product: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to create competitive product',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('products/:id')
+  @ApiOperation({
+    summary: 'Get competitive product details',
+    description: 'Retrieve detailed information about a specific competitive product',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Competitive product details retrieved successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Competitive product ID' })
+  @Permissions('competitive_intelligence:read')
+  async getCompetitiveProduct(
+    @CurrentTenant() tenantId: string,
+    @Param('id', ParseUUIDPipe) productId: string,
+  ): Promise<{
+    product: CompetitiveProduct;
+    recentPriceHistory: CompetitivePriceHistory[];
+    latestAnalysis: CompetitiveAnalysis[];
+    competitiveMetrics: {
+      priceCompetitiveness: string;
+      performanceGap: number;
+      marketPosition: number;
+      riskAssessment: string;
+    };
+  }> {
+    try {
+      this.logger.log(`Getting competitive product details: ${productId}`);
+
+      const product = await this.competitiveIntelligenceService.getCompetitiveProductById(tenantId, productId);
+      const recentPriceHistory = await this.competitiveIntelligenceService.getRecentPriceHistory(tenantId, productId, 30);
+      const latestAnalysis = await this.competitiveIntelligenceService.getLatestAnalyses(tenantId, productId, 5);
+
+      // Calculate competitive metrics
+      const competitiveMetrics = {
+        priceCompetitiveness: product.priceCompetitiveness,
+        performanceGap: latestAnalysis[0]?.overallPerformanceGap || 0,
+        marketPosition: product.marketRanking || 0,
+        riskAssessment: latestAnalysis[0]?.riskLevel || 'medium',
+      };
+
+      this.logger.log(`Retrieved competitive product details for: ${product.name}`);
+      return {
+        product,
+        recentPriceHistory,
+        latestAnalysis,
+        competitiveMetrics,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get competitive product details: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve competitive product details',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  }
+
+  @Post('products/:id/update')
+  @ApiOperation({
+    summary: 'Update competitive product',
+    description: 'Update competitive product information and settings',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Competitive product updated successfully',
+  })
+  @ApiParam({ name: 'id', description: 'Competitive product ID' })
+  @ApiBody({ type: UpdateCompetitiveProductDto })
+  @Permissions('competitive_intelligence:update')
+  async updateCompetitiveProduct(
+    @CurrentTenant() tenantId: string,
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body(ValidationPipe) updateDto: UpdateCompetitiveProductDto,
+  ): Promise<CompetitiveProduct> {
+    try {
+      this.logger.log(`Updating competitive product: ${productId}`);
+
+      const updatedProduct = await this.competitiveIntelligenceService.updateCompetitiveProduct(
+        tenantId,
+        productId,
+        updateDto,
+      );
+
+      this.logger.log(`Competitive product updated: ${updatedProduct.name}`);
+      return updatedProduct;
+    } catch (error) {
+      this.logger.error(`Failed to update competitive product: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to update competitive product',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('products/bulk-monitoring')
+  @ApiOperation({
+    summary: 'Bulk update monitoring settings',
+    description: 'Update monitoring settings for multiple competitive products',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk monitoring update completed successfully',
+  })
+  @ApiBody({ type: BulkMonitoringUpdateDto })
+  @Permissions('competitive_intelligence:update')
+  async bulkUpdateMonitoring(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) bulkUpdateDto: BulkMonitoringUpdateDto,
+  ): Promise<{ updated: number; failed: number; errors: string[] }> {
+    try {
+      this.logger.log(`Bulk updating monitoring for ${bulkUpdateDto.productIds.length} products`);
+
+      const result = await this.competitiveIntelligenceService.bulkUpdateMonitoring(
+        tenantId,
+        bulkUpdateDto.productIds,
+        {
+          monitoringEnabled: bulkUpdateDto.monitoringEnabled,
+          checkInterval: bulkUpdateDto.checkInterval,
+          monitoringPriority: bulkUpdateDto.monitoringPriority,
+          internalTags: bulkUpdateDto.internalTags,
+        },
+      );
+
+      this.logger.log(`Bulk monitoring update completed: ${result.updated} updated, ${result.failed} failed`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to bulk update monitoring: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to bulk update monitoring settings',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('insights/market-trends')
+  @ApiOperation({
+    summary: 'Get market trend insights',
+    description: 'Retrieve competitive market trend analysis and insights',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Market trend insights retrieved successfully',
+  })
+  @ApiQuery({ name: 'marketplace', required: false, enum: MarketplaceType })
+  @ApiQuery({ name: 'category', required: false, type: String })
+  @ApiQuery({ name: 'region', required: false, type: String })
+  @ApiQuery({ name: 'timeRangeFrom', required: false, type: String })
+  @ApiQuery({ name: 'timeRangeTo', required: false, type: String })
+  @Permissions('competitive_intelligence:read')
+  async getMarketTrendInsights(
+    @CurrentTenant() tenantId: string,
+    @Query() query: CompetitiveIntelligenceQueryDto,
+  ): Promise<{
+    trends: {
+      priceMovements: Array<{
+        period: string;
+        averageChange: number;
+        direction: 'up' | 'down' | 'stable';
+        volatility: number;
+      }>;
+      competitorActivity: Array<{
+        marketplace: MarketplaceType;
+        newEntrants: number;
+        priceChanges: number;
+        stockouts: number;
+      }>;
+      marketDynamics: {
+        competitiveIntensity: number;
+        priceWars: boolean;
+        emergingThreats: number;
+        opportunities: number;
+      };
+    };
+    indonesianContext: {
+      seasonalFactors: string[];
+      regionalVariations: Record<string, any>;
+      businessCycleImpact: string;
+      holidayEffects: Array<{
+        event: string;
+        impact: number;
+        duration: number;
+      }>;
+    };
+    recommendations: Array<{
+      type: 'immediate' | 'strategic' | 'tactical';
+      action: string;
+      rationale: string;
+      expectedImpact: number;
+      timeline: string;
+    }>;
+  }> {
+    try {
+      this.logger.log(`Getting market trend insights for tenant: ${tenantId}`);
+
+      const insights = await this.competitiveIntelligenceService.getMarketTrendInsights({
+        tenantId,
+        marketplace: query.marketplace,
+        category: query.category,
+        region: query.region,
+        timeRange: query.timeRangeFrom && query.timeRangeTo ? {
+          from: query.timeRangeFrom,
+          to: query.timeRangeTo,
+        } : undefined,
+      });
+
+      this.logger.log(`Market trend insights generated successfully`);
+      return insights;
+    } catch (error) {
+      this.logger.error(`Failed to get market trend insights: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve market trend insights',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('reports/competitive-dashboard')
+  @ApiOperation({
+    summary: 'Get competitive dashboard data',
+    description: 'Retrieve comprehensive competitive intelligence dashboard data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Competitive dashboard data retrieved successfully',
+  })
+  @ApiQuery({ name: 'refreshData', required: false, type: Boolean })
+  @Permissions('competitive_intelligence:read')
+  async getCompetitiveDashboard(
+    @CurrentTenant() tenantId: string,
+    @Query('refreshData') refreshData?: boolean,
+  ): Promise<{
+    overview: {
+      totalCompetitors: number;
+      activeMonitoring: number;
+      highThreatAlerts: number;
+      priceAdvantages: number;
+      marketShareImpact: number;
+    };
+    topThreats: Array<{
+      productName: string;
+      marketplace: MarketplaceType;
+      threatLevel: number;
+      priceGap: number;
+      action: string;
+    }>;
+    priceMovements: Array<{
+      productName: string;
+      oldPrice: number;
+      newPrice: number;
+      change: number;
+      timestamp: string;
+    }>;
+    marketPositions: Array<{
+      category: string;
+      ourRanking: number;
+      totalCompetitors: number;
+      competitiveness: string;
+    }>;
+    indonesianInsights: {
+      regionalLeaders: Record<string, string>;
+      holidayImpacts: Array<{
+        event: string;
+        impact: string;
+        recommendation: string;
+      }>;
+      localCompetitorAdvantages: string[];
+    };
+    alerts: Array<{
+      type: 'price_drop' | 'new_competitor' | 'stock_out' | 'market_shift';
+      severity: 'low' | 'medium' | 'high' | 'critical';
+      message: string;
+      timestamp: string;
+      productId?: string;
+    }>;
+  }> {
+    try {
+      this.logger.log(`Getting competitive dashboard data for tenant: ${tenantId}`);
+
+      const dashboardData = await this.competitiveIntelligenceService.getCompetitiveDashboard(
+        tenantId,
+        refreshData,
+      );
+
+      this.logger.log(`Competitive dashboard data retrieved successfully`);
+      return dashboardData;
+    } catch (error) {
+      this.logger.error(`Failed to get competitive dashboard data: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve competitive dashboard data',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('reports/export')
+  @ApiOperation({
+    summary: 'Export competitive intelligence report',
+    description: 'Generate and export comprehensive competitive intelligence report',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Report export initiated successfully',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        format: { type: 'string', enum: ['pdf', 'excel', 'json'] },
+        includeCharts: { type: 'boolean' },
+        sections: { 
+          type: 'array', 
+          items: { 
+            type: 'string', 
+            enum: ['overview', 'threats', 'opportunities', 'trends', 'recommendations', 'indonesian_context'] 
+          } 
+        },
+        email: { type: 'string' },
+      },
+    },
+  })
+  @Permissions('competitive_intelligence:export')
+  async exportCompetitiveReport(
+    @CurrentTenant() tenantId: string,
+    @Body() exportRequest: {
+      format: 'pdf' | 'excel' | 'json';
+      includeCharts?: boolean;
+      sections?: string[];
+      email?: string;
+    },
+  ): Promise<{
+    exportId: string;
+    estimatedCompletionTime: string;
+    downloadUrl?: string;
+    message: string;
+  }> {
+    try {
+      this.logger.log(`Exporting competitive intelligence report for tenant: ${tenantId}`);
+
+      const exportResult = await this.competitiveIntelligenceService.exportCompetitiveReport(
+        tenantId,
+        exportRequest,
+      );
+
+      this.logger.log(`Report export initiated: ${exportResult.exportId}`);
+      return exportResult;
+    } catch (error) {
+      this.logger.error(`Failed to export competitive report: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to initiate report export',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+}

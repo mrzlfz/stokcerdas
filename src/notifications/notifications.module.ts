@@ -8,6 +8,7 @@ import { NotificationsController } from './controllers/notifications.controller'
 // Services
 import { NotificationsService } from './services/notifications.service';
 import { EmailService } from './services/email.service';
+import { EmailTemplateService } from './services/email-template.service';
 import { PushNotificationService } from './services/push-notification.service';
 import { SmsService } from './services/sms.service';
 
@@ -18,7 +19,7 @@ import { NotificationSubscription } from './entities/notification-subscription.e
 
 @Module({
   imports: [
-    ConfigModule,
+    ConfigModule.forRoot(),
     TypeOrmModule.forFeature([
       Notification,
       NotificationTemplate,
@@ -29,12 +30,14 @@ import { NotificationSubscription } from './entities/notification-subscription.e
   providers: [
     NotificationsService,
     EmailService,
+    EmailTemplateService,
     PushNotificationService,
     SmsService,
   ],
   exports: [
     NotificationsService,
     EmailService,
+    EmailTemplateService,
     PushNotificationService,
     SmsService,
   ],

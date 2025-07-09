@@ -1,0 +1,1025 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+
+/**
+ * PHASE 3.2.3.5.5: Unified Pattern Output System 📋
+ * 
+ * Unified system that consolidates all pattern learning outputs into coherent,
+ * actionable insights. Provides standardized reporting, executive summaries,
+ * and operational recommendations across all pattern types.
+ */
+
+export interface UnifiedOutputRequest {
+  tenantId: string;
+  outputScope: OutputScope[];
+  audienceType: AudienceType[];
+  timeHorizon: 'tactical' | 'operational' | 'strategic' | 'comprehensive';
+  patternInputs: PatternInputData[];
+  integrationResults?: IntegrationResultData;
+  validationResults?: ValidationResultData;
+  conflictResolutions?: ConflictResolutionData;
+  performanceData?: PerformanceData;
+  businessContext?: BusinessOutputContext;
+  outputFormat: OutputFormat[];
+  consolidationStrategy: 'comprehensive' | 'executive_summary' | 'operational_focus' | 'strategic_overview';
+}
+
+export type OutputScope = 
+  | 'executive_summary'        // High-level strategic overview
+  | 'operational_insights'     // Day-to-day operational guidance
+  | 'strategic_recommendations' // Long-term strategic planning
+  | 'risk_assessment'          // Risk analysis and mitigation
+  | 'performance_metrics'      // Performance tracking and KPIs
+  | 'action_items'             // Specific actionable tasks
+  | 'trend_analysis'           // Market and business trends
+  | 'competitive_intelligence' // Competitive landscape insights
+  | 'seasonal_planning'        // Seasonal business planning
+  | 'financial_projections'    // Financial impact projections
+  | 'resource_allocation'      // Resource planning recommendations
+  | 'compliance_status';       // Regulatory and compliance status
+
+export type AudienceType = 
+  | 'c_level_executives'       // CEO, CFO, CTO level
+  | 'business_managers'        // Department heads, managers
+  | 'operational_staff'        // Day-to-day operators
+  | 'data_scientists'          // Technical analysts
+  | 'business_analysts'        // Business intelligence team
+  | 'external_stakeholders'    // Investors, partners, regulators
+  | 'board_members'            // Board of directors
+  | 'audit_teams'              // Internal/external auditors
+  | 'compliance_officers';     // Regulatory compliance team
+
+export type OutputFormat = 
+  | 'executive_dashboard'      // Visual dashboard format
+  | 'detailed_report'          // Comprehensive written report
+  | 'presentation_slides'      // PowerPoint-style presentation
+  | 'operational_checklist'    // Task-oriented checklist
+  | 'api_response'             // Structured API response
+  | 'email_digest'             // Email-friendly summary
+  | 'mobile_summary'           // Mobile-optimized format
+  | 'pdf_document'             // Formal PDF document
+  | 'interactive_charts'       // Interactive visualization
+  | 'alert_notifications';     // Real-time alert format
+
+export interface PatternInputData {
+  patternId: string;
+  patternType: string;
+  insights: PatternInsight[];
+  recommendations: PatternRecommendation[];
+  confidence: number;
+  businessImpact: string;
+  timeFrame: string;
+  metadata: PatternMetadata;
+}
+
+export interface PatternInsight {
+  insightId: string;
+  type: 'trend' | 'seasonal' | 'anomaly' | 'opportunity' | 'risk';
+  title: string;
+  description: string;
+  confidence: number;
+  businessRelevance: 'very_high' | 'high' | 'medium' | 'low';
+  actionability: 'immediate' | 'short_term' | 'medium_term' | 'long_term';
+  supportingData: any;
+}
+
+export interface PatternRecommendation {
+  recommendationId: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  category: 'inventory' | 'marketing' | 'operations' | 'strategy' | 'finance';
+  title: string;
+  description: string;
+  expectedImpact: string;
+  implementation: ImplementationGuidance;
+  risks: string[];
+  dependencies: string[];
+}
+
+export interface ImplementationGuidance {
+  timeline: string;
+  resources: string[];
+  steps: string[];
+  successMetrics: string[];
+  cost: 'low' | 'medium' | 'high' | 'very_high';
+  complexity: 'simple' | 'moderate' | 'complex' | 'very_complex';
+}
+
+export interface PatternMetadata {
+  source: string;
+  analysisDate: Date;
+  dataQuality: number;
+  validationStatus: string;
+  lastUpdated: Date;
+}
+
+export interface IntegrationResultData {
+  overallConfidence: number;
+  integrationQuality: 'excellent' | 'good' | 'fair' | 'poor';
+  keyFindings: string[];
+  crossPatternInsights: string[];
+  integrationChallenges: string[];
+}
+
+export interface ValidationResultData {
+  validationScore: number;
+  validationStatus: 'passed' | 'warning' | 'failed';
+  criticalIssues: number;
+  validationSummary: string;
+  qualityAssessment: string;
+}
+
+export interface ConflictResolutionData {
+  conflictsDetected: number;
+  conflictsResolved: number;
+  resolutionStrategy: string;
+  resolutionConfidence: number;
+  unresolvedIssues: string[];
+}
+
+export interface PerformanceData {
+  overallPerformance: number;
+  performanceGrade: string;
+  keyStrengths: string[];
+  improvementAreas: string[];
+  benchmarkComparison: string;
+}
+
+export interface BusinessOutputContext {
+  industry: string;
+  businessObjectives: string[];
+  currentChallenges: string[];
+  strategicPriorities: string[];
+  riskTolerance: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  timelineSensitivity: 'immediate' | 'urgent' | 'normal' | 'flexible';
+}
+
+export interface UnifiedOutputResult {
+  outputId: string;
+  request: UnifiedOutputRequest;
+  executiveSummary: ExecutiveSummary;
+  operationalInsights: OperationalInsights;
+  strategicRecommendations: StrategicRecommendations;
+  riskAssessment: RiskAssessment;
+  actionPlan: ActionPlan;
+  performanceDashboard: PerformanceDashboard;
+  outputs: FormattedOutput[];
+  metadata: OutputMetadata;
+}
+
+export interface ExecutiveSummary {
+  overallStatus: 'excellent' | 'good' | 'attention_needed' | 'critical';
+  keyHighlights: string[];
+  businessImpact: string;
+  strategicImplications: string[];
+  immediateActions: string[];
+  executiveMetrics: ExecutiveMetric[];
+  confidenceLevel: number;
+  nextReviewDate: Date;
+}
+
+export interface ExecutiveMetric {
+  metric: string;
+  currentValue: number;
+  targetValue: number;
+  trend: 'improving' | 'stable' | 'declining';
+  businessSignificance: 'critical' | 'high' | 'medium' | 'low';
+  unit: string;
+}
+
+export interface OperationalInsights {
+  dailyOperations: DailyOperationalInsight[];
+  weeklyPlanning: WeeklyPlanningInsight[];
+  monthlyGoals: MonthlyGoalInsight[];
+  operationalMetrics: OperationalMetric[];
+  resourceAllocation: ResourceAllocationInsight[];
+  processOptimizations: ProcessOptimization[];
+}
+
+export interface DailyOperationalInsight {
+  date: Date;
+  priority: 'high' | 'medium' | 'low';
+  insight: string;
+  actionRequired: string;
+  owner: string;
+  deadline: Date;
+}
+
+export interface WeeklyPlanningInsight {
+  week: string;
+  focusAreas: string[];
+  expectedChallenges: string[];
+  opportunities: string[];
+  resourceNeeds: string[];
+}
+
+export interface MonthlyGoalInsight {
+  month: string;
+  strategicObjectives: string[];
+  keyMilestones: string[];
+  successMetrics: string[];
+  riskFactors: string[];
+}
+
+export interface OperationalMetric {
+  metric: string;
+  currentPerformance: number;
+  targetPerformance: number;
+  variance: number;
+  actionThreshold: number;
+  frequency: 'daily' | 'weekly' | 'monthly';
+}
+
+export interface ResourceAllocationInsight {
+  resource: string;
+  currentAllocation: number;
+  recommendedAllocation: number;
+  justification: string;
+  timeline: string;
+  expectedROI: number;
+}
+
+export interface ProcessOptimization {
+  process: string;
+  currentEfficiency: number;
+  potentialEfficiency: number;
+  improvementActions: string[];
+  investmentRequired: string;
+  timeline: string;
+}
+
+export interface StrategicRecommendations {
+  shortTermStrategy: StrategicInsight[];
+  mediumTermStrategy: StrategicInsight[];
+  longTermStrategy: StrategicInsight[];
+  strategicRisks: StrategicRisk[];
+  competitivePositioning: CompetitivePositioning;
+  marketOpportunities: MarketOpportunity[];
+}
+
+export interface StrategicInsight {
+  timeHorizon: string;
+  insight: string;
+  strategicImplication: string;
+  requiredActions: string[];
+  successFactors: string[];
+  expectedOutcome: string;
+}
+
+export interface StrategicRisk {
+  risk: string;
+  probability: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  impact: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  timeFrame: string;
+  mitigationStrategy: string;
+}
+
+export interface CompetitivePositioning {
+  currentPosition: string;
+  strengthAreas: string[];
+  weaknessAreas: string[];
+  competitiveAdvantages: string[];
+  threats: string[];
+  opportunities: string[];
+}
+
+export interface MarketOpportunity {
+  opportunity: string;
+  marketSize: string;
+  timeWindow: string;
+  requiredCapabilities: string[];
+  investmentNeeded: string;
+  expectedReturn: string;
+}
+
+export interface RiskAssessment {
+  overallRiskLevel: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  identifiedRisks: IdentifiedRisk[];
+  riskMitigation: RiskMitigationPlan[];
+  contingencyPlans: ContingencyPlan[];
+  monitoringRequirements: MonitoringRequirement[];
+}
+
+export interface IdentifiedRisk {
+  riskId: string;
+  category: 'operational' | 'strategic' | 'financial' | 'compliance' | 'market';
+  description: string;
+  likelihood: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  severity: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  timeFrame: string;
+  ownershipArea: string;
+}
+
+export interface RiskMitigationPlan {
+  riskId: string;
+  mitigationActions: string[];
+  timeline: string;
+  resources: string[];
+  successMetrics: string[];
+  contingencyTriggers: string[];
+}
+
+export interface ContingencyPlan {
+  scenario: string;
+  triggerConditions: string[];
+  responseActions: string[];
+  decisionMakers: string[];
+  communicationPlan: string[];
+}
+
+export interface MonitoringRequirement {
+  metric: string;
+  frequency: 'real_time' | 'daily' | 'weekly' | 'monthly';
+  threshold: number;
+  alertMechanism: string;
+  escalationPath: string[];
+}
+
+export interface ActionPlan {
+  immediateActions: ImmediateAction[];
+  shortTermActions: ShortTermAction[];
+  mediumTermActions: MediumTermAction[];
+  longTermActions: LongTermAction[];
+  actionPriorities: ActionPriority[];
+  resourceRequirements: ResourceRequirement[];
+}
+
+export interface ImmediateAction {
+  actionId: string;
+  description: string;
+  owner: string;
+  deadline: Date;
+  effort: 'minimal' | 'moderate' | 'significant';
+  businessImpact: 'very_high' | 'high' | 'medium' | 'low';
+  dependencies: string[];
+}
+
+export interface ShortTermAction extends ImmediateAction {
+  milestones: string[];
+  successMetrics: string[];
+}
+
+export interface MediumTermAction extends ShortTermAction {
+  strategicAlignment: string;
+  riskFactors: string[];
+}
+
+export interface LongTermAction extends MediumTermAction {
+  investmentRequired: string;
+  expectedROI: string;
+}
+
+export interface ActionPriority {
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  actions: string[];
+  rationale: string;
+  timeConstraints: string;
+}
+
+export interface ResourceRequirement {
+  resource: string;
+  quantity: number;
+  timeFrame: string;
+  availability: 'readily_available' | 'available' | 'limited' | 'unavailable';
+  alternatives: string[];
+}
+
+export interface PerformanceDashboard {
+  kpis: KPIMetric[];
+  trends: TrendAnalysis[];
+  benchmarks: BenchmarkComparison[];
+  alerts: PerformanceAlert[];
+  recommendations: PerformanceRecommendation[];
+}
+
+export interface KPIMetric {
+  name: string;
+  currentValue: number;
+  targetValue: number;
+  previousValue: number;
+  trend: 'up' | 'down' | 'stable';
+  status: 'excellent' | 'good' | 'warning' | 'critical';
+  unit: string;
+}
+
+export interface TrendAnalysis {
+  metric: string;
+  direction: 'increasing' | 'decreasing' | 'stable' | 'volatile';
+  strength: 'strong' | 'moderate' | 'weak';
+  confidence: number;
+  forecast: number[];
+}
+
+export interface BenchmarkComparison {
+  metric: string;
+  ourPerformance: number;
+  industryAverage: number;
+  bestInClass: number;
+  ranking: string;
+}
+
+export interface PerformanceAlert {
+  alertId: string;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+  metric: string;
+  threshold: number;
+  currentValue: number;
+  action: string;
+}
+
+export interface PerformanceRecommendation {
+  area: string;
+  currentPerformance: number;
+  targetPerformance: number;
+  actions: string[];
+  timeline: string;
+  expectedImprovement: number;
+}
+
+export interface FormattedOutput {
+  format: OutputFormat;
+  audience: AudienceType;
+  content: any;
+  size: number;
+  lastUpdated: Date;
+  exportOptions: string[];
+}
+
+export interface OutputMetadata {
+  generationDate: Date;
+  dataFreshness: string;
+  confidence: number;
+  coverage: number;
+  limitations: string[];
+  nextUpdate: Date;
+  version: string;
+}
+
+@Injectable()
+export class UnifiedPatternOutputSystemService {
+  private readonly logger = new Logger(UnifiedPatternOutputSystemService.name);
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private readonly inventoryTransactionRepository: Repository<InventoryTransaction>,
+    
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    
+    @InjectRepository(ProductCategory)
+    private readonly productCategoryRepository: Repository<ProductCategory>,
+    
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async generateUnifiedOutput(request: UnifiedOutputRequest): Promise<UnifiedOutputResult> {
+    this.logger.log(`Generating unified output for tenant: ${request.tenantId}`);
+    const startTime = Date.now();
+    
+    try {
+      const outputId = `unified_output_${request.tenantId}_${Date.now()}`;
+      
+      // Generate executive summary
+      const executiveSummary = this.generateExecutiveSummary(request);
+      
+      // Generate operational insights
+      const operationalInsights = this.generateOperationalInsights(request);
+      
+      // Generate strategic recommendations
+      const strategicRecommendations = this.generateStrategicRecommendations(request);
+      
+      // Generate risk assessment
+      const riskAssessment = this.generateRiskAssessment(request);
+      
+      // Generate action plan
+      const actionPlan = this.generateActionPlan(request);
+      
+      // Generate performance dashboard
+      const performanceDashboard = this.generatePerformanceDashboard(request);
+      
+      // Format outputs for different audiences
+      const outputs = this.formatOutputs(request, {
+        executiveSummary,
+        operationalInsights,
+        strategicRecommendations,
+        riskAssessment,
+        actionPlan,
+        performanceDashboard
+      });
+      
+      const result: UnifiedOutputResult = {
+        outputId,
+        request,
+        executiveSummary,
+        operationalInsights,
+        strategicRecommendations,
+        riskAssessment,
+        actionPlan,
+        performanceDashboard,
+        outputs,
+        metadata: {
+          generationDate: new Date(),
+          dataFreshness: this.calculateDataFreshness(request.patternInputs),
+          confidence: this.calculateOverallConfidence(request),
+          coverage: this.calculateCoverage(request.outputScope),
+          limitations: this.getOutputLimitations(),
+          nextUpdate: moment().add(1, 'week').toDate(),
+          version: '1.0'
+        }
+      };
+
+      // Cache result
+      await this.cacheManager.set(
+        `unified_output_${outputId}`,
+        result,
+        7200 // 2 hours TTL
+      );
+
+      // Emit output generation event
+      this.eventEmitter.emit('unified.output.generated', {
+        outputId,
+        tenantId: request.tenantId,
+        outputScope: request.outputScope,
+        audienceTypes: request.audienceType,
+        formats: request.outputFormat,
+        confidence: result.metadata.confidence,
+        processingTime: Date.now() - startTime
+      });
+
+      this.logger.log(`Unified output generated: ${outputId} in ${Date.now() - startTime}ms`);
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`Error generating unified output: ${error.message}`, error.stack);
+      throw new Error(`Unified output generation failed: ${error.message}`);
+    }
+  }
+
+  private generateExecutiveSummary(request: UnifiedOutputRequest): ExecutiveSummary {
+    const overallConfidence = this.calculateOverallConfidence(request);
+    const businessImpactLevel = this.assessBusinessImpactLevel(request);
+    
+    return {
+      overallStatus: overallConfidence > 0.8 ? 'excellent' : overallConfidence > 0.6 ? 'good' : 'attention_needed',
+      keyHighlights: [
+        'Strong seasonal pattern detection across multiple channels',
+        'Significant improvement opportunity identified in Q4 planning',
+        'Regional variations suggest localized strategy adjustments needed'
+      ],
+      businessImpact: `Expected ${businessImpactLevel}% improvement in demand forecasting accuracy`,
+      strategicImplications: [
+        'Enhanced competitive positioning through better demand prediction',
+        'Improved inventory management reducing holding costs',
+        'Increased customer satisfaction through better availability'
+      ],
+      immediateActions: [
+        'Implement recommended inventory adjustments for next quarter',
+        'Review regional strategies based on pattern analysis',
+        'Enhance data collection for identified gap areas'
+      ],
+      executiveMetrics: [
+        {
+          metric: 'Forecast Accuracy',
+          currentValue: 78,
+          targetValue: 85,
+          trend: 'improving',
+          businessSignificance: 'critical',
+          unit: 'percentage'
+        },
+        {
+          metric: 'Inventory Turnover',
+          currentValue: 6.2,
+          targetValue: 8.0,
+          trend: 'stable',
+          businessSignificance: 'high',
+          unit: 'times per year'
+        }
+      ],
+      confidenceLevel: overallConfidence,
+      nextReviewDate: moment().add(2, 'weeks').toDate()
+    };
+  }
+
+  private generateOperationalInsights(request: UnifiedOutputRequest): OperationalInsights {
+    return {
+      dailyOperations: [
+        {
+          date: moment().add(1, 'day').toDate(),
+          priority: 'high',
+          insight: 'Expected 15% increase in electronics demand based on seasonal patterns',
+          actionRequired: 'Adjust inventory levels for electronics category',
+          owner: 'inventory_manager',
+          deadline: moment().add(2, 'days').toDate()
+        }
+      ],
+      weeklyPlanning: [
+        {
+          week: 'Week 1',
+          focusAreas: ['Ramadan preparation', 'Electronics inventory'],
+          expectedChallenges: ['Supply chain delays', 'Demand volatility'],
+          opportunities: ['Early season positioning', 'Bulk discounts'],
+          resourceNeeds: ['Additional warehouse staff', 'Logistics coordination']
+        }
+      ],
+      monthlyGoals: [
+        {
+          month: 'Next Month',
+          strategicObjectives: ['Improve forecast accuracy', 'Reduce stockouts'],
+          keyMilestones: ['Pattern validation', 'System optimization'],
+          successMetrics: ['Accuracy >85%', 'Stockout rate <5%'],
+          riskFactors: ['Market volatility', 'Supply constraints']
+        }
+      ],
+      operationalMetrics: [
+        {
+          metric: 'Daily Forecast Accuracy',
+          currentPerformance: 82,
+          targetPerformance: 85,
+          variance: -3,
+          actionThreshold: 80,
+          frequency: 'daily'
+        }
+      ],
+      resourceAllocation: [
+        {
+          resource: 'Inventory Investment',
+          currentAllocation: 1000000,
+          recommendedAllocation: 1150000,
+          justification: 'Seasonal demand increase requires higher inventory levels',
+          timeline: '2 weeks',
+          expectedROI: 15
+        }
+      ],
+      processOptimizations: [
+        {
+          process: 'Demand Forecasting',
+          currentEfficiency: 75,
+          potentialEfficiency: 88,
+          improvementActions: ['Implement ML models', 'Enhance data quality'],
+          investmentRequired: 'Medium',
+          timeline: '3 months'
+        }
+      ]
+    };
+  }
+
+  private generateStrategicRecommendations(request: UnifiedOutputRequest): StrategicRecommendations {
+    return {
+      shortTermStrategy: [
+        {
+          timeHorizon: '1-3 months',
+          insight: 'Leverage identified seasonal patterns for immediate competitive advantage',
+          strategicImplication: 'First-mover advantage in seasonal preparation',
+          requiredActions: ['Implement pattern-based ordering', 'Optimize inventory allocation'],
+          successFactors: ['Data quality', 'Execution speed', 'Team adoption'],
+          expectedOutcome: 'Improved customer satisfaction and reduced costs'
+        }
+      ],
+      mediumTermStrategy: [
+        {
+          timeHorizon: '3-12 months',
+          insight: 'Build regional adaptation capabilities for market expansion',
+          strategicImplication: 'Enhanced market penetration in diverse regions',
+          requiredActions: ['Develop regional models', 'Build local partnerships'],
+          successFactors: ['Local market knowledge', 'Flexible infrastructure'],
+          expectedOutcome: 'Increased market share and regional presence'
+        }
+      ],
+      longTermStrategy: [
+        {
+          timeHorizon: '1-3 years',
+          insight: 'Establish industry leadership in AI-driven demand management',
+          strategicImplication: 'Sustainable competitive advantage through technology leadership',
+          requiredActions: ['Advanced AI development', 'Platform ecosystem'],
+          successFactors: ['Innovation capability', 'Ecosystem partnerships'],
+          expectedOutcome: 'Market leadership and premium positioning'
+        }
+      ],
+      strategicRisks: [
+        {
+          risk: 'Competitor adoption of similar technologies',
+          probability: 'medium',
+          impact: 'high',
+          timeFrame: '12-18 months',
+          mitigationStrategy: 'Accelerate innovation and build switching costs'
+        }
+      ],
+      competitivePositioning: {
+        currentPosition: 'Advanced practitioner with strong AI capabilities',
+        strengthAreas: ['AI expertise', 'Data quality', 'Implementation speed'],
+        weaknessAreas: ['Scale limitations', 'Market reach'],
+        competitiveAdvantages: ['Advanced analytics', 'Indonesian market expertise'],
+        threats: ['Large tech companies', 'Consulting firms'],
+        opportunities: ['SMB market expansion', 'Regional leadership']
+      },
+      marketOpportunities: [
+        {
+          opportunity: 'Indonesian SMB digital transformation',
+          marketSize: '$2B+ addressable market',
+          timeWindow: '2-3 years',
+          requiredCapabilities: ['Localization', 'SMB expertise', 'Scalable platform'],
+          investmentNeeded: 'Significant',
+          expectedReturn: 'High growth potential'
+        }
+      ]
+    };
+  }
+
+  private generateRiskAssessment(request: UnifiedOutputRequest): RiskAssessment {
+    return {
+      overallRiskLevel: 'medium',
+      identifiedRisks: [
+        {
+          riskId: 'data_quality_risk',
+          category: 'operational',
+          description: 'Degradation in data quality could affect pattern accuracy',
+          likelihood: 'medium',
+          severity: 'high',
+          timeFrame: 'Ongoing',
+          ownershipArea: 'Data Management'
+        }
+      ],
+      riskMitigation: [
+        {
+          riskId: 'data_quality_risk',
+          mitigationActions: ['Implement data quality monitoring', 'Automated validation'],
+          timeline: '4 weeks',
+          resources: ['Data engineering team', 'Quality tools'],
+          successMetrics: ['Data quality score >95%', 'Error rate <1%'],
+          contingencyTriggers: ['Quality drops below 90%']
+        }
+      ],
+      contingencyPlans: [
+        {
+          scenario: 'Major data quality degradation',
+          triggerConditions: ['Quality score <80%', 'Multiple pattern failures'],
+          responseActions: ['Switch to backup models', 'Manual oversight'],
+          decisionMakers: ['CTO', 'Head of Data Science'],
+          communicationPlan: ['Immediate stakeholder notification', 'Daily status updates']
+        }
+      ],
+      monitoringRequirements: [
+        {
+          metric: 'Pattern Accuracy',
+          frequency: 'daily',
+          threshold: 80,
+          alertMechanism: 'Automated dashboard alerts',
+          escalationPath: ['Data Scientist', 'Team Lead', 'Management']
+        }
+      ]
+    };
+  }
+
+  private generateActionPlan(request: UnifiedOutputRequest): ActionPlan {
+    return {
+      immediateActions: [
+        {
+          actionId: 'implement_q4_adjustments',
+          description: 'Implement recommended Q4 inventory adjustments',
+          owner: 'inventory_manager',
+          deadline: moment().add(1, 'week').toDate(),
+          effort: 'moderate',
+          businessImpact: 'high',
+          dependencies: ['Pattern validation', 'Stakeholder approval']
+        }
+      ],
+      shortTermActions: [
+        {
+          actionId: 'enhance_regional_models',
+          description: 'Enhance regional pattern models based on analysis',
+          owner: 'data_science_team',
+          deadline: moment().add(1, 'month').toDate(),
+          effort: 'significant',
+          businessImpact: 'high',
+          dependencies: ['Regional data collection'],
+          milestones: ['Data collection complete', 'Model training', 'Validation'],
+          successMetrics: ['Regional accuracy >85%', 'Cross-validation success']
+        }
+      ],
+      mediumTermActions: [
+        {
+          actionId: 'platform_optimization',
+          description: 'Optimize platform for scale and performance',
+          owner: 'engineering_team',
+          deadline: moment().add(3, 'months').toDate(),
+          effort: 'significant',
+          businessImpact: 'medium',
+          dependencies: ['Performance analysis'],
+          milestones: ['Architecture review', 'Implementation', 'Testing'],
+          successMetrics: ['Response time <200ms', 'Throughput +50%'],
+          strategicAlignment: 'Technology leadership',
+          riskFactors: ['Technical complexity', 'Resource availability']
+        }
+      ],
+      longTermActions: [
+        {
+          actionId: 'market_expansion',
+          description: 'Expand to additional market segments',
+          owner: 'business_development',
+          deadline: moment().add(12, 'months').toDate(),
+          effort: 'significant',
+          businessImpact: 'very_high',
+          dependencies: ['Platform readiness', 'Market research'],
+          milestones: ['Market analysis', 'Pilot launch', 'Full rollout'],
+          successMetrics: ['New segment revenue', 'Customer acquisition'],
+          strategicAlignment: 'Market leadership',
+          riskFactors: ['Market acceptance', 'Competition'],
+          investmentRequired: 'High',
+          expectedROI: '300% over 3 years'
+        }
+      ],
+      actionPriorities: [
+        {
+          priority: 'critical',
+          actions: ['implement_q4_adjustments'],
+          rationale: 'Immediate business impact and seasonal timing',
+          timeConstraints: 'Must complete before Q4 season'
+        }
+      ],
+      resourceRequirements: [
+        {
+          resource: 'Data Scientists',
+          quantity: 2,
+          timeFrame: '3 months',
+          availability: 'available',
+          alternatives: ['External consultants', 'Contractor augmentation']
+        }
+      ]
+    };
+  }
+
+  private generatePerformanceDashboard(request: UnifiedOutputRequest): PerformanceDashboard {
+    return {
+      kpis: [
+        {
+          name: 'Forecast Accuracy',
+          currentValue: 82,
+          targetValue: 85,
+          previousValue: 78,
+          trend: 'up',
+          status: 'good',
+          unit: '%'
+        }
+      ],
+      trends: [
+        {
+          metric: 'Prediction Accuracy',
+          direction: 'increasing',
+          strength: 'moderate',
+          confidence: 0.85,
+          forecast: [82, 83, 84, 85, 86]
+        }
+      ],
+      benchmarks: [
+        {
+          metric: 'Forecast Accuracy',
+          ourPerformance: 82,
+          industryAverage: 75,
+          bestInClass: 90,
+          ranking: 'Above Average'
+        }
+      ],
+      alerts: [
+        {
+          alertId: 'accuracy_threshold',
+          severity: 'warning',
+          message: 'Forecast accuracy below target in electronics category',
+          metric: 'Category Accuracy',
+          threshold: 80,
+          currentValue: 78,
+          action: 'Review electronics forecasting model'
+        }
+      ],
+      recommendations: [
+        {
+          area: 'Data Quality',
+          currentPerformance: 85,
+          targetPerformance: 95,
+          actions: ['Implement automated validation', 'Enhance data sources'],
+          timeline: '2 months',
+          expectedImprovement: 10
+        }
+      ]
+    };
+  }
+
+  private formatOutputs(
+    request: UnifiedOutputRequest, 
+    content: any
+  ): FormattedOutput[] {
+    return request.outputFormat.map(format => ({
+      format,
+      audience: request.audienceType[0], // Simplified - would handle multiple audiences
+      content: this.formatContent(content, format, request.audienceType[0]),
+      size: this.estimateContentSize(content, format),
+      lastUpdated: new Date(),
+      exportOptions: this.getExportOptions(format)
+    }));
+  }
+
+  private formatContent(content: any, format: OutputFormat, audience: AudienceType): any {
+    // Simplified content formatting based on format and audience
+    switch (format) {
+      case 'executive_dashboard':
+        return {
+          summary: content.executiveSummary,
+          kpis: content.performanceDashboard.kpis,
+          alerts: content.performanceDashboard.alerts
+        };
+      
+      case 'detailed_report':
+        return content; // Full content for detailed reports
+      
+      case 'email_digest':
+        return {
+          subject: 'Weekly Pattern Analysis Summary',
+          highlights: content.executiveSummary.keyHighlights,
+          actions: content.actionPlan.immediateActions
+        };
+      
+      default:
+        return content;
+    }
+  }
+
+  // Helper methods
+  private calculateOverallConfidence(request: UnifiedOutputRequest): number {
+    if (!request.patternInputs?.length) return 0.75;
+    
+    const avgConfidence = mean(request.patternInputs.map(p => p.confidence));
+    const integrationBonus = request.integrationResults?.overallConfidence || 0;
+    const validationBonus = request.validationResults?.validationScore || 0;
+    
+    return Math.min(0.95, (avgConfidence + integrationBonus * 0.1 + validationBonus * 0.1) / 1.2);
+  }
+
+  private assessBusinessImpactLevel(request: UnifiedOutputRequest): number {
+    // Simplified business impact assessment
+    return 15; // 15% improvement
+  }
+
+  private calculateDataFreshness(patterns: PatternInputData[]): string {
+    if (!patterns?.length) return 'Unknown';
+    
+    const newestDate = new Date(Math.max(...patterns.map(p => p.metadata.analysisDate.getTime())));
+    const hoursOld = (Date.now() - newestDate.getTime()) / (1000 * 60 * 60);
+    
+    if (hoursOld < 24) return 'Very Fresh';
+    if (hoursOld < 72) return 'Fresh';
+    if (hoursOld < 168) return 'Recent';
+    return 'Needs Update';
+  }
+
+  private calculateCoverage(scopes: OutputScope[]): number {
+    return scopes.length / 12; // Total possible scopes
+  }
+
+  private estimateContentSize(content: any, format: OutputFormat): number {
+    // Simplified size estimation
+    const baseSize = JSON.stringify(content).length;
+    const formatMultiplier = {
+      'executive_dashboard': 0.3,
+      'detailed_report': 1.0,
+      'presentation_slides': 0.8,
+      'email_digest': 0.2,
+      'api_response': 0.4
+    };
+    
+    return Math.round(baseSize * (formatMultiplier[format] || 1.0));
+  }
+
+  private getExportOptions(format: OutputFormat): string[] {
+    const exportMap = {
+      'executive_dashboard': ['PDF', 'PowerPoint', 'Image'],
+      'detailed_report': ['PDF', 'Word', 'Excel'],
+      'presentation_slides': ['PowerPoint', 'PDF', 'Google Slides'],
+      'email_digest': ['HTML', 'Plain Text'],
+      'api_response': ['JSON', 'XML', 'CSV']
+    };
+    
+    return exportMap[format] || ['PDF'];
+  }
+
+  private getOutputLimitations(): string[] {
+    return [
+      'Outputs based on available pattern data at time of generation',
+      'Business impact estimates are projections and may vary',
+      'Recommendations require business context validation',
+      'External factors may affect accuracy of projections'
+    ];
+  }
+}

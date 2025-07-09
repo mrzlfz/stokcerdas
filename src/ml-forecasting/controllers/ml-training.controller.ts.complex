@@ -1,0 +1,1144 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiQuery,
+  ApiParam,
+  ApiProperty,
+} from '@nestjs/swagger';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  IsArray,
+  IsObject,
+  IsNumber,
+  Min,
+  Max,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { GetTenant } from '../../common/decorators/tenant.decorator';
+import { GetUser } from '../../common/decorators/user.decorator';
+import { UserRole } from '../../users/entities/user.entity';
+import { BaseAnalyticsController } from '../../analytics/controllers/base-analytics.controller';
+
+import {
+  ModelTrainingService,
+  TrainingRequest,
+} from '../services/model-training.service';
+import { ModelType, ModelStatus, MLModel } from '../entities/ml-model.entity';
+import { TrainingJob, TrainingJobStatus, TrainingJobType } from '../entities/training-job.entity';
+
+// DTOs
+class StartTrainingDto {
+  @ApiProperty({ description: 'Model name' })
+  @IsString()
+  modelName: string;
+
+  @ApiProperty({ description: 'Model type to train' })
+  @IsEnum(ModelType)
+  modelType: ModelType;
+
+  @ApiProperty({
+    description: 'Product ID for product-specific models (optional)',
+  })
+  @IsOptional()
+  @IsString()
+  productId?: string;
+
+  @ApiProperty({
+    description: 'Category ID for category-level models (optional)',
+  })
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @ApiProperty({
+    description: 'Location ID for location-specific models (optional)',
+  })
+  @IsOptional()
+  @IsString()
+  locationId?: string;
+
+  @ApiProperty({ description: 'Training data start date' })
+  @IsDateString()
+  trainingDataFrom: string;
+
+  @ApiProperty({ description: 'Training data end date' })
+  @IsDateString()
+  trainingDataTo: string;
+
+  @ApiProperty({ description: 'Product IDs to include in training (optional)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  productIds?: string[];
+
+  @ApiProperty({
+    description: 'Category IDs to include in training (optional)',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categoryIds?: string[];
+
+  @ApiProperty({
+    description: 'Location IDs to include in training (optional)',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  locationIds?: string[];
+
+  @ApiProperty({ description: 'Validation split ratio (0.1-0.9)' })
+  @IsNumber()
+  @Min(0.1)
+  @Max(0.9)
+  validationSplit: number = 0.8;
+
+  @ApiProperty({ description: 'Validation method' })
+  @IsEnum(['time_series', 'random'])
+  validationMethod: 'time_series' | 'random' = 'time_series';
+
+  @ApiProperty({ description: 'Feature list for training' })
+  @IsArray()
+  @IsString({ each: true })
+  features: string[];
+
+  @ApiProperty({ description: 'Target variable for prediction' })
+  @IsString()
+  target: string;
+
+  @ApiProperty({ description: 'Model hyperparameters' })
+  @IsObject()
+  hyperparameters: Record<string, any>;
+}
+
+class RetrainModelDto {
+  @ApiProperty({ description: 'New training data start date (optional)' })
+  @IsOptional()
+  @IsDateString()
+  trainingDataFrom?: string;
+
+  @ApiProperty({ description: 'New training data end date (optional)' })
+  @IsOptional()
+  @IsDateString()
+  trainingDataTo?: string;
+
+  @ApiProperty({ description: 'Updated hyperparameters (optional)' })
+  @IsOptional()
+  @IsObject()
+  hyperparameters?: Record<string, any>;
+
+  @ApiProperty({ description: 'Updated feature list (optional)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  features?: string[];
+}
+
+class TrainingJobQueryDto {
+  @ApiProperty({ description: 'Filter by model ID' })
+  @IsOptional()
+  @IsString()
+  modelId?: string;
+
+  @ApiProperty({ description: 'Filter by job status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiProperty({ description: 'Number of results to return' })
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value))
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @ApiProperty({ description: 'Number of results to skip' })
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value))
+  @IsNumber()
+  @Min(0)
+  offset?: number = 0;
+}
+
+@ApiTags('ML Training')
+@ApiBearerAuth()
+@Controller('api/v1/ml/training')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class MLTrainingController extends BaseAnalyticsController {
+  constructor(
+    private readonly modelTrainingService: ModelTrainingService,
+    @InjectRepository(MLModel)
+    private readonly mlModelRepo: Repository<MLModel>,
+    @InjectRepository(TrainingJob)
+    private readonly trainingJobRepo: Repository<TrainingJob>,
+  ) {
+    super();
+  }
+
+  @Post('start')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Start Model Training',
+    description:
+      'Start training a new machine learning model for demand forecasting',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Training job started successfully',
+    schema: {
+      properties: {
+        success: { type: 'boolean' },
+        modelId: { type: 'string' },
+        jobId: { type: 'string' },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid training configuration',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin/Manager access required',
+  })
+  @ApiBody({ type: StartTrainingDto })
+  async startTraining(
+    @GetTenant() tenantId: string,
+    @GetUser('id') userId: string,
+    @Body() trainingDto: StartTrainingDto,
+  ): Promise<{
+    success: boolean;
+    modelId: string;
+    jobId: string;
+    message: string;
+  }> {
+    // Validate training configuration
+    const trainingFrom = new Date(trainingDto.trainingDataFrom);
+    const trainingTo = new Date(trainingDto.trainingDataTo);
+
+    if (trainingFrom >= trainingTo) {
+      throw new BadRequestException(
+        'Training start date must be before end date',
+      );
+    }
+
+    // Check if enough training data timespan
+    const daysDiff = Math.ceil(
+      (trainingTo.getTime() - trainingFrom.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (daysDiff < 30) {
+      throw new BadRequestException('Training data must span at least 30 days');
+    }
+
+    const trainingRequest: TrainingRequest = {
+      modelType: trainingDto.modelType,
+      modelName: trainingDto.modelName,
+      productId: trainingDto.productId,
+      categoryId: trainingDto.categoryId,
+      locationId: trainingDto.locationId,
+      trainingConfig: {
+        dataSource: {
+          from: trainingDto.trainingDataFrom,
+          to: trainingDto.trainingDataTo,
+          productIds: trainingDto.productIds,
+          categoryIds: trainingDto.categoryIds,
+          locationIds: trainingDto.locationIds,
+        },
+        hyperparameters: trainingDto.hyperparameters,
+        validation: {
+          splitRatio: trainingDto.validationSplit,
+          method: trainingDto.validationMethod,
+        },
+        features: trainingDto.features,
+        target: trainingDto.target,
+      },
+      userId,
+    };
+
+    const result = await this.modelTrainingService.startTraining(
+      tenantId,
+      trainingRequest,
+    );
+
+    if (!result.success) {
+      throw new BadRequestException(result.error);
+    }
+
+    return {
+      success: true,
+      modelId: result.modelId,
+      jobId: result.jobId,
+      message:
+        'Model training started successfully. Check job status for progress.',
+    };
+  }
+
+  @Post(':modelId/retrain')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Retrain Existing Model',
+    description: 'Retrain an existing model with new data or parameters',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Retraining job started successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Model not found',
+  })
+  @ApiParam({
+    name: 'modelId',
+    description: 'Model ID to retrain',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiBody({ type: RetrainModelDto })
+  async retrainModel(
+    @GetTenant() tenantId: string,
+    @GetUser('id') userId: string,
+    @Param('modelId') modelId: string,
+    @Body() retrainDto: RetrainModelDto,
+  ): Promise<{
+    success: boolean;
+    modelId: string;
+    jobId: string;
+    message: string;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Retraining Request',
+        undefined,
+        { modelId, retrainDto }
+      );
+
+      // Check if model exists and belongs to tenant
+      const model = await this.mlModelRepo.findOne({
+        where: { id: modelId, tenantId },
+      });
+
+      if (!model) {
+        this.handleValidationError('Model tidak ditemukan atau tidak memiliki akses');
+      }
+
+      // Check if model can be retrained
+      if (model.status === ModelStatus.TRAINING) {
+        this.handleValidationError('Model sedang dalam proses training, tidak dapat diretraining');
+      }
+
+      if (model.status === ModelStatus.FAILED) {
+        this.handleValidationError('Model gagal training sebelumnya, silakan buat model baru');
+      }
+
+      // Prepare retraining request
+      const retrainRequest: TrainingRequest = {
+        modelId: model.id,
+        modelType: model.modelType,
+        modelName: model.name,
+        productId: model.productId,
+        categoryId: model.categoryId,
+        locationId: model.locationId,
+        trainingConfig: {
+          dataSource: {
+            from: retrainDto.trainingDataFrom || model.trainingConfig?.trainingDataFrom || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+            to: retrainDto.trainingDataTo || new Date().toISOString(),
+          },
+          hyperparameters: retrainDto.hyperparameters || model.hyperparameters,
+          validation: {
+            splitRatio: 0.8,
+            method: 'time_series',
+          },
+          features: retrainDto.features || model.trainingConfig?.features || ['sales', 'inventory', 'price'],
+          target: model.trainingConfig?.target || 'demand',
+        },
+        userId,
+      };
+
+      // Start retraining
+      const result = await this.modelTrainingService.startTraining(tenantId, retrainRequest);
+
+      if (!result.success) {
+        this.handleServiceError(new Error(result.error || 'Retraining gagal dimulai'), 'Model Retraining');
+      }
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Retraining Started',
+        executionTime,
+        { modelId: result.modelId, jobId: result.jobId }
+      );
+
+      return {
+        success: true,
+        modelId: result.modelId,
+        jobId: result.jobId,
+        message: 'Model retraining berhasil dimulai. Pantau status pada job tracking.',
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Model Retraining');
+    }
+  }
+
+  @Get('jobs')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Get Training Jobs',
+    description: 'Retrieve list of training jobs with their status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Training jobs retrieved successfully',
+    schema: {
+      properties: {
+        jobs: {
+          type: 'array',
+          items: {
+            properties: {
+              id: { type: 'string' },
+              modelId: { type: 'string' },
+              modelName: { type: 'string' },
+              modelType: { type: 'string' },
+              status: { type: 'string' },
+              progress: { type: 'number' },
+              currentStep: { type: 'string' },
+              startedAt: { type: 'string' },
+              completedAt: { type: 'string' },
+              duration: { type: 'number' },
+              performance: { type: 'object' },
+              errorMessage: { type: 'string' },
+            },
+          },
+        },
+        total: { type: 'number' },
+        hasMore: { type: 'boolean' },
+      },
+    },
+  })
+  @ApiQuery({
+    name: 'modelId',
+    required: false,
+    description: 'Filter by model ID',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by job status',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of results to return (1-100)',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of results to skip',
+    example: 0,
+  })
+  async getTrainingJobs(
+    @GetTenant() tenantId: string,
+    @Query() query: TrainingJobQueryDto,
+  ): Promise<{
+    jobs: any[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Training Jobs Query',
+        undefined,
+        { query }
+      );
+
+      // Build query conditions
+      const whereConditions: any = { tenantId };
+
+      if (query.modelId) {
+        whereConditions.modelId = query.modelId;
+      }
+
+      if (query.status) {
+        whereConditions.status = query.status;
+      }
+
+      // Get total count
+      const total = await this.trainingJobRepo.count({
+        where: whereConditions,
+      });
+
+      // Get jobs with pagination
+      const jobs = await this.trainingJobRepo.find({
+        where: whereConditions,
+        relations: ['model'],
+        order: { createdAt: 'DESC' },
+        take: query.limit || 20,
+        skip: query.offset || 0,
+      });
+
+      // Transform response
+      const transformedJobs = jobs.map(job => ({
+        id: job.id,
+        modelId: job.modelId,
+        modelName: job.model?.name || 'Unknown Model',
+        modelType: job.model?.modelType || 'unknown',
+        status: job.status,
+        progress: job.progress,
+        currentStep: job.currentStep,
+        startedAt: job.startedAt?.toISOString(),
+        completedAt: job.completedAt?.toISOString(),
+        duration: job.duration,
+        performance: job.performanceMetrics,
+        errorMessage: job.errorMessage,
+        jobType: job.jobType,
+        retryCount: job.retryCount,
+        canRetry: job.canRetry,
+        canCancel: job.canCancel,
+        estimatedTimeRemaining: job.estimatedTimeRemaining,
+        resourceUsage: job.resourceUsage,
+        createdAt: job.createdAt.toISOString(),
+      }));
+
+      const hasMore = (query.offset || 0) + jobs.length < total;
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Training Jobs Query Completed',
+        executionTime,
+        { totalJobs: total, returnedJobs: jobs.length }
+      );
+
+      return {
+        jobs: transformedJobs,
+        total,
+        hasMore,
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Training Jobs Query');
+    }
+  }
+
+  @Get('jobs/:jobId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Get Training Job Details',
+    description: 'Retrieve detailed information about a specific training job',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Training job details retrieved successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Training job not found',
+  })
+  @ApiParam({
+    name: 'jobId',
+    description: 'Training job ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  async getTrainingJobDetails(
+    @GetTenant() tenantId: string,
+    @Param('jobId') jobId: string,
+  ): Promise<any> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Training Job Details Query',
+        undefined,
+        { jobId }
+      );
+
+      // Find training job with model relation
+      const job = await this.trainingJobRepo.findOne({
+        where: { id: jobId, tenantId },
+        relations: ['model'],
+      });
+
+      if (!job) {
+        this.handleValidationError('Training job tidak ditemukan atau tidak memiliki akses');
+      }
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Training Job Details Query Completed',
+        executionTime,
+        { jobId, status: job.status }
+      );
+
+      return {
+        id: job.id,
+        modelId: job.modelId,
+        modelName: job.model?.name || 'Unknown Model',
+        modelType: job.model?.modelType || 'unknown',
+        status: job.status,
+        progress: job.progress,
+        currentStep: job.currentStep || 'Tidak ada langkah aktif',
+        startedAt: job.startedAt?.toISOString() || '',
+        completedAt: job.completedAt?.toISOString() || '',
+        duration: job.duration || 0,
+        trainingConfig: job.trainingConfig,
+        performance: job.performanceMetrics,
+        logs: job.logs || [],
+        errorMessage: job.errorMessage || '',
+        resourceUsage: job.resourceUsage || {},
+        jobType: job.jobType,
+        retryCount: job.retryCount,
+        maxRetries: job.maxRetries,
+        canRetry: job.canRetry,
+        canCancel: job.canCancel,
+        estimatedTimeRemaining: job.estimatedTimeRemaining,
+        priority: job.priority,
+        artifacts: job.artifacts,
+        hyperparameterResults: job.hyperparameterResults,
+        trainingMetrics: job.trainingMetrics,
+        errorDetails: job.errorDetails,
+        cancelledAt: job.cancelledAt?.toISOString(),
+        cancelledBy: job.cancelledBy,
+        cancellationReason: job.cancellationReason,
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Training Job Details Query');
+    }
+  }
+
+  @Post('jobs/:jobId/cancel')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancel Training Job',
+    description: 'Cancel a running training job',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Training job cancelled successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Training job not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Training job cannot be cancelled',
+  })
+  @ApiParam({
+    name: 'jobId',
+    description: 'Training job ID to cancel',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  async cancelTrainingJob(
+    @GetTenant() tenantId: string,
+    @GetUser('id') userId: string,
+    @Param('jobId') jobId: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Training Job Cancellation Request',
+        undefined,
+        { jobId, userId }
+      );
+
+      // Find the training job
+      const job = await this.trainingJobRepo.findOne({
+        where: { id: jobId, tenantId },
+        relations: ['model'],
+      });
+
+      if (!job) {
+        this.handleValidationError('Training job tidak ditemukan atau tidak memiliki akses');
+      }
+
+      // Check if job can be cancelled
+      if (!job.canCancel) {
+        const statusMessage = job.status === TrainingJobStatus.COMPLETED 
+          ? 'Training job sudah selesai, tidak dapat dibatalkan'
+          : job.status === TrainingJobStatus.FAILED
+          ? 'Training job sudah gagal, tidak perlu dibatalkan'
+          : job.status === TrainingJobStatus.CANCELLED
+          ? 'Training job sudah dibatalkan sebelumnya'
+          : 'Training job tidak dapat dibatalkan pada status saat ini';
+        
+        this.handleValidationError(statusMessage);
+      }
+
+      // Cancel the job
+      job.cancel(userId, 'Dibatalkan oleh pengguna melalui API');
+      await this.trainingJobRepo.save(job);
+
+      // Update model status if needed
+      if (job.model && job.model.status === ModelStatus.TRAINING) {
+        job.model.status = ModelStatus.FAILED; // Set model back to failed state
+        await this.mlModelRepo.save(job.model);
+      }
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Training Job Cancelled Successfully',
+        executionTime,
+        { jobId, modelId: job.modelId }
+      );
+
+      return {
+        success: true,
+        message: `Training job "${job.model?.name || 'Unknown'}" berhasil dibatalkan`,
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Training Job Cancellation');
+    }
+  }
+
+  @Get('models')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Get Trained Models',
+    description: 'Retrieve list of trained ML models',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Models retrieved successfully',
+    schema: {
+      properties: {
+        models: {
+          type: 'array',
+          items: {
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              modelType: { type: 'string' },
+              status: { type: 'string' },
+              productId: { type: 'string' },
+              categoryId: { type: 'string' },
+              locationId: { type: 'string' },
+              performance: { type: 'object' },
+              trainedAt: { type: 'string' },
+              deployedAt: { type: 'string' },
+              lastPredictionAt: { type: 'string' },
+              isActive: { type: 'boolean' },
+            },
+          },
+        },
+        total: { type: 'number' },
+      },
+    },
+  })
+  async getTrainedModels(
+    @GetTenant() tenantId: string,
+    @Query('status') status?: string,
+    @Query('modelType') modelType?: string,
+    @Query('limit') limit: number = 20,
+    @Query('offset') offset: number = 0,
+  ): Promise<{
+    models: any[];
+    total: number;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Trained Models Query',
+        undefined,
+        { status, modelType, limit, offset }
+      );
+
+      // Build query conditions
+      const whereConditions: any = { tenantId };
+
+      if (status && Object.values(ModelStatus).includes(status as ModelStatus)) {
+        whereConditions.status = status;
+      }
+
+      if (modelType && Object.values(ModelType).includes(modelType as ModelType)) {
+        whereConditions.modelType = modelType;
+      }
+
+      // Get total count
+      const total = await this.mlModelRepo.count({
+        where: whereConditions,
+      });
+
+      // Get models with pagination
+      const models = await this.mlModelRepo.find({
+        where: whereConditions,
+        order: { trainedAt: 'DESC', createdAt: 'DESC' },
+        take: Math.min(limit, 100), // Cap at 100
+        skip: offset,
+      });
+
+      // Transform response
+      const transformedModels = models.map(model => ({
+        id: model.id,
+        name: model.name,
+        description: model.description,
+        modelType: model.modelType,
+        status: model.status,
+        productId: model.productId,
+        categoryId: model.categoryId,
+        locationId: model.locationId,
+        performance: model.performance,
+        accuracy: model.accuracy,
+        trainedAt: model.trainedAt?.toISOString(),
+        deployedAt: model.deployedAt?.toISOString(),
+        lastPredictionAt: model.lastPredictionAt?.toISOString(),
+        nextRetrainingAt: model.nextRetrainingAt?.toISOString(),
+        isActive: model.isActive,
+        isDeployed: model.isDeployed,
+        needsRetraining: model.needsRetraining,
+        isAccurate: model.isAccurate,
+        modelAge: model.modelAge,
+        forecastHorizon: model.forecastHorizon,
+        forecastDays: model.forecastDays,
+        accuracyThreshold: model.accuracyThreshold,
+        retrainingIntervalDays: model.retrainingIntervalDays,
+        isEnsembleMember: model.isEnsembleMember,
+        parentEnsembleId: model.parentEnsembleId,
+        ensembleWeight: model.ensembleWeight,
+        createdAt: model.createdAt.toISOString(),
+        updatedAt: model.updatedAt.toISOString(),
+      }));
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Trained Models Query Completed',
+        executionTime,
+        { totalModels: total, returnedModels: models.length }
+      );
+
+      return {
+        models: transformedModels,
+        total,
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Trained Models Query');
+    }
+  }
+
+  @Get('models/:modelId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Get Model Details',
+    description: 'Retrieve detailed information about a specific ML model',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Model details retrieved successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Model not found',
+  })
+  @ApiParam({
+    name: 'modelId',
+    description: 'Model ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  async getModelDetails(
+    @GetTenant() tenantId: string,
+    @Param('modelId') modelId: string,
+  ): Promise<any> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Details Query',
+        undefined,
+        { modelId }
+      );
+
+      // Find model
+      const model = await this.mlModelRepo.findOne({
+        where: { id: modelId, tenantId },
+      });
+
+      if (!model) {
+        this.handleValidationError('Model tidak ditemukan atau tidak memiliki akses');
+      }
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Details Query Completed',
+        executionTime,
+        { modelId, modelType: model.modelType, status: model.status }
+      );
+
+      return {
+        id: model.id,
+        name: model.name,
+        description: model.description || '',
+        modelType: model.modelType,
+        status: model.status,
+        productId: model.productId || '',
+        categoryId: model.categoryId || '',
+        locationId: model.locationId || '',
+        hyperparameters: model.hyperparameters,
+        trainingConfig: model.trainingConfig,
+        performance: model.performance,
+        featureImportance: model.featureImportance,
+        trainedAt: model.trainedAt?.toISOString() || '',
+        deployedAt: model.deployedAt?.toISOString() || '',
+        lastPredictionAt: model.lastPredictionAt?.toISOString() || '',
+        nextRetrainingAt: model.nextRetrainingAt?.toISOString() || '',
+        isActive: model.isActive,
+        accuracy: model.accuracy,
+        accuracyThreshold: model.accuracyThreshold,
+        dataQuality: model.dataQuality,
+        forecastHorizon: model.forecastHorizon,
+        forecastDays: model.forecastDays,
+        retrainingIntervalDays: model.retrainingIntervalDays,
+        modelPath: model.modelPath,
+        isDeployed: model.isDeployed,
+        needsRetraining: model.needsRetraining,
+        isAccurate: model.isAccurate,
+        modelAge: model.modelAge,
+        isEnsembleMember: model.isEnsembleMember,
+        parentEnsembleId: model.parentEnsembleId,
+        ensembleWeight: model.ensembleWeight,
+        seasonalityComponents: model.seasonalityComponents,
+        metadata: model.metadata,
+        createdAt: model.createdAt.toISOString(),
+        updatedAt: model.updatedAt.toISOString(),
+        createdBy: model.createdBy,
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Model Details Query');
+    }
+  }
+
+  @Post('models/:modelId/deploy')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Deploy Model',
+    description: 'Deploy a trained model for predictions',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Model deployed successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Model not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Model cannot be deployed',
+  })
+  @ApiParam({
+    name: 'modelId',
+    description: 'Model ID to deploy',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  async deployModel(
+    @GetTenant() tenantId: string,
+    @Param('modelId') modelId: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Deployment Request',
+        undefined,
+        { modelId }
+      );
+
+      // Find the model
+      const model = await this.mlModelRepo.findOne({
+        where: { id: modelId, tenantId },
+      });
+
+      if (!model) {
+        this.handleValidationError('Model tidak ditemukan atau tidak memiliki akses');
+      }
+
+      // Check if model can be deployed
+      if (model.status !== ModelStatus.TRAINED) {
+        const statusMessage = model.status === ModelStatus.TRAINING
+          ? 'Model masih dalam proses training, belum dapat dideploy'
+          : model.status === ModelStatus.FAILED
+          ? 'Model gagal training, tidak dapat dideploy'
+          : model.status === ModelStatus.DEPLOYED
+          ? 'Model sudah dideploy sebelumnya'
+          : model.status === ModelStatus.DEPRECATED
+          ? 'Model sudah deprecated, tidak dapat dideploy'
+          : 'Model tidak dapat dideploy pada status saat ini';
+        
+        this.handleValidationError(statusMessage);
+      }
+
+      // Check model accuracy
+      if (!model.isAccurate) {
+        this.handleValidationError(
+          `Model tidak memenuhi threshold akurasi minimum (${model.accuracyThreshold}). Performa saat ini: MAPE ${model.performance?.mape?.toFixed(2)}%`
+        );
+      }
+
+      // Deploy the model
+      model.deploy();
+      await this.mlModelRepo.save(model);
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Deployed Successfully',
+        executionTime,
+        { 
+          modelId, 
+          modelName: model.name,
+          modelType: model.modelType,
+          accuracy: model.performance?.mape,
+        }
+      );
+
+      return {
+        success: true,
+        message: `Model "${model.name}" berhasil dideploy dan siap untuk prediksi. Retraining otomatis dijadwalkan dalam ${model.retrainingIntervalDays} hari.`,
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Model Deployment');
+    }
+  }
+
+  @Post('models/:modelId/deprecate')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Deprecate Model',
+    description: 'Deprecate a deployed model',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Model deprecated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Model not found',
+  })
+  @ApiParam({
+    name: 'modelId',
+    description: 'Model ID to deprecate',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  async deprecateModel(
+    @GetTenant() tenantId: string,
+    @Param('modelId') modelId: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Deprecation Request',
+        undefined,
+        { modelId }
+      );
+
+      // Find the model
+      const model = await this.mlModelRepo.findOne({
+        where: { id: modelId, tenantId },
+      });
+
+      if (!model) {
+        this.handleValidationError('Model tidak ditemukan atau tidak memiliki akses');
+      }
+
+      // Check if model can be deprecated
+      if (model.status === ModelStatus.DEPRECATED) {
+        this.handleValidationError('Model sudah deprecated sebelumnya');
+      }
+
+      if (model.status === ModelStatus.TRAINING) {
+        this.handleValidationError('Model sedang dalam proses training, tidak dapat dideprecate. Batalkan training job terlebih dahulu.');
+      }
+
+      // Store previous status for logging
+      const previousStatus = model.status;
+
+      // Deprecate the model
+      model.deprecate();
+      await this.mlModelRepo.save(model);
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        tenantId,
+        'Model Deprecated Successfully',
+        executionTime,
+        { 
+          modelId, 
+          modelName: model.name,
+          modelType: model.modelType,
+          previousStatus,
+        }
+      );
+
+      return {
+        success: true,
+        message: `Model "${model.name}" berhasil dideprecate dan tidak akan digunakan untuk prediksi baru. Model masih dapat dilihat untuk referensi historis.`,
+      };
+    } catch (error) {
+      this.handleServiceError(error, 'Model Deprecation');
+    }
+  }
+}

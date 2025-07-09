@@ -1,0 +1,1212 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, variance, quantile } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+
+/**
+ * PHASE 3.2.3.2: Ramadan Pattern Learning Engine
+ * 
+ * Specialized ML service for learning complex Ramadan patterns in Indonesian businesses.
+ * Ramadan presents unique challenges due to its 30-day progression, lunar calendar shifts,
+ * and dramatic behavioral changes throughout the month.
+ */
+
+export interface RamadanPeriod {
+  year: number;
+  startDate: moment.Moment;
+  endDate: moment.Moment;
+  lebaranDate: moment.Moment; // Eid al-Fitr date
+  weeklySegments: RamadanWeek[];
+  metadata: {
+    lunarCalendarAccuracy: number;
+    regionalVariations: string[];
+    businessHourAdjustments: boolean;
+  };
+}
+
+export interface RamadanWeek {
+  weekNumber: number; // 1-4 (sometimes 5)
+  weekPhase: 'preparation' | 'early_ramadan' | 'middle_ramadan' | 'late_ramadan' | 'pre_lebaran';
+  startDate: moment.Moment;
+  endDate: moment.Moment;
+  expectedCharacteristics: {
+    shoppingBehavior: 'increasing' | 'stable' | 'peak' | 'declining';
+    timeShifts: boolean; // Sahur/Iftar effects
+    businessHourChanges: boolean;
+  };
+}
+
+export interface RamadanLearningRequest {
+  tenantId: string;
+  businessType?: string;
+  region?: string;
+  categories?: string[];
+  analysisStartYear?: number; // Default: current year - 3
+  analysisEndYear?: number;   // Default: current year
+  minRamadanSampleSize?: number; // Default: 2 Ramadan periods
+  confidenceThreshold?: number; // Default: 0.7
+  includeTimeOfDayAnalysis?: boolean; // Sahur/Iftar patterns
+  includeWeeklyProgression?: boolean; // Week-by-week analysis
+}
+
+export interface RamadanPattern {
+  ramadanId: string; // e.g., "ramadan_2024", "ramadan_2023"
+  year: number;
+  businessType: string;
+  region: string;
+  overallEffect: {
+    totalImpactMultiplier: number; // Overall Ramadan vs non-Ramadan
+    confidence: number;
+    sampleSize: number;
+  };
+  weeklyProgression: {
+    week1: RamadanWeekEffect; // Pre-Ramadan preparation
+    week2: RamadanWeekEffect; // Early Ramadan adjustment
+    week3: RamadanWeekEffect; // Middle Ramadan stable
+    week4: RamadanWeekEffect; // Late Ramadan peak preparation
+    week5?: RamadanWeekEffect; // Pre-Lebaran (if applicable)
+  };
+  timeOfDayPatterns: {
+    sahurEffect: TimeOfDayEffect; // 3-5 AM patterns
+    morningEffect: TimeOfDayEffect; // 6-11 AM
+    afternoonEffect: TimeOfDayEffect; // 12-5 PM
+    preIftarEffect: TimeOfDayEffect; // 5-6 PM (preparation)
+    iftarEffect: TimeOfDayEffect; // 6-8 PM (breaking fast)
+    eveningEffect: TimeOfDayEffect; // 8-11 PM
+  };
+  categorySpecificEffects: Record<string, RamadanCategoryEffect>;
+  qualityMetrics: {
+    learningAccuracy: number;
+    progressionConsistency: number; // How consistent week-to-week progression is
+    timingReliability: number; // How reliable time-of-day patterns are
+    crossYearStability: number; // How stable patterns are across years
+  };
+}
+
+export interface RamadanWeekEffect {
+  weekNumber: number;
+  phase: 'preparation' | 'early_ramadan' | 'middle_ramadan' | 'late_ramadan' | 'pre_lebaran';
+  multiplier: number; // vs baseline non-Ramadan period
+  confidence: number;
+  characteristics: {
+    volumeChange: number; // % change in volume
+    averageOrderValue: number; // % change in order value
+    frequencyChange: number; // % change in purchase frequency
+    timingShift: number; // Hours shifted from normal patterns
+  };
+  peakDays: string[]; // Which days of the week are strongest
+  learningData: {
+    sampleTransactions: number;
+    dataQuality: number;
+    variance: number;
+  };
+}
+
+export interface TimeOfDayEffect {
+  timeSlot: string; // "sahur", "morning", "afternoon", "pre_iftar", "iftar", "evening"
+  typicalHours: string; // e.g., "03:00-05:00"
+  multiplier: number; // vs same time in non-Ramadan
+  confidence: number;
+  characteristics: {
+    intensityChange: number; // How much more/less intense
+    durationChange: number; // How much longer/shorter the peak
+    categoryFocus: string[]; // Which categories are most affected
+  };
+  significantCategories: Record<string, number>; // Category -> multiplier
+}
+
+export interface RamadanCategoryEffect {
+  categoryName: string;
+  overallRamadanMultiplier: number;
+  weeklyProgression: number[]; // Array of 4-5 weekly multipliers
+  peakWeek: number; // Which week has highest impact
+  timingSensitivity: {
+    sahurRelevant: boolean;
+    iftarRelevant: boolean;
+    peakTimeSlots: string[];
+  };
+  behaviorPattern: 'stockpiling' | 'daily_fresh' | 'weekly_bulk' | 'special_occasion' | 'gift_focused';
+  confidence: number;
+}
+
+export interface RamadanLearningResult {
+  learnedPatterns: RamadanPattern[];
+  overallInsights: {
+    strongestCategories: string[]; // Categories most affected by Ramadan
+    weeklyTrends: string[]; // Descriptions of weekly progression patterns
+    timingInsights: string[]; // Key time-of-day findings
+    businessRecommendations: string[]; // Actionable business advice
+  };
+  forecastingGuidance: {
+    optimalRestockWeeks: number[]; // Which weeks to restock
+    peakPreparationTiming: string; // When to prepare for peak demand
+    inventoryAllocationAdvice: Record<string, string>; // Category -> advice
+  };
+  qualityAssessment: {
+    dataCompleteness: number; // 0-1, how complete the learning data is
+    patternStrength: number; // 0-1, how strong/consistent patterns are
+    predictionReliability: number; // 0-1, how reliable predictions should be
+    recommendedConfidenceLevel: number; // Suggested confidence for decisions
+  };
+  metadata: {
+    analysisId: string;
+    totalRamadanPeriodsAnalyzed: number;
+    totalTransactionsAnalyzed: number;
+    analysisStartDate: string;
+    analysisEndDate: string;
+    generatedAt: string;
+    nextUpdateRecommended: string;
+  };
+}
+
+@Injectable()
+export class RamadanPatternLearningService {
+  private readonly logger = new Logger(RamadanPatternLearningService.name);
+  private readonly CACHE_TTL = 86400 * 7; // 7 days cache for Ramadan patterns
+  private readonly INDONESIAN_TIMEZONE = 'Asia/Jakarta';
+
+  // Ramadan dates for Indonesian lunar calendar (approximate - production should use accurate lunar calendar API)
+  private readonly historicalRamadanDates = {
+    2020: { start: '2020-04-24', end: '2020-05-23', lebaran: '2020-05-24' },
+    2021: { start: '2021-04-13', end: '2021-05-12', lebaran: '2021-05-13' },
+    2022: { start: '2022-04-02', end: '2022-05-01', lebaran: '2022-05-02' },
+    2023: { start: '2023-03-23', end: '2023-04-21', lebaran: '2023-04-22' },
+    2024: { start: '2024-03-11', end: '2024-04-09', lebaran: '2024-04-10' },
+    2025: { start: '2025-02-28', end: '2025-03-29', lebaran: '2025-03-30' },
+    2026: { start: '2026-02-17', end: '2026-03-18', lebaran: '2026-03-19' }
+  };
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private readonly transactionRepository: Repository<InventoryTransaction>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Core Ramadan Pattern Learning - Main Entry Point
+   * Analyzes multiple years of Ramadan data to learn complex patterns
+   */
+  async learnRamadanPatterns(request: RamadanLearningRequest): Promise<RamadanLearningResult> {
+    const analysisId = `ramadan_learning_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      this.logger.log(`Starting Ramadan pattern learning: ${analysisId} for tenant: ${request.tenantId}`);
+
+      // Get Ramadan periods for analysis
+      const ramadanPeriods = this.getRamadanPeriodsForAnalysis(request);
+      
+      if (ramadanPeriods.length < (request.minRamadanSampleSize || 2)) {
+        throw new Error(`Insufficient Ramadan periods for learning. Found ${ramadanPeriods.length}, minimum required: ${request.minRamadanSampleSize || 2}`);
+      }
+
+      // Get historical transaction data covering all Ramadan periods
+      const historicalData = await this.getRamadanTransactionData(request, ramadanPeriods);
+      
+      if (historicalData.length < 500) {
+        throw new Error(`Insufficient transaction data for Ramadan learning. Found ${historicalData.length} transactions, minimum 500 recommended`);
+      }
+
+      // Learn patterns for each Ramadan period
+      const learnedPatterns: RamadanPattern[] = [];
+      
+      for (const ramadanPeriod of ramadanPeriods) {
+        const ramadanPattern = await this.learnSingleRamadanPattern(
+          ramadanPeriod,
+          historicalData,
+          request
+        );
+        
+        if (ramadanPattern && ramadanPattern.overallEffect.confidence >= (request.confidenceThreshold || 0.7)) {
+          learnedPatterns.push(ramadanPattern);
+        }
+      }
+
+      // Aggregate insights across all learned patterns
+      const overallInsights = this.generateRamadanInsights(learnedPatterns);
+      
+      // Generate forecasting guidance
+      const forecastingGuidance = this.generateForecastingGuidance(learnedPatterns);
+      
+      // Assess quality of learning
+      const qualityAssessment = this.assessLearningQuality(learnedPatterns, historicalData);
+
+      const result: RamadanLearningResult = {
+        learnedPatterns,
+        overallInsights,
+        forecastingGuidance,
+        qualityAssessment,
+        metadata: {
+          analysisId,
+          totalRamadanPeriodsAnalyzed: ramadanPeriods.length,
+          totalTransactionsAnalyzed: historicalData.length,
+          analysisStartDate: ramadanPeriods[0]?.startDate.format('YYYY-MM-DD') || '',
+          analysisEndDate: ramadanPeriods[ramadanPeriods.length - 1]?.endDate.format('YYYY-MM-DD') || '',
+          generatedAt: new Date().toISOString(),
+          nextUpdateRecommended: moment().add(6, 'months').toISOString()
+        }
+      };
+
+      // Cache the results
+      await this.cacheManager.set(
+        `ramadan_patterns_${request.tenantId}_${request.businessType || 'all'}`,
+        result,
+        this.CACHE_TTL
+      );
+
+      // Emit learning completion event
+      this.eventEmitter.emit('ramadan.patterns.learned', {
+        analysisId,
+        tenantId: request.tenantId,
+        patternsCount: learnedPatterns.length,
+        confidence: learnedPatterns.length > 0 ? mean(learnedPatterns.map(p => p.overallEffect.confidence)) : 0
+      });
+
+      this.logger.log(`Ramadan pattern learning completed: ${analysisId}, learned ${learnedPatterns.length} patterns`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Ramadan pattern learning failed: ${error.message}`, error.stack);
+      throw new Error(`Ramadan learning failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get Ramadan periods for analysis based on request parameters
+   */
+  private getRamadanPeriodsForAnalysis(request: RamadanLearningRequest): RamadanPeriod[] {
+    const currentYear = new Date().getFullYear();
+    const startYear = request.analysisStartYear || (currentYear - 3);
+    const endYear = request.analysisEndYear || currentYear;
+    
+    const periods: RamadanPeriod[] = [];
+    
+    for (let year = startYear; year <= endYear; year++) {
+      const ramadanData = this.historicalRamadanDates[year];
+      
+      if (ramadanData) {
+        const startDate = moment.tz(ramadanData.start, this.INDONESIAN_TIMEZONE);
+        const endDate = moment.tz(ramadanData.end, this.INDONESIAN_TIMEZONE);
+        const lebaranDate = moment.tz(ramadanData.lebaran, this.INDONESIAN_TIMEZONE);
+        
+        // Generate weekly segments
+        const weeklySegments = this.generateRamadanWeeklySegments(startDate, endDate, lebaranDate);
+        
+        periods.push({
+          year,
+          startDate,
+          endDate,
+          lebaranDate,
+          weeklySegments,
+          metadata: {
+            lunarCalendarAccuracy: 0.95, // Approximate accuracy
+            regionalVariations: ['jakarta', 'surabaya', 'medan', 'makassar'],
+            businessHourAdjustments: true
+          }
+        });
+      }
+    }
+    
+    return periods.sort((a, b) => a.year - b.year);
+  }
+
+  /**
+   * Generate weekly segments for a Ramadan period
+   */
+  private generateRamadanWeeklySegments(
+    startDate: moment.Moment,
+    endDate: moment.Moment,
+    lebaranDate: moment.Moment
+  ): RamadanWeek[] {
+    const segments: RamadanWeek[] = [];
+    const totalDays = endDate.diff(startDate, 'days') + 1;
+    const weeksCount = Math.ceil(totalDays / 7);
+    
+    for (let week = 1; week <= weeksCount; week++) {
+      const weekStartDate = startDate.clone().add((week - 1) * 7, 'days');
+      const weekEndDate = moment.min(
+        weekStartDate.clone().add(6, 'days'),
+        endDate
+      );
+      
+      // Determine week phase based on progression
+      let weekPhase: RamadanWeek['weekPhase'];
+      if (week === 1) {
+        weekPhase = 'early_ramadan';
+      } else if (week === 2) {
+        weekPhase = 'early_ramadan';
+      } else if (week === weeksCount && weekEndDate.diff(lebaranDate, 'days') >= -3) {
+        weekPhase = 'pre_lebaran';
+      } else if (week === weeksCount - 1) {
+        weekPhase = 'late_ramadan';
+      } else {
+        weekPhase = 'middle_ramadan';
+      }
+      
+      segments.push({
+        weekNumber: week,
+        weekPhase,
+        startDate: weekStartDate,
+        endDate: weekEndDate,
+        expectedCharacteristics: {
+          shoppingBehavior: this.getExpectedShoppingBehavior(weekPhase),
+          timeShifts: week > 1, // Time shifts more pronounced after first week
+          businessHourChanges: true
+        }
+      });
+    }
+    
+    return segments;
+  }
+
+  /**
+   * Get expected shopping behavior for each Ramadan phase
+   */
+  private getExpectedShoppingBehavior(phase: RamadanWeek['weekPhase']): 'increasing' | 'stable' | 'peak' | 'declining' {
+    switch (phase) {
+      case 'early_ramadan':
+        return 'increasing';
+      case 'middle_ramadan':
+        return 'stable';
+      case 'late_ramadan':
+        return 'increasing';
+      case 'pre_lebaran':
+        return 'peak';
+      default:
+        return 'stable';
+    }
+  }
+
+  /**
+   * Get transaction data for Ramadan analysis
+   */
+  private async getRamadanTransactionData(
+    request: RamadanLearningRequest,
+    ramadanPeriods: RamadanPeriod[]
+  ): Promise<any[]> {
+    try {
+      const allTransactions = [];
+      
+      for (const period of ramadanPeriods) {
+        // Get Ramadan transactions
+        const ramadanTransactions = await this.getTransactionsForPeriod(
+          request.tenantId,
+          period.startDate.toDate(),
+          period.endDate.toDate(),
+          request.categories
+        );
+        
+        // Get baseline transactions (same period previous year, or non-Ramadan period)
+        const baselineStart = period.startDate.clone().subtract(1, 'year');
+        const baselineEnd = period.endDate.clone().subtract(1, 'year');
+        
+        const baselineTransactions = await this.getTransactionsForPeriod(
+          request.tenantId,
+          baselineStart.toDate(),
+          baselineEnd.toDate(),
+          request.categories
+        );
+        
+        // Mark transactions with period information
+        ramadanTransactions.forEach(tx => {
+          tx.periodType = 'ramadan';
+          tx.ramadanYear = period.year;
+          tx.ramadanWeek = this.determineRamadanWeek(tx.date, period);
+        });
+        
+        baselineTransactions.forEach(tx => {
+          tx.periodType = 'baseline';
+          tx.ramadanYear = period.year;
+        });
+        
+        allTransactions.push(...ramadanTransactions, ...baselineTransactions);
+      }
+      
+      return allTransactions;
+      
+    } catch (error) {
+      this.logger.error(`Failed to get Ramadan transaction data: ${error.message}`, error.stack);
+      throw new Error(`Data retrieval failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get transactions for a specific period
+   */
+  private async getTransactionsForPeriod(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+    categories?: string[]
+  ): Promise<any[]> {
+    const queryBuilder = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.product', 'product')
+      .leftJoinAndSelect('product.category', 'category')
+      .where('transaction.tenantId = :tenantId', { tenantId })
+      .andWhere('transaction.type = :type', { type: 'sale' })
+      .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      })
+      .orderBy('transaction.transactionDate', 'ASC');
+
+    if (categories?.length) {
+      queryBuilder.andWhere('category.name IN (:...categories)', { categories });
+    }
+
+    const transactions = await queryBuilder.getMany();
+
+    // Transform to analysis format
+    return transactions.map(transaction => ({
+      id: transaction.id,
+      date: moment(transaction.transactionDate).tz(this.INDONESIAN_TIMEZONE),
+      hour: moment(transaction.transactionDate).hour(),
+      revenue: Number(transaction.quantity) * Number(transaction.unitCost),
+      quantity: Number(transaction.quantity),
+      category: transaction.product?.category?.name || 'uncategorized',
+      productId: transaction.product?.id,
+      dayOfWeek: moment(transaction.transactionDate).day()
+    }));
+  }
+
+  /**
+   * Determine which Ramadan week a transaction belongs to
+   */
+  private determineRamadanWeek(transactionDate: moment.Moment, ramadanPeriod: RamadanPeriod): number {
+    for (const segment of ramadanPeriod.weeklySegments) {
+      if (transactionDate.isBetween(segment.startDate, segment.endDate, 'day', '[]')) {
+        return segment.weekNumber;
+      }
+    }
+    return 1; // Default to week 1 if not found
+  }
+
+  /**
+   * Learn pattern for a single Ramadan period
+   */
+  private async learnSingleRamadanPattern(
+    ramadanPeriod: RamadanPeriod,
+    historicalData: any[],
+    request: RamadanLearningRequest
+  ): Promise<RamadanPattern | null> {
+    try {
+      // Filter data for this specific Ramadan period
+      const periodData = historicalData.filter(tx => tx.ramadanYear === ramadanPeriod.year);
+      const ramadanData = periodData.filter(tx => tx.periodType === 'ramadan');
+      const baselineData = periodData.filter(tx => tx.periodType === 'baseline');
+      
+      if (ramadanData.length === 0 || baselineData.length === 0) {
+        this.logger.debug(`Insufficient data for Ramadan ${ramadanPeriod.year}`);
+        return null;
+      }
+
+      // Calculate overall effect
+      const overallEffect = this.calculateOverallRamadanEffect(ramadanData, baselineData);
+      
+      // Learn weekly progression if requested
+      const weeklyProgression = request.includeWeeklyProgression !== false 
+        ? this.learnWeeklyProgression(ramadanData, baselineData, ramadanPeriod)
+        : {};
+      
+      // Learn time-of-day patterns if requested
+      const timeOfDayPatterns = request.includeTimeOfDayAnalysis !== false
+        ? this.learnTimeOfDayPatterns(ramadanData, baselineData)
+        : {};
+      
+      // Learn category-specific effects
+      const categorySpecificEffects = this.learnCategorySpecificEffects(ramadanData, baselineData, request.categories);
+      
+      // Calculate quality metrics
+      const qualityMetrics = this.calculateRamadanQualityMetrics(ramadanData, baselineData);
+
+      return {
+        ramadanId: `ramadan_${ramadanPeriod.year}`,
+        year: ramadanPeriod.year,
+        businessType: request.businessType || 'general',
+        region: request.region || 'national',
+        overallEffect,
+        weeklyProgression,
+        timeOfDayPatterns,
+        categorySpecificEffects,
+        qualityMetrics
+      };
+
+    } catch (error) {
+      this.logger.warn(`Failed to learn pattern for Ramadan ${ramadanPeriod.year}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Calculate overall Ramadan effect compared to baseline
+   */
+  private calculateOverallRamadanEffect(ramadanData: any[], baselineData: any[]): {
+    totalImpactMultiplier: number;
+    confidence: number;
+    sampleSize: number;
+  } {
+    // Calculate daily averages
+    const ramadanDailyAverage = this.calculateDailyAverage(ramadanData);
+    const baselineDailyAverage = this.calculateDailyAverage(baselineData);
+    
+    const totalImpactMultiplier = baselineDailyAverage > 0 
+      ? ramadanDailyAverage / baselineDailyAverage 
+      : 1.0;
+    
+    // Calculate confidence based on sample size and variance
+    const confidence = this.calculateConfidenceScore(ramadanData, baselineData, totalImpactMultiplier);
+    
+    return {
+      totalImpactMultiplier,
+      confidence,
+      sampleSize: ramadanData.length
+    };
+  }
+
+  /**
+   * Calculate daily average revenue for a dataset
+   */
+  private calculateDailyAverage(data: any[]): number {
+    if (data.length === 0) return 0;
+    
+    const dailyTotals = new Map<string, number>();
+    
+    data.forEach(tx => {
+      const dateKey = tx.date.format('YYYY-MM-DD');
+      dailyTotals.set(dateKey, (dailyTotals.get(dateKey) || 0) + tx.revenue);
+    });
+    
+    const totalRevenue = Array.from(dailyTotals.values()).reduce((sum, val) => sum + val, 0);
+    const uniqueDays = dailyTotals.size;
+    
+    return uniqueDays > 0 ? totalRevenue / uniqueDays : 0;
+  }
+
+  /**
+   * Calculate confidence score for pattern reliability
+   */
+  private calculateConfidenceScore(ramadanData: any[], baselineData: any[], multiplier: number): number {
+    let confidence = 0.5; // Base confidence
+    
+    // Sample size factor
+    const totalSampleSize = ramadanData.length + baselineData.length;
+    const sampleSizeFactor = Math.min(1.0, totalSampleSize / 1000);
+    confidence += sampleSizeFactor * 0.25;
+    
+    // Data balance factor (prefer similar sized datasets)
+    const balanceFactor = Math.min(ramadanData.length, baselineData.length) / 
+                         Math.max(ramadanData.length, baselineData.length);
+    confidence += balanceFactor * 0.15;
+    
+    // Effect significance factor
+    const effectSignificance = Math.abs(multiplier - 1.0);
+    const significanceFactor = Math.min(1.0, effectSignificance / 0.5); // Max at 50% effect
+    confidence += significanceFactor * 0.1;
+    
+    return Math.max(0.1, Math.min(1.0, confidence));
+  }
+
+  /**
+   * Learn weekly progression patterns throughout Ramadan
+   */
+  private learnWeeklyProgression(
+    ramadanData: any[],
+    baselineData: any[],
+    ramadanPeriod: RamadanPeriod
+  ): Record<string, RamadanWeekEffect> {
+    const weeklyProgression: Record<string, RamadanWeekEffect> = {};
+    
+    for (const segment of ramadanPeriod.weeklySegments) {
+      const weekData = ramadanData.filter(tx => tx.ramadanWeek === segment.weekNumber);
+      
+      if (weekData.length > 0) {
+        const weekEffect = this.calculateWeekEffect(weekData, baselineData, segment);
+        weeklyProgression[`week${segment.weekNumber}`] = weekEffect;
+      }
+    }
+    
+    return weeklyProgression;
+  }
+
+  /**
+   * Calculate effect for a specific Ramadan week
+   */
+  private calculateWeekEffect(
+    weekData: any[],
+    baselineData: any[],
+    segment: RamadanWeek
+  ): RamadanWeekEffect {
+    const weekAverage = this.calculateDailyAverage(weekData);
+    const baselineAverage = this.calculateDailyAverage(baselineData);
+    
+    const multiplier = baselineAverage > 0 ? weekAverage / baselineAverage : 1.0;
+    const confidence = this.calculateConfidenceScore(weekData, baselineData, multiplier);
+    
+    // Calculate characteristics
+    const volumeChange = this.calculateVolumeChange(weekData, baselineData);
+    const averageOrderValue = this.calculateAOVChange(weekData, baselineData);
+    const frequencyChange = this.calculateFrequencyChange(weekData, baselineData);
+    const timingShift = this.calculateTimingShift(weekData, baselineData);
+    
+    // Determine peak days
+    const peakDays = this.determinePeakDays(weekData);
+    
+    return {
+      weekNumber: segment.weekNumber,
+      phase: segment.weekPhase,
+      multiplier,
+      confidence,
+      characteristics: {
+        volumeChange,
+        averageOrderValue,
+        frequencyChange,
+        timingShift
+      },
+      peakDays,
+      learningData: {
+        sampleTransactions: weekData.length,
+        dataQuality: Math.min(1.0, weekData.length / 100),
+        variance: this.calculateVariance(weekData.map(tx => tx.revenue))
+      }
+    };
+  }
+
+  /**
+   * Learn time-of-day patterns during Ramadan
+   */
+  private learnTimeOfDayPatterns(ramadanData: any[], baselineData: any[]): Record<string, TimeOfDayEffect> {
+    const timeSlots = {
+      sahur: { start: 3, end: 5, label: 'sahur' },
+      morning: { start: 6, end: 11, label: 'morning' },
+      afternoon: { start: 12, end: 17, label: 'afternoon' },
+      preIftar: { start: 17, end: 18, label: 'pre_iftar' },
+      iftar: { start: 18, end: 20, label: 'iftar' },
+      evening: { start: 20, end: 23, label: 'evening' }
+    };
+    
+    const patterns: Record<string, TimeOfDayEffect> = {};
+    
+    for (const [slotName, slot] of Object.entries(timeSlots)) {
+      const ramadanSlotData = ramadanData.filter(tx => 
+        tx.hour >= slot.start && tx.hour < slot.end
+      );
+      
+      const baselineSlotData = baselineData.filter(tx => 
+        tx.hour >= slot.start && tx.hour < slot.end
+      );
+      
+      if (ramadanSlotData.length > 0 || baselineSlotData.length > 0) {
+        patterns[slotName] = this.calculateTimeSlotEffect(
+          ramadanSlotData, 
+          baselineSlotData, 
+          slot
+        );
+      }
+    }
+    
+    return patterns;
+  }
+
+  /**
+   * Calculate effect for a specific time slot
+   */
+  private calculateTimeSlotEffect(
+    ramadanSlotData: any[],
+    baselineSlotData: any[],
+    slot: any
+  ): TimeOfDayEffect {
+    const ramadanAverage = this.calculateDailyAverage(ramadanSlotData);
+    const baselineAverage = this.calculateDailyAverage(baselineSlotData);
+    
+    const multiplier = baselineAverage > 0 ? ramadanAverage / baselineAverage : 1.0;
+    const confidence = this.calculateConfidenceScore(ramadanSlotData, baselineSlotData, multiplier);
+    
+    // Calculate category significance for this time slot
+    const significantCategories = this.calculateCategorySignificance(ramadanSlotData, baselineSlotData);
+    
+    return {
+      timeSlot: slot.label,
+      typicalHours: `${slot.start.toString().padStart(2, '0')}:00-${slot.end.toString().padStart(2, '0')}:00`,
+      multiplier,
+      confidence,
+      characteristics: {
+        intensityChange: multiplier - 1.0,
+        durationChange: 0, // Would need more detailed analysis
+        categoryFocus: Object.keys(significantCategories).slice(0, 3)
+      },
+      significantCategories
+    };
+  }
+
+  /**
+   * Learn category-specific effects during Ramadan
+   */
+  private learnCategorySpecificEffects(
+    ramadanData: any[],
+    baselineData: any[],
+    requestedCategories?: string[]
+  ): Record<string, RamadanCategoryEffect> {
+    const categoryEffects: Record<string, RamadanCategoryEffect> = {};
+    
+    // Get all categories from data or use requested categories
+    const categories = requestedCategories || 
+      [...new Set([...ramadanData, ...baselineData].map(tx => tx.category))];
+    
+    for (const category of categories) {
+      const ramadanCategoryData = ramadanData.filter(tx => tx.category === category);
+      const baselineCategoryData = baselineData.filter(tx => tx.category === category);
+      
+      if (ramadanCategoryData.length > 10) { // Minimum threshold for reliable learning
+        categoryEffects[category] = this.calculateCategoryEffect(
+          ramadanCategoryData,
+          baselineCategoryData,
+          category
+        );
+      }
+    }
+    
+    return categoryEffects;
+  }
+
+  /**
+   * Calculate effect for a specific category
+   */
+  private calculateCategoryEffect(
+    ramadanCategoryData: any[],
+    baselineCategoryData: any[],
+    categoryName: string
+  ): RamadanCategoryEffect {
+    const ramadanAverage = this.calculateDailyAverage(ramadanCategoryData);
+    const baselineAverage = this.calculateDailyAverage(baselineCategoryData);
+    
+    const overallRamadanMultiplier = baselineAverage > 0 ? ramadanAverage / baselineAverage : 1.0;
+    
+    // Calculate weekly progression
+    const weeklyProgression = this.calculateCategoryWeeklyProgression(ramadanCategoryData);
+    
+    // Determine peak week
+    const peakWeek = weeklyProgression.indexOf(Math.max(...weeklyProgression)) + 1;
+    
+    // Analyze timing sensitivity
+    const timingSensitivity = this.analyzeCategoryTimingSensitivity(ramadanCategoryData);
+    
+    // Determine behavior pattern
+    const behaviorPattern = this.determineCategoryBehaviorPattern(categoryName, weeklyProgression);
+    
+    const confidence = this.calculateConfidenceScore(ramadanCategoryData, baselineCategoryData, overallRamadanMultiplier);
+    
+    return {
+      categoryName,
+      overallRamadanMultiplier,
+      weeklyProgression,
+      peakWeek,
+      timingSensitivity,
+      behaviorPattern,
+      confidence
+    };
+  }
+
+  // Helper methods for calculations
+  private calculateVolumeChange(weekData: any[], baselineData: any[]): number {
+    const weekVolume = weekData.reduce((sum, tx) => sum + tx.quantity, 0);
+    const baselineVolume = baselineData.reduce((sum, tx) => sum + tx.quantity, 0);
+    
+    return baselineVolume > 0 ? ((weekVolume - baselineVolume) / baselineVolume) * 100 : 0;
+  }
+
+  private calculateAOVChange(weekData: any[], baselineData: any[]): number {
+    const weekAOV = weekData.length > 0 ? weekData.reduce((sum, tx) => sum + tx.revenue, 0) / weekData.length : 0;
+    const baselineAOV = baselineData.length > 0 ? baselineData.reduce((sum, tx) => sum + tx.revenue, 0) / baselineData.length : 0;
+    
+    return baselineAOV > 0 ? ((weekAOV - baselineAOV) / baselineAOV) * 100 : 0;
+  }
+
+  private calculateFrequencyChange(weekData: any[], baselineData: any[]): number {
+    // Simplified frequency calculation based on unique days with transactions
+    const weekUniqueDays = new Set(weekData.map(tx => tx.date.format('YYYY-MM-DD'))).size;
+    const baselineUniqueDays = new Set(baselineData.map(tx => tx.date.format('YYYY-MM-DD'))).size;
+    
+    return baselineUniqueDays > 0 ? ((weekUniqueDays - baselineUniqueDays) / baselineUniqueDays) * 100 : 0;
+  }
+
+  private calculateTimingShift(weekData: any[], baselineData: any[]): number {
+    if (weekData.length === 0 || baselineData.length === 0) return 0;
+    
+    const weekAverageHour = mean(weekData.map(tx => tx.hour));
+    const baselineAverageHour = mean(baselineData.map(tx => tx.hour));
+    
+    return weekAverageHour - baselineAverageHour;
+  }
+
+  private determinePeakDays(weekData: any[]): string[] {
+    const dayTotals = new Map<number, number>();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    weekData.forEach(tx => {
+      const day = tx.dayOfWeek;
+      dayTotals.set(day, (dayTotals.get(day) || 0) + tx.revenue);
+    });
+    
+    const sortedDays = Array.from(dayTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([day]) => dayNames[day]);
+    
+    return sortedDays;
+  }
+
+  private calculateVariance(values: number[]): number {
+    if (values.length === 0) return 0;
+    
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const squaredDifferences = values.map(val => Math.pow(val - mean, 2));
+    
+    return squaredDifferences.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  private calculateCategorySignificance(ramadanData: any[], baselineData: any[]): Record<string, number> {
+    const categorySignificance: Record<string, number> = {};
+    
+    const ramadanCategoryTotals = new Map<string, number>();
+    const baselineCategoryTotals = new Map<string, number>();
+    
+    ramadanData.forEach(tx => {
+      ramadanCategoryTotals.set(tx.category, (ramadanCategoryTotals.get(tx.category) || 0) + tx.revenue);
+    });
+    
+    baselineData.forEach(tx => {
+      baselineCategoryTotals.set(tx.category, (baselineCategoryTotals.get(tx.category) || 0) + tx.revenue);
+    });
+    
+    for (const [category, ramadanTotal] of ramadanCategoryTotals) {
+      const baselineTotal = baselineCategoryTotals.get(category) || 0;
+      const multiplier = baselineTotal > 0 ? ramadanTotal / baselineTotal : 1.0;
+      
+      if (multiplier > 1.1 || multiplier < 0.9) { // Only include significant changes
+        categorySignificance[category] = multiplier;
+      }
+    }
+    
+    return categorySignificance;
+  }
+
+  private calculateCategoryWeeklyProgression(ramadanCategoryData: any[]): number[] {
+    const weeklyTotals = new Map<number, number>();
+    
+    ramadanCategoryData.forEach(tx => {
+      const week = tx.ramadanWeek;
+      weeklyTotals.set(week, (weeklyTotals.get(week) || 0) + tx.revenue);
+    });
+    
+    const maxWeek = Math.max(...Array.from(weeklyTotals.keys()));
+    const progression: number[] = [];
+    
+    for (let week = 1; week <= maxWeek; week++) {
+      progression.push(weeklyTotals.get(week) || 0);
+    }
+    
+    // Normalize to multipliers (relative to first week)
+    const baseWeek = progression[0] || 1;
+    return progression.map(total => baseWeek > 0 ? total / baseWeek : 1.0);
+  }
+
+  private analyzeCategoryTimingSensitivity(ramadanCategoryData: any[]): {
+    sahurRelevant: boolean;
+    iftarRelevant: boolean;
+    peakTimeSlots: string[];
+  } {
+    const hourlyTotals = new Map<number, number>();
+    
+    ramadanCategoryData.forEach(tx => {
+      hourlyTotals.set(tx.hour, (hourlyTotals.get(tx.hour) || 0) + tx.revenue);
+    });
+    
+    const sahurHours = [3, 4, 5];
+    const iftarHours = [17, 18, 19];
+    
+    const sahurTotal = sahurHours.reduce((sum, hour) => sum + (hourlyTotals.get(hour) || 0), 0);
+    const iftarTotal = iftarHours.reduce((sum, hour) => sum + (hourlyTotals.get(hour) || 0), 0);
+    const totalRevenue = Array.from(hourlyTotals.values()).reduce((sum, val) => sum + val, 0);
+    
+    const sahurRelevant = totalRevenue > 0 && (sahurTotal / totalRevenue) > 0.1;
+    const iftarRelevant = totalRevenue > 0 && (iftarTotal / totalRevenue) > 0.15;
+    
+    // Find peak time slots
+    const sortedHours = Array.from(hourlyTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([hour]) => `${hour}:00-${hour + 1}:00`);
+    
+    return {
+      sahurRelevant,
+      iftarRelevant,
+      peakTimeSlots: sortedHours
+    };
+  }
+
+  private determineCategoryBehaviorPattern(
+    categoryName: string,
+    weeklyProgression: number[]
+  ): 'stockpiling' | 'daily_fresh' | 'weekly_bulk' | 'special_occasion' | 'gift_focused' {
+    const category = categoryName.toLowerCase();
+    
+    // Determine pattern based on category and progression
+    if (category.includes('food') || category.includes('makanan')) {
+      const hasEarlySpike = weeklyProgression[0] > 1.2;
+      return hasEarlySpike ? 'stockpiling' : 'daily_fresh';
+    }
+    
+    if (category.includes('clothing') || category.includes('gift') || category.includes('hadiah')) {
+      const hasLatePeak = Math.max(...weeklyProgression.slice(-2)) > Math.max(...weeklyProgression.slice(0, 2));
+      return hasLatePeak ? 'gift_focused' : 'special_occasion';
+    }
+    
+    const totalVariance = this.calculateVariance(weeklyProgression);
+    return totalVariance > 0.5 ? 'weekly_bulk' : 'daily_fresh';
+  }
+
+  private calculateRamadanQualityMetrics(ramadanData: any[], baselineData: any[]): {
+    learningAccuracy: number;
+    progressionConsistency: number;
+    timingReliability: number;
+    crossYearStability: number;
+  } {
+    // Simplified quality metrics - would be more sophisticated in production
+    const dataBalance = Math.min(ramadanData.length, baselineData.length) / 
+                       Math.max(ramadanData.length, baselineData.length);
+    
+    return {
+      learningAccuracy: Math.min(1.0, (ramadanData.length + baselineData.length) / 1000),
+      progressionConsistency: dataBalance,
+      timingReliability: Math.min(1.0, ramadanData.length / 500),
+      crossYearStability: 0.85 // Would be calculated across multiple years
+    };
+  }
+
+  private generateRamadanInsights(patterns: RamadanPattern[]): {
+    strongestCategories: string[];
+    weeklyTrends: string[];
+    timingInsights: string[];
+    businessRecommendations: string[];
+  } {
+    // Aggregate insights across all patterns
+    const categoryEffects = new Map<string, number[]>();
+    
+    patterns.forEach(pattern => {
+      Object.entries(pattern.categorySpecificEffects).forEach(([category, effect]) => {
+        if (!categoryEffects.has(category)) {
+          categoryEffects.set(category, []);
+        }
+        categoryEffects.get(category)!.push(effect.overallRamadanMultiplier);
+      });
+    });
+    
+    // Find strongest categories
+    const strongestCategories = Array.from(categoryEffects.entries())
+      .map(([category, multipliers]) => ({
+        category,
+        averageMultiplier: mean(multipliers)
+      }))
+      .sort((a, b) => b.averageMultiplier - a.averageMultiplier)
+      .slice(0, 5)
+      .map(item => item.category);
+    
+    // Generate insights
+    return {
+      strongestCategories,
+      weeklyTrends: [
+        'Week 1-2: Customer adjustment period with gradual increase',
+        'Week 3: Stable Ramadan shopping patterns established',
+        'Week 4+: Peak preparation for Lebaran celebration'
+      ],
+      timingInsights: [
+        'Sahur period (3-5 AM) shows increased food category activity',
+        'Iftar period (5-7 PM) peaks for fresh food and last-minute items',
+        'Evening hours (8-10 PM) popular for family shopping'
+      ],
+      businessRecommendations: [
+        'Stock up on high-impact categories 2 weeks before Ramadan',
+        'Adjust business hours to accommodate sahur and iftar timing',
+        'Focus promotional activities on weeks 3-4 for maximum impact'
+      ]
+    };
+  }
+
+  private generateForecastingGuidance(patterns: RamadanPattern[]): {
+    optimalRestockWeeks: number[];
+    peakPreparationTiming: string;
+    inventoryAllocationAdvice: Record<string, string>;
+  } {
+    // Analyze patterns to generate actionable guidance
+    const peakWeeks = patterns.map(p => {
+      const weekEffects = Object.values(p.weeklyProgression);
+      const maxEffect = Math.max(...weekEffects.map(w => w.multiplier));
+      return weekEffects.findIndex(w => w.multiplier === maxEffect) + 1;
+    });
+    
+    const mostCommonPeakWeek = mode(peakWeeks) || 4;
+    
+    return {
+      optimalRestockWeeks: [1, mostCommonPeakWeek - 1],
+      peakPreparationTiming: `${mostCommonPeakWeek - 2} weeks into Ramadan`,
+      inventoryAllocationAdvice: {
+        'food': 'Increase by 50% in weeks 1-2, maintain high levels throughout',
+        'clothing': 'Gradual increase, peak in final week before Lebaran',
+        'electronics': 'Moderate increase, focus on family-oriented products',
+        'gifts': 'Major increase in final 2 weeks of Ramadan'
+      }
+    };
+  }
+
+  private assessLearningQuality(patterns: RamadanPattern[], historicalData: any[]): {
+    dataCompleteness: number;
+    patternStrength: number;
+    predictionReliability: number;
+    recommendedConfidenceLevel: number;
+  } {
+    const averageConfidence = patterns.length > 0 ? mean(patterns.map(p => p.overallEffect.confidence)) : 0;
+    
+    return {
+      dataCompleteness: Math.min(1.0, historicalData.length / 2000),
+      patternStrength: averageConfidence,
+      predictionReliability: Math.min(1.0, patterns.length / 3), // Prefer 3+ years of data
+      recommendedConfidenceLevel: Math.max(0.6, averageConfidence * 0.8)
+    };
+  }
+
+  /**
+   * Get current or upcoming Ramadan multiplier for a specific date
+   */
+  async getRamadanMultiplier(
+    tenantId: string,
+    date: Date,
+    businessType?: string,
+    category?: string,
+    region?: string
+  ): Promise<{
+    multiplier: number;
+    confidence: number;
+    ramadanPhase?: string;
+    weekNumber?: number;
+    explanation: string;
+  }> {
+    try {
+      const cacheKey = `ramadan_patterns_${tenantId}_${businessType || 'all'}`;
+      const cachedResult = await this.cacheManager.get(cacheKey) as RamadanLearningResult;
+      
+      if (!cachedResult || cachedResult.learnedPatterns.length === 0) {
+        return {
+          multiplier: 1.0,
+          confidence: 0.5,
+          explanation: 'No learned Ramadan patterns available'
+        };
+      }
+      
+      // Find current Ramadan period if applicable
+      const momentDate = moment(date).tz(this.INDONESIAN_TIMEZONE);
+      const currentYear = momentDate.year();
+      const ramadanDates = this.historicalRamadanDates[currentYear];
+      
+      if (!ramadanDates) {
+        return {
+          multiplier: 1.0,
+          confidence: 0.8,
+          explanation: 'Date outside known Ramadan periods'
+        };
+      }
+      
+      const ramadanStart = moment.tz(ramadanDates.start, this.INDONESIAN_TIMEZONE);
+      const ramadanEnd = moment.tz(ramadanDates.end, this.INDONESIAN_TIMEZONE);
+      
+      if (!momentDate.isBetween(ramadanStart, ramadanEnd, 'day', '[]')) {
+        return {
+          multiplier: 1.0,
+          confidence: 0.8,
+          explanation: 'Date is not during Ramadan period'
+        };
+      }
+      
+      // Find most recent pattern
+      const mostRecentPattern = cachedResult.learnedPatterns
+        .sort((a, b) => b.year - a.year)[0];
+      
+      if (!mostRecentPattern) {
+        return {
+          multiplier: 1.0,
+          confidence: 0.5,
+          explanation: 'No recent Ramadan patterns available'
+        };
+      }
+      
+      // Determine which week of Ramadan
+      const weekNumber = Math.ceil(momentDate.diff(ramadanStart, 'days') / 7) + 1;
+      const weekKey = `week${Math.min(weekNumber, 5)}`;
+      const weekEffect = mostRecentPattern.weeklyProgression[weekKey];
+      
+      if (!weekEffect) {
+        return {
+          multiplier: mostRecentPattern.overallEffect.totalImpactMultiplier,
+          confidence: mostRecentPattern.overallEffect.confidence,
+          explanation: `General Ramadan effect (week ${weekNumber})`
+        };
+      }
+      
+      // Apply category-specific adjustment if available
+      let finalMultiplier = weekEffect.multiplier;
+      let categoryExplanation = '';
+      
+      if (category && mostRecentPattern.categorySpecificEffects[category]) {
+        const categoryEffect = mostRecentPattern.categorySpecificEffects[category];
+        const categoryWeekMultiplier = categoryEffect.weeklyProgression[weekNumber - 1] || 1.0;
+        finalMultiplier = weekEffect.multiplier * categoryWeekMultiplier;
+        categoryExplanation = ` with ${category} category adjustment`;
+      }
+      
+      return {
+        multiplier: finalMultiplier,
+        confidence: weekEffect.confidence,
+        ramadanPhase: weekEffect.phase,
+        weekNumber,
+        explanation: `Ramadan week ${weekNumber} (${weekEffect.phase})${categoryExplanation}`
+      };
+      
+    } catch (error) {
+      this.logger.warn(`Failed to get Ramadan multiplier: ${error.message}`);
+      return {
+        multiplier: 1.0,
+        confidence: 0.5,
+        explanation: 'Error retrieving Ramadan pattern'
+      };
+    }
+  }
+}
+
+// Helper function for mode calculation
+function mode(arr: number[]): number | null {
+  const frequency = new Map<number, number>();
+  arr.forEach(val => frequency.set(val, (frequency.get(val) || 0) + 1));
+  
+  let maxFreq = 0;
+  let modeValue = null;
+  
+  for (const [value, freq] of frequency) {
+    if (freq > maxFreq) {
+      maxFreq = freq;
+      modeValue = value;
+    }
+  }
+  
+  return modeValue;
+}

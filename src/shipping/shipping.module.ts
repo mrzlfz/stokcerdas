@@ -61,31 +61,28 @@ import { InstantDeliveryProcessor } from './processors/instant-delivery.processo
     forwardRef(() => OrdersModule),
     IntegrationsModule,
   ],
-  controllers: [
-    ShippingController,
-    InstantDeliveryController,
-  ],
+  controllers: [ShippingController, InstantDeliveryController],
   providers: [
     // Core services
     ShippingService,
     InstantDeliveryService,
-    
+
     // Integration services - JNE
     JneShippingService,
     JneApiService,
-    
-    // Integration services - J&T Express  
+
+    // Integration services - J&T Express
     JntShippingService,
     JntApiService,
-    
+
     // Integration services - Gojek (instant delivery)
     GojekShippingService,
     GojekApiService,
-    
+
     // Integration services - Grab (instant delivery)
     GrabShippingService,
     GrabApiService,
-    
+
     // Background processors
     InstantDeliveryProcessor,
   ],

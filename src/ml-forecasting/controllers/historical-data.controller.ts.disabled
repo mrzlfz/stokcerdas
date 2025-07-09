@@ -1,0 +1,579 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Logger,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import {
+  HistoricalDataExtractionService,
+  HistoricalDataRequest,
+  HistoricalDataResponse,
+} from '../services/historical-data-extraction.service';
+
+// DTOs for API documentation and validation
+export class HistoricalDataRequestDto implements HistoricalDataRequest {
+  tenantId: string;
+  dataTypes: ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+  dateRange: {
+    from: string;
+    to: string;
+  };
+  filters?: {
+    productIds?: string[];
+    categoryIds?: string[];
+    locationIds?: string[];
+    brandNames?: string[];
+    priceRange?: { min: number; max: number };
+    customerSegments?: string[];
+  };
+  aggregation: 'hourly' | 'daily' | 'weekly' | 'monthly';
+  includeMetadata?: boolean;
+  validationLevel?: 'basic' | 'standard' | 'strict';
+}
+
+export class DataExtractionJobDto {
+  jobId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  progress: number;
+  estimatedCompletion?: string;
+  result?: HistoricalDataResponse;
+}
+
+export class DataExtractionStatsDto {
+  totalExtractions: number;
+  successRate: number;
+  averageExtractionTime: number;
+  dataQualityScore: number;
+  topDataTypes: string[];
+  recentExtractions: {
+    requestId: string;
+    dataTypes: string[];
+    status: string;
+    extractionTime: number;
+    recordCount: number;
+    timestamp: string;
+  }[];
+}
+
+@Controller('ml-forecasting/historical-data')
+@ApiTags('Historical Data Extraction')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class HistoricalDataController {
+  private readonly logger = new Logger(HistoricalDataController.name);
+
+  constructor(
+    private readonly historicalDataService: HistoricalDataExtractionService,
+  ) {}
+
+  /**
+   * Extract comprehensive historical data
+   */
+  @Post('extract')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read', 'analytics:read')
+  @ApiOperation({
+    summary: 'Extract historical data for ML training and analysis',
+    description: 'Extracts comprehensive historical data including sales, inventory, product lifecycle, orders, and external market data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Historical data extraction completed successfully',
+    type: HistoricalDataResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request parameters',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Insufficient permissions',
+  })
+  async extractHistoricalData(
+    @Body() request: HistoricalDataRequestDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ): Promise<HistoricalDataResponse> {
+    this.logger.log(`Historical data extraction requested by user ${user.id} for tenant ${tenantId}`);
+
+    // Override tenant ID from token for security
+    request.tenantId = tenantId;
+
+    // Validate request
+    this.validateExtractionRequest(request);
+
+    try {
+      const result = await this.historicalDataService.extractHistoricalData(request);
+      
+      this.logger.log(`Historical data extraction completed: ${result.requestId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Historical data extraction failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Get historical data extraction for sales only (quick endpoint)
+   */
+  @Get('sales')
+  @Permissions('ml_forecasting:read', 'analytics:read')
+  @ApiOperation({
+    summary: 'Quick sales data extraction',
+    description: 'Extract sales data with simplified parameters for common use cases',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sales data extracted successfully',
+  })
+  async extractSalesData(
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('aggregation') aggregation: 'daily' | 'weekly' | 'monthly' = 'daily',
+    @Query('productIds') productIds?: string,
+    @Query('categoryIds') categoryIds?: string,
+    @Query('includeMetadata') includeMetadata?: boolean,
+    @CurrentTenant() tenantId: string,
+  ): Promise<HistoricalDataResponse> {
+    this.logger.log(`Quick sales data extraction for tenant ${tenantId}`);
+
+    if (!from || !to) {
+      throw new BadRequestException('Date range (from, to) is required');
+    }
+
+    const request: HistoricalDataRequest = {
+      tenantId,
+      dataTypes: ['sales'],
+      dateRange: { from, to },
+      aggregation,
+      includeMetadata: includeMetadata || false,
+      validationLevel: 'basic',
+    };
+
+    // Parse optional filters
+    if (productIds) {
+      request.filters = { productIds: productIds.split(',') };
+    }
+    if (categoryIds) {
+      if (!request.filters) request.filters = {};
+      request.filters.categoryIds = categoryIds.split(',');
+    }
+
+    return await this.historicalDataService.extractHistoricalData(request);
+  }
+
+  /**
+   * Get historical data extraction for inventory movements
+   */
+  @Get('inventory')
+  @Permissions('ml_forecasting:read', 'inventory:read')
+  @ApiOperation({
+    summary: 'Extract inventory movement history',
+    description: 'Extract detailed inventory movement history with stock levels and turnover rates',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory data extracted successfully',
+  })
+  async extractInventoryData(
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('aggregation') aggregation: 'daily' | 'weekly' | 'monthly' = 'daily',
+    @Query('productIds') productIds?: string,
+    @Query('locationIds') locationIds?: string,
+    @CurrentTenant() tenantId: string,
+  ): Promise<HistoricalDataResponse> {
+    this.logger.log(`Inventory data extraction for tenant ${tenantId}`);
+
+    if (!from || !to) {
+      throw new BadRequestException('Date range (from, to) is required');
+    }
+
+    const request: HistoricalDataRequest = {
+      tenantId,
+      dataTypes: ['inventory'],
+      dateRange: { from, to },
+      aggregation,
+      includeMetadata: true,
+      validationLevel: 'standard',
+    };
+
+    // Parse optional filters
+    if (productIds || locationIds) {
+      request.filters = {};
+      if (productIds) request.filters.productIds = productIds.split(',');
+      if (locationIds) request.filters.locationIds = locationIds.split(',');
+    }
+
+    return await this.historicalDataService.extractHistoricalData(request);
+  }
+
+  /**
+   * Get product lifecycle analysis
+   */
+  @Get('product-lifecycle')
+  @Permissions('ml_forecasting:read', 'products:read')
+  @ApiOperation({
+    summary: 'Extract product lifecycle data',
+    description: 'Extract product lifecycle stages and performance metrics over time',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Product lifecycle data extracted successfully',
+  })
+  async extractProductLifecycleData(
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('aggregation') aggregation: 'daily' | 'weekly' | 'monthly' = 'weekly',
+    @Query('productIds') productIds?: string,
+    @CurrentTenant() tenantId: string,
+  ): Promise<HistoricalDataResponse> {
+    this.logger.log(`Product lifecycle extraction for tenant ${tenantId}`);
+
+    if (!from || !to) {
+      throw new BadRequestException('Date range (from, to) is required');
+    }
+
+    const request: HistoricalDataRequest = {
+      tenantId,
+      dataTypes: ['products'],
+      dateRange: { from, to },
+      aggregation,
+      includeMetadata: true,
+      validationLevel: 'standard',
+    };
+
+    if (productIds) {
+      request.filters = { productIds: productIds.split(',') };
+    }
+
+    return await this.historicalDataService.extractHistoricalData(request);
+  }
+
+  /**
+   * Get comprehensive market analysis data
+   */
+  @Post('market-analysis')
+  @Permissions('ml_forecasting:read', 'analytics:read')
+  @ApiOperation({
+    summary: 'Extract comprehensive market analysis data',
+    description: 'Extract all data types (sales, inventory, products, orders, external) for comprehensive market analysis',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Market analysis data extracted successfully',
+  })
+  async extractMarketAnalysisData(
+    @Body() request: {
+      dateRange: { from: string; to: string };
+      aggregation?: 'daily' | 'weekly' | 'monthly';
+      filters?: {
+        categoryIds?: string[];
+        brandNames?: string[];
+        priceRange?: { min: number; max: number };
+      };
+    },
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ): Promise<HistoricalDataResponse> {
+    this.logger.log(`Market analysis extraction requested by user ${user.id} for tenant ${tenantId}`);
+
+    const extractionRequest: HistoricalDataRequest = {
+      tenantId,
+      dataTypes: ['sales', 'inventory', 'products', 'orders', 'external'],
+      dateRange: request.dateRange,
+      aggregation: request.aggregation || 'weekly',
+      filters: request.filters,
+      includeMetadata: true,
+      validationLevel: 'strict',
+    };
+
+    return await this.historicalDataService.extractHistoricalData(extractionRequest);
+  }
+
+  /**
+   * Get data extraction statistics and insights
+   */
+  @Get('stats')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get historical data extraction statistics',
+    description: 'Get statistics and insights about historical data extractions for the tenant',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Extraction statistics retrieved successfully',
+  })
+  async getExtractionStats(
+    @CurrentTenant() tenantId: string,
+    @Query('period') period: 'day' | 'week' | 'month' = 'month',
+  ): Promise<DataExtractionStatsDto> {
+    this.logger.log(`Extraction stats requested for tenant ${tenantId}`);
+
+    // This would typically query a metrics/stats table
+    // For now, return mock data
+    const stats: DataExtractionStatsDto = {
+      totalExtractions: 45,
+      successRate: 96.7,
+      averageExtractionTime: 3240, // ms
+      dataQualityScore: 87.3,
+      topDataTypes: ['sales', 'inventory', 'products'],
+      recentExtractions: [
+        {
+          requestId: 'hist_tenant1_1640995200000',
+          dataTypes: ['sales', 'inventory'],
+          status: 'completed',
+          extractionTime: 2100,
+          recordCount: 15420,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          requestId: 'hist_tenant1_1640991600000',
+          dataTypes: ['products'],
+          status: 'completed',
+          extractionTime: 1850,
+          recordCount: 892,
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+        },
+      ],
+    };
+
+    return stats;
+  }
+
+  /**
+   * Get data quality report for a specific date range
+   */
+  @Get('quality-report')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get data quality report',
+    description: 'Get comprehensive data quality report for specified date range and data types',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data quality report generated successfully',
+  })
+  async getDataQualityReport(
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('dataTypes') dataTypes: string = 'sales,inventory',
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    dateRange: { from: string; to: string };
+    dataTypes: string[];
+    qualityScores: Record<string, number>;
+    coverage: Record<string, number>;
+    gaps: any[];
+    recommendations: string[];
+  }> {
+    this.logger.log(`Data quality report requested for tenant ${tenantId}`);
+
+    if (!from || !to) {
+      throw new BadRequestException('Date range (from, to) is required');
+    }
+
+    const dataTypeArray = dataTypes.split(',') as ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+
+    // Perform a validation-only extraction to get quality metrics
+    const request: HistoricalDataRequest = {
+      tenantId,
+      dataTypes: dataTypeArray,
+      dateRange: { from, to },
+      aggregation: 'daily',
+      includeMetadata: false,
+      validationLevel: 'strict',
+    };
+
+    const result = await this.historicalDataService.extractHistoricalData(request);
+
+    return {
+      dateRange: request.dateRange,
+      dataTypes: dataTypeArray,
+      qualityScores: result.metadata.dataQuality,
+      coverage: result.metadata.coverage,
+      gaps: result.metadata.gaps,
+      recommendations: result.recommendations,
+    };
+  }
+
+  /**
+   * Get available data sources and their status
+   */
+  @Get('sources')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get available data sources',
+    description: 'Get list of available data sources and their current status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data sources retrieved successfully',
+  })
+  async getDataSources(
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    internal: {
+      source: string;
+      status: 'available' | 'limited' | 'unavailable';
+      recordCount: number;
+      lastUpdate: string;
+      dataRange: { from: string; to: string };
+    }[];
+    external: {
+      source: string;
+      type: 'weather' | 'economic' | 'competitor' | 'social';
+      status: 'connected' | 'degraded' | 'offline';
+      lastSync: string;
+      reliability: number;
+    }[];
+  }> {
+    this.logger.log(`Data sources status requested for tenant ${tenantId}`);
+
+    // This would typically query actual data source status
+    // For now, return mock data
+    return {
+      internal: [
+        {
+          source: 'sales_transactions',
+          status: 'available',
+          recordCount: 125430,
+          lastUpdate: new Date().toISOString(),
+          dataRange: {
+            from: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            to: new Date().toISOString().split('T')[0],
+          },
+        },
+        {
+          source: 'inventory_movements',
+          status: 'available',
+          recordCount: 89320,
+          lastUpdate: new Date().toISOString(),
+          dataRange: {
+            from: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            to: new Date().toISOString().split('T')[0],
+          },
+        },
+        {
+          source: 'product_catalog',
+          status: 'available',
+          recordCount: 2145,
+          lastUpdate: new Date().toISOString(),
+          dataRange: {
+            from: new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            to: new Date().toISOString().split('T')[0],
+          },
+        },
+        {
+          source: 'orders',
+          status: 'limited',
+          recordCount: 45210,
+          lastUpdate: new Date().toISOString(),
+          dataRange: {
+            from: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            to: new Date().toISOString().split('T')[0],
+          },
+        },
+      ],
+      external: [
+        {
+          source: 'BMKG Weather Service',
+          type: 'weather',
+          status: 'connected',
+          lastSync: new Date().toISOString(),
+          reliability: 95.8,
+        },
+        {
+          source: 'Bank Indonesia Economic Data',
+          type: 'economic',
+          status: 'connected',
+          lastSync: new Date(Date.now() - 3600000).toISOString(),
+          reliability: 98.2,
+        },
+        {
+          source: 'Social Media Trends',
+          type: 'social',
+          status: 'degraded',
+          lastSync: new Date(Date.now() - 7200000).toISOString(),
+          reliability: 72.4,
+        },
+        {
+          source: 'Competitor Pricing',
+          type: 'competitor',
+          status: 'offline',
+          lastSync: new Date(Date.now() - 86400000).toISOString(),
+          reliability: 0,
+        },
+      ],
+    };
+  }
+
+  /**
+   * Private helper methods
+   */
+
+  private validateExtractionRequest(request: HistoricalDataRequestDto): void {
+    if (!request.dataTypes || request.dataTypes.length === 0) {
+      throw new BadRequestException('At least one data type must be specified');
+    }
+
+    if (!request.dateRange || !request.dateRange.from || !request.dateRange.to) {
+      throw new BadRequestException('Date range is required');
+    }
+
+    const fromDate = new Date(request.dateRange.from);
+    const toDate = new Date(request.dateRange.to);
+
+    if (fromDate >= toDate) {
+      throw new BadRequestException('From date must be before to date');
+    }
+
+    // Check for reasonable date range (not more than 2 years)
+    const daysDiff = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysDiff > 730) {
+      throw new BadRequestException('Date range cannot exceed 2 years');
+    }
+
+    // Validate aggregation
+    const validAggregations = ['hourly', 'daily', 'weekly', 'monthly'];
+    if (!validAggregations.includes(request.aggregation)) {
+      throw new BadRequestException('Invalid aggregation type');
+    }
+
+    // Validate data types
+    const validDataTypes = ['sales', 'inventory', 'products', 'orders', 'external'];
+    for (const dataType of request.dataTypes) {
+      if (!validDataTypes.includes(dataType)) {
+        throw new BadRequestException(`Invalid data type: ${dataType}`);
+      }
+    }
+
+    // Validate filters if provided
+    if (request.filters) {
+      if (request.filters.priceRange) {
+        const { min, max } = request.filters.priceRange;
+        if (min < 0 || max < 0 || min >= max) {
+          throw new BadRequestException('Invalid price range');
+        }
+      }
+    }
+
+    this.logger.debug(`Extraction request validation passed for ${request.dataTypes.join(', ')}`);
+  }
+}

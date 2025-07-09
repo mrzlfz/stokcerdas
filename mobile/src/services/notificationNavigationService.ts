@@ -8,6 +8,7 @@ import { Alert } from 'react-native';
 
 // Types
 import type { AppNotification } from '@/types';
+import { NotificationMessageGenerator, NotificationData } from '../utils/notificationMessageGenerator';
 
 interface NavigationData {
   screen: string;
@@ -493,21 +494,150 @@ class NotificationNavigationService {
   async navigateFromNotificationType(
     type: string,
     category: string,
-    data?: any
+    data?: NotificationData
   ): Promise<void> {
-    const mockNotification: AppNotification = {
-      id: Date.now().toString(),
-      title: '',
-      message: '',
-      type: type as any,
+    // Validate notification type
+    const validatedType = NotificationMessageGenerator.isValidNotificationType(type) 
+      ? type as any 
+      : 'info' as any;
+
+    // Generate proper notification content
+    const content = NotificationMessageGenerator.generateContent(
+      validatedType,
       category,
-      timestamp: new Date().toISOString(),
+      data
+    );
+
+    // Create proper notification object
+    const notification: AppNotification = {
+      id: NotificationMessageGenerator.generateNotificationId(),
+      title: content.title,
+      message: content.message,
+      type: validatedType,
+      category,
+      timestamp: NotificationMessageGenerator.getLocalizedTimestamp(),
       read: false,
       actionable: true,
       data,
     };
 
-    await this.handleNotificationNavigation(mockNotification);
+    await this.handleNotificationNavigation(notification);
+  }
+
+  /**
+   * Create and handle low stock notification
+   */
+  async handleLowStockNotification(
+    productName: string,
+    currentStock: number,
+    locationName: string
+  ): Promise<void> {
+    await this.navigateFromNotificationType(
+      'low_stock',
+      'inventory',
+      {
+        productName,
+        currentStock,
+        locationName
+      }
+    );
+  }
+
+  /**
+   * Create and handle product expiry notification
+   */
+  async handleExpiryNotification(
+    productName: string,
+    expiryDate: string,
+    isExpired: boolean = false
+  ): Promise<void> {
+    const type = isExpired ? 'expired' : 'expiring_soon';
+    await this.navigateFromNotificationType(
+      type,
+      'inventory',
+      {
+        productName,
+        expiryDate
+      }
+    );
+  }
+
+  /**
+   * Create and handle order notification
+   */
+  async handleOrderNotification(
+    orderNumber: string,
+    status: 'success' | 'error' | 'warning' = 'success'
+  ): Promise<void> {
+    await this.navigateFromNotificationType(
+      status,
+      'order',
+      {
+        orderNumber
+      }
+    );
+  }
+
+  /**
+   * Create and handle sync notification
+   */
+  async handleSyncNotification(
+    isSuccess: boolean,
+    message?: string
+  ): Promise<void> {
+    const type = isSuccess ? 'success' : 'error';
+    await this.navigateFromNotificationType(
+      type,
+      'sync',
+      {
+        message
+      }
+    );
+  }
+
+  /**
+   * Create and handle generic notification
+   */
+  async createNotification(
+    type: string,
+    category: string,
+    title?: string,
+    message?: string,
+    data?: NotificationData
+  ): Promise<AppNotification> {
+    // If custom title/message provided, use them
+    const customData = { ...data };
+    if (title || message) {
+      customData.customTitle = title;
+      customData.customMessage = message;
+    }
+
+    const validatedType = NotificationMessageGenerator.isValidNotificationType(type) 
+      ? type as any 
+      : 'info' as any;
+
+    let content;
+    if (title && message) {
+      content = { title, message };
+    } else {
+      content = NotificationMessageGenerator.generateContent(
+        validatedType,
+        category,
+        customData
+      );
+    }
+
+    return {
+      id: NotificationMessageGenerator.generateNotificationId(),
+      title: content.title,
+      message: content.message,
+      type: validatedType,
+      category,
+      timestamp: NotificationMessageGenerator.getLocalizedTimestamp(),
+      read: false,
+      actionable: true,
+      data: customData,
+    };
   }
 
   /**

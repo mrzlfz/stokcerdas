@@ -1,5 +1,7 @@
 import { Entity, Column, Index, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
+import { TrainingJob } from './training-job.entity';
+import { Prediction } from './prediction.entity';
 
 export enum ModelType {
   ARIMA = 'arima',
@@ -67,6 +69,12 @@ export class MLModel extends BaseEntity {
 
   @Column({ type: 'jsonb' })
   hyperparameters: Record<string, any>;
+
+  @Column({ type: 'varchar', length: 50, default: 'v1.0' })
+  version: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  configuration?: Record<string, any>;
 
   @Column({ type: 'jsonb', nullable: true })
   trainingConfig?: {
@@ -149,11 +157,11 @@ export class MLModel extends BaseEntity {
   metadata?: Record<string, any>; // Additional model-specific data
 
   // Relations
-  // @OneToMany(() => TrainingJob, job => job.model)
-  // trainingJobs?: TrainingJob[];
+  @OneToMany(() => TrainingJob, job => job.model)
+  trainingJobs?: TrainingJob[];
 
-  // @OneToMany(() => Prediction, prediction => prediction.model)
-  // predictions?: Prediction[];
+  @OneToMany(() => Prediction, prediction => prediction.model)
+  predictions?: Prediction[];
 
   // Virtual fields
   get isDeployed(): boolean {
@@ -221,13 +229,4 @@ export class MLModel extends BaseEntity {
     this.parentEnsembleId = ensembleId;
     this.ensembleWeight = weight;
   }
-}
-
-// Import types for relations (will be defined in separate files)
-declare class TrainingJob {
-  model: MLModel;
-}
-
-declare class Prediction {
-  model: MLModel;
 }

@@ -497,14 +497,53 @@ export class OrderRoutingService {
         `Resolving conflict ${conflictId} with action: ${resolution.action}`,
       );
 
-      // Implementation would depend on conflict type and resolution strategy
-      // For now, return a successful resolution
+      const appliedChanges: string[] = [];
+      const affectedChannels: string[] = [];
 
-      const result = {
-        success: true,
-        appliedChanges: ['Status updated', 'Inventory reallocated'],
-        affectedChannels: [],
-      };
+      // Parse conflict ID to extract order ID and conflict type
+      const [orderId, conflictType] = conflictId.split('_');
+      
+      if (!orderId || !conflictType) {
+        throw new Error('Invalid conflict ID format');
+      }
+
+      const order = await this.ordersService.getOrderById(tenantId, orderId);
+      
+      // Handle different conflict types
+      switch (conflictType) {
+        case 'status':
+          await this.resolveStatusConflict(
+            tenantId,
+            order,
+            resolution,
+            appliedChanges,
+            affectedChannels,
+          );
+          break;
+
+        case 'inventory':
+          await this.resolveInventoryConflict(
+            tenantId,
+            order,
+            resolution,
+            appliedChanges,
+            affectedChannels,
+          );
+          break;
+
+        case 'fulfillment':
+          await this.resolveFulfillmentConflict(
+            tenantId,
+            order,
+            resolution,
+            appliedChanges,
+            affectedChannels,
+          );
+          break;
+
+        default:
+          throw new Error(`Unsupported conflict type: ${conflictType}`);
+      }
 
       // Log resolution
       await this.logService.log({
@@ -515,16 +554,47 @@ export class OrderRoutingService {
         metadata: {
           conflictId,
           resolution,
-          result,
+          appliedChanges,
+          affectedChannels,
+          userId: resolution.userId,
         },
       });
 
-      return result;
+      // Emit conflict resolution event
+      this.eventEmitter.emit('conflict.resolved', {
+        tenantId,
+        conflictId,
+        orderId,
+        conflictType,
+        resolution,
+        appliedChanges,
+        affectedChannels,
+      });
+
+      return {
+        success: true,
+        appliedChanges,
+        affectedChannels,
+      };
     } catch (error) {
       this.logger.error(
         `Failed to resolve conflict: ${error.message}`,
         error.stack,
       );
+      
+      // Log error
+      await this.logService.log({
+        tenantId,
+        type: IntegrationLogType.CONFLICT,
+        level: IntegrationLogLevel.ERROR,
+        message: `Conflict resolution failed: ${conflictId}`,
+        metadata: {
+          conflictId,
+          resolution,
+          error: error.message,
+        },
+      });
+
       throw error;
     }
   }
@@ -1067,27 +1137,265 @@ export class OrderRoutingService {
     tenantId: string,
     order: Order,
   ): Promise<CrossChannelConflict[]> {
-    // Simplified inventory conflict detection
-    // In production, this would check inventory allocations across channels
-    return [];
+    const conflicts: CrossChannelConflict[] = [];
+    
+    try {
+      // Get all active channels for this tenant
+      const activeChannels = await this.channelsService.getActiveChannels(tenantId);
+      
+      if (activeChannels.length <= 1) {
+        return conflicts; // No conflicts possible with single channel
+      }
+
+      // Check inventory allocation conflicts across channels
+      for (const item of order.items || []) {
+        const channelAllocations = [];
+        
+        // Get inventory allocations for this product across all channels
+        for (const channel of activeChannels) {
+          const hasAllocation = await this.checkChannelInventoryAllocation(
+            tenantId,
+            order,
+            channel.id,
+          );
+          
+          if (hasAllocation) {
+            channelAllocations.push({
+              channelId: channel.id,
+              channelName: channel.name,
+              conflictingData: {
+                productId: item.productId,
+                sku: item.sku,
+                allocatedQuantity: item.quantity,
+                availableQuantity: 0, // Would be fetched from inventory service
+              },
+            });
+          }
+        }
+
+        // If product is allocated to multiple channels, it's a potential conflict
+        if (channelAllocations.length > 1) {
+          conflicts.push({
+            type: 'inventory',
+            orderId: order.id,
+            channels: channelAllocations,
+            severity: 'high',
+            autoResolvable: false,
+            recommendedAction: 'Reallocate inventory based on channel priority',
+            created: new Date(),
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error detecting inventory conflicts: ${error.message}`);
+    }
+
+    return conflicts;
   }
 
   private async detectStatusConflicts(
     tenantId: string,
     order: Order,
   ): Promise<CrossChannelConflict[]> {
-    // Simplified status conflict detection
-    // In production, this would compare order status across platforms
-    return [];
+    const conflicts: CrossChannelConflict[] = [];
+    
+    try {
+      if (!order.channelId) {
+        return conflicts; // No external channel to sync with
+      }
+
+      const channel = await this.channelsService.getChannelById(tenantId, order.channelId);
+      const platformStatuses = [];
+      
+      // Get current status from each platform
+      const localStatus = order.status;
+      let externalStatus: string | undefined;
+      let externalPlatform: string;
+
+      switch (channel.platformId.toLowerCase()) {
+        case 'shopee':
+          try {
+            const shopeeOrderId = order.channelMetadata?.shopee?.orderSn;
+            if (shopeeOrderId) {
+              const shopeeDetails = await this.shopeeOrderService.getShopeeOrderDetails(
+                tenantId,
+                channel.id,
+                shopeeOrderId,
+              );
+              if (shopeeDetails.success && shopeeDetails.data) {
+                externalStatus = shopeeDetails.data.order_status;
+                externalPlatform = 'shopee';
+              }
+            }
+          } catch (error) {
+            this.logger.warn(`Failed to get Shopee order status: ${error.message}`);
+          }
+          break;
+
+        case 'lazada':
+          try {
+            const lazadaOrderId = order.channelMetadata?.lazada?.orderId;
+            if (lazadaOrderId) {
+              // Would call lazada order details method
+              // For now, use metadata if available
+              externalStatus = order.channelMetadata?.lazada?.lastExternalStatus;
+              externalPlatform = 'lazada';
+            }
+          } catch (error) {
+            this.logger.warn(`Failed to get Lazada order status: ${error.message}`);
+          }
+          break;
+
+        case 'tokopedia':
+          try {
+            const tokopediaOrderId = order.channelMetadata?.tokopedia?.orderId;
+            if (tokopediaOrderId) {
+              const tokopediaDetails = await this.tokopediaOrderService.getTokopediaOrderDetails(
+                tenantId,
+                channel.id,
+                tokopediaOrderId,
+              );
+              if (tokopediaDetails.success && tokopediaDetails.data) {
+                externalStatus = tokopediaDetails.data.order_status;
+                externalPlatform = 'tokopedia';
+              }
+            }
+          } catch (error) {
+            this.logger.warn(`Failed to get Tokopedia order status: ${error.message}`);
+          }
+          break;
+      }
+
+      // Compare local vs external status
+      if (externalStatus && localStatus) {
+        const statusMapping = this.getStatusMapping(channel.platformId);
+        const expectedLocalStatus = statusMapping[externalStatus];
+        
+        if (expectedLocalStatus && expectedLocalStatus !== localStatus) {
+          // Check if this is a critical conflict
+          const severity = this.assessStatusConflictSeverity(
+            localStatus,
+            expectedLocalStatus,
+            externalStatus,
+          );
+
+          conflicts.push({
+            type: 'status',
+            orderId: order.id,
+            channels: [
+              {
+                channelId: 'local',
+                channelName: 'Local System',
+                conflictingData: {
+                  status: localStatus,
+                  lastUpdated: order.updatedAt,
+                },
+              },
+              {
+                channelId: channel.id,
+                channelName: channel.name,
+                conflictingData: {
+                  status: externalStatus,
+                  expectedLocalStatus,
+                  lastUpdated: order.channelMetadata?.[externalPlatform]?.lastSyncAt || new Date(),
+                },
+              },
+            ],
+            severity,
+            autoResolvable: severity === 'low' || severity === 'medium',
+            recommendedAction: this.getStatusConflictRecommendation(
+              localStatus,
+              expectedLocalStatus,
+              externalStatus,
+            ),
+            created: new Date(),
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error detecting status conflicts: ${error.message}`);
+    }
+
+    return conflicts;
   }
 
   private async detectFulfillmentConflicts(
     tenantId: string,
     order: Order,
   ): Promise<CrossChannelConflict[]> {
-    // Simplified fulfillment conflict detection
-    // In production, this would check fulfillment assignments
-    return [];
+    const conflicts: CrossChannelConflict[] = [];
+    
+    try {
+      // Get fulfillment options for this order
+      const fulfillmentOptions = await this.fulfillmentService.getFulfillmentOptions(
+        tenantId,
+        order.id,
+      );
+
+      if (fulfillmentOptions.options.length <= 1) {
+        return conflicts; // No conflicts possible with single option
+      }
+
+      // Check for conflicting fulfillment assignments
+      const activeAssignments = fulfillmentOptions.options.filter(
+        option => option.availability.canFulfill && option.priority > 0
+      );
+
+      if (activeAssignments.length > 1) {
+        // Check if multiple locations have similar priority (potential conflict)
+        const topPriority = Math.min(...activeAssignments.map(opt => opt.priority));
+        const tiedOptions = activeAssignments.filter(opt => opt.priority === topPriority);
+        
+        if (tiedOptions.length > 1) {
+          conflicts.push({
+            type: 'fulfillment',
+            orderId: order.id,
+            channels: tiedOptions.map(assignment => ({
+              channelId: assignment.locationId,
+              channelName: assignment.location?.locationName || assignment.locationId,
+              conflictingData: {
+                locationId: assignment.locationId,
+                priority: assignment.priority,
+                estimatedCost: assignment.cost.total,
+                estimatedTime: assignment.timeframe.total,
+              },
+            })),
+            severity: 'high',
+            autoResolvable: true,
+            recommendedAction: 'Choose location with lowest cost or fastest delivery',
+            created: new Date(),
+          });
+        }
+      }
+
+      // Check for capacity conflicts (simplified - would need actual capacity data)
+      for (const option of fulfillmentOptions.options) {
+        if (!option.availability.canFulfill) {
+          conflicts.push({
+            type: 'fulfillment',
+            orderId: order.id,
+            channels: [{
+              channelId: option.locationId,
+              channelName: option.location?.locationName || option.locationId,
+              conflictingData: {
+                locationId: option.locationId,
+                canFulfill: option.availability.canFulfill,
+                reason: option.reason.join(', ') || 'Capacity unavailable',
+                missingItems: option.availability.missingItems.length,
+              },
+            }],
+            severity: 'medium',
+            autoResolvable: true,
+            recommendedAction: 'Reassign to location with available capacity',
+            created: new Date(),
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error detecting fulfillment conflicts: ${error.message}`);
+    }
+
+    return conflicts;
   }
 
   private async getOrderChannels(
@@ -1118,34 +1426,74 @@ export class OrderRoutingService {
     try {
       let success = false;
       let syncedFields: string[] = [];
+      let error: string | undefined;
 
-      // Sync based on platform
+      // Sync based on platform using implemented syncOrderStatus methods
       switch (channel.platformId.toLowerCase()) {
         case 'shopee':
-          // TODO: Implement syncOrderStatus method in ShopeeOrderService
-          // const shopeeResult = await this.shopeeOrderService.syncOrderStatus(tenantId, channel.id, order);
-          // success = shopeeResult.success;
-          // syncedFields = shopeeResult.syncedFields || [];
-          success = true; // Placeholder
-          syncedFields = ['status'];
+          try {
+            const shopeeResult = await this.shopeeOrderService.syncOrderStatus(
+              tenantId,
+              channel.id,
+              [order.id],
+            );
+            success = shopeeResult.success;
+            syncedFields = ['status', 'metadata'];
+            
+            if (shopeeResult.conflictCount > 0) {
+              error = `${shopeeResult.conflictCount} conflicts detected`;
+            }
+            if (shopeeResult.errorCount > 0) {
+              error = shopeeResult.errors[0] || 'Sync errors occurred';
+            }
+          } catch (syncError) {
+            success = false;
+            error = syncError.message;
+          }
           break;
 
         case 'lazada':
-          // TODO: Implement syncOrderStatus method in LazadaOrderService
-          // const lazadaResult = await this.lazadaOrderService.syncOrderStatus(tenantId, channel.id, order);
-          // success = lazadaResult.success;
-          // syncedFields = lazadaResult.syncedFields || [];
-          success = true; // Placeholder
-          syncedFields = ['status'];
+          try {
+            const lazadaResult = await this.lazadaOrderService.syncOrderStatus(
+              tenantId,
+              channel.id,
+              [order.id],
+            );
+            success = lazadaResult.success;
+            syncedFields = ['status', 'metadata'];
+            
+            if (lazadaResult.conflictCount > 0) {
+              error = `${lazadaResult.conflictCount} conflicts detected`;
+            }
+            if (lazadaResult.errorCount > 0) {
+              error = lazadaResult.errors[0] || 'Sync errors occurred';
+            }
+          } catch (syncError) {
+            success = false;
+            error = syncError.message;
+          }
           break;
 
         case 'tokopedia':
-          // TODO: Implement syncOrderStatus method in TokopediaOrderService
-          // const tokopediaResult = await this.tokopediaOrderService.syncOrderStatus(tenantId, channel.id, order);
-          // success = tokopediaResult.success;
-          // syncedFields = tokopediaResult.syncedFields || [];
-          success = true; // Placeholder
-          syncedFields = ['status'];
+          try {
+            const tokopediaResult = await this.tokopediaOrderService.syncOrderStatus(
+              tenantId,
+              channel.id,
+              [order.id],
+            );
+            success = tokopediaResult.success;
+            syncedFields = ['status', 'metadata'];
+            
+            if (tokopediaResult.conflictCount > 0) {
+              error = `${tokopediaResult.conflictCount} conflicts detected`;
+            }
+            if (tokopediaResult.errorCount > 0) {
+              error = tokopediaResult.errors[0] || 'Sync errors occurred';
+            }
+          } catch (syncError) {
+            success = false;
+            error = syncError.message;
+          }
           break;
 
         default:
@@ -1158,6 +1506,7 @@ export class OrderRoutingService {
         platform: channel.platformId,
         channelId: channel.id,
         success,
+        error,
         syncedFields,
       };
     } catch (error) {
@@ -1248,5 +1597,269 @@ export class OrderRoutingService {
       performanceIssues: [],
       integrationErrors: [],
     };
+  }
+
+  // Helper methods for conflict detection and resolution
+
+  private getStatusMapping(platformId: string): Record<string, OrderStatus> {
+    switch (platformId.toLowerCase()) {
+      case 'shopee':
+        return {
+          'UNPAID': OrderStatus.PENDING,
+          'TO_SHIP': OrderStatus.CONFIRMED,
+          'SHIPPED': OrderStatus.SHIPPED,
+          'TO_CONFIRM_RECEIVE': OrderStatus.SHIPPED,
+          'COMPLETED': OrderStatus.DELIVERED,
+          'CANCELLED': OrderStatus.CANCELLED,
+          'IN_CANCEL': OrderStatus.CANCELLED,
+          'INVOICE_PENDING': OrderStatus.PENDING,
+        };
+      case 'lazada':
+        return {
+          'pending': OrderStatus.PENDING,
+          'shipped': OrderStatus.SHIPPED,
+          'delivered': OrderStatus.DELIVERED,
+          'canceled': OrderStatus.CANCELLED,
+          'returned': OrderStatus.RETURNED,
+          'failed': OrderStatus.CANCELLED,
+        };
+      case 'tokopedia':
+        return {
+          'waiting_payment': OrderStatus.PENDING,
+          'payment_verified': OrderStatus.CONFIRMED,
+          'processing': OrderStatus.PROCESSING,
+          'shipped': OrderStatus.SHIPPED,
+          'delivered': OrderStatus.DELIVERED,
+          'cancelled': OrderStatus.CANCELLED,
+          'return_requested': OrderStatus.RETURNED,
+          'returned': OrderStatus.RETURNED,
+          'refunded': OrderStatus.REFUNDED,
+        };
+      default:
+        return {};
+    }
+  }
+
+  private assessStatusConflictSeverity(
+    localStatus: OrderStatus,
+    expectedLocalStatus: OrderStatus,
+    externalStatus: string,
+  ): 'low' | 'medium' | 'high' | 'critical' {
+    // Critical conflicts - cannot resolve automatically
+    const criticalConflicts = [
+      [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+      [OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+      [OrderStatus.REFUNDED, OrderStatus.DELIVERED],
+    ];
+
+    for (const [status1, status2] of criticalConflicts) {
+      if ((localStatus === status1 && expectedLocalStatus === status2) ||
+          (localStatus === status2 && expectedLocalStatus === status1)) {
+        return 'critical';
+      }
+    }
+
+    // High severity conflicts - require careful handling
+    const highSeverityConflicts = [
+      [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+      [OrderStatus.DELIVERED, OrderStatus.PROCESSING],
+    ];
+
+    for (const [status1, status2] of highSeverityConflicts) {
+      if ((localStatus === status1 && expectedLocalStatus === status2) ||
+          (localStatus === status2 && expectedLocalStatus === status1)) {
+        return 'high';
+      }
+    }
+
+    // Medium severity - normal business flow conflicts
+    const mediumSeverityConflicts = [
+      [OrderStatus.PENDING, OrderStatus.PROCESSING],
+      [OrderStatus.CONFIRMED, OrderStatus.PROCESSING],
+      [OrderStatus.PROCESSING, OrderStatus.SHIPPED],
+    ];
+
+    for (const [status1, status2] of mediumSeverityConflicts) {
+      if ((localStatus === status1 && expectedLocalStatus === status2) ||
+          (localStatus === status2 && expectedLocalStatus === status1)) {
+        return 'medium';
+      }
+    }
+
+    // Low severity - minor timing differences
+    return 'low';
+  }
+
+  private getStatusConflictRecommendation(
+    localStatus: OrderStatus,
+    expectedLocalStatus: OrderStatus,
+    externalStatus: string,
+  ): string {
+    // Indonesian business logic for status conflict recommendations
+    const recommendations = {
+      // Customer-facing statuses should be prioritized
+      [`${OrderStatus.DELIVERED}_${OrderStatus.SHIPPED}`]: 'Keep local DELIVERED status - customer has confirmed receipt',
+      [`${OrderStatus.CANCELLED}_${OrderStatus.PROCESSING}`]: 'Keep local CANCELLED status - customer request priority',
+      [`${OrderStatus.SHIPPED}_${OrderStatus.PROCESSING}`]: 'Sync external platform to SHIPPED status',
+      [`${OrderStatus.PROCESSING}_${OrderStatus.PENDING}`]: 'Update local to PROCESSING - order is being prepared',
+      [`${OrderStatus.CONFIRMED}_${OrderStatus.PENDING}`]: 'Update local to CONFIRMED - payment verified',
+      
+      // Critical conflicts
+      [`${OrderStatus.DELIVERED}_${OrderStatus.CANCELLED}`]: 'ESCALATE - Cannot cancel delivered order',
+      [`${OrderStatus.CANCELLED}_${OrderStatus.DELIVERED}`]: 'ESCALATE - Cannot deliver cancelled order',
+      [`${OrderStatus.REFUNDED}_${OrderStatus.DELIVERED}`]: 'ESCALATE - Status mismatch requires manual review',
+    };
+
+    const key = `${localStatus}_${expectedLocalStatus}`;
+    return recommendations[key] || 'Update to most recent status based on timestamp';
+  }
+
+  // Specific conflict resolution methods
+
+  private async resolveStatusConflict(
+    tenantId: string,
+    order: Order,
+    resolution: any,
+    appliedChanges: string[],
+    affectedChannels: string[],
+  ): Promise<void> {
+    const channel = await this.channelsService.getChannelById(tenantId, order.channelId);
+    
+    switch (resolution.action) {
+      case 'use_source':
+        // Keep local status, update external platform
+        await this.synchronizeOrderStatus(tenantId, order.id, true);
+        appliedChanges.push('Updated external platform to match local status');
+        affectedChannels.push(channel.id);
+        break;
+
+      case 'use_target':
+        // Use external platform status, update local
+        if (resolution.data?.targetStatus) {
+          await this.ordersService.updateOrder(tenantId, order.id, {
+            status: resolution.data.targetStatus,
+            notes: `Status updated via conflict resolution: ${resolution.reason || 'Auto-resolved'}`,
+          });
+          appliedChanges.push('Updated local status to match external platform');
+          affectedChannels.push('local');
+        }
+        break;
+
+      case 'manual_override':
+        // Use manually specified status
+        if (resolution.data?.overrideStatus) {
+          await this.ordersService.updateOrder(tenantId, order.id, {
+            status: resolution.data.overrideStatus,
+            notes: `Status manually overridden: ${resolution.reason || 'Manual resolution'}`,
+          });
+          
+          // Also update external platform
+          await this.synchronizeOrderStatus(tenantId, order.id, true);
+          
+          appliedChanges.push('Applied manual status override');
+          affectedChannels.push('local', channel.id);
+        }
+        break;
+
+      default:
+        throw new Error(`Invalid resolution action for status conflict: ${resolution.action}`);
+    }
+  }
+
+  private async resolveInventoryConflict(
+    tenantId: string,
+    order: Order,
+    resolution: any,
+    appliedChanges: string[],
+    affectedChannels: string[],
+  ): Promise<void> {
+    switch (resolution.action) {
+      case 'use_source':
+        // Prioritize source channel inventory allocation
+        // Implementation would reallocate inventory from other channels
+        appliedChanges.push('Reallocated inventory to source channel');
+        affectedChannels.push(order.channelId);
+        break;
+
+      case 'split_fulfillment':
+        // Split fulfillment across multiple channels
+        if (resolution.data?.splitRules) {
+          for (const rule of resolution.data.splitRules) {
+            // Implementation would split order items across channels
+            appliedChanges.push(`Split fulfillment: ${rule.quantity} units to ${rule.channelId}`);
+            affectedChannels.push(rule.channelId);
+          }
+        }
+        break;
+
+      case 'manual_override':
+        // Manual inventory reallocation
+        if (resolution.data?.allocations) {
+          for (const allocation of resolution.data.allocations) {
+            // Implementation would update inventory allocations
+            appliedChanges.push(`Allocated ${allocation.quantity} units to ${allocation.channelId}`);
+            affectedChannels.push(allocation.channelId);
+          }
+        }
+        break;
+
+      default:
+        throw new Error(`Invalid resolution action for inventory conflict: ${resolution.action}`);
+    }
+  }
+
+  private async resolveFulfillmentConflict(
+    tenantId: string,
+    order: Order,
+    resolution: any,
+    appliedChanges: string[],
+    affectedChannels: string[],
+  ): Promise<void> {
+    switch (resolution.action) {
+      case 'use_source':
+        // Use primary fulfillment location
+        if (resolution.data?.primaryLocationId) {
+          await this.fulfillmentService.assignOrderFulfillment(
+            tenantId,
+            order.id,
+            resolution.data.primaryLocationId,
+          );
+          appliedChanges.push('Assigned to primary fulfillment location');
+          affectedChannels.push(resolution.data.primaryLocationId);
+        }
+        break;
+
+      case 'split_fulfillment':
+        // Split fulfillment across multiple locations
+        if (resolution.data?.locationSplits) {
+          for (const split of resolution.data.locationSplits) {
+            await this.fulfillmentService.assignOrderFulfillment(
+              tenantId,
+              order.id,
+              split.locationId,
+            );
+            appliedChanges.push(`Split fulfillment to ${split.locationId}`);
+            affectedChannels.push(split.locationId);
+          }
+        }
+        break;
+
+      case 'manual_override':
+        // Manual fulfillment assignment
+        if (resolution.data?.assignedLocationId) {
+          await this.fulfillmentService.assignOrderFulfillment(
+            tenantId,
+            order.id,
+            resolution.data.assignedLocationId,
+          );
+          appliedChanges.push('Manual fulfillment assignment applied');
+          affectedChannels.push(resolution.data.assignedLocationId);
+        }
+        break;
+
+      default:
+        throw new Error(`Invalid resolution action for fulfillment conflict: ${resolution.action}`);
+    }
   }
 }

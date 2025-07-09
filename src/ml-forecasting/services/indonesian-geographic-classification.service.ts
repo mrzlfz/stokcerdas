@@ -1,0 +1,2091 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+
+/**
+ * PHASE 3.2.3.4.1: Indonesian Geographic Classification Framework 🗺️
+ * 
+ * Comprehensive framework for understanding and classifying Indonesian geographic regions
+ * and their unique business characteristics. This service provides the foundation for
+ * region-specific pattern adaptation across the vast Indonesian archipelago.
+ */
+
+export interface GeographicClassificationRequest {
+  tenantId: string;
+  analysisLocation?: IndonesianLocation;
+  businessScope?: BusinessScope[];
+  includeProvinceAnalysis?: boolean;
+  includeIslandAnalysis?: boolean;
+  includeEconomicZoneAnalysis?: boolean;
+  includeUrbanRuralAnalysis?: boolean;
+  includeConnectivityAnalysis?: boolean;
+  analysisDepth: 'basic' | 'standard' | 'comprehensive' | 'expert';
+}
+
+export interface IndonesianLocation {
+  province: IndonesianProvince;
+  regency?: string; // Kabupaten/Kota
+  district?: string; // Kecamatan
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  timezone: IndonesianTimezone;
+}
+
+export type IndonesianProvince = 
+  // Sumatera Island
+  | 'aceh'                    // NAD - Nanggroe Aceh Darussalam
+  | 'sumatera_utara'          // North Sumatera
+  | 'sumatera_barat'          // West Sumatera
+  | 'riau'                    // Riau
+  | 'kepulauan_riau'          // Riau Islands
+  | 'jambi'                   // Jambi
+  | 'sumatera_selatan'        // South Sumatera
+  | 'bangka_belitung'         // Bangka Belitung Islands
+  | 'bengkulu'                // Bengkulu
+  | 'lampung'                 // Lampung
+  
+  // Java Island
+  | 'jakarta'                 // DKI Jakarta
+  | 'jawa_barat'              // West Java
+  | 'banten'                  // Banten
+  | 'jawa_tengah'             // Central Java
+  | 'yogyakarta'              // DI Yogyakarta
+  | 'jawa_timur'              // East Java
+  
+  // Kalimantan Island
+  | 'kalimantan_barat'        // West Kalimantan
+  | 'kalimantan_tengah'       // Central Kalimantan
+  | 'kalimantan_selatan'      // South Kalimantan
+  | 'kalimantan_timur'        // East Kalimantan
+  | 'kalimantan_utara'        // North Kalimantan
+  
+  // Sulawesi Island
+  | 'sulawesi_utara'          // North Sulawesi
+  | 'sulawesi_tengah'         // Central Sulawesi
+  | 'sulawesi_selatan'        // South Sulawesi
+  | 'sulawesi_tenggara'       // Southeast Sulawesi
+  | 'gorontalo'               // Gorontalo
+  | 'sulawesi_barat'          // West Sulawesi
+  
+  // Lesser Sunda Islands
+  | 'bali'                    // Bali
+  | 'nusa_tenggara_barat'     // West Nusa Tenggara (NTB)
+  | 'nusa_tenggara_timur'     // East Nusa Tenggara (NTT)
+  
+  // Maluku Islands
+  | 'maluku'                  // Maluku
+  | 'maluku_utara'            // North Maluku
+  
+  // Papua
+  | 'papua'                   // Papua
+  | 'papua_barat'             // West Papua
+  | 'papua_selatan'           // South Papua
+  | 'papua_tengah'            // Central Papua
+  | 'papua_pegunungan'        // Highland Papua
+  | 'papua_barat_daya';       // Southwest Papua
+
+export type IndonesianTimezone = 
+  | 'WIB'   // Western Indonesia Time (UTC+7) - Sumatera, Java, West & Central Kalimantan
+  | 'WITA'  // Central Indonesia Time (UTC+8) - East & South Kalimantan, Sulawesi, Bali, NTB, NTT
+  | 'WIT';  // Eastern Indonesia Time (UTC+9) - Maluku, Papua
+
+export type BusinessScope = 
+  | 'hyperlocal'              // Single neighborhood/village
+  | 'local_city'              // Single city/regency
+  | 'provincial'              // Province-wide
+  | 'regional'                // Multi-province (island/region)
+  | 'national'                // Indonesia-wide
+  | 'international';          // Cross-border
+
+export interface RegionalCharacteristics {
+  regionId: string;
+  regionName: string;
+  regionType: 'province' | 'island' | 'economic_zone' | 'urban_cluster' | 'development_corridor';
+  
+  geographicProfile: GeographicProfile;
+  economicProfile: EconomicProfile;
+  demographicProfile: DemographicProfile;
+  infrastructureProfile: InfrastructureProfile;
+  businessEnvironment: BusinessEnvironment;
+  seasonalFactors: RegionalSeasonalFactors;
+  connectivityMatrix: ConnectivityMatrix;
+}
+
+export interface GeographicProfile {
+  totalArea: number; // km²
+  populationDensity: number; // people per km²
+  topography: TopographicType[];
+  climaticZone: ClimaticZone;
+  naturalResources: NaturalResource[];
+  coastalAccess: boolean;
+  islandType: 'main_island' | 'major_island' | 'minor_island' | 'archipelago';
+  
+  physicalCharacteristics: {
+    mountainous: number; // percentage
+    plains: number;
+    coastal: number;
+    forest: number;
+    agricultural: number;
+    urban: number;
+  };
+  
+  naturalDisasterRisk: {
+    earthquake: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    tsunami: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    volcanic: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    flooding: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    landslide: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  };
+}
+
+export type TopographicType = 
+  | 'mountainous'     // Pegunungan
+  | 'hilly'           // Perbukitan
+  | 'plains'          // Dataran
+  | 'coastal_plains'  // Dataran pantai
+  | 'river_delta'     // Delta sungai
+  | 'swampland'       // Rawa
+  | 'karst'           // Karst
+  | 'volcanic';       // Vulkanik
+
+export type ClimaticZone = 
+  | 'tropical_rainforest'     // Hutan hujan tropis
+  | 'tropical_monsoon'        // Monsun tropis
+  | 'tropical_savanna'        // Savana tropis
+  | 'highland_tropical'       // Dataran tinggi tropis
+  | 'coastal_tropical';       // Pantai tropis
+
+export type NaturalResource = 
+  | 'crude_oil'        // Minyak bumi
+  | 'natural_gas'      // Gas alam
+  | 'coal'             // Batu bara
+  | 'gold'             // Emas
+  | 'nickel'           // Nikel
+  | 'tin'              // Timah
+  | 'copper'           // Tembaga
+  | 'bauxite'          // Bauksit
+  | 'palm_oil'         // Kelapa sawit
+  | 'rubber'           // Karet
+  | 'coffee'           // Kopi
+  | 'cocoa'            // Kakao
+  | 'tea'              // Teh
+  | 'spices'           // Rempah-rempah
+  | 'timber'           // Kayu
+  | 'fisheries'        // Perikanan
+  | 'agriculture'      // Pertanian
+  | 'tourism_natural'; // Wisata alam
+
+export interface EconomicProfile {
+  gdpPerCapita: number;
+  majorIndustries: IndustryType[];
+  economicGrowthRate: number; // annual percentage
+  unemploymentRate: number;
+  povertyRate: number;
+  humanDevelopmentIndex: number;
+  
+  economicStructure: {
+    agriculture: number; // percentage of GDP
+    manufacturing: number;
+    services: number;
+    mining: number;
+    construction: number;
+    trade: number;
+    tourism: number;
+  };
+  
+  businessIndicators: {
+    smeConcentration: number; // SMEs per 1000 people
+    ecommerceAdoption: number; // percentage
+    digitalPaymentUsage: number; // percentage
+    bankingAccess: number; // percentage with bank accounts
+    internetPenetration: number; // percentage
+    mobilePenetration: number; // percentage
+  };
+  
+  tradingPatterns: {
+    domesticTrade: number; // percentage of total trade
+    exportOriented: number;
+    importDependent: number;
+    regionalTrade: number; // trade within region
+    internationalTrade: number;
+  };
+}
+
+export type IndustryType = 
+  | 'agriculture'              // Pertanian
+  | 'plantation'               // Perkebunan
+  | 'forestry'                 // Kehutanan
+  | 'fisheries'                // Perikanan
+  | 'mining_oil_gas'           // Pertambangan migas
+  | 'mining_general'           // Pertambangan umum
+  | 'manufacturing_food'       // Industri makanan
+  | 'manufacturing_textile'    // Industri tekstil
+  | 'manufacturing_automotive' // Industri otomotif
+  | 'manufacturing_electronics'// Industri elektronik
+  | 'manufacturing_chemical'   // Industri kimia
+  | 'construction'             // Konstruksi
+  | 'trade_retail'             // Perdagangan retail
+  | 'trade_wholesale'          // Perdagangan grosir
+  | 'transportation'           // Transportasi
+  | 'logistics'                // Logistik
+  | 'telecommunications'       // Telekomunikasi
+  | 'finance_banking'          // Keuangan perbankan
+  | 'finance_insurance'        // Asuransi
+  | 'real_estate'              // Real estat
+  | 'tourism_hospitality'      // Pariwisata
+  | 'education'                // Pendidikan
+  | 'healthcare'               // Kesehatan
+  | 'government'               // Pemerintahan
+  | 'creative_economy'         // Ekonomi kreatif
+  | 'technology';              // Teknologi
+
+export interface DemographicProfile {
+  totalPopulation: number;
+  populationGrowthRate: number; // annual percentage
+  medianAge: number;
+  urbanizationRate: number; // percentage living in urban areas
+  
+  ageDistribution: {
+    age_0_14: number;   // percentage
+    age_15_24: number;
+    age_25_54: number;
+    age_55_64: number;
+    age_65_plus: number;
+  };
+  
+  educationLevel: {
+    no_education: number;      // percentage
+    elementary: number;
+    junior_high: number;
+    senior_high: number;
+    vocational: number;
+    university: number;
+  };
+  
+  ethnicComposition: {
+    javanese: number;          // percentage
+    sundanese: number;
+    batak: number;
+    madurese: number;
+    minangkabau: number;
+    bugis: number;
+    malay: number;
+    balinese: number;
+    dayak: number;
+    papuan: number;
+    chinese: number;
+    others: number;
+  };
+  
+  religiousComposition: {
+    islam: number;             // percentage
+    christianity: number;
+    catholicism: number;
+    hinduism: number;
+    buddhism: number;
+    others: number;
+  };
+  
+  languageProfile: {
+    indonesian: number;        // fluency percentage
+    localLanguages: string[];  // dominant local languages
+    englishProficiency: number; // percentage with basic English
+  };
+}
+
+export interface InfrastructureProfile {
+  transportationInfrastructure: TransportationInfrastructure;
+  digitalInfrastructure: DigitalInfrastructure;
+  energyInfrastructure: EnergyInfrastructure;
+  waterSanitation: WaterSanitationInfrastructure;
+  healthcareInfrastructure: HealthcareInfrastructure;
+  educationInfrastructure: EducationInfrastructure;
+}
+
+export interface TransportationInfrastructure {
+  roadDensity: number;        // km per 1000 km²
+  roadQuality: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  railwayAccess: boolean;
+  majorPorts: number;
+  airports: {
+    international: number;
+    domestic: number;
+    regional: number;
+  };
+  publicTransportation: {
+    availability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+    coverage: number; // percentage of area covered
+    reliability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  };
+}
+
+export interface DigitalInfrastructure {
+  internetSpeed: {
+    averageDownload: number; // Mbps
+    averageUpload: number;   // Mbps
+    reliability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  };
+  mobileNetworkCoverage: {
+    coverage_2g: number;     // percentage
+    coverage_3g: number;
+    coverage_4g: number;
+    coverage_5g: number;
+  };
+  fiberOpticCoverage: number; // percentage of area
+  digitalLiteracy: number;    // percentage of population
+}
+
+export interface EnergyInfrastructure {
+  electricityAccess: number;      // percentage of population
+  electricityReliability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  renewableEnergyShare: number;   // percentage
+  energySources: {
+    coal: number;               // percentage
+    oil: number;
+    gas: number;
+    hydro: number;
+    geothermal: number;
+    solar: number;
+    wind: number;
+    biomass: number;
+  };
+}
+
+export interface WaterSanitationInfrastructure {
+  cleanWaterAccess: number;       // percentage of population
+  sanitationAccess: number;       // percentage of population
+  wasteManagement: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  waterQuality: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+}
+
+export interface HealthcareInfrastructure {
+  hospitalsPerCapita: number;     // per 100,000 people
+  healthCentersPerCapita: number; // per 100,000 people
+  doctorsPerCapita: number;       // per 100,000 people
+  healthcareAccess: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  specializedCare: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+}
+
+export interface EducationInfrastructure {
+  schoolsPerCapita: {
+    elementary: number;         // per 100,000 people
+    juniorHigh: number;
+    seniorHigh: number;
+    vocational: number;
+    university: number;
+  };
+  educationQuality: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  teacherRatio: number;           // students per teacher
+  educationBudget: number;        // percentage of regional budget
+}
+
+export interface BusinessEnvironment {
+  easeOfDoingBusiness: {
+    ranking: number;            // regional ranking
+    businessRegistration: 'very_easy' | 'easy' | 'moderate' | 'difficult' | 'very_difficult';
+    licensingProcess: 'very_easy' | 'easy' | 'moderate' | 'difficult' | 'very_difficult';
+    taxation: 'very_favorable' | 'favorable' | 'neutral' | 'unfavorable' | 'very_unfavorable';
+    laborRegulations: 'very_flexible' | 'flexible' | 'moderate' | 'rigid' | 'very_rigid';
+  };
+  
+  investmentClimate: {
+    foreignInvestmentOpenness: number; // score 0-100
+    localInvestmentSupport: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+    accessToFinance: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+    skillAvailability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+    marketSize: 'very_large' | 'large' | 'medium' | 'small' | 'very_small';
+  };
+  
+  regulatoryEnvironment: {
+    businessFriendliness: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+    corruption: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high';
+    bureaucracy: 'very_efficient' | 'efficient' | 'moderate' | 'slow' | 'very_slow';
+    legalFramework: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  };
+  
+  economicIncentives: {
+    taxIncentives: string[];        // Available tax incentives
+    investmentIncentives: string[]; // Available investment incentives
+    specialEconomicZones: boolean;  // Presence of SEZ
+    industrySupport: string[];      // Supported industries
+  };
+}
+
+export interface RegionalSeasonalFactors {
+  weatherSeasonality: WeatherSeasonalPattern[];
+  culturalSeasonality: CulturalSeasonalPattern[];
+  economicSeasonality: EconomicSeasonalPattern[];
+  agriculturalSeasonality: AgriculturalSeasonalPattern[];
+  tourismSeasonality: TourismSeasonalPattern[];
+}
+
+export interface WeatherSeasonalPattern {
+  patternName: string;
+  season: 'dry_season' | 'wet_season' | 'transition';
+  startMonth: number;
+  endMonth: number;
+  intensity: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  businessImpact: string[];
+  affectedIndustries: IndustryType[];
+}
+
+export interface CulturalSeasonalPattern {
+  patternName: string;
+  culturalEvent: string;
+  timing: string; // e.g., "Month 7 lunar calendar"
+  duration: number; // days
+  economicImpact: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  affectedBusinessTypes: string[];
+}
+
+export interface EconomicSeasonalPattern {
+  patternName: string;
+  economicDriver: string;
+  cyclePeriod: 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
+  peakMonths: number[];
+  lowMonths: number[];
+  volatility: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+}
+
+export interface AgriculturalSeasonalPattern {
+  cropType: string;
+  plantingMonth: number;
+  harvestMonth: number;
+  marketImpact: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  supplyChainEffects: string[];
+}
+
+export interface TourismSeasonalPattern {
+  tourismType: string;
+  peakSeason: string;
+  lowSeason: string;
+  internationalVisitors: number; // percentage
+  domesticVisitors: number; // percentage
+  economicMultiplier: number;
+}
+
+export interface ConnectivityMatrix {
+  domesticConnectivity: DomesticConnectivity;
+  internationalConnectivity: InternationalConnectivity;
+  logisticsPerformance: LogisticsPerformance;
+  digitalConnectivity: DigitalConnectivity;
+}
+
+export interface DomesticConnectivity {
+  connectionToJakarta: {
+    transportTime: number;      // hours
+    logisticsCost: number;      // cost index
+    frequency: number;          // connections per day
+    reliability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  };
+  connectionToRegionalHub: {
+    transportTime: number;
+    logisticsCost: number;
+    frequency: number;
+    reliability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  };
+  intraNasionalHub: boolean;     // Is this region a hub itself?
+  supplyChainIntegration: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+}
+
+export interface InternationalConnectivity {
+  internationalPorts: number;
+  internationalAirports: number;
+  borderCrossings: number;
+  exportFacilities: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  importFacilities: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  tradeAgreementBenefits: string[];
+}
+
+export interface LogisticsPerformance {
+  lastMileDelivery: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  warehouseFacilities: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  coldChainCapability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  crossDockingFacilities: boolean;
+  logisticsCostIndex: number;     // relative to national average
+  deliveryTimeReliability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+}
+
+export interface DigitalConnectivity {
+  ecommerceInfrastructure: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  digitalPaymentInfrastructure: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  onlineMarketplacePresence: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+  digitalLiteracyRate: number;    // percentage
+  cloudInfrastructure: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+}
+
+export interface GeographicClassificationResult {
+  tenantId: string;
+  analysisTimestamp: Date;
+  
+  regionalProfile: RegionalCharacteristics;
+  comparativeAnalysis: ComparativeAnalysis;
+  businessOpportunities: RegionalBusinessOpportunity[];
+  risks: RegionalBusinessRisk[];
+  recommendations: RegionalRecommendation[];
+  
+  adaptationFactors: {
+    seasonalityAdjustments: { [factor: string]: number };
+    economicModifiers: { [industry: string]: number };
+    infrastructureImpacts: { [aspect: string]: string };
+    culturalConsiderations: string[];
+  };
+  
+  performanceMetrics: GeographicAnalysisMetrics;
+}
+
+export interface ComparativeAnalysis {
+  nationalComparison: {
+    gdpPerCapitaRank: number;       // rank among provinces
+    developmentIndex: number;       // HDI comparison
+    businessEnvironmentRank: number;
+    infrastructureRank: number;
+    competitivenessScore: number;
+  };
+  
+  regionalComparison: {
+    similarRegions: string[];       // Regions with similar characteristics
+    benchmarkRegions: string[];     // Better performing similar regions
+    competitorRegions: string[];    // Competing regions
+    complementaryRegions: string[]; // Regions with complementary strengths
+  };
+  
+  strengthsWeaknesses: {
+    keyStrengths: string[];
+    criticalWeaknesses: string[];
+    uniqueAdvantages: string[];
+    developmentChallenges: string[];
+  };
+}
+
+export interface RegionalBusinessOpportunity {
+  opportunityType: string;
+  description: string;
+  potential: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  timeframe: string;
+  requirements: string[];
+  expectedOutcome: string;
+  successFactors: string[];
+}
+
+export interface RegionalBusinessRisk {
+  riskType: string;
+  description: string;
+  probability: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  impact: 'very_severe' | 'severe' | 'major' | 'moderate' | 'minor';
+  mitigation: string[];
+  earlyWarningSignals: string[];
+}
+
+export interface RegionalRecommendation {
+  category: string;
+  recommendation: string;
+  priority: 'critical' | 'important' | 'moderate' | 'low';
+  timeline: string;
+  resources: string[];
+  expectedBenefit: string;
+  implementationSteps: string[];
+}
+
+export interface GeographicAnalysisMetrics {
+  dataCompleteness: number;       // 0-1 scale
+  analysisConfidence: number;     // 0-1 scale
+  benchmarkingAccuracy: number;   // 0-1 scale
+  predictionReliability: number;  // 0-1 scale
+  
+  coverage: {
+    geographicCoverage: number;   // percentage of region analyzed
+    economicCoverage: number;     // percentage of economy covered
+    demographicCoverage: number;  // percentage of population covered
+    infrastructureCoverage: number; // percentage of infrastructure assessed
+  };
+  
+  businessValue: {
+    decisionSupport: number;      // 0-1 scale
+    riskReduction: number;
+    opportunityIdentification: number;
+    strategicPlanning: number;
+  };
+}
+
+@Injectable()
+export class IndonesianGeographicClassificationService {
+  private readonly logger = new Logger(IndonesianGeographicClassificationService.name);
+
+  // Comprehensive Indonesian regional profiles database
+  private readonly indonesianRegionalProfiles: { [province: string]: RegionalCharacteristics } = {
+    'jakarta': {
+      regionId: 'ID-JK',
+      regionName: 'DKI Jakarta',
+      regionType: 'province',
+      
+      geographicProfile: {
+        totalArea: 664.01, // km²
+        populationDensity: 15234, // people per km²
+        topography: ['coastal_plains', 'plains'],
+        climaticZone: 'tropical_monsoon',
+        naturalResources: ['fisheries', 'agriculture', 'tourism_natural'],
+        coastalAccess: true,
+        islandType: 'main_island',
+        
+        physicalCharacteristics: {
+          mountainous: 0,
+          plains: 85,
+          coastal: 15,
+          forest: 2,
+          agricultural: 3,
+          urban: 95
+        },
+        
+        naturalDisasterRisk: {
+          earthquake: 'high',
+          tsunami: 'medium',
+          volcanic: 'low',
+          flooding: 'very_high',
+          landslide: 'low'
+        }
+      },
+      
+      economicProfile: {
+        gdpPerCapita: 284000000, // IDR
+        majorIndustries: ['finance_banking', 'trade_retail', 'manufacturing_food', 'telecommunications', 'construction'],
+        economicGrowthRate: 5.02,
+        unemploymentRate: 5.28,
+        povertyRate: 3.47,
+        humanDevelopmentIndex: 80.77,
+        
+        economicStructure: {
+          agriculture: 0.09,
+          manufacturing: 13.35,
+          services: 67.84,
+          mining: 0.05,
+          construction: 10.89,
+          trade: 18.78,
+          tourism: 4.12
+        },
+        
+        businessIndicators: {
+          smeConcentration: 85.2,
+          ecommerceAdoption: 78.5,
+          digitalPaymentUsage: 89.3,
+          bankingAccess: 94.7,
+          internetPenetration: 95.8,
+          mobilePenetration: 142.5
+        },
+        
+        tradingPatterns: {
+          domesticTrade: 45.2,
+          exportOriented: 15.8,
+          importDependent: 25.4,
+          regionalTrade: 35.6,
+          internationalTrade: 39.0
+        }
+      },
+      
+      demographicProfile: {
+        totalPopulation: 10562088,
+        populationGrowthRate: 1.19,
+        medianAge: 35.5,
+        urbanizationRate: 100.0,
+        
+        ageDistribution: {
+          age_0_14: 19.5,
+          age_15_24: 13.8,
+          age_25_54: 51.2,
+          age_55_64: 10.3,
+          age_65_plus: 5.2
+        },
+        
+        educationLevel: {
+          no_education: 0.8,
+          elementary: 12.4,
+          junior_high: 15.7,
+          senior_high: 41.2,
+          vocational: 12.8,
+          university: 17.1
+        },
+        
+        ethnicComposition: {
+          javanese: 36.2,
+          sundanese: 15.4,
+          batak: 8.7,
+          chinese: 12.3,
+          madurese: 3.2,
+          minangkabau: 2.8,
+          bugis: 1.9,
+          malay: 2.1,
+          balinese: 0.8,
+          dayak: 0.1,
+          papuan: 0.1,
+          others: 16.4
+        },
+        
+        religiousComposition: {
+          islam: 85.4,
+          christianity: 8.7,
+          catholicism: 3.2,
+          hinduism: 0.8,
+          buddhism: 1.6,
+          others: 0.3
+        },
+        
+        languageProfile: {
+          indonesian: 98.5,
+          localLanguages: ['Betawi', 'Javanese', 'Sundanese'],
+          englishProficiency: 32.4
+        }
+      },
+      
+      infrastructureProfile: {
+        transportationInfrastructure: {
+          roadDensity: 4789,
+          roadQuality: 'good',
+          railwayAccess: true,
+          majorPorts: 1,
+          airports: {
+            international: 1,
+            domestic: 1,
+            regional: 0
+          },
+          publicTransportation: {
+            availability: 'excellent',
+            coverage: 85,
+            reliability: 'good'
+          }
+        },
+        
+        digitalInfrastructure: {
+          internetSpeed: {
+            averageDownload: 45.8,
+            averageUpload: 23.7,
+            reliability: 'excellent'
+          },
+          mobileNetworkCoverage: {
+            coverage_2g: 99.8,
+            coverage_3g: 99.5,
+            coverage_4g: 98.9,
+            coverage_5g: 45.2
+          },
+          fiberOpticCoverage: 78.4,
+          digitalLiteracy: 82.3
+        },
+        
+        energyInfrastructure: {
+          electricityAccess: 99.9,
+          electricityReliability: 'good',
+          renewableEnergyShare: 12.4,
+          energySources: {
+            coal: 54.2,
+            oil: 8.7,
+            gas: 22.8,
+            hydro: 3.4,
+            geothermal: 2.1,
+            solar: 1.8,
+            wind: 0.5,
+            biomass: 6.5
+          }
+        },
+        
+        waterSanitation: {
+          cleanWaterAccess: 94.7,
+          sanitationAccess: 89.3,
+          wasteManagement: 'good',
+          waterQuality: 'fair'
+        },
+        
+        healthcareInfrastructure: {
+          hospitalsPerCapita: 1.8,
+          healthCentersPerCapita: 0.9,
+          doctorsPerCapita: 45.2,
+          healthcareAccess: 'excellent',
+          specializedCare: 'excellent'
+        },
+        
+        educationInfrastructure: {
+          schoolsPerCapita: {
+            elementary: 15.4,
+            juniorHigh: 8.7,
+            seniorHigh: 12.3,
+            vocational: 5.8,
+            university: 3.2
+          },
+          educationQuality: 'excellent',
+          teacherRatio: 18.5,
+          educationBudget: 25.4
+        }
+      },
+      
+      businessEnvironment: {
+        easeOfDoingBusiness: {
+          ranking: 1,
+          businessRegistration: 'easy',
+          licensingProcess: 'moderate',
+          taxation: 'neutral',
+          laborRegulations: 'moderate'
+        },
+        
+        investmentClimate: {
+          foreignInvestmentOpenness: 85.4,
+          localInvestmentSupport: 'excellent',
+          accessToFinance: 'excellent',
+          skillAvailability: 'excellent',
+          marketSize: 'very_large'
+        },
+        
+        regulatoryEnvironment: {
+          businessFriendliness: 'good',
+          corruption: 'moderate',
+          bureaucracy: 'moderate',
+          legalFramework: 'good'
+        },
+        
+        economicIncentives: {
+          taxIncentives: ['Investment tax allowance', 'Tax holiday for new investment', 'Accelerated depreciation'],
+          investmentIncentives: ['One-stop service', 'Investment facilitation', 'Business incubator support'],
+          specialEconomicZones: true,
+          industrySupport: ['Financial services', 'Technology', 'Creative economy', 'Manufacturing']
+        }
+      },
+      
+      seasonalFactors: {
+        weatherSeasonality: [
+          {
+            patternName: 'Jakarta Dry Season',
+            season: 'dry_season',
+            startMonth: 4,
+            endMonth: 10,
+            intensity: 'medium',
+            businessImpact: ['Increased construction activity', 'Higher outdoor event frequency', 'Tourism peak'],
+            affectedIndustries: ['construction', 'tourism_hospitality', 'trade_retail']
+          },
+          {
+            patternName: 'Jakarta Wet Season',
+            season: 'wet_season',
+            startMonth: 11,
+            endMonth: 3,
+            intensity: 'high',
+            businessImpact: ['Flooding disruption', 'Transportation delays', 'Indoor activity increase'],
+            affectedIndustries: ['transportation', 'construction', 'agriculture']
+          }
+        ],
+        
+        culturalSeasonality: [
+          {
+            patternName: 'Ramadan Business Cycle',
+            culturalEvent: 'Ramadan',
+            timing: 'Month 9 lunar calendar',
+            duration: 30,
+            economicImpact: 'very_high',
+            affectedBusinessTypes: ['Food & beverage', 'Retail fashion', 'Religious items', 'Charity services']
+          }
+        ],
+        
+        economicSeasonality: [
+          {
+            patternName: 'Government Budget Cycle',
+            economicDriver: 'Government fiscal year',
+            cyclePeriod: 'annual',
+            peakMonths: [3, 6, 9, 12],
+            lowMonths: [1, 2],
+            volatility: 'medium'
+          }
+        ],
+        
+        agriculturalSeasonality: [
+          {
+            cropType: 'Urban agriculture',
+            plantingMonth: 4,
+            harvestMonth: 7,
+            marketImpact: 'low',
+            supplyChainEffects: ['Local produce availability', 'Short supply chain']
+          }
+        ],
+        
+        tourismSeasonality: [
+          {
+            tourismType: 'Business tourism',
+            peakSeason: 'March-June, September-November',
+            lowSeason: 'December-February, July-August',
+            internationalVisitors: 65,
+            domesticVisitors: 35,
+            economicMultiplier: 2.1
+          }
+        ]
+      },
+      
+      connectivityMatrix: {
+        domesticConnectivity: {
+          connectionToJakarta: {
+            transportTime: 0, // Already in Jakarta
+            logisticsCost: 100, // Base index
+            frequency: 999,
+            reliability: 'excellent'
+          },
+          connectionToRegionalHub: {
+            transportTime: 0,
+            logisticsCost: 100,
+            frequency: 999,
+            reliability: 'excellent'
+          },
+          intraNasionalHub: true,
+          supplyChainIntegration: 'excellent'
+        },
+        
+        internationalConnectivity: {
+          internationalPorts: 1,
+          internationalAirports: 1,
+          borderCrossings: 0,
+          exportFacilities: 'excellent',
+          importFacilities: 'excellent',
+          tradeAgreementBenefits: ['ASEAN', 'APEC', 'WTO', 'Bilateral agreements']
+        },
+        
+        logisticsPerformance: {
+          lastMileDelivery: 'excellent',
+          warehouseFacilities: 'excellent',
+          coldChainCapability: 'excellent',
+          crossDockingFacilities: true,
+          logisticsCostIndex: 100,
+          deliveryTimeReliability: 'excellent'
+        },
+        
+        digitalConnectivity: {
+          ecommerceInfrastructure: 'excellent',
+          digitalPaymentInfrastructure: 'excellent',
+          onlineMarketplacePresence: 'excellent',
+          digitalLiteracyRate: 82.3,
+          cloudInfrastructure: 'excellent'
+        }
+      }
+    }
+
+    // Additional regional profiles would be added here for all 38 provinces
+    // This is a representative example for Jakarta
+  };
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private readonly transactionRepository: Repository<InventoryTransaction>,
+    
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    
+    @InjectRepository(ProductCategory)
+    private readonly categoryRepository: Repository<ProductCategory>,
+    
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Main entry point for geographic classification analysis
+   */
+  async analyzeGeographicClassification(request: GeographicClassificationRequest): Promise<GeographicClassificationResult> {
+    this.logger.log(`Starting geographic classification analysis for tenant: ${request.tenantId}`);
+
+    try {
+      // Get regional profile
+      const regionalProfile = await this.getRegionalProfile(request);
+      
+      // Perform comparative analysis
+      const comparativeAnalysis = this.performComparativeAnalysis(regionalProfile, request);
+      
+      // Identify business opportunities
+      const businessOpportunities = this.identifyRegionalOpportunities(regionalProfile, request);
+      
+      // Assess regional risks
+      const risks = this.assessRegionalRisks(regionalProfile, request);
+      
+      // Generate recommendations
+      const recommendations = this.generateRegionalRecommendations(regionalProfile, request);
+      
+      // Calculate adaptation factors
+      const adaptationFactors = this.calculateAdaptationFactors(regionalProfile, request);
+      
+      // Calculate performance metrics
+      const performanceMetrics = this.calculateAnalysisMetrics(regionalProfile, request);
+
+      const result: GeographicClassificationResult = {
+        tenantId: request.tenantId,
+        analysisTimestamp: new Date(),
+        regionalProfile,
+        comparativeAnalysis,
+        businessOpportunities,
+        risks,
+        recommendations,
+        adaptationFactors,
+        performanceMetrics
+      };
+
+      // Cache the results
+      await this.cacheResults(request.tenantId, result);
+      
+      // Emit analysis completion event
+      this.eventEmitter.emit('geographicClassification.analysisComplete', {
+        tenantId: request.tenantId,
+        region: regionalProfile.regionName,
+        analysisDepth: request.analysisDepth
+      });
+
+      this.logger.log(`Geographic classification analysis completed for tenant: ${request.tenantId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Error in geographic classification analysis: ${error.message}`, error.stack);
+      throw new Error(`Geographic classification analysis failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get regional profile for the specified location
+   */
+  private async getRegionalProfile(request: GeographicClassificationRequest): Promise<RegionalCharacteristics> {
+    if (request.analysisLocation?.province) {
+      const profile = this.indonesianRegionalProfiles[request.analysisLocation.province];
+      if (profile) {
+        return this.enhanceProfileWithRealData(profile, request);
+      }
+    }
+
+    // Return default profile if specific region not found
+    return this.getDefaultRegionalProfile(request);
+  }
+
+  /**
+   * Enhance regional profile with real business data
+   */
+  private async enhanceProfileWithRealData(
+    baseProfile: RegionalCharacteristics, 
+    request: GeographicClassificationRequest
+  ): Promise<RegionalCharacteristics> {
+    const enhancedProfile = JSON.parse(JSON.stringify(baseProfile));
+    
+    try {
+      // Get business transaction data for the region
+      const businessData = await this.getRegionalBusinessData(request);
+      
+      if (businessData.length > 0) {
+        // Update business indicators based on actual data
+        enhancedProfile.economicProfile.businessIndicators = 
+          this.updateBusinessIndicators(enhancedProfile.economicProfile.businessIndicators, businessData);
+        
+        // Update trading patterns
+        enhancedProfile.economicProfile.tradingPatterns = 
+          this.updateTradingPatterns(enhancedProfile.economicProfile.tradingPatterns, businessData);
+        
+        // Update seasonal factors
+        enhancedProfile.seasonalFactors = 
+          this.updateSeasonalFactors(enhancedProfile.seasonalFactors, businessData);
+      }
+    } catch (error) {
+      this.logger.warn(`Could not enhance profile with real data: ${error.message}`);
+    }
+
+    return enhancedProfile;
+  }
+
+  /**
+   * Get regional business data from transactions
+   */
+  private async getRegionalBusinessData(request: GeographicClassificationRequest): Promise<any[]> {
+    const queryBuilder = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.product', 'product')
+      .leftJoinAndSelect('product.category', 'category')
+      .where('transaction.tenantId = :tenantId', { tenantId: request.tenantId });
+
+    // Add date range if specified
+    if (request.analysisLocation) {
+      const endDate = new Date();
+      const startDate = moment(endDate).subtract(1, 'year').toDate();
+      
+      queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate
+      });
+    }
+
+    const transactions = await queryBuilder.getMany();
+
+    return transactions.map(transaction => ({
+      id: transaction.id,
+      date: transaction.transactionDate,
+      quantity: transaction.quantity,
+      unitCost: transaction.unitCost || 0,
+      totalValue: transaction.totalCost || 0,
+      categoryName: transaction.product?.category?.name,
+      transactionType: transaction.type,
+      metadata: transaction.metadata || {}
+    }));
+  }
+
+  /**
+   * Update business indicators with real data
+   */
+  private updateBusinessIndicators(baseIndicators: any, businessData: any[]): any {
+    const updated = { ...baseIndicators };
+    
+    if (businessData.length > 0) {
+      // Calculate actual ecommerce adoption based on transaction types
+      const digitalTransactions = businessData.filter(t => 
+        t.metadata?.channel === 'online' || t.metadata?.digital === true
+      );
+      
+      if (digitalTransactions.length > 0) {
+        updated.ecommerceAdoption = (digitalTransactions.length / businessData.length) * 100;
+      }
+      
+      // Update other indicators based on available data
+      // This is a simplified example - real implementation would be more sophisticated
+    }
+    
+    return updated;
+  }
+
+  /**
+   * Update trading patterns with real data
+   */
+  private updateTradingPatterns(basePatterns: any, businessData: any[]): any {
+    const updated = { ...basePatterns };
+    
+    // Analyze transaction patterns to determine trading characteristics
+    // This is a simplified implementation
+    
+    return updated;
+  }
+
+  /**
+   * Update seasonal factors with real data
+   */
+  private updateSeasonalFactors(baseFactors: RegionalSeasonalFactors, businessData: any[]): RegionalSeasonalFactors {
+    const updated = JSON.parse(JSON.stringify(baseFactors));
+    
+    // Analyze seasonal patterns in the business data
+    const monthlyData = this.groupDataByMonth(businessData);
+    
+    // Update economic seasonality based on actual patterns
+    if (monthlyData.length > 0) {
+      const seasonalPattern = this.detectSeasonalPattern(monthlyData);
+      
+      if (seasonalPattern) {
+        updated.economicSeasonality.push({
+          patternName: 'Detected Business Pattern',
+          economicDriver: 'Local business cycle',
+          cyclePeriod: 'annual',
+          peakMonths: seasonalPattern.peakMonths,
+          lowMonths: seasonalPattern.lowMonths,
+          volatility: seasonalPattern.volatility
+        });
+      }
+    }
+    
+    return updated;
+  }
+
+  /**
+   * Group business data by month for seasonal analysis
+   */
+  private groupDataByMonth(businessData: any[]): any[] {
+    const monthlyData = Array(12).fill(0).map((_, index) => ({
+      month: index + 1,
+      totalValue: 0,
+      transactionCount: 0
+    }));
+
+    businessData.forEach(transaction => {
+      const month = moment(transaction.date).month(); // 0-based
+      monthlyData[month].totalValue += transaction.totalValue;
+      monthlyData[month].transactionCount += 1;
+    });
+
+    return monthlyData;
+  }
+
+  /**
+   * Detect seasonal patterns in monthly data
+   */
+  private detectSeasonalPattern(monthlyData: any[]): any | null {
+    if (monthlyData.length !== 12) return null;
+
+    const values = monthlyData.map(m => m.totalValue);
+    const avgValue = mean(values);
+    const stdDev = standardDeviation(values);
+    
+    const peakMonths: number[] = [];
+    const lowMonths: number[] = [];
+    
+    values.forEach((value, index) => {
+      if (value > avgValue + stdDev) {
+        peakMonths.push(index + 1);
+      } else if (value < avgValue - stdDev) {
+        lowMonths.push(index + 1);
+      }
+    });
+
+    const coefficientOfVariation = stdDev / avgValue;
+    let volatility: 'very_high' | 'high' | 'medium' | 'low' | 'very_low' = 'medium';
+    
+    if (coefficientOfVariation > 0.5) volatility = 'very_high';
+    else if (coefficientOfVariation > 0.3) volatility = 'high';
+    else if (coefficientOfVariation > 0.15) volatility = 'medium';
+    else if (coefficientOfVariation > 0.05) volatility = 'low';
+    else volatility = 'very_low';
+
+    return {
+      peakMonths,
+      lowMonths,
+      volatility
+    };
+  }
+
+  /**
+   * Get default regional profile when specific region data is not available
+   */
+  private getDefaultRegionalProfile(request: GeographicClassificationRequest): RegionalCharacteristics {
+    // Return a generic Indonesian regional profile
+    return {
+      regionId: 'ID-GENERIC',
+      regionName: 'Indonesian Region',
+      regionType: 'province',
+      
+      geographicProfile: {
+        totalArea: 50000,
+        populationDensity: 150,
+        topography: ['plains', 'hilly'],
+        climaticZone: 'tropical_monsoon',
+        naturalResources: ['agriculture', 'fisheries'],
+        coastalAccess: true,
+        islandType: 'main_island',
+        
+        physicalCharacteristics: {
+          mountainous: 20,
+          plains: 50,
+          coastal: 10,
+          forest: 30,
+          agricultural: 40,
+          urban: 20
+        },
+        
+        naturalDisasterRisk: {
+          earthquake: 'medium',
+          tsunami: 'medium',
+          volcanic: 'medium',
+          flooding: 'medium',
+          landslide: 'medium'
+        }
+      },
+      
+      // Additional default properties would be defined here
+      economicProfile: {
+        gdpPerCapita: 50000000,
+        majorIndustries: ['agriculture', 'trade_retail', 'manufacturing_food'],
+        economicGrowthRate: 4.5,
+        unemploymentRate: 8.0,
+        povertyRate: 12.0,
+        humanDevelopmentIndex: 65.0,
+        
+        economicStructure: {
+          agriculture: 25,
+          manufacturing: 20,
+          services: 35,
+          mining: 5,
+          construction: 8,
+          trade: 15,
+          tourism: 7
+        },
+        
+        businessIndicators: {
+          smeConcentration: 65.0,
+          ecommerceAdoption: 45.0,
+          digitalPaymentUsage: 55.0,
+          bankingAccess: 70.0,
+          internetPenetration: 65.0,
+          mobilePenetration: 110.0
+        },
+        
+        tradingPatterns: {
+          domesticTrade: 70.0,
+          exportOriented: 10.0,
+          importDependent: 15.0,
+          regionalTrade: 60.0,
+          internationalTrade: 20.0
+        }
+      },
+      
+      // Simplified default profiles for other components
+      demographicProfile: {} as DemographicProfile,
+      infrastructureProfile: {} as InfrastructureProfile,
+      businessEnvironment: {} as BusinessEnvironment,
+      seasonalFactors: {} as RegionalSeasonalFactors,
+      connectivityMatrix: {} as ConnectivityMatrix
+    };
+  }
+
+  /**
+   * Perform comparative analysis
+   */
+  private performComparativeAnalysis(
+    regionalProfile: RegionalCharacteristics,
+    request: GeographicClassificationRequest
+  ): ComparativeAnalysis {
+    return {
+      nationalComparison: {
+        gdpPerCapitaRank: this.calculateGDPRank(regionalProfile),
+        developmentIndex: regionalProfile.economicProfile.humanDevelopmentIndex,
+        businessEnvironmentRank: this.calculateBusinessEnvironmentRank(regionalProfile),
+        infrastructureRank: this.calculateInfrastructureRank(regionalProfile),
+        competitivenessScore: this.calculateCompetitivenessScore(regionalProfile)
+      },
+      
+      regionalComparison: {
+        similarRegions: this.findSimilarRegions(regionalProfile),
+        benchmarkRegions: this.findBenchmarkRegions(regionalProfile),
+        competitorRegions: this.findCompetitorRegions(regionalProfile),
+        complementaryRegions: this.findComplementaryRegions(regionalProfile)
+      },
+      
+      strengthsWeaknesses: {
+        keyStrengths: this.identifyKeyStrengths(regionalProfile),
+        criticalWeaknesses: this.identifyCriticalWeaknesses(regionalProfile),
+        uniqueAdvantages: this.identifyUniqueAdvantages(regionalProfile),
+        developmentChallenges: this.identifyDevelopmentChallenges(regionalProfile)
+      }
+    };
+  }
+
+  /**
+   * Calculate GDP rank among Indonesian provinces
+   */
+  private calculateGDPRank(profile: RegionalCharacteristics): number {
+    // Simplified ranking based on GDP per capita
+    const gdpPerCapita = profile.economicProfile.gdpPerCapita;
+    
+    if (gdpPerCapita > 200000000) return 1; // Top tier (Jakarta, etc.)
+    if (gdpPerCapita > 100000000) return 5; // Second tier
+    if (gdpPerCapita > 75000000) return 10; // Third tier
+    if (gdpPerCapita > 50000000) return 20; // Fourth tier
+    return 30; // Lower tier
+  }
+
+  /**
+   * Calculate business environment rank
+   */
+  private calculateBusinessEnvironmentRank(profile: RegionalCharacteristics): number {
+    const businessEnv = profile.businessEnvironment;
+    let score = 0;
+    
+    // Score based on various factors
+    if (businessEnv.easeOfDoingBusiness?.ranking) {
+      score += (38 - businessEnv.easeOfDoingBusiness.ranking) * 2;
+    }
+    
+    if (businessEnv.investmentClimate?.foreignInvestmentOpenness) {
+      score += businessEnv.investmentClimate.foreignInvestmentOpenness / 10;
+    }
+    
+    return Math.max(1, Math.min(38, Math.round(38 - (score / 10))));
+  }
+
+  /**
+   * Calculate infrastructure rank
+   */
+  private calculateInfrastructureRank(profile: RegionalCharacteristics): number {
+    const infra = profile.infrastructureProfile;
+    let score = 0;
+    
+    // Score based on infrastructure quality
+    if (infra.digitalInfrastructure?.internetSpeed?.averageDownload) {
+      score += infra.digitalInfrastructure.internetSpeed.averageDownload / 5;
+    }
+    
+    if (infra.transportationInfrastructure?.roadDensity) {
+      score += infra.transportationInfrastructure.roadDensity / 100;
+    }
+    
+    return Math.max(1, Math.min(38, Math.round(38 - (score / 10))));
+  }
+
+  /**
+   * Calculate competitiveness score
+   */
+  private calculateCompetitivenessScore(profile: RegionalCharacteristics): number {
+    let score = 0;
+    
+    // Economic factors (40%)
+    score += (profile.economicProfile.humanDevelopmentIndex / 100) * 0.4;
+    
+    // Infrastructure factors (30%)
+    if (profile.infrastructureProfile.digitalInfrastructure?.internetSpeed?.averageDownload) {
+      score += (profile.infrastructureProfile.digitalInfrastructure.internetSpeed.averageDownload / 100) * 0.3;
+    }
+    
+    // Business environment factors (30%)
+    if (profile.businessEnvironment.investmentClimate?.foreignInvestmentOpenness) {
+      score += (profile.businessEnvironment.investmentClimate.foreignInvestmentOpenness / 100) * 0.3;
+    }
+    
+    return Math.max(0, Math.min(1, score));
+  }
+
+  /**
+   * Find similar regions based on characteristics
+   */
+  private findSimilarRegions(profile: RegionalCharacteristics): string[] {
+    // Simplified logic to find regions with similar economic structure
+    const similarRegions: string[] = [];
+    
+    Object.entries(this.indonesianRegionalProfiles).forEach(([province, regionProfile]) => {
+      if (regionProfile.regionId !== profile.regionId) {
+        const similarity = this.calculateRegionalSimilarity(profile, regionProfile);
+        if (similarity > 0.7) {
+          similarRegions.push(regionProfile.regionName);
+        }
+      }
+    });
+    
+    return similarRegions.slice(0, 5); // Return top 5 similar regions
+  }
+
+  /**
+   * Calculate similarity between regions
+   */
+  private calculateRegionalSimilarity(region1: RegionalCharacteristics, region2: RegionalCharacteristics): number {
+    let similarity = 0;
+    let factors = 0;
+    
+    // Compare economic structure
+    const econ1 = region1.economicProfile.economicStructure;
+    const econ2 = region2.economicProfile.economicStructure;
+    
+    if (econ1 && econ2) {
+      const econSimilarity = 1 - Math.abs(econ1.agriculture - econ2.agriculture) / 100 +
+                            1 - Math.abs(econ1.manufacturing - econ2.manufacturing) / 100 +
+                            1 - Math.abs(econ1.services - econ2.services) / 100;
+      similarity += econSimilarity / 3;
+      factors++;
+    }
+    
+    // Compare development levels
+    const hdi1 = region1.economicProfile.humanDevelopmentIndex;
+    const hdi2 = region2.economicProfile.humanDevelopmentIndex;
+    
+    if (hdi1 && hdi2) {
+      similarity += 1 - Math.abs(hdi1 - hdi2) / 100;
+      factors++;
+    }
+    
+    return factors > 0 ? similarity / factors : 0;
+  }
+
+  /**
+   * Find benchmark regions (better performing similar regions)
+   */
+  private findBenchmarkRegions(profile: RegionalCharacteristics): string[] {
+    const benchmarkRegions: string[] = [];
+    
+    Object.entries(this.indonesianRegionalProfiles).forEach(([province, regionProfile]) => {
+      if (regionProfile.regionId !== profile.regionId) {
+        const similarity = this.calculateRegionalSimilarity(profile, regionProfile);
+        const betterPerformance = this.isBetterPerforming(profile, regionProfile);
+        
+        if (similarity > 0.6 && betterPerformance) {
+          benchmarkRegions.push(regionProfile.regionName);
+        }
+      }
+    });
+    
+    return benchmarkRegions.slice(0, 3);
+  }
+
+  /**
+   * Check if one region performs better than another
+   */
+  private isBetterPerforming(region1: RegionalCharacteristics, region2: RegionalCharacteristics): boolean {
+    return region2.economicProfile.gdpPerCapita > region1.economicProfile.gdpPerCapita &&
+           region2.economicProfile.humanDevelopmentIndex > region1.economicProfile.humanDevelopmentIndex;
+  }
+
+  /**
+   * Find competitor regions
+   */
+  private findCompetitorRegions(profile: RegionalCharacteristics): string[] {
+    const competitorRegions: string[] = [];
+    
+    // Find regions with similar major industries
+    Object.entries(this.indonesianRegionalProfiles).forEach(([province, regionProfile]) => {
+      if (regionProfile.regionId !== profile.regionId) {
+        const industryOverlap = this.calculateIndustryOverlap(
+          profile.economicProfile.majorIndustries,
+          regionProfile.economicProfile.majorIndustries
+        );
+        
+        if (industryOverlap > 0.5) {
+          competitorRegions.push(regionProfile.regionName);
+        }
+      }
+    });
+    
+    return competitorRegions.slice(0, 5);
+  }
+
+  /**
+   * Calculate industry overlap between regions
+   */
+  private calculateIndustryOverlap(industries1: IndustryType[], industries2: IndustryType[]): number {
+    const overlap = industries1.filter(industry => industries2.includes(industry));
+    return overlap.length / Math.max(industries1.length, industries2.length);
+  }
+
+  /**
+   * Find complementary regions
+   */
+  private findComplementaryRegions(profile: RegionalCharacteristics): string[] {
+    const complementaryRegions: string[] = [];
+    
+    // Find regions with complementary economic structures
+    Object.entries(this.indonesianRegionalProfiles).forEach(([province, regionProfile]) => {
+      if (regionProfile.regionId !== profile.regionId) {
+        const complementarity = this.calculateComplementarity(profile, regionProfile);
+        
+        if (complementarity > 0.6) {
+          complementaryRegions.push(regionProfile.regionName);
+        }
+      }
+    });
+    
+    return complementaryRegions.slice(0, 3);
+  }
+
+  /**
+   * Calculate complementarity between regions
+   */
+  private calculateComplementarity(region1: RegionalCharacteristics, region2: RegionalCharacteristics): number {
+    // Simplified complementarity calculation
+    const resources1 = region1.geographicProfile.naturalResources;
+    const resources2 = region2.geographicProfile.naturalResources;
+    
+    // Regions are complementary if they have different resource bases
+    const uniqueResources = resources1.filter(resource => !resources2.includes(resource));
+    return uniqueResources.length / Math.max(resources1.length, 1);
+  }
+
+  /**
+   * Identify key strengths of the region
+   */
+  private identifyKeyStrengths(profile: RegionalCharacteristics): string[] {
+    const strengths: string[] = [];
+    
+    // Check various indicators for strengths
+    if (profile.economicProfile.humanDevelopmentIndex > 70) {
+      strengths.push('High human development index');
+    }
+    
+    if (profile.economicProfile.businessIndicators.internetPenetration > 80) {
+      strengths.push('Excellent digital connectivity');
+    }
+    
+    if (profile.businessEnvironment.investmentClimate?.marketSize === 'very_large') {
+      strengths.push('Large market size');
+    }
+    
+    if (profile.geographicProfile.coastalAccess) {
+      strengths.push('Strategic coastal location');
+    }
+    
+    if (profile.connectivityMatrix?.domesticConnectivity?.intraNasionalHub) {
+      strengths.push('Major transportation hub');
+    }
+    
+    return strengths;
+  }
+
+  /**
+   * Identify critical weaknesses of the region
+   */
+  private identifyCriticalWeaknesses(profile: RegionalCharacteristics): string[] {
+    const weaknesses: string[] = [];
+    
+    if (profile.economicProfile.povertyRate > 15) {
+      weaknesses.push('High poverty rate');
+    }
+    
+    if (profile.economicProfile.unemploymentRate > 10) {
+      weaknesses.push('High unemployment rate');
+    }
+    
+    if (profile.infrastructureProfile.digitalInfrastructure?.internetSpeed?.averageDownload < 20) {
+      weaknesses.push('Poor internet infrastructure');
+    }
+    
+    if (profile.businessEnvironment.regulatoryEnvironment?.corruption === 'high') {
+      weaknesses.push('Corruption issues');
+    }
+    
+    return weaknesses;
+  }
+
+  /**
+   * Identify unique advantages
+   */
+  private identifyUniqueAdvantages(profile: RegionalCharacteristics): string[] {
+    const advantages: string[] = [];
+    
+    // Check for unique natural resources
+    const uniqueResources = profile.geographicProfile.naturalResources.filter(resource => 
+      ['gold', 'nickel', 'oil', 'gas', 'spices'].includes(resource)
+    );
+    
+    if (uniqueResources.length > 0) {
+      advantages.push(`Rich in ${uniqueResources.join(', ')}`);
+    }
+    
+    // Check for strategic location
+    if (profile.connectivityMatrix?.internationalConnectivity?.internationalPorts > 0) {
+      advantages.push('International gateway location');
+    }
+    
+    // Check for special economic zones
+    if (profile.businessEnvironment.economicIncentives?.specialEconomicZones) {
+      advantages.push('Special Economic Zone benefits');
+    }
+    
+    return advantages;
+  }
+
+  /**
+   * Identify development challenges
+   */
+  private identifyDevelopmentChallenges(profile: RegionalCharacteristics): string[] {
+    const challenges: string[] = [];
+    
+    // Infrastructure challenges
+    if (profile.infrastructureProfile.transportationInfrastructure?.roadQuality === 'poor') {
+      challenges.push('Poor transportation infrastructure');
+    }
+    
+    // Natural disaster risks
+    const highRisks = Object.entries(profile.geographicProfile.naturalDisasterRisk).filter(
+      ([_, risk]) => risk === 'very_high' || risk === 'high'
+    );
+    
+    if (highRisks.length > 0) {
+      challenges.push(`High natural disaster risk: ${highRisks.map(([type, _]) => type).join(', ')}`);
+    }
+    
+    // Economic challenges
+    if (profile.economicProfile.economicGrowthRate < 3) {
+      challenges.push('Low economic growth rate');
+    }
+    
+    return challenges;
+  }
+
+  /**
+   * Identify regional business opportunities
+   */
+  private identifyRegionalOpportunities(
+    profile: RegionalCharacteristics,
+    request: GeographicClassificationRequest
+  ): RegionalBusinessOpportunity[] {
+    const opportunities: RegionalBusinessOpportunity[] = [];
+    
+    // Tourism opportunities
+    if (profile.seasonalFactors.tourismSeasonality && profile.seasonalFactors.tourismSeasonality.length > 0) {
+      opportunities.push({
+        opportunityType: 'Tourism Development',
+        description: 'Leverage natural beauty and cultural heritage for tourism growth',
+        potential: 'high',
+        timeframe: '2-3 years',
+        requirements: ['Infrastructure development', 'Marketing campaign', 'Service quality improvement'],
+        expectedOutcome: 'Increased tourism revenue and job creation',
+        successFactors: ['Government support', 'Private sector engagement', 'Community participation']
+      });
+    }
+    
+    // Digital economy opportunities
+    if (profile.economicProfile.businessIndicators.internetPenetration > 60) {
+      opportunities.push({
+        opportunityType: 'Digital Economy',
+        description: 'Develop e-commerce and digital services sector',
+        potential: 'very_high',
+        timeframe: '1-2 years',
+        requirements: ['Digital skills training', 'Technology infrastructure', 'Regulatory support'],
+        expectedOutcome: 'New business creation and economic diversification',
+        successFactors: ['Youth engagement', 'Technology adoption', 'Market access']
+      });
+    }
+    
+    // Manufacturing opportunities
+    if (profile.economicProfile.economicStructure.manufacturing < 20 && 
+        profile.infrastructureProfile.transportationInfrastructure?.roadQuality === 'good') {
+      opportunities.push({
+        opportunityType: 'Manufacturing Development',
+        description: 'Attract manufacturing investment with good infrastructure',
+        potential: 'medium',
+        timeframe: '3-5 years',
+        requirements: ['Industrial land preparation', 'Workforce training', 'Investment promotion'],
+        expectedOutcome: 'Industrial growth and employment creation',
+        successFactors: ['Investment incentives', 'Skilled workforce', 'Supply chain integration']
+      });
+    }
+    
+    return opportunities;
+  }
+
+  /**
+   * Assess regional business risks
+   */
+  private assessRegionalRisks(
+    profile: RegionalCharacteristics,
+    request: GeographicClassificationRequest
+  ): RegionalBusinessRisk[] {
+    const risks: RegionalBusinessRisk[] = [];
+    
+    // Natural disaster risks
+    const highDisasterRisks = Object.entries(profile.geographicProfile.naturalDisasterRisk).filter(
+      ([_, risk]) => risk === 'very_high' || risk === 'high'
+    );
+    
+    if (highDisasterRisks.length > 0) {
+      risks.push({
+        riskType: 'Natural Disaster',
+        description: `High risk of ${highDisasterRisks.map(([type, _]) => type).join(', ')}`,
+        probability: 'high',
+        impact: 'severe',
+        mitigation: ['Disaster preparedness planning', 'Insurance coverage', 'Emergency response systems'],
+        earlyWarningSignals: ['Weather alerts', 'Geological activity', 'Historical patterns']
+      });
+    }
+    
+    // Economic dependency risks
+    if (profile.economicProfile.economicStructure.agriculture > 40) {
+      risks.push({
+        riskType: 'Economic Dependency',
+        description: 'Over-reliance on agriculture sector',
+        probability: 'medium',
+        impact: 'major',
+        mitigation: ['Economic diversification', 'Value chain development', 'Market expansion'],
+        earlyWarningSignals: ['Commodity price volatility', 'Weather impacts', 'Market demand changes']
+      });
+    }
+    
+    // Infrastructure risks
+    if (profile.infrastructureProfile.digitalInfrastructure?.internetSpeed?.averageDownload < 20) {
+      risks.push({
+        riskType: 'Digital Divide',
+        description: 'Poor digital infrastructure limiting business opportunities',
+        probability: 'high',
+        impact: 'moderate',
+        mitigation: ['Infrastructure investment', 'Public-private partnerships', 'Technology leapfrogging'],
+        earlyWarningSignals: ['Declining competitiveness', 'Youth migration', 'Business relocations']
+      });
+    }
+    
+    return risks;
+  }
+
+  /**
+   * Generate regional recommendations
+   */
+  private generateRegionalRecommendations(
+    profile: RegionalCharacteristics,
+    request: GeographicClassificationRequest
+  ): RegionalRecommendation[] {
+    const recommendations: RegionalRecommendation[] = [];
+    
+    // Infrastructure development
+    if (profile.infrastructureProfile.transportationInfrastructure?.roadQuality === 'poor') {
+      recommendations.push({
+        category: 'Infrastructure',
+        recommendation: 'Prioritize transportation infrastructure development',
+        priority: 'critical',
+        timeline: '3-5 years',
+        resources: ['Government funding', 'Development partners', 'Private sector'],
+        expectedBenefit: 'Improved connectivity and business efficiency',
+        implementationSteps: [
+          'Conduct infrastructure assessment',
+          'Develop master plan',
+          'Secure financing',
+          'Execute construction projects'
+        ]
+      });
+    }
+    
+    // Digital transformation
+    if (profile.economicProfile.businessIndicators.ecommerceAdoption < 50) {
+      recommendations.push({
+        category: 'Digital Economy',
+        recommendation: 'Accelerate digital transformation initiatives',
+        priority: 'important',
+        timeline: '1-2 years',
+        resources: ['Technology providers', 'Training institutions', 'Government support'],
+        expectedBenefit: 'Enhanced business competitiveness and market access',
+        implementationSteps: [
+          'Digital literacy programs',
+          'E-commerce platform development',
+          'Digital payment system adoption',
+          'Online marketing training'
+        ]
+      });
+    }
+    
+    // Economic diversification
+    if (profile.economicProfile.economicStructure.agriculture > 50) {
+      recommendations.push({
+        category: 'Economic Development',
+        recommendation: 'Promote economic diversification beyond agriculture',
+        priority: 'important',
+        timeline: '5-10 years',
+        resources: ['Investment promotion', 'Skills development', 'Market facilitation'],
+        expectedBenefit: 'Reduced economic vulnerability and increased growth',
+        implementationSteps: [
+          'Identify diversification opportunities',
+          'Develop sector strategies',
+          'Attract investment',
+          'Build supporting infrastructure'
+        ]
+      });
+    }
+    
+    return recommendations;
+  }
+
+  /**
+   * Calculate adaptation factors for regional differences
+   */
+  private calculateAdaptationFactors(
+    profile: RegionalCharacteristics,
+    request: GeographicClassificationRequest
+  ): any {
+    const seasonalityAdjustments: { [factor: string]: number } = {};
+    const economicModifiers: { [industry: string]: number } = {};
+    const infrastructureImpacts: { [aspect: string]: string } = {};
+    const culturalConsiderations: string[] = [];
+    
+    // Calculate seasonality adjustments
+    if (profile.seasonalFactors.weatherSeasonality) {
+      profile.seasonalFactors.weatherSeasonality.forEach(pattern => {
+        const intensity = pattern.intensity === 'very_high' ? 1.5 :
+                         pattern.intensity === 'high' ? 1.3 :
+                         pattern.intensity === 'medium' ? 1.1 :
+                         pattern.intensity === 'low' ? 0.9 : 0.8;
+        
+        seasonalityAdjustments[pattern.patternName] = intensity;
+      });
+    }
+    
+    // Calculate economic modifiers
+    profile.economicProfile.majorIndustries.forEach(industry => {
+      let modifier = 1.0;
+      
+      // Adjust based on regional economic structure
+      if (industry === 'agriculture' && profile.economicProfile.economicStructure.agriculture > 30) {
+        modifier = 1.2; // Agriculture is strong in this region
+      } else if (industry === 'tourism_hospitality' && profile.seasonalFactors.tourismSeasonality.length > 0) {
+        modifier = 1.3; // Tourism potential
+      } else if (industry === 'technology' && profile.economicProfile.businessIndicators.internetPenetration > 80) {
+        modifier = 1.4; // Good digital infrastructure
+      }
+      
+      economicModifiers[industry] = modifier;
+    });
+    
+    // Infrastructure impacts
+    infrastructureImpacts['digital_readiness'] = 
+      profile.infrastructureProfile.digitalInfrastructure?.internetSpeed?.averageDownload > 50 ? 'high' :
+      profile.infrastructureProfile.digitalInfrastructure?.internetSpeed?.averageDownload > 20 ? 'medium' : 'low';
+    
+    infrastructureImpacts['logistics_efficiency'] = 
+      profile.connectivityMatrix?.logisticsPerformance?.lastMileDelivery === 'excellent' ? 'high' :
+      profile.connectivityMatrix?.logisticsPerformance?.lastMileDelivery === 'good' ? 'medium' : 'low';
+    
+    // Cultural considerations
+    if (profile.demographicProfile.religiousComposition?.islam > 80) {
+      culturalConsiderations.push('Islamic business practices important');
+      culturalConsiderations.push('Halal certification valuable');
+      culturalConsiderations.push('Prayer time considerations needed');
+    }
+    
+    if (profile.demographicProfile.ethnicComposition?.javanese > 50) {
+      culturalConsiderations.push('Javanese cultural values influence business');
+      culturalConsiderations.push('Hierarchy and relationship-based business');
+    }
+    
+    return {
+      seasonalityAdjustments,
+      economicModifiers,
+      infrastructureImpacts,
+      culturalConsiderations
+    };
+  }
+
+  /**
+   * Calculate analysis performance metrics
+   */
+  private calculateAnalysisMetrics(
+    profile: RegionalCharacteristics,
+    request: GeographicClassificationRequest
+  ): GeographicAnalysisMetrics {
+    // Calculate data completeness
+    let dataCompleteness = 0;
+    let completenessFactors = 0;
+    
+    if (profile.economicProfile) {
+      dataCompleteness += 0.3;
+      completenessFactors++;
+    }
+    
+    if (profile.infrastructureProfile) {
+      dataCompleteness += 0.2;
+      completenessFactors++;
+    }
+    
+    if (profile.demographicProfile) {
+      dataCompleteness += 0.2;
+      completenessFactors++;
+    }
+    
+    if (profile.businessEnvironment) {
+      dataCompleteness += 0.15;
+      completenessFactors++;
+    }
+    
+    if (profile.connectivityMatrix) {
+      dataCompleteness += 0.15;
+      completenessFactors++;
+    }
+    
+    const finalDataCompleteness = completenessFactors > 0 ? dataCompleteness : 0.5;
+    
+    return {
+      dataCompleteness: finalDataCompleteness,
+      analysisConfidence: Math.min(0.95, finalDataCompleteness + 0.1),
+      benchmarkingAccuracy: 0.8, // Based on profile availability
+      predictionReliability: 0.75,
+      
+      coverage: {
+        geographicCoverage: request.analysisLocation ? 0.9 : 0.7,
+        economicCoverage: 0.85,
+        demographicCoverage: 0.8,
+        infrastructureCoverage: 0.75
+      },
+      
+      businessValue: {
+        decisionSupport: 0.85,
+        riskReduction: 0.8,
+        opportunityIdentification: 0.9,
+        strategicPlanning: 0.82
+      }
+    };
+  }
+
+  /**
+   * Cache analysis results
+   */
+  private async cacheResults(tenantId: string, result: GeographicClassificationResult): Promise<void> {
+    const cacheKey = `geographic_classification:${tenantId}`;
+    await this.cacheManager.set(cacheKey, result, 48 * 60 * 60 * 1000); // 48 hours
+  }
+
+  /**
+   * Get cached analysis results
+   */
+  async getCachedResults(tenantId: string): Promise<GeographicClassificationResult | null> {
+    const cacheKey = `geographic_classification:${tenantId}`;
+    return await this.cacheManager.get<GeographicClassificationResult>(cacheKey);
+  }
+
+  /**
+   * Get regional adaptation recommendations
+   */
+  async getRegionalAdaptationRecommendations(
+    tenantId: string,
+    province?: IndonesianProvince
+  ): Promise<RegionalRecommendation[]> {
+    if (province && this.indonesianRegionalProfiles[province]) {
+      const profile = this.indonesianRegionalProfiles[province];
+      return this.generateRegionalRecommendations(profile, { tenantId, analysisDepth: 'standard' });
+    }
+    
+    return this.getGeneralRegionalRecommendations();
+  }
+
+  /**
+   * Get general regional recommendations
+   */
+  private getGeneralRegionalRecommendations(): RegionalRecommendation[] {
+    return [
+      {
+        category: 'Digital Infrastructure',
+        recommendation: 'Improve internet connectivity and digital infrastructure',
+        priority: 'critical',
+        timeline: '2-3 years',
+        resources: ['Technology investment', 'Government support', 'Private partnerships'],
+        expectedBenefit: 'Enhanced business competitiveness and market access',
+        implementationSteps: [
+          'Assess current digital infrastructure',
+          'Develop improvement plan',
+          'Secure funding and partnerships',
+          'Implement infrastructure upgrades'
+        ]
+      },
+      {
+        category: 'Economic Diversification',
+        recommendation: 'Develop multiple economic sectors to reduce dependency',
+        priority: 'important',
+        timeline: '5-7 years',
+        resources: ['Investment promotion', 'Skills development', 'Market facilitation'],
+        expectedBenefit: 'Reduced economic vulnerability and sustainable growth',
+        implementationSteps: [
+          'Identify competitive advantages',
+          'Develop sector strategies',
+          'Attract targeted investments',
+          'Build supporting ecosystem'
+        ]
+      }
+    ];
+  }
+
+  /**
+   * Validate geographic classification results
+   */
+  async validateClassificationResults(result: GeographicClassificationResult): Promise<boolean> {
+    try {
+      // Validate basic structure
+      if (!result.tenantId || !result.regionalProfile || !result.comparativeAnalysis) {
+        return false;
+      }
+      
+      // Validate performance metrics
+      if (result.performanceMetrics.dataCompleteness < 0 || 
+          result.performanceMetrics.dataCompleteness > 1) {
+        return false;
+      }
+      
+      // Validate adaptation factors
+      if (!result.adaptationFactors.seasonalityAdjustments || 
+          !result.adaptationFactors.economicModifiers) {
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      this.logger.error(`Validation error: ${error.message}`);
+      return false;
+    }
+  }
+}

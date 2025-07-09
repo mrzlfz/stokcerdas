@@ -20,6 +20,9 @@ import { BaseApiService } from '../common/services/base-api.service';
 import { RateLimiterService } from '../common/services/rate-limiter.service';
 import { IntegrationLogService } from '../common/services/integration-log.service';
 import { WebhookHandlerService } from '../common/services/webhook-handler.service';
+import { ErrorHandlingService } from '../common/services/error-handling.service';
+import { RetryService } from '../common/services/retry.service';
+import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
 
 // Shopee services
 import { ShopeeApiService } from './services/shopee-api.service';
@@ -90,11 +93,14 @@ import { ShopeeProcessor } from './processors/shopee.processor';
   controllers: [ShopeeController, ShopeeWebhookController],
 
   providers: [
-    // Common services  
+    // Common services
     BaseApiService,
     RateLimiterService,
     IntegrationLogService,
     WebhookHandlerService,
+    ErrorHandlingService,
+    RetryService,
+    CircuitBreakerService,
 
     // Shopee-specific services
     ShopeeApiService,

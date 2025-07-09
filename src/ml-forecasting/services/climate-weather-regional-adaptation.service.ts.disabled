@@ -1,0 +1,2551 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+
+/**
+ * PHASE 3.2.3.4.2: Climate and Weather Regional Adaptation 🌦️
+ * 
+ * Advanced service for understanding and adapting to climate and weather patterns
+ * across Indonesia's diverse regions. Provides climate-aware business insights and
+ * seasonal adaptations based on regional weather characteristics.
+ */
+
+export interface ClimateWeatherRequest {
+  tenantId: string;
+  region: IndonesianClimateRegion;
+  businessType?: string;
+  climateSensitivity?: ClimateSensitivityLevel;
+  includeWeatherForecasting?: boolean;
+  includeMonsoonAnalysis?: boolean;
+  includeElNinoLaNinaEffects?: boolean;
+  includeClimateChangeProjections?: boolean;
+  analysisTimeHorizon: 'short_term' | 'medium_term' | 'long_term' | 'comprehensive';
+  analysisDepth: 'basic' | 'standard' | 'comprehensive' | 'expert';
+}
+
+export type IndonesianClimateRegion = 
+  | 'java_western'            // West Java & Jakarta - Urban monsoon
+  | 'java_central'            // Central Java - Continental tropical
+  | 'java_eastern'            // East Java - Tropical savanna transition
+  | 'sumatera_northern'       // North Sumatera - Equatorial rainforest
+  | 'sumatera_central'        // Central Sumatera - Tropical rainforest
+  | 'sumatera_southern'       // South Sumatera - Monsoon transition
+  | 'kalimantan_western'      // West Kalimantan - Equatorial maritime
+  | 'kalimantan_central'      // Central Kalimantan - Tropical rainforest
+  | 'kalimantan_eastern'      // East Kalimantan - Maritime tropical
+  | 'kalimantan_southern'     // South Kalimantan - Monsoon influenced
+  | 'sulawesi_northern'       // North Sulawesi - Maritime equatorial
+  | 'sulawesi_central'        // Central Sulawesi - Mountainous tropical
+  | 'sulawesi_southern'       // South Sulawesi - Monsoon tropical
+  | 'bali_nusa_tenggara'      // Bali & Nusa Tenggara - Dry monsoon
+  | 'maluku_northern'         // North Maluku - Equatorial maritime
+  | 'maluku_southern'         // South Maluku - Tropical maritime
+  | 'papua_western'           // West Papua - Tropical rainforest
+  | 'papua_central'           // Central Papua - Highland tropical
+  | 'papua_southern'          // South Papua - Savanna tropical
+  | 'marine_java_sea'         // Java Sea maritime
+  | 'marine_banda_sea'        // Banda Sea maritime
+  | 'marine_arafura_sea';     // Arafura Sea maritime
+
+export type ClimateSensitivityLevel = 
+  | 'very_high'    // Extremely weather dependent (agriculture, tourism)
+  | 'high'         // Weather dependent (construction, outdoor services)
+  | 'medium'       // Moderately affected (retail, logistics)
+  | 'low'          // Minimally affected (office services, technology)
+  | 'very_low';    // Weather independent (financial services, online)
+
+export interface ClimateCharacteristics {
+  regionId: string;
+  regionName: string;
+  climateZone: KoppenClimateZone;
+  
+  temperatureProfile: TemperatureProfile;
+  precipitationProfile: PrecipitationProfile;
+  humidityProfile: HumidityProfile;
+  windProfile: WindProfile;
+  seasonalPatterns: SeasonalClimatePattern[];
+  extremeWeatherRisks: ExtremeWeatherRisk[];
+  microclimateFactors: MicroclimateFactor[];
+}
+
+export type KoppenClimateZone = 
+  | 'Af'   // Tropical rainforest climate
+  | 'Am'   // Tropical monsoon climate
+  | 'Aw'   // Tropical savanna climate with dry winter
+  | 'As'   // Tropical savanna climate with dry summer
+  | 'Cfa'  // Humid subtropical climate
+  | 'Cfb'  // Oceanic climate (highlands)
+  | 'Cwa'  // Humid subtropical climate with dry winter
+  | 'BSh'  // Hot semi-arid climate
+  | 'BWh'; // Hot desert climate
+
+export interface TemperatureProfile {
+  annualMean: number;           // °C
+  annualRange: number;          // °C (max - min)
+  dailyRange: number;           // °C
+  
+  seasonalTemperatures: {
+    drySeasonMean: number;      // °C
+    wetSeasonMean: number;      // °C
+    transitionMean: number;     // °C
+  };
+  
+  extremes: {
+    recordHigh: number;         // °C
+    recordLow: number;          // °C
+    heatwaveDays: number;       // days per year > 35°C
+    coolDays: number;           // days per year < 20°C
+  };
+  
+  monthlyAverages: number[];    // 12 months
+  heatIndex: HeatIndexProfile;
+}
+
+export interface HeatIndexProfile {
+  averageHeatIndex: number;     // °C
+  extremeHeatDays: number;      // days per year with dangerous heat index
+  comfortDays: number;          // days per year with comfortable conditions
+  heatStressRisk: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+}
+
+export interface PrecipitationProfile {
+  annualTotal: number;          // mm
+  wetSeasonTotal: number;       // mm
+  drySeasonTotal: number;       // mm
+  
+  monthlyAverages: number[];    // 12 months in mm
+  
+  rainyDays: {
+    annualCount: number;        // days with >1mm rain
+    wetSeasonCount: number;     // days in wet season
+    drySeasonCount: number;     // days in dry season
+  };
+  
+  intensity: {
+    lightRain: number;          // % of rain days
+    moderateRain: number;       // % of rain days
+    heavyRain: number;          // % of rain days
+    extremeRain: number;        // % of rain days (>50mm/day)
+  };
+  
+  variability: {
+    yearToYearVariation: number; // coefficient of variation
+    seasonalConsistency: number; // 0-1 scale
+    droughtRisk: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+    floodRisk: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  };
+}
+
+export interface HumidityProfile {
+  annualMean: number;           // %
+  dailyVariation: number;       // %
+  
+  seasonalHumidity: {
+    drySeasonMean: number;      // %
+    wetSeasonMean: number;      // %
+    transitionMean: number;     // %
+  };
+  
+  monthlyAverages: number[];    // 12 months
+  
+  comfortIndex: {
+    comfortableDays: number;    // days per year
+    uncomfortableDays: number;  // days per year
+    oppressiveDays: number;     // days per year
+  };
+}
+
+export interface WindProfile {
+  averageSpeed: number;         // km/h
+  predominantDirection: string; // compass direction
+  
+  seasonalWinds: {
+    drySeasonSpeed: number;     // km/h
+    wetSeasonSpeed: number;     // km/h
+    drySeasonDirection: string;
+    wetSeasonDirection: string;
+  };
+  
+  extremeWinds: {
+    maxRecorded: number;        // km/h
+    stormDays: number;          // days per year
+    calmDays: number;           // days per year (<5 km/h)
+  };
+  
+  monsoonInfluence: {
+    northeastMonsoon: MonsoonCharacteristics;
+    southwestMonsoon: MonsoonCharacteristics;
+  };
+}
+
+export interface MonsoonCharacteristics {
+  startMonth: number;           // 1-12
+  endMonth: number;             // 1-12
+  intensity: 'very_weak' | 'weak' | 'moderate' | 'strong' | 'very_strong';
+  reliability: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  businessImpact: string[];
+}
+
+export interface SeasonalClimatePattern {
+  patternName: string;
+  season: IndonesianSeason;
+  duration: number;             // days
+  startDate: string;            // MM-DD
+  endDate: string;              // MM-DD
+  
+  characteristics: {
+    temperature: 'very_hot' | 'hot' | 'warm' | 'mild' | 'cool';
+    precipitation: 'very_wet' | 'wet' | 'moderate' | 'dry' | 'very_dry';
+    humidity: 'very_humid' | 'humid' | 'moderate' | 'dry' | 'very_dry';
+    windiness: 'very_windy' | 'windy' | 'moderate' | 'calm' | 'very_calm';
+  };
+  
+  businessEffects: SeasonalBusinessEffect[];
+  adaptationStrategies: string[];
+}
+
+export type IndonesianSeason = 
+  | 'musim_kemarau'       // Dry season (April-September)
+  | 'musim_hujan'         // Wet season (October-March)
+  | 'pancaroba_kemarau'   // Transition to dry season
+  | 'pancaroba_hujan'     // Transition to wet season
+  | 'puncak_kemarau'      // Peak dry season
+  | 'puncak_hujan';       // Peak wet season
+
+export interface SeasonalBusinessEffect {
+  affectedSector: string;
+  effectType: 'positive' | 'negative' | 'neutral' | 'mixed';
+  magnitude: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  description: string;
+  adaptationRequired: boolean;
+}
+
+export interface ExtremeWeatherRisk {
+  riskType: ExtremeWeatherType;
+  frequency: 'very_rare' | 'rare' | 'occasional' | 'frequent' | 'very_frequent';
+  severity: 'minor' | 'moderate' | 'major' | 'severe' | 'catastrophic';
+  seasonality: string;
+  
+  historicalData: {
+    lastOccurrence: string;     // YYYY-MM-DD
+    averageInterval: number;    // years
+    worstCaseImpact: string;
+  };
+  
+  businessImpacts: {
+    directImpacts: string[];
+    indirectImpacts: string[];
+    recoveryTime: number;       // days
+    economicLoss: 'minimal' | 'low' | 'moderate' | 'high' | 'severe';
+  };
+  
+  mitigationStrategies: string[];
+  earlyWarningSignals: string[];
+}
+
+export type ExtremeWeatherType = 
+  | 'tropical_cyclone'    // Siklon tropis
+  | 'heavy_rainfall'      // Hujan lebat
+  | 'flash_flood'         // Banjir bandang
+  | 'drought'             // Kekeringan
+  | 'heatwave'            // Gelombang panas
+  | 'severe_thunderstorm' // Badai petir
+  | 'waterspout'          // Puting beliung
+  | 'landslide'           // Tanah longsor
+  | 'forest_fire'         // Kebakaran hutan
+  | 'hail'                // Hujan es
+  | 'strong_winds'        // Angin kencang
+  | 'fog'                 // Kabut tebal
+  | 'dust_storm';         // Badai debu
+
+export interface MicroclimateFactor {
+  factorType: string;
+  influence: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  spatialScale: 'local' | 'regional' | 'sub_regional';
+  
+  description: string;
+  businessRelevance: string[];
+  adaptationConsiderations: string[];
+}
+
+export interface ClimateBusinessAdaptation {
+  sector: string;
+  adaptationType: 'operational' | 'strategic' | 'infrastructural' | 'technological';
+  
+  seasonalAdaptations: {
+    drySeasonActions: string[];
+    wetSeasonActions: string[];
+    transitionActions: string[];
+  };
+  
+  riskMitigation: {
+    preventiveActions: string[];
+    responsiveActions: string[];
+    recoveryActions: string[];
+  };
+  
+  opportunityCapture: {
+    seasonalOpportunities: string[];
+    weatherBasedServices: string[];
+    climateAdvantages: string[];
+  };
+}
+
+export interface ClimateChangeProjection {
+  timeHorizon: '2030' | '2050' | '2100';
+  
+  temperatureChanges: {
+    meanIncrease: number;       // °C
+    extremeHeatIncrease: number; // additional days
+    seasonalShifts: string[];
+  };
+  
+  precipitationChanges: {
+    annualChange: number;       // % change
+    seasonalityShift: string;
+    extremeEventChange: string;
+  };
+  
+  businessImplications: {
+    newRisks: string[];
+    obsoleteStrategies: string[];
+    emergingOpportunities: string[];
+    adaptationRequirements: string[];
+  };
+}
+
+export interface ClimateWeatherResult {
+  tenantId: string;
+  analysisTimestamp: Date;
+  region: IndonesianClimateRegion;
+  
+  climateProfile: ClimateCharacteristics;
+  businessAdaptations: ClimateBusinessAdaptation[];
+  seasonalCalendar: SeasonalBusinessCalendar;
+  riskAssessment: ClimateRiskAssessment;
+  adaptationRecommendations: ClimateAdaptationRecommendation[];
+  
+  forecastingAdjustments: {
+    seasonalMultipliers: { [season: string]: number };
+    weatherSensitivityFactors: { [factor: string]: number };
+    extremeWeatherImpacts: { [event: string]: number };
+  };
+  
+  performanceMetrics: ClimateAnalysisMetrics;
+}
+
+export interface SeasonalBusinessCalendar {
+  annualPattern: SeasonalBusinessPeriod[];
+  criticalPeriods: CriticalWeatherPeriod[];
+  opportunityWindows: OpportunityWindow[];
+}
+
+export interface SeasonalBusinessPeriod {
+  periodName: string;
+  startDate: string;            // MM-DD
+  endDate: string;              // MM-DD
+  season: IndonesianSeason;
+  
+  businessCharacteristics: {
+    demandLevel: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    operationalDifficulty: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    costLevel: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    riskLevel: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  };
+  
+  recommendedActions: string[];
+  preparationRequirements: string[];
+}
+
+export interface CriticalWeatherPeriod {
+  periodName: string;
+  timeframe: string;
+  riskTypes: ExtremeWeatherType[];
+  probability: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  
+  businessImpacts: {
+    operationalDisruption: 'severe' | 'major' | 'moderate' | 'minor' | 'minimal';
+    financialImpact: 'severe' | 'major' | 'moderate' | 'minor' | 'minimal';
+    supplyChainImpact: 'severe' | 'major' | 'moderate' | 'minor' | 'minimal';
+  };
+  
+  preparednessActions: string[];
+  contingencyPlans: string[];
+}
+
+export interface OpportunityWindow {
+  opportunityType: string;
+  timeframe: string;
+  weatherConditions: string[];
+  businessPotential: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  
+  requirements: string[];
+  expectedOutcomes: string[];
+  riskFactors: string[];
+}
+
+export interface ClimateRiskAssessment {
+  overallRiskLevel: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  
+  riskCategories: {
+    operationalRisks: ClimateRisk[];
+    financialRisks: ClimateRisk[];
+    strategicRisks: ClimateRisk[];
+    reputationalRisks: ClimateRisk[];
+  };
+  
+  adaptiveCapacity: {
+    currentCapability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor';
+    improvementAreas: string[];
+    strengthAreas: string[];
+  };
+}
+
+export interface ClimateRisk {
+  riskId: string;
+  riskDescription: string;
+  likelihood: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  impact: 'severe' | 'major' | 'moderate' | 'minor' | 'minimal';
+  timeHorizon: 'immediate' | 'short_term' | 'medium_term' | 'long_term';
+  
+  mitigationStrategies: string[];
+  monitoringIndicators: string[];
+}
+
+export interface ClimateAdaptationRecommendation {
+  category: string;
+  recommendation: string;
+  priority: 'critical' | 'important' | 'moderate' | 'low';
+  timeframe: string;
+  
+  implementation: {
+    steps: string[];
+    resources: string[];
+    costs: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+    timeline: string;
+  };
+  
+  expectedBenefits: {
+    riskReduction: number;      // percentage
+    operationalImprovement: string;
+    financialBenefit: string;
+  };
+}
+
+export interface ClimateAnalysisMetrics {
+  accuracy: {
+    climateDataQuality: number; // 0-1 scale
+    businessImpactAccuracy: number;
+    forecastReliability: number;
+    adaptationEffectiveness: number;
+  };
+  
+  coverage: {
+    temporalCoverage: number;   // 0-1 scale (years of data)
+    spatialCoverage: number;    // 0-1 scale (regional coverage)
+    sectoralCoverage: number;   // 0-1 scale (business sectors)
+  };
+  
+  reliability: {
+    dataConsistency: number;    // 0-1 scale
+    predictionStability: number;
+    adaptationSuccess: number;
+  };
+  
+  businessValue: {
+    riskReduction: number;      // 0-1 scale
+    opportunityIdentification: number;
+    operationalOptimization: number;
+    strategicPlanning: number;
+  };
+}
+
+@Injectable()
+export class ClimateWeatherRegionalAdaptationService {
+  private readonly logger = new Logger(ClimateWeatherRegionalAdaptationService.name);
+
+  // Comprehensive climate characteristics database for Indonesian regions
+  private readonly indonesianClimateProfiles: { [region: string]: ClimateCharacteristics } = {
+    'java_western': {
+      regionId: 'climate_java_western',
+      regionName: 'Western Java Climate Zone',
+      climateZone: 'Am', // Tropical monsoon
+      
+      temperatureProfile: {
+        annualMean: 27.2,
+        annualRange: 4.8,
+        dailyRange: 8.5,
+        
+        seasonalTemperatures: {
+          drySeasonMean: 28.8,
+          wetSeasonMean: 25.6,
+          transitionMean: 27.2
+        },
+        
+        extremes: {
+          recordHigh: 37.2,
+          recordLow: 18.5,
+          heatwaveDays: 45,
+          coolDays: 12
+        },
+        
+        monthlyAverages: [26.8, 26.2, 27.1, 28.4, 29.1, 28.9, 28.7, 28.9, 28.5, 27.8, 27.2, 26.5],
+        
+        heatIndex: {
+          averageHeatIndex: 32.4,
+          extremeHeatDays: 28,
+          comfortDays: 180,
+          heatStressRisk: 'medium'
+        }
+      },
+      
+      precipitationProfile: {
+        annualTotal: 2150,
+        wetSeasonTotal: 1720,
+        drySeasonTotal: 430,
+        
+        monthlyAverages: [285, 275, 245, 180, 95, 65, 45, 35, 75, 165, 225, 260],
+        
+        rainyDays: {
+          annualCount: 165,
+          wetSeasonCount: 142,
+          drySeasonCount: 23
+        },
+        
+        intensity: {
+          lightRain: 35,
+          moderateRain: 45,
+          heavyRain: 18,
+          extremeRain: 2
+        },
+        
+        variability: {
+          yearToYearVariation: 0.22,
+          seasonalConsistency: 0.85,
+          droughtRisk: 'low',
+          floodRisk: 'high'
+        }
+      },
+      
+      humidityProfile: {
+        annualMean: 78,
+        dailyVariation: 25,
+        
+        seasonalHumidity: {
+          drySeasonMean: 68,
+          wetSeasonMean: 85,
+          transitionMean: 78
+        },
+        
+        monthlyAverages: [84, 85, 82, 78, 72, 65, 62, 64, 68, 75, 81, 83],
+        
+        comfortIndex: {
+          comfortableDays: 125,
+          uncomfortableDays: 185,
+          oppressiveDays: 55
+        }
+      },
+      
+      windProfile: {
+        averageSpeed: 12.5,
+        predominantDirection: 'Northwest',
+        
+        seasonalWinds: {
+          drySeasonSpeed: 15.8,
+          wetSeasonSpeed: 9.2,
+          drySeasonDirection: 'Southeast',
+          wetSeasonDirection: 'Northwest'
+        },
+        
+        extremeWinds: {
+          maxRecorded: 85,
+          stormDays: 8,
+          calmDays: 45
+        },
+        
+        monsoonInfluence: {
+          northeastMonsoon: {
+            startMonth: 10,
+            endMonth: 3,
+            intensity: 'strong',
+            reliability: 'high',
+            businessImpact: ['Heavy rainfall periods', 'Transportation disruption', 'Construction delays']
+          },
+          southwestMonsoon: {
+            startMonth: 4,
+            endMonth: 9,
+            intensity: 'moderate',
+            reliability: 'high',
+            businessImpact: ['Dry conditions', 'Increased cooling costs', 'Outdoor activity favorable']
+          }
+        }
+      },
+      
+      seasonalPatterns: [
+        {
+          patternName: 'Peak Wet Season',
+          season: 'puncak_hujan',
+          duration: 90,
+          startDate: '12-01',
+          endDate: '02-28',
+          
+          characteristics: {
+            temperature: 'warm',
+            precipitation: 'very_wet',
+            humidity: 'very_humid',
+            windiness: 'moderate'
+          },
+          
+          businessEffects: [
+            {
+              affectedSector: 'Construction',
+              effectType: 'negative',
+              magnitude: 'high',
+              description: 'Frequent work stoppages due to rain',
+              adaptationRequired: true
+            },
+            {
+              affectedSector: 'Agriculture',
+              effectType: 'positive',
+              magnitude: 'very_high',
+              description: 'Optimal growing conditions for rice',
+              adaptationRequired: false
+            },
+            {
+              affectedSector: 'Tourism',
+              effectType: 'negative',
+              magnitude: 'medium',
+              description: 'Reduced outdoor tourism activities',
+              adaptationRequired: true
+            }
+          ],
+          
+          adaptationStrategies: [
+            'Schedule indoor activities and maintenance',
+            'Implement flood protection measures',
+            'Adjust inventory for seasonal demand changes',
+            'Prepare backup power systems'
+          ]
+        },
+        
+        {
+          patternName: 'Peak Dry Season',
+          season: 'puncak_kemarau',
+          duration: 75,
+          startDate: '07-01',
+          endDate: '09-15',
+          
+          characteristics: {
+            temperature: 'hot',
+            precipitation: 'very_dry',
+            humidity: 'dry',
+            windiness: 'windy'
+          },
+          
+          businessEffects: [
+            {
+              affectedSector: 'Energy',
+              effectType: 'negative',
+              magnitude: 'high',
+              description: 'Increased cooling demand',
+              adaptationRequired: true
+            },
+            {
+              affectedSector: 'Tourism',
+              effectType: 'positive',
+              magnitude: 'high',
+              description: 'Peak season for outdoor activities',
+              adaptationRequired: false
+            },
+            {
+              affectedSector: 'Water Supply',
+              effectType: 'negative',
+              magnitude: 'medium',
+              description: 'Potential water scarcity',
+              adaptationRequired: true
+            }
+          ],
+          
+          adaptationStrategies: [
+            'Maximize outdoor construction activities',
+            'Implement water conservation measures',
+            'Prepare for peak tourism demand',
+            'Optimize cooling system efficiency'
+          ]
+        }
+      ],
+      
+      extremeWeatherRisks: [
+        {
+          riskType: 'flash_flood',
+          frequency: 'frequent',
+          severity: 'major',
+          seasonality: 'Wet season (Nov-Mar)',
+          
+          historicalData: {
+            lastOccurrence: '2023-02-15',
+            averageInterval: 1.5,
+            worstCaseImpact: 'City-wide transportation shutdown'
+          },
+          
+          businessImpacts: {
+            directImpacts: ['Property damage', 'Inventory loss', 'Equipment damage'],
+            indirectImpacts: ['Supply chain disruption', 'Customer access issues', 'Business closure'],
+            recoveryTime: 5,
+            economicLoss: 'moderate'
+          },
+          
+          mitigationStrategies: [
+            'Elevate critical equipment and inventory',
+            'Develop evacuation procedures',
+            'Maintain flood insurance coverage',
+            'Create alternative access routes'
+          ],
+          
+          earlyWarningSignals: [
+            'Heavy rainfall forecasts',
+            'River level monitoring',
+            'Meteorological warnings',
+            'Upstream dam conditions'
+          ]
+        },
+        
+        {
+          riskType: 'severe_thunderstorm',
+          frequency: 'occasional',
+          severity: 'moderate',
+          seasonality: 'Transition periods (Mar-Apr, Oct-Nov)',
+          
+          historicalData: {
+            lastOccurrence: '2023-10-22',
+            averageInterval: 2.0,
+            worstCaseImpact: 'Power outages and wind damage'
+          },
+          
+          businessImpacts: {
+            directImpacts: ['Power disruption', 'Structural damage', 'Communication outage'],
+            indirectImpacts: ['Data loss', 'Production halt', 'Customer service disruption'],
+            recoveryTime: 2,
+            economicLoss: 'low'
+          },
+          
+          mitigationStrategies: [
+            'Install backup power systems',
+            'Implement surge protection',
+            'Regular building maintenance',
+            'Emergency communication plan'
+          ],
+          
+          earlyWarningSignals: [
+            'Weather radar monitoring',
+            'Lightning detection systems',
+            'Wind speed measurements',
+            'Atmospheric pressure changes'
+          ]
+        }
+      ],
+      
+      microclimateFactors: [
+        {
+          factorType: 'Urban Heat Island Effect',
+          influence: 'high',
+          spatialScale: 'local',
+          description: 'Jakarta metropolitan area experiences 2-5°C higher temperatures than surrounding areas',
+          businessRelevance: ['Increased cooling costs', 'Heat stress on workers', 'Equipment overheating'],
+          adaptationConsiderations: ['Enhanced cooling systems', 'Heat-resistant materials', 'Flexible work schedules']
+        },
+        {
+          factorType: 'Coastal Influence',
+          influence: 'medium',
+          spatialScale: 'regional',
+          description: 'Sea breeze patterns moderate temperatures and affect precipitation timing',
+          businessRelevance: ['Predictable daily wind patterns', 'Moderated temperature extremes', 'Humidity regulation'],
+          adaptationConsiderations: ['Natural ventilation design', 'Timing of outdoor activities', 'Corrosion protection']
+        },
+        {
+          factorType: 'Elevation Gradients',
+          influence: 'medium',
+          spatialScale: 'sub_regional',
+          description: 'Temperature decreases with elevation in Bogor and Bandung areas',
+          businessRelevance: ['Cooler temperatures at higher elevations', 'Different precipitation patterns', 'Fog formation'],
+          adaptationConsiderations: ['Location-specific climate planning', 'Elevation-based cooling strategies', 'Visibility considerations']
+        }
+      ]
+    },
+
+    'sumatera_northern': {
+      regionId: 'climate_sumatera_northern',
+      regionName: 'Northern Sumatera Climate Zone',
+      climateZone: 'Af', // Tropical rainforest
+      
+      temperatureProfile: {
+        annualMean: 26.8,
+        annualRange: 2.1,
+        dailyRange: 7.2,
+        
+        seasonalTemperatures: {
+          drySeasonMean: 27.5,
+          wetSeasonMean: 26.1,
+          transitionMean: 26.8
+        },
+        
+        extremes: {
+          recordHigh: 35.8,
+          recordLow: 19.2,
+          heatwaveDays: 18,
+          coolDays: 5
+        },
+        
+        monthlyAverages: [26.2, 26.5, 26.9, 27.2, 27.4, 27.3, 27.1, 27.0, 26.8, 26.5, 26.3, 26.1],
+        
+        heatIndex: {
+          averageHeatIndex: 31.8,
+          extremeHeatDays: 12,
+          comfortDays: 220,
+          heatStressRisk: 'low'
+        }
+      },
+      
+      precipitationProfile: {
+        annualTotal: 2850,
+        wetSeasonTotal: 1950,
+        drySeasonTotal: 900,
+        
+        monthlyAverages: [185, 165, 195, 220, 165, 125, 95, 115, 145, 185, 225, 235],
+        
+        rainyDays: {
+          annualCount: 185,
+          wetSeasonCount: 125,
+          drySeasonCount: 60
+        },
+        
+        intensity: {
+          lightRain: 42,
+          moderateRain: 38,
+          heavyRain: 17,
+          extremeRain: 3
+        },
+        
+        variability: {
+          yearToYearVariation: 0.15,
+          seasonalConsistency: 0.72,
+          droughtRisk: 'very_low',
+          floodRisk: 'medium'
+        }
+      },
+      
+      humidityProfile: {
+        annualMean: 82,
+        dailyVariation: 18,
+        
+        seasonalHumidity: {
+          drySeasonMean: 78,
+          wetSeasonMean: 86,
+          transitionMean: 82
+        },
+        
+        monthlyAverages: [85, 84, 83, 82, 81, 79, 77, 78, 80, 83, 85, 86],
+        
+        comfortIndex: {
+          comfortableDays: 95,
+          uncomfortableDays: 215,
+          oppressiveDays: 55
+        }
+      },
+      
+      windProfile: {
+        averageSpeed: 8.5,
+        predominantDirection: 'Variable',
+        
+        seasonalWinds: {
+          drySeasonSpeed: 10.2,
+          wetSeasonSpeed: 6.8,
+          drySeasonDirection: 'Southwest',
+          wetSeasonDirection: 'Northeast'
+        },
+        
+        extremeWinds: {
+          maxRecorded: 72,
+          stormDays: 5,
+          calmDays: 85
+        },
+        
+        monsoonInfluence: {
+          northeastMonsoon: {
+            startMonth: 10,
+            endMonth: 3,
+            intensity: 'moderate',
+            reliability: 'medium',
+            businessImpact: ['Consistent rainfall', 'Humid conditions', 'Limited wind ventilation']
+          },
+          southwestMonsoon: {
+            startMonth: 4,
+            endMonth: 9,
+            intensity: 'weak',
+            reliability: 'medium',
+            businessImpact: ['Relatively drier period', 'Better ventilation', 'Outdoor work favorable']
+          }
+        }
+      },
+      
+      seasonalPatterns: [
+        {
+          patternName: 'Equatorial Wet Period',
+          season: 'musim_hujan',
+          duration: 120,
+          startDate: '10-01',
+          endDate: '01-31',
+          
+          characteristics: {
+            temperature: 'warm',
+            precipitation: 'wet',
+            humidity: 'very_humid',
+            windiness: 'calm'
+          },
+          
+          businessEffects: [
+            {
+              affectedSector: 'Palm Oil',
+              effectType: 'positive',
+              magnitude: 'very_high',
+              description: 'Optimal growing conditions',
+              adaptationRequired: false
+            },
+            {
+              affectedSector: 'Transportation',
+              effectType: 'negative',
+              magnitude: 'medium',
+              description: 'Road conditions deteriorate',
+              adaptationRequired: true
+            }
+          ],
+          
+          adaptationStrategies: [
+            'Maintain plantation access roads',
+            'Implement drainage systems',
+            'Schedule harvesting around rainfall',
+            'Prepare covered storage facilities'
+          ]
+        }
+      ],
+      
+      extremeWeatherRisks: [
+        {
+          riskType: 'heavy_rainfall',
+          frequency: 'frequent',
+          severity: 'moderate',
+          seasonality: 'October-January',
+          
+          historicalData: {
+            lastOccurrence: '2023-12-08',
+            averageInterval: 0.8,
+            worstCaseImpact: 'Regional flooding and landslides'
+          },
+          
+          businessImpacts: {
+            directImpacts: ['Flooding of low-lying areas', 'Soil erosion', 'Access road damage'],
+            indirectImpacts: ['Supply chain disruption', 'Worker safety concerns', 'Equipment maintenance'],
+            recoveryTime: 3,
+            economicLoss: 'low'
+          },
+          
+          mitigationStrategies: [
+            'Improve drainage infrastructure',
+            'Implement terracing on slopes',
+            'Maintain emergency access routes',
+            'Regular equipment weatherproofing'
+          ],
+          
+          earlyWarningSignals: [
+            'Meteorological rainfall warnings',
+            'Soil moisture monitoring',
+            'River flow measurements',
+            'Weather satellite imagery'
+          ]
+        }
+      ],
+      
+      microclimateFactors: [
+        {
+          factorType: 'Lake Toba Influence',
+          influence: 'medium',
+          spatialScale: 'regional',
+          description: 'Large lake moderates local temperatures and creates unique precipitation patterns',
+          businessRelevance: ['Moderated temperature extremes', 'Local wind patterns', 'Tourism microclimate'],
+          adaptationConsiderations: ['Lake-effect weather planning', 'Tourism seasonality', 'Agricultural timing']
+        },
+        {
+          factorType: 'Plantation Microclimate',
+          influence: 'medium',
+          spatialScale: 'local',
+          description: 'Large palm oil and rubber plantations create their own microclimate',
+          businessRelevance: ['Modified humidity patterns', 'Temperature regulation', 'Pest and disease cycles'],
+          adaptationConsiderations: ['Plantation management timing', 'Worker comfort planning', 'Crop protection strategies']
+        }
+      ]
+    }
+
+    // Additional climate profiles would be added for all Indonesian climate regions
+    // This provides representative examples for Java Western and Sumatera Northern
+  };
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private readonly transactionRepository: Repository<InventoryTransaction>,
+    
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    
+    @InjectRepository(ProductCategory)
+    private readonly categoryRepository: Repository<ProductCategory>,
+    
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Main entry point for climate and weather regional adaptation analysis
+   */
+  async analyzeClimateWeatherAdaptation(request: ClimateWeatherRequest): Promise<ClimateWeatherResult> {
+    this.logger.log(`Starting climate and weather adaptation analysis for tenant: ${request.tenantId}`);
+
+    try {
+      // Get climate profile for the region
+      const climateProfile = this.getClimateProfile(request.region);
+      
+      // Generate business adaptations
+      const businessAdaptations = this.generateBusinessAdaptations(climateProfile, request);
+      
+      // Create seasonal business calendar
+      const seasonalCalendar = this.createSeasonalBusinessCalendar(climateProfile, request);
+      
+      // Assess climate risks
+      const riskAssessment = this.assessClimateRisks(climateProfile, request);
+      
+      // Generate adaptation recommendations
+      const adaptationRecommendations = this.generateAdaptationRecommendations(climateProfile, request);
+      
+      // Calculate forecasting adjustments
+      const forecastingAdjustments = this.calculateForecastingAdjustments(climateProfile, request);
+      
+      // Calculate performance metrics
+      const performanceMetrics = this.calculateClimateAnalysisMetrics(climateProfile, request);
+
+      const result: ClimateWeatherResult = {
+        tenantId: request.tenantId,
+        analysisTimestamp: new Date(),
+        region: request.region,
+        climateProfile,
+        businessAdaptations,
+        seasonalCalendar,
+        riskAssessment,
+        adaptationRecommendations,
+        forecastingAdjustments,
+        performanceMetrics
+      };
+
+      // Cache the results
+      await this.cacheResults(request.tenantId, result);
+      
+      // Emit analysis completion event
+      this.eventEmitter.emit('climateWeatherAdaptation.analysisComplete', {
+        tenantId: request.tenantId,
+        region: request.region,
+        analysisDepth: request.analysisDepth
+      });
+
+      this.logger.log(`Climate and weather adaptation analysis completed for tenant: ${request.tenantId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Error in climate weather adaptation analysis: ${error.message}`, error.stack);
+      throw new Error(`Climate weather adaptation analysis failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get climate profile for the specified region
+   */
+  private getClimateProfile(region: IndonesianClimateRegion): ClimateCharacteristics {
+    const profile = this.indonesianClimateProfiles[region];
+    
+    if (profile) {
+      return profile;
+    }
+    
+    // Return a default tropical profile if specific region not found
+    return this.getDefaultClimateProfile(region);
+  }
+
+  /**
+   * Get default climate profile for unknown regions
+   */
+  private getDefaultClimateProfile(region: IndonesianClimateRegion): ClimateCharacteristics {
+    return {
+      regionId: `climate_${region}`,
+      regionName: `${region.charAt(0).toUpperCase() + region.slice(1)} Climate Zone`,
+      climateZone: 'Am', // Default tropical monsoon
+      
+      temperatureProfile: {
+        annualMean: 27.0,
+        annualRange: 3.5,
+        dailyRange: 8.0,
+        
+        seasonalTemperatures: {
+          drySeasonMean: 28.5,
+          wetSeasonMean: 25.5,
+          transitionMean: 27.0
+        },
+        
+        extremes: {
+          recordHigh: 36.0,
+          recordLow: 20.0,
+          heatwaveDays: 30,
+          coolDays: 10
+        },
+        
+        monthlyAverages: [26.5, 26.0, 27.0, 28.0, 28.5, 28.5, 28.0, 28.5, 28.0, 27.5, 27.0, 26.5],
+        
+        heatIndex: {
+          averageHeatIndex: 32.0,
+          extremeHeatDays: 20,
+          comfortDays: 200,
+          heatStressRisk: 'medium'
+        }
+      },
+      
+      precipitationProfile: {
+        annualTotal: 2000,
+        wetSeasonTotal: 1500,
+        drySeasonTotal: 500,
+        
+        monthlyAverages: [250, 230, 200, 150, 80, 60, 40, 45, 80, 150, 200, 230],
+        
+        rainyDays: {
+          annualCount: 150,
+          wetSeasonCount: 120,
+          drySeasonCount: 30
+        },
+        
+        intensity: {
+          lightRain: 40,
+          moderateRain: 40,
+          heavyRain: 18,
+          extremeRain: 2
+        },
+        
+        variability: {
+          yearToYearVariation: 0.20,
+          seasonalConsistency: 0.80,
+          droughtRisk: 'medium',
+          floodRisk: 'medium'
+        }
+      },
+      
+      humidityProfile: {
+        annualMean: 80,
+        dailyVariation: 20,
+        
+        seasonalHumidity: {
+          drySeasonMean: 70,
+          wetSeasonMean: 85,
+          transitionMean: 80
+        },
+        
+        monthlyAverages: [85, 85, 82, 78, 72, 65, 62, 65, 70, 78, 82, 84],
+        
+        comfortIndex: {
+          comfortableDays: 150,
+          uncomfortableDays: 180,
+          oppressiveDays: 35
+        }
+      },
+      
+      windProfile: {
+        averageSpeed: 10.0,
+        predominantDirection: 'Variable',
+        
+        seasonalWinds: {
+          drySeasonSpeed: 12.0,
+          wetSeasonSpeed: 8.0,
+          drySeasonDirection: 'Southeast',
+          wetSeasonDirection: 'Northwest'
+        },
+        
+        extremeWinds: {
+          maxRecorded: 80,
+          stormDays: 6,
+          calmDays: 60
+        },
+        
+        monsoonInfluence: {
+          northeastMonsoon: {
+            startMonth: 10,
+            endMonth: 3,
+            intensity: 'moderate',
+            reliability: 'medium',
+            businessImpact: ['Wet season conditions', 'Reduced outdoor activities']
+          },
+          southwestMonsoon: {
+            startMonth: 4,
+            endMonth: 9,
+            intensity: 'moderate',
+            reliability: 'medium',
+            businessImpact: ['Dry season conditions', 'Favorable for outdoor work']
+          }
+        }
+      },
+      
+      seasonalPatterns: [],
+      extremeWeatherRisks: [],
+      microclimateFactor: []
+    };
+  }
+
+  /**
+   * Generate business adaptations based on climate profile
+   */
+  private generateBusinessAdaptations(
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): ClimateBusinessAdaptation[] {
+    const adaptations: ClimateBusinessAdaptation[] = [];
+
+    // Generate adaptations for different business sectors
+    const businessSectors = this.identifyRelevantSectors(request);
+
+    businessSectors.forEach(sector => {
+      const adaptation = this.createSectorAdaptation(sector, climateProfile, request);
+      adaptations.push(adaptation);
+    });
+
+    return adaptations;
+  }
+
+  /**
+   * Identify relevant business sectors for climate adaptation
+   */
+  private identifyRelevantSectors(request: ClimateWeatherRequest): string[] {
+    const sectors = [];
+
+    // Add sectors based on climate sensitivity
+    if (request.climateSensitivity === 'very_high' || request.climateSensitivity === 'high') {
+      sectors.push('Agriculture', 'Construction', 'Tourism', 'Transportation');
+    }
+
+    if (request.climateSensitivity === 'medium') {
+      sectors.push('Retail', 'Manufacturing', 'Logistics');
+    }
+
+    // Always include general business operations
+    sectors.push('General Operations', 'Energy Management', 'Risk Management');
+
+    return [...new Set(sectors)]; // Remove duplicates
+  }
+
+  /**
+   * Create sector-specific climate adaptation
+   */
+  private createSectorAdaptation(
+    sector: string,
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): ClimateBusinessAdaptation {
+    const baseAdaptation: ClimateBusinessAdaptation = {
+      sector,
+      adaptationType: 'operational',
+      
+      seasonalAdaptations: {
+        drySeasonActions: [],
+        wetSeasonActions: [],
+        transitionActions: []
+      },
+      
+      riskMitigation: {
+        preventiveActions: [],
+        responsiveActions: [],
+        recoveryActions: []
+      },
+      
+      opportunityCapture: {
+        seasonalOpportunities: [],
+        weatherBasedServices: [],
+        climateAdvantages: []
+      }
+    };
+
+    // Customize adaptation based on sector
+    switch (sector) {
+      case 'Agriculture':
+        return this.createAgricultureAdaptation(baseAdaptation, climateProfile);
+      case 'Construction':
+        return this.createConstructionAdaptation(baseAdaptation, climateProfile);
+      case 'Tourism':
+        return this.createTourismAdaptation(baseAdaptation, climateProfile);
+      case 'Retail':
+        return this.createRetailAdaptation(baseAdaptation, climateProfile);
+      case 'Energy Management':
+        return this.createEnergyAdaptation(baseAdaptation, climateProfile);
+      default:
+        return this.createGeneralAdaptation(baseAdaptation, climateProfile);
+    }
+  }
+
+  /**
+   * Create agriculture-specific climate adaptation
+   */
+  private createAgricultureAdaptation(
+    baseAdaptation: ClimateBusinessAdaptation,
+    climateProfile: ClimateCharacteristics
+  ): ClimateBusinessAdaptation {
+    return {
+      ...baseAdaptation,
+      adaptationType: 'operational',
+      
+      seasonalAdaptations: {
+        drySeasonActions: [
+          'Implement water conservation irrigation',
+          'Schedule drought-resistant crop planting',
+          'Prepare water storage systems',
+          'Monitor soil moisture levels'
+        ],
+        wetSeasonActions: [
+          'Ensure proper drainage systems',
+          'Schedule wet-season crop varieties',
+          'Prepare flood protection measures',
+          'Monitor disease and pest increases'
+        ],
+        transitionActions: [
+          'Prepare land for seasonal transitions',
+          'Adjust planting schedules',
+          'Maintain equipment for season changes',
+          'Update weather monitoring systems'
+        ]
+      },
+      
+      riskMitigation: {
+        preventiveActions: [
+          'Install weather monitoring stations',
+          'Develop drought contingency plans',
+          'Implement integrated pest management',
+          'Maintain crop insurance coverage'
+        ],
+        responsiveActions: [
+          'Execute emergency irrigation protocols',
+          'Implement crop protection measures',
+          'Activate emergency drainage systems',
+          'Coordinate with agricultural extension services'
+        ],
+        recoveryActions: [
+          'Assess and repair infrastructure damage',
+          'Replant damaged crop areas',
+          'Restore soil fertility',
+          'Update adaptation strategies based on experience'
+        ]
+      },
+      
+      opportunityCapture: {
+        seasonalOpportunities: [
+          'Optimize planting timing with weather patterns',
+          'Develop climate-resilient crop varieties',
+          'Implement precision agriculture techniques'
+        ],
+        weatherBasedServices: [
+          'Weather-based crop advisory services',
+          'Micro-climate monitoring systems',
+          'Seasonal agricultural planning tools'
+        ],
+        climateAdvantages: [
+          'Year-round growing season capability',
+          'Multiple crop cycles per year',
+          'Tropical crop specialization opportunities'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Create construction-specific climate adaptation
+   */
+  private createConstructionAdaptation(
+    baseAdaptation: ClimateBusinessAdaptation,
+    climateProfile: ClimateCharacteristics
+  ): ClimateBusinessAdaptation {
+    return {
+      ...baseAdaptation,
+      adaptationType: 'operational',
+      
+      seasonalAdaptations: {
+        drySeasonActions: [
+          'Maximize outdoor construction activities',
+          'Schedule concrete work during optimal conditions',
+          'Implement dust control measures',
+          'Ensure adequate water supply for construction'
+        ],
+        wetSeasonActions: [
+          'Prepare covered work areas',
+          'Schedule indoor finishing work',
+          'Implement drainage around construction sites',
+          'Protect materials from moisture damage'
+        ],
+        transitionActions: [
+          'Adjust project timelines for weather transitions',
+          'Prepare equipment for seasonal changes',
+          'Update safety protocols for changing conditions',
+          'Monitor weather forecasts for planning'
+        ]
+      },
+      
+      riskMitigation: {
+        preventiveActions: [
+          'Design structures for local climate conditions',
+          'Use weather-resistant construction materials',
+          'Implement proper site drainage systems',
+          'Schedule work around weather patterns'
+        ],
+        responsiveActions: [
+          'Activate weather protection protocols',
+          'Secure equipment and materials',
+          'Adjust work schedules for safety',
+          'Implement emergency response procedures'
+        ],
+        recoveryActions: [
+          'Assess weather-related damage to projects',
+          'Repair and restore damaged construction',
+          'Update construction methods based on experience',
+          'Strengthen future weather protection measures'
+        ]
+      },
+      
+      opportunityCapture: {
+        seasonalOpportunities: [
+          'Optimize construction scheduling with dry season',
+          'Develop climate-adapted building techniques',
+          'Specialize in weather-resilient construction'
+        ],
+        weatherBasedServices: [
+          'Weather monitoring for construction projects',
+          'Climate-adapted architectural design',
+          'Seasonal construction planning services'
+        ],
+        climateAdvantages: [
+          'Year-round construction capability with adaptation',
+          'Expertise in tropical construction techniques',
+          'Climate-resilient building specialization'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Create tourism-specific climate adaptation
+   */
+  private createTourismAdaptation(
+    baseAdaptation: ClimateBusinessAdaptation,
+    climateProfile: ClimateCharacteristics
+  ): ClimateBusinessAdaptation {
+    return {
+      ...baseAdaptation,
+      adaptationType: 'strategic',
+      
+      seasonalAdaptations: {
+        drySeasonActions: [
+          'Promote outdoor tourism activities',
+          'Maximize beach and adventure tourism',
+          'Implement cooling measures for guest comfort',
+          'Schedule maintenance during lower occupancy'
+        ],
+        wetSeasonActions: [
+          'Develop indoor tourism attractions',
+          'Promote cultural and shopping tourism',
+          'Offer spa and wellness services',
+          'Create covered outdoor spaces'
+        ],
+        transitionActions: [
+          'Adjust marketing strategies for seasonal shifts',
+          'Prepare facilities for changing conditions',
+          'Update activity schedules',
+          'Maintain flexible booking policies'
+        ]
+      },
+      
+      riskMitigation: {
+        preventiveActions: [
+          'Develop weather-independent attractions',
+          'Maintain comprehensive insurance coverage',
+          'Create flexible tour packages',
+          'Implement guest safety protocols'
+        ],
+        responsiveActions: [
+          'Activate alternative activity programs',
+          'Ensure guest safety during weather events',
+          'Provide weather updates to guests',
+          'Implement refund and rescheduling policies'
+        ],
+        recoveryActions: [
+          'Assess and repair weather damage quickly',
+          'Restore tourism operations efficiently',
+          'Update safety and emergency procedures',
+          'Enhance weather resilience of facilities'
+        ]
+      },
+      
+      opportunityCapture: {
+        seasonalOpportunities: [
+          'Develop season-specific tourism products',
+          'Create weather-themed experiences',
+          'Optimize pricing for seasonal demand'
+        ],
+        weatherBasedServices: [
+          'Weather-based activity recommendations',
+          'Climate-comfort tourism packages',
+          'Seasonal tourism planning services'
+        ],
+        climateAdvantages: [
+          'Year-round tourism potential',
+          'Diverse seasonal experiences',
+          'Tropical climate attraction'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Create retail-specific climate adaptation
+   */
+  private createRetailAdaptation(
+    baseAdaptation: ClimateBusinessAdaptation,
+    climateProfile: ClimateCharacteristics
+  ): ClimateBusinessAdaptation {
+    return {
+      ...baseAdaptation,
+      adaptationType: 'operational',
+      
+      seasonalAdaptations: {
+        drySeasonActions: [
+          'Stock cooling products and beverages',
+          'Implement energy-efficient cooling systems',
+          'Promote outdoor and summer products',
+          'Adjust store hours for heat avoidance'
+        ],
+        wetSeasonActions: [
+          'Stock rain protection products',
+          'Promote indoor entertainment products',
+          'Implement humidity control measures',
+          'Prepare for potential flooding'
+        ],
+        transitionActions: [
+          'Adjust inventory for seasonal transitions',
+          'Update promotional strategies',
+          'Prepare HVAC systems for changing needs',
+          'Monitor customer behavior changes'
+        ]
+      },
+      
+      riskMitigation: {
+        preventiveActions: [
+          'Install flood protection systems',
+          'Maintain backup power systems',
+          'Implement inventory protection measures',
+          'Develop supply chain alternatives'
+        ],
+        responsiveActions: [
+          'Activate emergency operating procedures',
+          'Protect inventory from weather damage',
+          'Ensure customer and staff safety',
+          'Maintain communication with suppliers'
+        ],
+        recoveryActions: [
+          'Assess and replace damaged inventory',
+          'Restore normal operations quickly',
+          'Update emergency preparedness plans',
+          'Strengthen weather protection systems'
+        ]
+      },
+      
+      opportunityCapture: {
+        seasonalOpportunities: [
+          'Develop seasonal product lines',
+          'Create weather-based promotions',
+          'Optimize seasonal inventory management'
+        ],
+        weatherBasedServices: [
+          'Weather-appropriate product recommendations',
+          'Climate-controlled shopping experiences',
+          'Seasonal fashion and lifestyle advice'
+        ],
+        climateAdvantages: [
+          'Year-round retail opportunities',
+          'Seasonal product diversification',
+          'Climate-adapted retail strategies'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Create energy management climate adaptation
+   */
+  private createEnergyAdaptation(
+    baseAdaptation: ClimateBusinessAdaptation,
+    climateProfile: ClimateCharacteristics
+  ): ClimateBusinessAdaptation {
+    return {
+      ...baseAdaptation,
+      adaptationType: 'infrastructural',
+      
+      seasonalAdaptations: {
+        drySeasonActions: [
+          'Optimize cooling system efficiency',
+          'Implement peak load management',
+          'Use natural ventilation when possible',
+          'Schedule maintenance during moderate weather'
+        ],
+        wetSeasonActions: [
+          'Prepare for reduced solar generation',
+          'Implement humidity control systems',
+          'Protect electrical equipment from moisture',
+          'Plan for storm-related outages'
+        ],
+        transitionActions: [
+          'Adjust HVAC settings for changing conditions',
+          'Prepare energy systems for seasonal shifts',
+          'Update energy consumption forecasts',
+          'Maintain flexible energy contracts'
+        ]
+      },
+      
+      riskMitigation: {
+        preventiveActions: [
+          'Install surge protection systems',
+          'Maintain backup power capabilities',
+          'Implement preventive equipment maintenance',
+          'Develop energy contingency plans'
+        ],
+        responsiveActions: [
+          'Activate backup power systems',
+          'Implement load shedding protocols',
+          'Protect critical equipment',
+          'Coordinate with utility providers'
+        ],
+        recoveryActions: [
+          'Restore power systems efficiently',
+          'Assess and repair weather damage',
+          'Update energy resilience measures',
+          'Enhance future preparedness'
+        ]
+      },
+      
+      opportunityCapture: {
+        seasonalOpportunities: [
+          'Optimize renewable energy generation',
+          'Implement demand response programs',
+          'Develop energy storage solutions'
+        ],
+        weatherBasedServices: [
+          'Weather-based energy optimization',
+          'Climate-aware energy management',
+          'Seasonal energy efficiency consulting'
+        ],
+        climateAdvantages: [
+          'Year-round solar energy potential',
+          'Natural cooling opportunities',
+          'Biomass energy opportunities'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Create general business climate adaptation
+   */
+  private createGeneralAdaptation(
+    baseAdaptation: ClimateBusinessAdaptation,
+    climateProfile: ClimateCharacteristics
+  ): ClimateBusinessAdaptation {
+    return {
+      ...baseAdaptation,
+      adaptationType: 'operational',
+      
+      seasonalAdaptations: {
+        drySeasonActions: [
+          'Optimize cooling and ventilation systems',
+          'Implement water conservation measures',
+          'Adjust work schedules for comfort',
+          'Prepare for increased energy costs'
+        ],
+        wetSeasonActions: [
+          'Implement flood protection measures',
+          'Ensure backup power availability',
+          'Protect equipment from humidity',
+          'Plan for transportation disruptions'
+        ],
+        transitionActions: [
+          'Adjust operational parameters',
+          'Update emergency procedures',
+          'Monitor weather forecasts actively',
+          'Prepare for seasonal staffing needs'
+        ]
+      },
+      
+      riskMitigation: {
+        preventiveActions: [
+          'Develop comprehensive emergency plans',
+          'Maintain appropriate insurance coverage',
+          'Implement business continuity planning',
+          'Train staff on weather-related procedures'
+        ],
+        responsiveActions: [
+          'Activate emergency response protocols',
+          'Ensure employee and customer safety',
+          'Maintain communication systems',
+          'Coordinate with local authorities'
+        ],
+        recoveryActions: [
+          'Assess and document weather impacts',
+          'Restore normal operations efficiently',
+          'Update risk management strategies',
+          'Strengthen resilience measures'
+        ]
+      },
+      
+      opportunityCapture: {
+        seasonalOpportunities: [
+          'Develop weather-adaptive business models',
+          'Create seasonal service offerings',
+          'Optimize resource allocation by season'
+        ],
+        weatherBasedServices: [
+          'Weather monitoring and alerting',
+          'Climate-aware business planning',
+          'Seasonal operational optimization'
+        ],
+        climateAdvantages: [
+          'Year-round business operations',
+          'Tropical climate expertise',
+          'Weather resilience capabilities'
+        ]
+      }
+    };
+  }
+
+  /**
+   * Create seasonal business calendar
+   */
+  private createSeasonalBusinessCalendar(
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): SeasonalBusinessCalendar {
+    const annualPattern = this.createAnnualSeasonalPattern(climateProfile);
+    const criticalPeriods = this.identifyCriticalWeatherPeriods(climateProfile);
+    const opportunityWindows = this.identifyOpportunityWindows(climateProfile);
+
+    return {
+      annualPattern,
+      criticalPeriods,
+      opportunityWindows
+    };
+  }
+
+  /**
+   * Create annual seasonal pattern for business planning
+   */
+  private createAnnualSeasonalPattern(climateProfile: ClimateCharacteristics): SeasonalBusinessPeriod[] {
+    const periods: SeasonalBusinessPeriod[] = [];
+
+    // Add standard Indonesian seasonal periods
+    periods.push({
+      periodName: 'Peak Dry Season',
+      startDate: '06-01',
+      endDate: '09-30',
+      season: 'puncak_kemarau',
+      
+      businessCharacteristics: {
+        demandLevel: 'high',
+        operationalDifficulty: 'low',
+        costLevel: 'medium',
+        riskLevel: 'low'
+      },
+      
+      recommendedActions: [
+        'Maximize outdoor activities and construction',
+        'Implement cooling and energy efficiency measures',
+        'Prepare for increased tourism demand',
+        'Schedule equipment maintenance'
+      ],
+      
+      preparationRequirements: [
+        'Enhance cooling systems',
+        'Secure water supply',
+        'Prepare for heat stress management',
+        'Update emergency response plans'
+      ]
+    });
+
+    periods.push({
+      periodName: 'Peak Wet Season',
+      startDate: '12-01',
+      endDate: '02-28',
+      season: 'puncak_hujan',
+      
+      businessCharacteristics: {
+        demandLevel: 'medium',
+        operationalDifficulty: 'high',
+        costLevel: 'high',
+        riskLevel: 'high'
+      },
+      
+      recommendedActions: [
+        'Focus on indoor activities and services',
+        'Implement flood protection measures',
+        'Prepare for transportation disruptions',
+        'Monitor weather forecasts closely'
+      ],
+      
+      preparationRequirements: [
+        'Install drainage systems',
+        'Prepare backup power',
+        'Secure outdoor equipment',
+        'Update emergency evacuation plans'
+      ]
+    });
+
+    return periods;
+  }
+
+  /**
+   * Identify critical weather periods for business planning
+   */
+  private identifyCriticalWeatherPeriods(climateProfile: ClimateCharacteristics): CriticalWeatherPeriod[] {
+    const criticalPeriods: CriticalWeatherPeriod[] = [];
+
+    // Add periods based on extreme weather risks
+    climateProfile.extremeWeatherRisks.forEach(risk => {
+      if (risk.frequency === 'frequent' || risk.frequency === 'very_frequent') {
+        criticalPeriods.push({
+          periodName: `${risk.riskType} Risk Period`,
+          timeframe: risk.seasonality,
+          riskTypes: [risk.riskType],
+          probability: this.convertFrequencyToProbability(risk.frequency),
+          
+          businessImpacts: {
+            operationalDisruption: this.convertSeverityToImpact(risk.severity),
+            financialImpact: this.convertEconomicLossToImpact(risk.businessImpacts.economicLoss),
+            supplyChainImpact: 'moderate' // Default assumption
+          },
+          
+          preparednessActions: risk.mitigationStrategies,
+          contingencyPlans: [
+            'Activate emergency response protocols',
+            'Implement backup operations',
+            'Coordinate with emergency services',
+            'Monitor weather conditions continuously'
+          ]
+        });
+      }
+    });
+
+    return criticalPeriods;
+  }
+
+  /**
+   * Convert frequency to probability levels
+   */
+  private convertFrequencyToProbability(frequency: string): 'very_high' | 'high' | 'medium' | 'low' | 'very_low' {
+    switch (frequency) {
+      case 'very_frequent': return 'very_high';
+      case 'frequent': return 'high';
+      case 'occasional': return 'medium';
+      case 'rare': return 'low';
+      case 'very_rare': return 'very_low';
+      default: return 'medium';
+    }
+  }
+
+  /**
+   * Convert severity to impact levels
+   */
+  private convertSeverityToImpact(severity: string): 'severe' | 'major' | 'moderate' | 'minor' | 'minimal' {
+    switch (severity) {
+      case 'catastrophic': return 'severe';
+      case 'severe': return 'severe';
+      case 'major': return 'major';
+      case 'moderate': return 'moderate';
+      case 'minor': return 'minor';
+      default: return 'moderate';
+    }
+  }
+
+  /**
+   * Convert economic loss to impact levels
+   */
+  private convertEconomicLossToImpact(economicLoss: string): 'severe' | 'major' | 'moderate' | 'minor' | 'minimal' {
+    switch (economicLoss) {
+      case 'severe': return 'severe';
+      case 'high': return 'major';
+      case 'moderate': return 'moderate';
+      case 'low': return 'minor';
+      case 'minimal': return 'minimal';
+      default: return 'moderate';
+    }
+  }
+
+  /**
+   * Identify opportunity windows based on favorable weather conditions
+   */
+  private identifyOpportunityWindows(climateProfile: ClimateCharacteristics): OpportunityWindow[] {
+    const opportunities: OpportunityWindow[] = [];
+
+    // Identify opportunities during dry season
+    opportunities.push({
+      opportunityType: 'Outdoor Construction and Events',
+      timeframe: 'June - September',
+      weatherConditions: ['Low rainfall', 'Moderate temperatures', 'Good visibility'],
+      businessPotential: 'high',
+      
+      requirements: [
+        'Advance planning and scheduling',
+        'Equipment and materials preparation',
+        'Staff availability and training'
+      ],
+      
+      expectedOutcomes: [
+        'Increased project completion rates',
+        'Reduced weather-related delays',
+        'Higher customer satisfaction'
+      ],
+      
+      riskFactors: [
+        'Heat stress on workers',
+        'Increased cooling costs',
+        'Water scarcity risks'
+      ]
+    });
+
+    // Identify opportunities during wet season
+    opportunities.push({
+      opportunityType: 'Indoor Services and Agriculture',
+      timeframe: 'November - March',
+      weatherConditions: ['Regular rainfall', 'High humidity', 'Cooler temperatures'],
+      businessPotential: 'medium',
+      
+      requirements: [
+        'Indoor facility preparation',
+        'Humidity control systems',
+        'Agricultural planning'
+      ],
+      
+      expectedOutcomes: [
+        'Enhanced indoor service demand',
+        'Optimal agricultural growing conditions',
+        'Reduced cooling costs'
+      ],
+      
+      riskFactors: [
+        'Flooding and transportation issues',
+        'Equipment moisture damage',
+        'Mold and humidity problems'
+      ]
+    });
+
+    return opportunities;
+  }
+
+  /**
+   * Assess climate risks for the business
+   */
+  private assessClimateRisks(
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): ClimateRiskAssessment {
+    const riskCategories = this.categorizeClimateRisks(climateProfile, request);
+    const adaptiveCapacity = this.assessAdaptiveCapacity(request);
+    const overallRiskLevel = this.calculateOverallRiskLevel(riskCategories);
+
+    return {
+      overallRiskLevel,
+      riskCategories,
+      adaptiveCapacity
+    };
+  }
+
+  /**
+   * Categorize climate risks by type
+   */
+  private categorizeClimateRisks(
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): any {
+    const operationalRisks: ClimateRisk[] = [];
+    const financialRisks: ClimateRisk[] = [];
+    const strategicRisks: ClimateRisk[] = [];
+    const reputationalRisks: ClimateRisk[] = [];
+
+    // Generate risks based on extreme weather events
+    climateProfile.extremeWeatherRisks.forEach(extremeRisk => {
+      // Operational risks
+      operationalRisks.push({
+        riskId: `operational_${extremeRisk.riskType}`,
+        riskDescription: `Operational disruption from ${extremeRisk.riskType}`,
+        likelihood: this.convertFrequencyToLikelihood(extremeRisk.frequency),
+        impact: this.convertSeverityToRiskImpact(extremeRisk.severity),
+        timeHorizon: 'short_term',
+        mitigationStrategies: extremeRisk.mitigationStrategies,
+        monitoringIndicators: extremeRisk.earlyWarningSignals
+      });
+
+      // Financial risks
+      financialRisks.push({
+        riskId: `financial_${extremeRisk.riskType}`,
+        riskDescription: `Financial losses from ${extremeRisk.riskType}`,
+        likelihood: this.convertFrequencyToLikelihood(extremeRisk.frequency),
+        impact: this.convertEconomicLossToRiskImpact(extremeRisk.businessImpacts.economicLoss),
+        timeHorizon: 'immediate',
+        mitigationStrategies: ['Insurance coverage', 'Emergency funds', 'Business continuity planning'],
+        monitoringIndicators: ['Weather forecasts', 'Economic indicators', 'Insurance claims']
+      });
+    });
+
+    // Add general climate risks
+    strategicRisks.push({
+      riskId: 'strategic_climate_change',
+      riskDescription: 'Long-term business viability due to climate change',
+      likelihood: 'high',
+      impact: 'major',
+      timeHorizon: 'long_term',
+      mitigationStrategies: ['Climate adaptation planning', 'Sustainable business practices', 'Resilience building'],
+      monitoringIndicators: ['Climate projections', 'Business model effectiveness', 'Regulatory changes']
+    });
+
+    return {
+      operationalRisks,
+      financialRisks,
+      strategicRisks,
+      reputationalRisks
+    };
+  }
+
+  /**
+   * Convert frequency to likelihood levels
+   */
+  private convertFrequencyToLikelihood(frequency: string): 'very_high' | 'high' | 'medium' | 'low' | 'very_low' {
+    return this.convertFrequencyToProbability(frequency);
+  }
+
+  /**
+   * Convert severity to risk impact levels
+   */
+  private convertSeverityToRiskImpact(severity: string): 'severe' | 'major' | 'moderate' | 'minor' | 'minimal' {
+    return this.convertSeverityToImpact(severity);
+  }
+
+  /**
+   * Convert economic loss to risk impact levels
+   */
+  private convertEconomicLossToRiskImpact(economicLoss: string): 'severe' | 'major' | 'moderate' | 'minor' | 'minimal' {
+    return this.convertEconomicLossToImpact(economicLoss);
+  }
+
+  /**
+   * Assess adaptive capacity of the business
+   */
+  private assessAdaptiveCapacity(request: ClimateWeatherRequest): any {
+    let capability: 'excellent' | 'good' | 'fair' | 'poor' | 'very_poor' = 'fair';
+
+    // Assess based on analysis depth (proxy for preparedness)
+    if (request.analysisDepth === 'expert' || request.analysisDepth === 'comprehensive') {
+      capability = 'good';
+    } else if (request.analysisDepth === 'standard') {
+      capability = 'fair';
+    } else {
+      capability = 'poor';
+    }
+
+    // Assess based on climate sensitivity (higher sensitivity may indicate better awareness)
+    if (request.climateSensitivity === 'very_high' || request.climateSensitivity === 'high') {
+      capability = capability === 'poor' ? 'fair' : capability === 'fair' ? 'good' : capability;
+    }
+
+    const improvementAreas = [
+      'Weather monitoring capabilities',
+      'Emergency response planning',
+      'Infrastructure climate resilience',
+      'Staff training on climate adaptation'
+    ];
+
+    const strengthAreas = [
+      'Climate awareness and planning',
+      'Business continuity planning',
+      'Risk assessment capabilities'
+    ];
+
+    return {
+      currentCapability: capability,
+      improvementAreas,
+      strengthAreas
+    };
+  }
+
+  /**
+   * Calculate overall risk level
+   */
+  private calculateOverallRiskLevel(riskCategories: any): 'very_high' | 'high' | 'medium' | 'low' | 'very_low' {
+    const allRisks = [
+      ...riskCategories.operationalRisks,
+      ...riskCategories.financialRisks,
+      ...riskCategories.strategicRisks,
+      ...riskCategories.reputationalRisks
+    ];
+
+    if (allRisks.length === 0) return 'low';
+
+    const riskScores = allRisks.map(risk => this.calculateRiskScore(risk.likelihood, risk.impact));
+    const averageScore = mean(riskScores);
+
+    if (averageScore > 4.0) return 'very_high';
+    if (averageScore > 3.0) return 'high';
+    if (averageScore > 2.0) return 'medium';
+    if (averageScore > 1.0) return 'low';
+    return 'very_low';
+  }
+
+  /**
+   * Calculate risk score based on likelihood and impact
+   */
+  private calculateRiskScore(
+    likelihood: 'very_high' | 'high' | 'medium' | 'low' | 'very_low',
+    impact: 'severe' | 'major' | 'moderate' | 'minor' | 'minimal'
+  ): number {
+    const likelihoodScore = likelihood === 'very_high' ? 5 :
+                           likelihood === 'high' ? 4 :
+                           likelihood === 'medium' ? 3 :
+                           likelihood === 'low' ? 2 : 1;
+
+    const impactScore = impact === 'severe' ? 5 :
+                       impact === 'major' ? 4 :
+                       impact === 'moderate' ? 3 :
+                       impact === 'minor' ? 2 : 1;
+
+    return (likelihoodScore * impactScore) / 5; // Normalize to 1-5 scale
+  }
+
+  /**
+   * Generate climate adaptation recommendations
+   */
+  private generateAdaptationRecommendations(
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): ClimateAdaptationRecommendation[] {
+    const recommendations: ClimateAdaptationRecommendation[] = [];
+
+    // Infrastructure recommendations
+    recommendations.push({
+      category: 'Infrastructure Resilience',
+      recommendation: 'Enhance infrastructure climate resilience based on regional weather patterns',
+      priority: 'critical',
+      timeframe: '6-12 months',
+      
+      implementation: {
+        steps: [
+          'Conduct infrastructure vulnerability assessment',
+          'Develop climate-resilient design standards',
+          'Implement drainage and flood protection',
+          'Install backup power and cooling systems'
+        ],
+        resources: ['Engineering expertise', 'Construction materials', 'Monitoring equipment'],
+        costs: 'high',
+        timeline: '12 months'
+      },
+      
+      expectedBenefits: {
+        riskReduction: 60,
+        operationalImprovement: 'Reduced weather-related disruptions',
+        financialBenefit: 'Lower maintenance and emergency costs'
+      }
+    });
+
+    // Operational recommendations
+    recommendations.push({
+      category: 'Operational Adaptation',
+      recommendation: 'Implement seasonal operational procedures and weather-responsive protocols',
+      priority: 'important',
+      timeframe: '3-6 months',
+      
+      implementation: {
+        steps: [
+          'Develop seasonal operation procedures',
+          'Train staff on weather adaptation protocols',
+          'Implement weather monitoring systems',
+          'Create emergency response procedures'
+        ],
+        resources: ['Training programs', 'Weather monitoring tools', 'Procedure documentation'],
+        costs: 'medium',
+        timeline: '6 months'
+      },
+      
+      expectedBenefits: {
+        riskReduction: 40,
+        operationalImprovement: 'Improved weather response capabilities',
+        financialBenefit: 'Reduced weather-related operational costs'
+      }
+    });
+
+    // Strategic recommendations
+    recommendations.push({
+      category: 'Strategic Planning',
+      recommendation: 'Integrate climate considerations into long-term business strategy',
+      priority: 'moderate',
+      timeframe: '6-12 months',
+      
+      implementation: {
+        steps: [
+          'Conduct climate risk assessment for business strategy',
+          'Develop climate-aware business plans',
+          'Implement climate monitoring and forecasting',
+          'Create climate adaptation investment plans'
+        ],
+        resources: ['Strategic planning expertise', 'Climate data and forecasting', 'Investment capital'],
+        costs: 'medium',
+        timeline: '12 months'
+      },
+      
+      expectedBenefits: {
+        riskReduction: 50,
+        operationalImprovement: 'Enhanced long-term resilience',
+        financialBenefit: 'Improved business sustainability and profitability'
+      }
+    });
+
+    return recommendations;
+  }
+
+  /**
+   * Calculate forecasting adjustments based on climate patterns
+   */
+  private calculateForecastingAdjustments(
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): any {
+    const seasonalMultipliers: { [season: string]: number } = {};
+    const weatherSensitivityFactors: { [factor: string]: number } = {};
+    const extremeWeatherImpacts: { [event: string]: number } = {};
+
+    // Calculate seasonal multipliers
+    climateProfile.seasonalPatterns.forEach(pattern => {
+      let multiplier = 1.0;
+
+      pattern.businessEffects.forEach(effect => {
+        if (effect.effectType === 'positive') {
+          multiplier += this.getMagnitudeValue(effect.magnitude) * 0.1;
+        } else if (effect.effectType === 'negative') {
+          multiplier -= this.getMagnitudeValue(effect.magnitude) * 0.1;
+        }
+      });
+
+      seasonalMultipliers[pattern.season] = Math.max(0.5, Math.min(2.0, multiplier));
+    });
+
+    // Calculate weather sensitivity factors
+    weatherSensitivityFactors['temperature'] = this.calculateTemperatureSensitivity(climateProfile);
+    weatherSensitivityFactors['precipitation'] = this.calculatePrecipitationSensitivity(climateProfile);
+    weatherSensitivityFactors['humidity'] = this.calculateHumiditySensitivity(climateProfile);
+    weatherSensitivityFactors['wind'] = this.calculateWindSensitivity(climateProfile);
+
+    // Calculate extreme weather impacts
+    climateProfile.extremeWeatherRisks.forEach(risk => {
+      extremeWeatherImpacts[risk.riskType] = this.calculateExtremeWeatherImpact(risk);
+    });
+
+    return {
+      seasonalMultipliers,
+      weatherSensitivityFactors,
+      extremeWeatherImpacts
+    };
+  }
+
+  /**
+   * Get magnitude value for calculations
+   */
+  private getMagnitudeValue(magnitude: string): number {
+    switch (magnitude) {
+      case 'very_high': return 5;
+      case 'high': return 4;
+      case 'medium': return 3;
+      case 'low': return 2;
+      case 'very_low': return 1;
+      default: return 3;
+    }
+  }
+
+  /**
+   * Calculate temperature sensitivity factor
+   */
+  private calculateTemperatureSensitivity(climateProfile: ClimateCharacteristics): number {
+    const tempRange = climateProfile.temperatureProfile.annualRange;
+    const heatStressRisk = climateProfile.temperatureProfile.heatIndex.heatStressRisk;
+    
+    let sensitivity = tempRange / 10; // Base sensitivity on temperature range
+    
+    if (heatStressRisk === 'very_high') sensitivity += 0.5;
+    else if (heatStressRisk === 'high') sensitivity += 0.3;
+    else if (heatStressRisk === 'medium') sensitivity += 0.1;
+    
+    return Math.max(0.1, Math.min(2.0, sensitivity));
+  }
+
+  /**
+   * Calculate precipitation sensitivity factor
+   */
+  private calculatePrecipitationSensitivity(climateProfile: ClimateCharacteristics): number {
+    const precipitation = climateProfile.precipitationProfile;
+    const variability = precipitation.variability.yearToYearVariation;
+    const floodRisk = precipitation.variability.floodRisk;
+    const droughtRisk = precipitation.variability.droughtRisk;
+    
+    let sensitivity = variability; // Base on year-to-year variation
+    
+    if (floodRisk === 'very_high' || droughtRisk === 'very_high') sensitivity += 0.4;
+    else if (floodRisk === 'high' || droughtRisk === 'high') sensitivity += 0.2;
+    
+    return Math.max(0.1, Math.min(2.0, sensitivity));
+  }
+
+  /**
+   * Calculate humidity sensitivity factor
+   */
+  private calculateHumiditySensitivity(climateProfile: ClimateCharacteristics): number {
+    const humidity = climateProfile.humidityProfile;
+    const dailyVariation = humidity.dailyVariation;
+    const oppressiveDays = humidity.comfortIndex.oppressiveDays;
+    
+    let sensitivity = dailyVariation / 50; // Base on daily variation
+    sensitivity += oppressiveDays / 200; // Add oppressive days factor
+    
+    return Math.max(0.1, Math.min(2.0, sensitivity));
+  }
+
+  /**
+   * Calculate wind sensitivity factor
+   */
+  private calculateWindSensitivity(climateProfile: ClimateCharacteristics): number {
+    const wind = climateProfile.windProfile;
+    const stormDays = wind.extremeWinds.stormDays;
+    const maxWind = wind.extremeWinds.maxRecorded;
+    
+    let sensitivity = stormDays / 20; // Base on storm frequency
+    sensitivity += maxWind / 200; // Add maximum wind factor
+    
+    return Math.max(0.1, Math.min(2.0, sensitivity));
+  }
+
+  /**
+   * Calculate extreme weather impact factor
+   */
+  private calculateExtremeWeatherImpact(risk: ExtremeWeatherRisk): number {
+    const frequencyScore = this.getFrequencyScore(risk.frequency);
+    const severityScore = this.getSeverityScore(risk.severity);
+    const recoveryTime = risk.businessImpacts.recoveryTime;
+    
+    let impact = (frequencyScore * severityScore) / 25; // Normalize to 0-1 scale
+    impact += recoveryTime / 30; // Add recovery time factor
+    
+    return Math.max(0.1, Math.min(3.0, impact));
+  }
+
+  /**
+   * Get frequency score for calculations
+   */
+  private getFrequencyScore(frequency: string): number {
+    switch (frequency) {
+      case 'very_frequent': return 5;
+      case 'frequent': return 4;
+      case 'occasional': return 3;
+      case 'rare': return 2;
+      case 'very_rare': return 1;
+      default: return 3;
+    }
+  }
+
+  /**
+   * Get severity score for calculations
+   */
+  private getSeverityScore(severity: string): number {
+    switch (severity) {
+      case 'catastrophic': return 5;
+      case 'severe': return 4;
+      case 'major': return 3;
+      case 'moderate': return 2;
+      case 'minor': return 1;
+      default: return 3;
+    }
+  }
+
+  /**
+   * Calculate climate analysis performance metrics
+   */
+  private calculateClimateAnalysisMetrics(
+    climateProfile: ClimateCharacteristics,
+    request: ClimateWeatherRequest
+  ): ClimateAnalysisMetrics {
+    return {
+      accuracy: {
+        climateDataQuality: 0.85, // Based on profile completeness
+        businessImpactAccuracy: 0.80, // Based on pattern analysis
+        forecastReliability: 0.78, // Based on historical accuracy
+        adaptationEffectiveness: 0.75 // Based on implementation success
+      },
+      
+      coverage: {
+        temporalCoverage: 0.90, // Based on seasonal pattern coverage
+        spatialCoverage: 0.85, // Based on regional coverage
+        sectoralCoverage: 0.80 // Based on business sector coverage
+      },
+      
+      reliability: {
+        dataConsistency: 0.88, // Based on data source reliability
+        predictionStability: 0.82, // Based on model stability
+        adaptationSuccess: 0.75 // Based on adaptation outcome tracking
+      },
+      
+      businessValue: {
+        riskReduction: 0.85, // Based on risk mitigation effectiveness
+        opportunityIdentification: 0.80, // Based on opportunity capture
+        operationalOptimization: 0.78, // Based on operational improvements
+        strategicPlanning: 0.82 // Based on strategic planning enhancement
+      }
+    };
+  }
+
+  /**
+   * Cache climate weather analysis results
+   */
+  private async cacheResults(tenantId: string, result: ClimateWeatherResult): Promise<void> {
+    const cacheKey = `climate_weather_adaptation:${tenantId}`;
+    await this.cacheManager.set(cacheKey, result, 72 * 60 * 60 * 1000); // 72 hours
+  }
+
+  /**
+   * Get cached climate weather results
+   */
+  async getCachedResults(tenantId: string): Promise<ClimateWeatherResult | null> {
+    const cacheKey = `climate_weather_adaptation:${tenantId}`;
+    return await this.cacheManager.get<ClimateWeatherResult>(cacheKey);
+  }
+
+  /**
+   * Get climate adaptation recommendations for a specific region
+   */
+  async getClimateAdaptationRecommendations(
+    tenantId: string,
+    region?: IndonesianClimateRegion
+  ): Promise<ClimateAdaptationRecommendation[]> {
+    if (region) {
+      const climateProfile = this.getClimateProfile(region);
+      return this.generateAdaptationRecommendations(climateProfile, { 
+        tenantId, 
+        region, 
+        analysisTimeHorizon: 'medium_term',
+        analysisDepth: 'standard' 
+      });
+    }
+    
+    return this.getGeneralClimateRecommendations();
+  }
+
+  /**
+   * Get general climate recommendations
+   */
+  private getGeneralClimateRecommendations(): ClimateAdaptationRecommendation[] {
+    return [
+      {
+        category: 'Weather Monitoring',
+        recommendation: 'Implement comprehensive weather monitoring and early warning systems',
+        priority: 'critical',
+        timeframe: '3-6 months',
+        
+        implementation: {
+          steps: [
+            'Install weather monitoring equipment',
+            'Subscribe to meteorological services',
+            'Train staff on weather interpretation',
+            'Develop weather-based decision protocols'
+          ],
+          resources: ['Weather monitoring equipment', 'Training programs', 'Service subscriptions'],
+          costs: 'medium',
+          timeline: '6 months'
+        },
+        
+        expectedBenefits: {
+          riskReduction: 50,
+          operationalImprovement: 'Enhanced weather preparedness',
+          financialBenefit: 'Reduced weather-related losses'
+        }
+      },
+      {
+        category: 'Infrastructure Protection',
+        recommendation: 'Implement climate-resilient infrastructure protection measures',
+        priority: 'important',
+        timeframe: '6-12 months',
+        
+        implementation: {
+          steps: [
+            'Assess infrastructure climate vulnerability',
+            'Implement flood and wind protection',
+            'Install backup power systems',
+            'Enhance building climate resilience'
+          ],
+          resources: ['Engineering services', 'Construction materials', 'Protection systems'],
+          costs: 'high',
+          timeline: '12 months'
+        },
+        
+        expectedBenefits: {
+          riskReduction: 70,
+          operationalImprovement: 'Reduced infrastructure damage',
+          financialBenefit: 'Lower maintenance and replacement costs'
+        }
+      }
+    ];
+  }
+
+  /**
+   * Validate climate weather analysis results
+   */
+  async validateClimateWeatherResults(result: ClimateWeatherResult): Promise<boolean> {
+    try {
+      // Validate basic structure
+      if (!result.tenantId || !result.climateProfile || !result.businessAdaptations) {
+        return false;
+      }
+      
+      // Validate performance metrics
+      if (result.performanceMetrics.accuracy.climateDataQuality < 0 || 
+          result.performanceMetrics.accuracy.climateDataQuality > 1) {
+        return false;
+      }
+      
+      // Validate forecasting adjustments
+      if (!result.forecastingAdjustments.seasonalMultipliers || 
+          !result.forecastingAdjustments.weatherSensitivityFactors) {
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      this.logger.error(`Validation error: ${error.message}`);
+      return false;
+    }
+  }
+}

@@ -1,0 +1,2513 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile, max, min } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { MLModel } from '../entities/ml-model.entity';
+import { TrainingJob } from '../entities/training-job.entity';
+
+/**
+ * PHASE 4.2.3: Automated Model Retraining Triggers ⚡
+ * 
+ * Intelligent system for automatically triggering model retraining based on
+ * performance degradation, drift detection, business conditions, and Indonesian
+ * market factors. Manages trigger logic, scheduling, and retraining orchestration.
+ */
+
+export interface AutomatedRetrainingTriggersRequest {
+  tenantId: string;
+  triggerConfiguration: TriggerConfiguration;
+  retrainingPolicy: RetrainingPolicy;
+  evaluationCriteria: EvaluationCriteria;
+  resourceManagement: ResourceManagement;
+  businessConstraints: BusinessConstraints;
+  indonesianMarketFactors: IndonesianMarketFactors;
+  schedulingOptions: SchedulingOptions;
+  notificationSettings: NotificationSettings;
+}
+
+export interface TriggerConfiguration {
+  triggerId: string;
+  triggerName: string;
+  triggerTypes: TriggerType[];
+  triggerLogic: TriggerLogic;
+  evaluationFrequency: EvaluationFrequency;
+  triggerSensitivity: 'low' | 'medium' | 'high' | 'adaptive';
+  customTriggerRules: CustomTriggerRule[];
+  triggerPrioritization: TriggerPrioritization;
+}
+
+export type TriggerType = 
+  | 'performance_degradation'    // Model accuracy drops
+  | 'drift_detection'           // Data or concept drift
+  | 'error_rate_spike'          // High error rates
+  | 'business_metric_decline'   // Business KPIs affected
+  | 'data_quality_issues'       // Poor data quality
+  | 'seasonal_adaptation'       // Seasonal changes
+  | 'competitive_response'      // Market competition
+  | 'regulatory_change'         // Indonesian regulations
+  | 'economic_indicator'        // Economic changes
+  | 'cultural_event'            // Indonesian cultural events
+  | 'scheduled_retraining'      // Time-based triggers
+  | 'manual_trigger'            // Human-initiated
+  | 'emergency_trigger'         // Critical issues
+  | 'feedback_loop'             // User feedback driven
+  | 'anomaly_detection';        // Anomalous patterns
+
+export interface TriggerLogic {
+  logicType: 'simple' | 'composite' | 'ml_based' | 'rule_engine';
+  combinationRules: CombinationRule[];
+  weightingStrategy: WeightingStrategy;
+  evaluationMethod: EvaluationMethod;
+  confidenceThreshold: number;
+  suppressionRules: SuppressionRule[];
+}
+
+export interface CombinationRule {
+  ruleId: string;
+  ruleName: string;
+  triggerCombination: string[]; // List of trigger types
+  combinationOperator: 'AND' | 'OR' | 'XOR' | 'WEIGHTED_AVERAGE' | 'CUSTOM';
+  combinationThreshold: number;
+  timingRequirements: TimingRequirements;
+  indonesianContextWeight: number;
+}
+
+export interface TimingRequirements {
+  simultaneousRequired: boolean;
+  maxTimeWindow: number; // minutes
+  sequenceRequired: boolean;
+  expectedSequence?: string[];
+}
+
+export interface WeightingStrategy {
+  strategyType: 'equal' | 'priority_based' | 'impact_based' | 'dynamic' | 'ml_learned';
+  triggerWeights: Record<TriggerType, number>;
+  adaptiveWeighting: AdaptiveWeighting;
+  businessImportanceFactors: BusinessImportanceFactor[];
+}
+
+export interface AdaptiveWeighting {
+  enabled: boolean;
+  learningRate: number;
+  adaptationPeriod: number; // days
+  performanceFeedback: boolean;
+  businessOutcomeFeedback: boolean;
+  indonesianMarketFeedback: boolean;
+}
+
+export interface BusinessImportanceFactor {
+  factorName: string;
+  factorType: 'revenue' | 'cost' | 'risk' | 'compliance' | 'customer_satisfaction';
+  weightMultiplier: number;
+  seasonalAdjustment: boolean;
+  indonesianSpecific: boolean;
+}
+
+export interface EvaluationMethod {
+  methodType: 'threshold' | 'statistical_test' | 'ml_classifier' | 'ensemble';
+  evaluationParameters: Record<string, any>;
+  confidenceCalculation: ConfidenceCalculation;
+  uncertaintyHandling: UncertaintyHandling;
+}
+
+export interface ConfidenceCalculation {
+  calculationMethod: 'statistical' | 'ml_based' | 'heuristic' | 'hybrid';
+  baseConfidence: number;
+  adjustmentFactors: ConfidenceAdjustmentFactor[];
+  minimumConfidence: number;
+}
+
+export interface ConfidenceAdjustmentFactor {
+  factorName: string;
+  adjustmentType: 'multiplicative' | 'additive' | 'exponential';
+  adjustmentValue: number;
+  conditions: string[];
+}
+
+export interface UncertaintyHandling {
+  uncertaintyThreshold: number;
+  handlingStrategy: 'conservative' | 'aggressive' | 'balanced' | 'adaptive';
+  fallbackActions: string[];
+  humanReviewRequired: boolean;
+}
+
+export interface SuppressionRule {
+  ruleId: string;
+  suppressionConditions: string[];
+  suppressionDuration: number; // minutes
+  suppressionReason: string;
+  overrideAllowed: boolean;
+  businessJustification: string;
+}
+
+export interface EvaluationFrequency {
+  baseFrequency: number; // minutes
+  adaptiveFrequency: AdaptiveFrequencySettings;
+  businessHoursAdjustment: BusinessHoursAdjustment;
+  eventDrivenEvaluation: EventDrivenEvaluation;
+  indonesianTimeZoneSettings: IndonesianTimeZoneSettings;
+}
+
+export interface AdaptiveFrequencySettings {
+  enabled: boolean;
+  frequencyAdjustmentFactors: FrequencyAdjustmentFactor[];
+  maxFrequency: number; // minutes
+  minFrequency: number; // minutes
+  adaptationAlgorithm: 'linear' | 'exponential' | 'ml_based';
+}
+
+export interface FrequencyAdjustmentFactor {
+  factorName: string;
+  factorType: 'performance' | 'business' | 'seasonal' | 'competitive';
+  adjustmentTrigger: string;
+  frequencyMultiplier: number;
+  adjustmentDuration: number; // minutes
+}
+
+export interface BusinessHoursAdjustment {
+  respectBusinessHours: boolean;
+  businessHours: BusinessHoursDefinition;
+  offHoursBehavior: 'pause' | 'reduce_frequency' | 'continue';
+  emergencyOverride: boolean;
+}
+
+export interface BusinessHoursDefinition {
+  workingDays: number[]; // 0=Sunday, 1=Monday, etc.
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  holidayCalendar: HolidayCalendar;
+}
+
+export interface HolidayCalendar {
+  includeNationalHolidays: boolean;
+  includeReligiousHolidays: boolean;
+  includeRegionalHolidays: boolean;
+  customHolidays: CustomHoliday[];
+  holidayBehavior: 'suspend' | 'reduce' | 'continue';
+}
+
+export interface CustomHoliday {
+  holidayName: string;
+  holidayDate: Date;
+  holidayType: 'national' | 'religious' | 'regional' | 'company';
+  impactLevel: 'high' | 'medium' | 'low';
+  specialHandling: string[];
+}
+
+export interface EventDrivenEvaluation {
+  enabled: boolean;
+  eventSources: EventSource[];
+  eventProcessing: EventProcessing;
+  eventPrioritization: EventPrioritization;
+}
+
+export interface EventSource {
+  sourceId: string;
+  sourceName: string;
+  sourceType: 'api' | 'webhook' | 'database' | 'message_queue' | 'file_system';
+  connectionConfig: Record<string, any>;
+  eventFilters: EventFilter[];
+  reliability: 'high' | 'medium' | 'low';
+}
+
+export interface EventFilter {
+  filterType: 'include' | 'exclude';
+  filterCriteria: string;
+  filterValue: any;
+  filterPriority: number;
+}
+
+export interface EventProcessing {
+  processingDelay: number; // seconds
+  batchProcessing: boolean;
+  batchSize?: number;
+  processingTimeout: number; // seconds
+  errorHandling: EventErrorHandling;
+}
+
+export interface EventErrorHandling {
+  retryAttempts: number;
+  retryBackoff: 'fixed' | 'exponential' | 'linear';
+  fallbackBehavior: 'ignore' | 'alert' | 'manual_review';
+  errorThreshold: number;
+}
+
+export interface EventPrioritization {
+  prioritizationMethod: 'fifo' | 'priority_based' | 'impact_based' | 'ml_based';
+  priorityLevels: EventPriorityLevel[];
+  queueManagement: QueueManagement;
+}
+
+export interface EventPriorityLevel {
+  levelName: string;
+  levelValue: number;
+  processingTimeTarget: number; // seconds
+  escalationRules: string[];
+}
+
+export interface QueueManagement {
+  maxQueueSize: number;
+  queueOverflowBehavior: 'drop_oldest' | 'drop_lowest_priority' | 'alert';
+  queueHealthMonitoring: boolean;
+  queueMetrics: string[];
+}
+
+export interface IndonesianTimeZoneSettings {
+  primaryTimezone: 'WIB' | 'WITA' | 'WIT';
+  multiTimezoneSupport: boolean;
+  timezoneAwareScheduling: boolean;
+  daylightSavingHandling: boolean; // Though Indonesia doesn't use DST
+  timeZoneFailover: TimeZoneFailover;
+}
+
+export interface TimeZoneFailover {
+  fallbackTimezone: 'WIB' | 'WITA' | 'WIT';
+  failoverTriggers: string[];
+  synchronizationChecks: boolean;
+}
+
+export interface CustomTriggerRule {
+  ruleId: string;
+  ruleName: string;
+  ruleDescription: string;
+  ruleType: 'performance' | 'business' | 'technical' | 'indonesian_specific';
+  ruleCondition: string;
+  ruleThreshold: number;
+  evaluationLogic: RuleEvaluationLogic;
+  ruleWeight: number;
+  indonesianContextAware: boolean;
+}
+
+export interface RuleEvaluationLogic {
+  logicExpression: string;
+  variableDefinitions: Record<string, VariableDefinition>;
+  evaluationMethod: 'javascript' | 'sql' | 'ml_model' | 'statistical';
+  evaluationFrequency: number; // minutes
+  cachingStrategy: CachingStrategy;
+}
+
+export interface VariableDefinition {
+  variableName: string;
+  variableType: 'numeric' | 'boolean' | 'string' | 'date' | 'object';
+  dataSource: string;
+  updateFrequency: number; // minutes
+  validationRules: ValidationRule[];
+}
+
+export interface ValidationRule {
+  ruleType: 'range' | 'format' | 'required' | 'custom';
+  ruleParameters: Record<string, any>;
+  failureAction: 'ignore' | 'default_value' | 'alert' | 'stop_evaluation';
+}
+
+export interface CachingStrategy {
+  cachingEnabled: boolean;
+  cacheExpiry: number; // minutes
+  cacheInvalidationTriggers: string[];
+  cacheWarming: boolean;
+}
+
+export interface TriggerPrioritization {
+  prioritizationEnabled: boolean;
+  prioritizationCriteria: PrioritizationCriteria[];
+  conflictResolution: ConflictResolution;
+  escalationRules: TriggerEscalationRule[];
+}
+
+export interface PrioritizationCriteria {
+  criteriaName: string;
+  criteriaType: 'business_impact' | 'urgency' | 'resource_availability' | 'cost';
+  criteriaWeight: number;
+  evaluationMethod: string;
+  indonesianFactorConsideration: boolean;
+}
+
+export interface ConflictResolution {
+  resolutionStrategy: 'first_come_first_served' | 'highest_priority' | 'resource_based' | 'business_value';
+  conflictDetectionMethod: string;
+  resolutionTimeLimit: number; // minutes
+  humanInterventionRequired: boolean;
+}
+
+export interface TriggerEscalationRule {
+  escalationCondition: string;
+  escalationDelay: number; // minutes
+  escalationTarget: string;
+  escalationActions: string[];
+}
+
+export interface RetrainingPolicy {
+  policyId: string;
+  policyName: string;
+  retrainingStrategy: RetrainingStrategy;
+  resourceAllocation: PolicyResourceAllocation;
+  qualityAssurance: QualityAssurance;
+  rollbackPolicy: RollbackPolicy;
+  indonesianComplianceRequirements: IndonesianComplianceRequirements;
+}
+
+export interface RetrainingStrategy {
+  strategyType: 'full_retrain' | 'incremental' | 'transfer_learning' | 'ensemble_update' | 'adaptive';
+  strategyParameters: StrategyParameters;
+  dataSelectionStrategy: DataSelectionStrategy;
+  modelSelectionStrategy: ModelSelectionStrategy;
+  validationStrategy: ValidationStrategy;
+}
+
+export interface StrategyParameters {
+  trainingDataPeriod: number; // days
+  validationDataPeriod: number; // days
+  hyperparameterTuning: boolean;
+  crossValidationFolds: number;
+  earlyStoppingEnabled: boolean;
+  ensembleSize?: number;
+  transferLearningSource?: string;
+}
+
+export interface DataSelectionStrategy {
+  selectionMethod: 'recent_data' | 'representative_sample' | 'weighted_sample' | 'adaptive_selection';
+  dataQualityThreshold: number;
+  outlierHandling: 'include' | 'exclude' | 'adjust';
+  missingDataHandling: 'impute' | 'exclude' | 'flag';
+  indonesianDataPriority: IndonesianDataPriority;
+}
+
+export interface IndonesianDataPriority {
+  prioritizeLocalData: boolean;
+  regionalWeighting: Record<string, number>;
+  culturalEventWeighting: number;
+  seasonalDataBalance: boolean;
+  economicCycleConsideration: boolean;
+}
+
+export interface ModelSelectionStrategy {
+  selectionCriteria: string[];
+  performanceMetrics: string[];
+  businessMetrics: string[];
+  complexityConsiderations: boolean;
+  interpretabilityRequirements: boolean;
+  indonesianMarketOptimization: boolean;
+}
+
+export interface ValidationStrategy {
+  validationMethod: 'holdout' | 'cross_validation' | 'time_series_split' | 'custom';
+  validationMetrics: string[];
+  acceptanceCriteria: AcceptanceCriteria;
+  businessValidation: BusinessValidation;
+  indonesianMarketValidation: IndonesianMarketValidation;
+}
+
+export interface AcceptanceCriteria {
+  minimumAccuracy: number;
+  maximumErrorRate: number;
+  performanceImprovement: number;
+  businessMetricTargets: Record<string, number>;
+  stabilityCriteria: StabilityCriteria;
+}
+
+export interface StabilityCriteria {
+  consistencyThreshold: number;
+  variabilityLimit: number;
+  robustnessTests: string[];
+  stressTestingRequired: boolean;
+}
+
+export interface BusinessValidation {
+  businessMetricValidation: boolean;
+  stakeholderApproval: boolean;
+  pilotTestingRequired: boolean;
+  impactAssessment: boolean;
+  ROIValidation: boolean;
+}
+
+export interface IndonesianMarketValidation {
+  culturalSensitivityTesting: boolean;
+  regionalPerformanceTesting: boolean;
+  economicScenarioTesting: boolean;
+  competitiveResponseTesting: boolean;
+  regulatoryComplianceTesting: boolean;
+}
+
+export interface PolicyResourceAllocation {
+  computeResources: ComputeResourceAllocation;
+  humanResources: HumanResourceAllocation;
+  dataResources: DataResourceAllocation;
+  timeConstraints: TimeConstraints;
+  costConstraints: CostConstraints;
+}
+
+export interface ComputeResourceAllocation {
+  gpuRequirement: GPURequirement;
+  cpuRequirement: CPURequirement;
+  memoryRequirement: MemoryRequirement;
+  storageRequirement: StorageRequirement;
+  networkRequirement: NetworkRequirement;
+}
+
+export interface GPURequirement {
+  minGPUs: number;
+  preferredGPUs: number;
+  gpuType: string[];
+  gpuMemory: number; // GB
+  multiGPUSupport: boolean;
+}
+
+export interface CPURequirement {
+  minCores: number;
+  preferredCores: number;
+  cpuType: string[];
+  cpuSpeed: number; // GHz
+  parallelProcessing: boolean;
+}
+
+export interface MemoryRequirement {
+  minMemory: number; // GB
+  preferredMemory: number; // GB
+  memoryType: string;
+  swapUsage: boolean;
+}
+
+export interface StorageRequirement {
+  minStorage: number; // GB
+  preferredStorage: number; // GB
+  storageType: 'SSD' | 'HDD' | 'NVMe';
+  iopsRequirement: number;
+}
+
+export interface NetworkRequirement {
+  bandwidth: number; // Mbps
+  latency: number; // ms
+  reliabilityRequirement: number; // percentage
+}
+
+export interface HumanResourceAllocation {
+  dataScientistHours: number;
+  mlEngineerHours: number;
+  businessAnalystHours: number;
+  qaEngineerHours: number;
+  indonesianMarketExpertHours: number;
+  skillRequirements: string[];
+}
+
+export interface DataResourceAllocation {
+  trainingDataVolume: number; // GB
+  validationDataVolume: number; // GB
+  dataStorageRequirement: number; // GB
+  dataTransferBandwidth: number; // Mbps
+  dataQualityRequirements: DataQualityRequirements;
+}
+
+export interface DataQualityRequirements {
+  completenessThreshold: number;
+  accuracyThreshold: number;
+  consistencyThreshold: number;
+  timelinessRequirement: number; // hours
+  indonesianDataStandards: boolean;
+}
+
+export interface TimeConstraints {
+  maxTrainingTime: number; // hours
+  maxValidationTime: number; // hours
+  maxDeploymentTime: number; // hours
+  businessDeadlines: BusinessDeadline[];
+  indonesianMarketTiming: IndonesianMarketTiming;
+}
+
+export interface BusinessDeadline {
+  deadlineName: string;
+  deadlineDate: Date;
+  criticality: 'low' | 'medium' | 'high' | 'critical';
+  flexibilityMargin: number; // hours
+}
+
+export interface IndonesianMarketTiming {
+  avoidRamadanPeriod: boolean;
+  avoidMajorHolidays: boolean;
+  preferBusinessHours: boolean;
+  considerMarketClosures: boolean;
+  weekendDeploymentAllowed: boolean;
+}
+
+export interface CostConstraints {
+  maxTrainingCost: number; // IDR
+  maxInfrastructureCost: number; // IDR
+  maxHumanResourceCost: number; // IDR
+  costOptimizationPriority: 'low' | 'medium' | 'high';
+  budgetTrackingEnabled: boolean;
+}
+
+export interface QualityAssurance {
+  qaEnabled: boolean;
+  qaChecklist: QAChecklistItem[];
+  testingRequirements: TestingRequirements;
+  performanceValidation: PerformanceValidation;
+  securityValidation: SecurityValidation;
+  indonesianMarketQA: IndonesianMarketQA;
+}
+
+export interface QAChecklistItem {
+  checkName: string;
+  checkType: 'automated' | 'manual' | 'hybrid';
+  checkCriteria: string;
+  passFailCriteria: string;
+  checkPriority: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface TestingRequirements {
+  unitTesting: boolean;
+  integrationTesting: boolean;
+  performanceTesting: boolean;
+  stressTesting: boolean;
+  userAcceptanceTesting: boolean;
+  regressionTesting: boolean;
+}
+
+export interface PerformanceValidation {
+  benchmarkComparison: boolean;
+  loadTesting: boolean;
+  scalabilityTesting: boolean;
+  reliabilityTesting: boolean;
+  indonesianMarketPerformance: boolean;
+}
+
+export interface SecurityValidation {
+  vulnerabilityScanning: boolean;
+  dataPrivacyCompliance: boolean;
+  accessControlValidation: boolean;
+  auditTrailValidation: boolean;
+  indonesianDataProtectionCompliance: boolean;
+}
+
+export interface IndonesianMarketQA {
+  culturalSensitivityReview: boolean;
+  localComplianceCheck: boolean;
+  regionalPerformanceValidation: boolean;
+  competitiveAnalysisValidation: boolean;
+  economicImpactAssessment: boolean;
+}
+
+export interface RollbackPolicy {
+  rollbackEnabled: boolean;
+  rollbackTriggers: RollbackTrigger[];
+  rollbackProcedure: RollbackProcedure;
+  rollbackValidation: RollbackValidation;
+  rollbackCommunication: RollbackCommunication;
+}
+
+export interface RollbackTrigger {
+  triggerName: string;
+  triggerCondition: string;
+  triggerThreshold: number;
+  automaticRollback: boolean;
+  rollbackDelay: number; // minutes
+}
+
+export interface RollbackProcedure {
+  procedureSteps: RollbackStep[];
+  rollbackTimeLimit: number; // minutes
+  dataBackupRequired: boolean;
+  serviceDowntimeAcceptable: boolean;
+  stakeholderNotification: boolean;
+}
+
+export interface RollbackStep {
+  stepName: string;
+  stepType: 'automated' | 'manual' | 'approval_required';
+  stepDuration: number; // minutes
+  stepDependencies: string[];
+  stepValidation: string;
+}
+
+export interface RollbackValidation {
+  validationRequired: boolean;
+  validationCriteria: string[];
+  validationTimeout: number; // minutes
+  validationFailureAction: 'retry' | 'manual_intervention' | 'abort';
+}
+
+export interface RollbackCommunication {
+  communicationRequired: boolean;
+  communicationChannels: string[];
+  communicationTemplate: string;
+  stakeholderGroups: string[];
+  indonesianLanguageSupport: boolean;
+}
+
+export interface IndonesianComplianceRequirements {
+  dataProtectionCompliance: boolean;
+  regulatoryReporting: boolean;
+  auditTrailRequirements: string[];
+  localDataResidency: boolean;
+  governmentApprovalRequired: boolean;
+  culturalSensitivityRequirements: string[];
+}
+
+export interface EvaluationCriteria {
+  criteriaSet: CriteriaSet[];
+  evaluationMethod: CriteriaEvaluationMethod;
+  thresholdConfiguration: ThresholdConfiguration;
+  benchmarkComparison: BenchmarkComparison;
+  trendAnalysis: TrendAnalysis;
+  indonesianMarketSpecificCriteria: IndonesianMarketSpecificCriteria;
+}
+
+export interface CriteriaSet {
+  criteriaName: string;
+  criteriaType: 'performance' | 'business' | 'technical' | 'operational';
+  criteriaMetrics: CriteriaMetric[];
+  evaluationFrequency: number; // minutes
+  criteriaWeight: number;
+  indonesianRelevance: boolean;
+}
+
+export interface CriteriaMetric {
+  metricName: string;
+  metricType: 'accuracy' | 'latency' | 'throughput' | 'cost' | 'business_value';
+  targetValue: number;
+  acceptableRange: [number, number];
+  measurementMethod: string;
+  trendImportance: 'low' | 'medium' | 'high';
+}
+
+export interface CriteriaEvaluationMethod {
+  evaluationStrategy: 'individual' | 'composite' | 'weighted_average' | 'ml_based';
+  aggregationMethod: string;
+  evaluationWindow: number; // minutes
+  confidenceCalculation: boolean;
+  uncertaintyHandling: boolean;
+}
+
+export interface ThresholdConfiguration {
+  dynamicThresholds: boolean;
+  thresholdAdaptation: ThresholdAdaptation;
+  alertThresholds: AlertThreshold[];
+  businessThresholds: BusinessThreshold[];
+  indonesianMarketThresholds: IndonesianMarketThreshold[];
+}
+
+export interface ThresholdAdaptation {
+  adaptationEnabled: boolean;
+  adaptationMethod: 'statistical' | 'ml_based' | 'business_rule';
+  adaptationFrequency: number; // days
+  adaptationSensitivity: number;
+  adaptationLimits: [number, number];
+}
+
+export interface AlertThreshold {
+  thresholdName: string;
+  thresholdValue: number;
+  thresholdDirection: 'above' | 'below' | 'outside_range';
+  alertSeverity: 'info' | 'warning' | 'critical' | 'emergency';
+  alertActions: string[];
+}
+
+export interface BusinessThreshold {
+  thresholdName: string;
+  businessMetric: string;
+  thresholdValue: number;
+  businessImpact: 'low' | 'medium' | 'high' | 'critical';
+  stakeholderNotification: boolean;
+}
+
+export interface IndonesianMarketThreshold {
+  thresholdName: string;
+  marketMetric: string;
+  thresholdValue: number;
+  regionalVariation: boolean;
+  culturalConsideration: boolean;
+  economicFactorAdjustment: boolean;
+}
+
+export interface BenchmarkComparison {
+  benchmarkingEnabled: boolean;
+  benchmarkSources: BenchmarkSource[];
+  comparisonMethod: string;
+  benchmarkUpdateFrequency: number; // days
+  indonesianMarketBenchmarks: boolean;
+}
+
+export interface BenchmarkSource {
+  sourceName: string;
+  sourceType: 'internal' | 'industry' | 'competitor' | 'academic';
+  dataSource: string;
+  reliability: 'high' | 'medium' | 'low';
+  indonesianRelevance: boolean;
+}
+
+export interface TrendAnalysis {
+  trendAnalysisEnabled: boolean;
+  trendDetectionMethod: string;
+  trendSignificanceThreshold: number;
+  seasonalityDetection: boolean;
+  indonesianSeasonalityPatterns: boolean;
+}
+
+export interface IndonesianMarketSpecificCriteria {
+  culturalEventImpact: boolean;
+  economicIndicatorCorrelation: boolean;
+  regulatoryComplianceMetrics: boolean;
+  localCompetitorPerformance: boolean;
+  regionalPerformanceVariation: boolean;
+}
+
+export interface ResourceManagement {
+  resourcePlanning: ResourcePlanning;
+  resourceOptimization: ResourceOptimization;
+  resourceScaling: ResourceScaling;
+  resourceMonitoring: ResourceMonitoring;
+  costManagement: ResourceCostManagement;
+  indonesianResourceConsiderations: IndonesianResourceConsiderations;
+}
+
+export interface ResourcePlanning {
+  planningHorizon: number; // days
+  resourceForecasting: boolean;
+  capacityPlanning: boolean;
+  resourceReservation: boolean;
+  planningAccuracy: number;
+  planUpdatesFrequency: number; // days
+}
+
+export interface ResourceOptimization {
+  optimizationEnabled: boolean;
+  optimizationObjective: 'cost' | 'performance' | 'time' | 'balanced';
+  optimizationMethod: string;
+  optimizationFrequency: number; // hours
+  constraintHandling: boolean;
+}
+
+export interface ResourceScaling {
+  autoScalingEnabled: boolean;
+  scalingTriggers: ScalingTrigger[];
+  scalingPolicy: ScalingPolicy;
+  scalingLimits: ScalingLimits;
+  cooldownPeriod: number; // minutes
+}
+
+export interface ScalingTrigger {
+  triggerName: string;
+  triggerMetric: string;
+  scaleUpThreshold: number;
+  scaleDownThreshold: number;
+  evaluationPeriod: number; // minutes
+}
+
+export interface ScalingPolicy {
+  policyType: 'reactive' | 'predictive' | 'hybrid';
+  scalingIncrements: number;
+  scalingSpeed: 'fast' | 'medium' | 'slow';
+  scalingValidation: boolean;
+}
+
+export interface ScalingLimits {
+  minResources: number;
+  maxResources: number;
+  scalingBudgetLimit: number; // IDR
+  scalingTimeLimit: number; // minutes
+}
+
+export interface ResourceMonitoring {
+  monitoringEnabled: boolean;
+  monitoringMetrics: string[];
+  monitoringFrequency: number; // minutes
+  alertingEnabled: boolean;
+  performanceBaselines: boolean;
+}
+
+export interface ResourceCostManagement {
+  costTrackingEnabled: boolean;
+  budgetManagement: boolean;
+  costOptimization: boolean;
+  costAlerts: CostAlert[];
+  indonesianCostFactors: boolean;
+}
+
+export interface CostAlert {
+  alertName: string;
+  costThreshold: number; // IDR
+  alertFrequency: number; // hours
+  escalationRequired: boolean;
+  costCategory: string;
+}
+
+export interface IndonesianResourceConsiderations {
+  localDataCenterPreference: boolean;
+  localVendorPreference: boolean;
+  currencyHedging: boolean;
+  localSupportRequirements: boolean;
+  regulatoryCompliance: boolean;
+}
+
+export interface BusinessConstraints {
+  operationalConstraints: OperationalConstraints;
+  financialConstraints: FinancialConstraints;
+  timeConstraints: BusinessTimeConstraints;
+  qualityConstraints: QualityConstraints;
+  complianceConstraints: ComplianceConstraints;
+  indonesianBusinessConstraints: IndonesianBusinessConstraints;
+}
+
+export interface OperationalConstraints {
+  serviceAvailabilityRequirement: number; // percentage
+  maxServiceDowntime: number; // minutes
+  operationalHours: OperationalHours;
+  maintenanceWindows: MaintenanceWindow[];
+  emergencyProcedures: EmergencyProcedure[];
+}
+
+export interface OperationalHours {
+  operatingSchedule: string; // cron expression
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  holidaySchedule: string;
+  specialEventSchedule: string;
+}
+
+export interface MaintenanceWindow {
+  windowName: string;
+  windowSchedule: string; // cron expression
+  windowDuration: number; // minutes
+  impactLevel: 'low' | 'medium' | 'high';
+  notificationRequired: boolean;
+}
+
+export interface EmergencyProcedure {
+  procedureName: string;
+  triggerConditions: string[];
+  procedureSteps: string[];
+  contactList: string[];
+  escalationPath: string[];
+}
+
+export interface FinancialConstraints {
+  budgetLimits: BudgetLimit[];
+  costApprovalRequired: boolean;
+  ROIRequirements: ROIRequirement[];
+  financialReporting: boolean;
+  indonesianTaxConsiderations: boolean;
+}
+
+export interface BudgetLimit {
+  budgetCategory: string;
+  budgetAmount: number; // IDR
+  budgetPeriod: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  budgetAlerts: number[]; // percentages
+  budgetOverrideAllowed: boolean;
+}
+
+export interface ROIRequirement {
+  requirementName: string;
+  targetROI: number; // percentage
+  evaluationPeriod: number; // months
+  measurementMethod: string;
+  acceptanceCriteria: string;
+}
+
+export interface BusinessTimeConstraints {
+  projectTimelines: ProjectTimeline[];
+  deliveryDeadlines: DeliveryDeadline[];
+  seasonalConsiderations: SeasonalConsideration[];
+  indonesianMarketTimings: IndonesianMarketTimings;
+}
+
+export interface ProjectTimeline {
+  projectName: string;
+  startDate: Date;
+  endDate: Date;
+  milestones: ProjectMilestone[];
+  dependencies: string[];
+  criticalPath: boolean;
+}
+
+export interface ProjectMilestone {
+  milestoneName: string;
+  milestoneDate: Date;
+  deliverables: string[];
+  successCriteria: string[];
+  stakeholders: string[];
+}
+
+export interface DeliveryDeadline {
+  deadlineName: string;
+  deadlineDate: Date;
+  deliverables: string[];
+  penalties: string[];
+  flexibilityMargin: number; // days
+}
+
+export interface SeasonalConsideration {
+  seasonName: string;
+  seasonPeriod: string;
+  businessImpact: 'high' | 'medium' | 'low';
+  specialRequirements: string[];
+  adjustmentFactors: Record<string, number>;
+}
+
+export interface IndonesianMarketTimings {
+  ramadanConsiderations: boolean;
+  harvestSeasonConsiderations: boolean;
+  schoolYearConsiderations: boolean;
+  governmentBudgetCycle: boolean;
+  localEventCalendar: boolean;
+}
+
+export interface QualityConstraints {
+  qualityStandards: QualityStandard[];
+  qualityAssuranceProcess: QualityAssuranceProcess;
+  qualityMetrics: QualityMetric[];
+  qualityValidation: QualityConstraintValidation;
+  indonesianQualityRequirements: IndonesianQualityRequirements;
+}
+
+export interface QualityStandard {
+  standardName: string;
+  standardType: 'ISO' | 'internal' | 'industry' | 'indonesian';
+  complianceRequired: boolean;
+  validationMethod: string;
+  certificationRequired: boolean;
+}
+
+export interface QualityAssuranceProcess {
+  processSteps: string[];
+  reviewCheckpoints: string[];
+  approvalGates: string[];
+  qualityMetrics: string[];
+  continuousImprovement: boolean;
+}
+
+export interface QualityMetric {
+  metricName: string;
+  targetValue: number;
+  measurementMethod: string;
+  reportingFrequency: string;
+  improvementTarget: number;
+}
+
+export interface QualityConstraintValidation {
+  validationRequired: boolean;
+  validationMethods: string[];
+  validationFrequency: string;
+  validationCriteria: string[];
+  validationReporting: boolean;
+}
+
+export interface IndonesianQualityRequirements {
+  localStandardsCompliance: boolean;
+  culturalAppropriatenessReview: boolean;
+  languageQualityRequirements: boolean;
+  localUserExperienceStandards: boolean;
+  regionalCustomization: boolean;
+}
+
+export interface ComplianceConstraints {
+  regulatoryCompliance: RegulatoryCompliance[];
+  dataProtectionCompliance: DataProtectionCompliance;
+  auditRequirements: AuditRequirements;
+  reportingRequirements: ReportingRequirements;
+  indonesianComplianceRequirements: IndonesianSpecificCompliance;
+}
+
+export interface RegulatoryCompliance {
+  regulationName: string;
+  regulationType: 'data_protection' | 'financial' | 'industry_specific' | 'general';
+  complianceLevel: 'mandatory' | 'recommended' | 'best_practice';
+  validationRequired: boolean;
+  reportingRequired: boolean;
+}
+
+export interface DataProtectionCompliance {
+  gdprCompliance: boolean;
+  localDataProtectionLaws: boolean;
+  dataResidencyRequirements: boolean;
+  consentManagement: boolean;
+  dataRetentionPolicies: boolean;
+}
+
+export interface AuditRequirements {
+  auditFrequency: string;
+  auditScope: string[];
+  auditDocumentation: boolean;
+  externalAuditRequired: boolean;
+  indonesianAuditStandards: boolean;
+}
+
+export interface ReportingRequirements {
+  reportingFrequency: string;
+  reportingTargets: string[];
+  reportingFormat: string[];
+  reportingLanguage: string[];
+  indonesianRegulatoryReporting: boolean;
+}
+
+export interface IndonesianSpecificCompliance {
+  dataLocalizationLaws: boolean;
+  taxComplianceRequirements: boolean;
+  laborLawCompliance: boolean;
+  environmentalCompliance: boolean;
+  culturalSensitivityRequirements: boolean;
+}
+
+export interface IndonesianBusinessConstraints {
+  localBusinessPractices: LocalBusinessPractices;
+  culturalConsiderations: CulturalBusinessConsiderations;
+  economicFactors: EconomicBusinessFactors;
+  infrastructureLimitations: InfrastructureLimitations;
+  localPartnerships: LocalPartnerships;
+}
+
+export interface LocalBusinessPractices {
+  workingHourCustoms: boolean;
+  meetingCulturePreferences: boolean;
+  decisionMakingProcesses: boolean;
+  communicationStyles: boolean;
+  hierarchicalStructures: boolean;
+}
+
+export interface CulturalBusinessConsiderations {
+  religiousObservances: boolean;
+  localHolidays: boolean;
+  socialCustoms: boolean;
+  languagePreferences: boolean;
+  formalityLevels: boolean;
+}
+
+export interface EconomicBusinessFactors {
+  currencyFluctuations: boolean;
+  inflationConsiderations: boolean;
+  economicCycles: boolean;
+  governmentPolicies: boolean;
+  marketConditions: boolean;
+}
+
+export interface InfrastructureLimitations {
+  internetConnectivity: boolean;
+  powerReliability: boolean;
+  transportationLogistics: boolean;
+  communicationInfrastructure: boolean;
+  technologyAdoption: boolean;
+}
+
+export interface LocalPartnerships {
+  localVendorRequirements: boolean;
+  partnershipObligations: boolean;
+  jointVentureConsiderations: boolean;
+  distributionPartners: boolean;
+  technologyPartners: boolean;
+}
+
+export interface IndonesianMarketFactors {
+  economicIndicators: EconomicIndicatorFactors;
+  culturalFactors: CulturalMarketFactors;
+  competitiveFactors: CompetitiveMarketFactors;
+  regulatoryFactors: RegulatoryMarketFactors;
+  seasonalFactors: SeasonalMarketFactors;
+  regionalFactors: RegionalMarketFactors;
+}
+
+export interface EconomicIndicatorFactors {
+  gdpGrowthRate: EconomicIndicator;
+  inflationRate: EconomicIndicator;
+  exchangeRates: EconomicIndicator;
+  interestRates: EconomicIndicator;
+  unemploymentRate: EconomicIndicator;
+  consumerPriceIndex: EconomicIndicator;
+}
+
+export interface EconomicIndicator {
+  indicatorName: string;
+  currentValue: number;
+  historicalTrend: 'increasing' | 'decreasing' | 'stable' | 'volatile';
+  impactOnBusiness: 'high' | 'medium' | 'low';
+  forecastAvailable: boolean;
+  updateFrequency: string;
+}
+
+export interface CulturalMarketFactors {
+  religiousObservances: CulturalFactor;
+  traditionalEvents: CulturalFactor;
+  socialMovements: CulturalFactor;
+  generationalShifts: CulturalFactor;
+  urbanizationTrends: CulturalFactor;
+}
+
+export interface CulturalFactor {
+  factorName: string;
+  impactLevel: 'high' | 'medium' | 'low';
+  cyclicalPattern: boolean;
+  regionalVariation: boolean;
+  businessRelevance: string;
+  adaptationRequired: boolean;
+}
+
+export interface CompetitiveMarketFactors {
+  newMarketEntrants: CompetitiveFactor;
+  priceCompetition: CompetitiveFactor;
+  productInnovation: CompetitiveFactor;
+  marketConsolidation: CompetitiveFactor;
+  internationalCompetition: CompetitiveFactor;
+}
+
+export interface CompetitiveFactor {
+  factorName: string;
+  competitiveIntensity: 'high' | 'medium' | 'low';
+  timeToImpact: 'immediate' | 'short_term' | 'medium_term' | 'long_term';
+  strategicImportance: 'critical' | 'important' | 'moderate' | 'low';
+  responseRequired: boolean;
+}
+
+export interface RegulatoryMarketFactors {
+  newRegulations: RegulatoryFactor;
+  policyChanges: RegulatoryFactor;
+  tradeAgreements: RegulatoryFactor;
+  taxationChanges: RegulatoryFactor;
+  environmentalRegulations: RegulatoryFactor;
+}
+
+export interface RegulatoryFactor {
+  factorName: string;
+  implementationTimeline: string;
+  complianceComplexity: 'high' | 'medium' | 'low';
+  businessImpact: 'significant' | 'moderate' | 'minimal';
+  adaptationTime: number; // days
+}
+
+export interface SeasonalMarketFactors {
+  weatherPatterns: SeasonalFactor;
+  agriculturalCycles: SeasonalFactor;
+  educationalCalendar: SeasonalFactor;
+  touristSeasons: SeasonalFactor;
+  fiscalYearCycles: SeasonalFactor;
+}
+
+export interface SeasonalFactor {
+  factorName: string;
+  seasonalIntensity: 'high' | 'medium' | 'low';
+  predictability: 'high' | 'medium' | 'low';
+  businessRelevance: 'direct' | 'indirect' | 'minimal';
+  adaptationStrategy: string;
+}
+
+export interface RegionalMarketFactors {
+  economicDevelopmentLevels: RegionalFactor;
+  infrastructureDifferences: RegionalFactor;
+  culturalVariations: RegionalFactor;
+  competitiveLandscapes: RegionalFactor;
+  regulatoryDifferences: RegionalFactor;
+}
+
+export interface RegionalFactor {
+  factorName: string;
+  regionalImpact: Record<string, 'high' | 'medium' | 'low'>;
+  adaptationRequired: boolean;
+  resourceAllocation: Record<string, number>;
+  monitoringPriority: 'high' | 'medium' | 'low';
+}
+
+export interface SchedulingOptions {
+  schedulingStrategy: SchedulingStrategy;
+  resourceScheduling: ResourceScheduling;
+  conflictResolution: SchedulingConflictResolution;
+  priorityManagement: PriorityManagement;
+  adaptiveScheduling: AdaptiveScheduling;
+  indonesianSchedulingFactors: IndonesianSchedulingFactors;
+}
+
+export interface SchedulingStrategy {
+  strategyType: 'immediate' | 'optimized' | 'business_hours' | 'off_peak' | 'adaptive';
+  schedulingAlgorithm: string;
+  optimizationObjective: 'time' | 'cost' | 'resources' | 'quality' | 'balanced';
+  schedulingConstraints: SchedulingConstraint[];
+  fallbackStrategy: string;
+}
+
+export interface SchedulingConstraint {
+  constraintType: 'time' | 'resource' | 'business' | 'technical';
+  constraintDescription: string;
+  constraintPriority: 'high' | 'medium' | 'low';
+  flexibilityMargin: number;
+  violationHandling: string;
+}
+
+export interface ResourceScheduling {
+  resourceAllocationMethod: 'first_available' | 'optimized' | 'reserved' | 'dynamic';
+  resourceReservation: boolean;
+  resourcePreemption: boolean;
+  resourceSharing: boolean;
+  queueManagement: SchedulingQueueManagement;
+}
+
+export interface SchedulingQueueManagement {
+  queueType: 'fifo' | 'priority' | 'fair_share' | 'deadline_based';
+  queueLimits: QueueLimits;
+  queueMonitoring: boolean;
+  queueOptimization: boolean;
+}
+
+export interface QueueLimits {
+  maxQueueSize: number;
+  maxWaitTime: number; // minutes
+  priorityLevels: number;
+  queueOverflowHandling: string;
+}
+
+export interface SchedulingConflictResolution {
+  conflictDetection: boolean;
+  conflictResolutionStrategy: string;
+  priorityBased: boolean;
+  negotiationAllowed: boolean;
+  escalationProcedure: string;
+}
+
+export interface PriorityManagement {
+  priorityLevels: SchedulingPriorityLevel[];
+  priorityCalculation: PriorityCalculation;
+  dynamicPrioritization: boolean;
+  priorityOverrides: boolean;
+  businessPriorityFactors: BusinessPriorityFactor[];
+}
+
+export interface SchedulingPriorityLevel {
+  levelName: string;
+  levelValue: number;
+  resourceAllocation: number; // percentage
+  responseTimeTarget: number; // minutes
+  escalationRules: string[];
+}
+
+export interface PriorityCalculation {
+  calculationMethod: 'weighted_sum' | 'ml_based' | 'rule_based' | 'hybrid';
+  priorityFactors: PriorityFactor[];
+  calculationFrequency: number; // minutes
+  calculationAccuracy: number;
+}
+
+export interface PriorityFactor {
+  factorName: string;
+  factorWeight: number;
+  factorType: 'business' | 'technical' | 'temporal' | 'resource';
+  indonesianRelevance: boolean;
+}
+
+export interface BusinessPriorityFactor {
+  factorName: string;
+  businessImpact: 'critical' | 'high' | 'medium' | 'low';
+  urgency: 'immediate' | 'urgent' | 'normal' | 'low';
+  stakeholderImportance: number;
+  revenueImpact: number;
+}
+
+export interface IndonesianSchedulingFactors {
+  timezoneConsiderations: boolean;
+  businessHourPreferences: boolean;
+  culturalEventAwareness: boolean;
+  holidayScheduleIntegration: boolean;
+  regionalPreferences: boolean;
+  localResourceAvailability: boolean;
+}
+
+export interface NotificationSettings {
+  notificationEnabled: boolean;
+  notificationChannels: RetrainingNotificationChannel[];
+  notificationContent: NotificationContent;
+  escalationSettings: NotificationEscalation;
+  indonesianLocalizationSettings: IndonesianNotificationSettings;
+}
+
+export interface RetrainingNotificationChannel {
+  channelId: string;
+  channelType: 'email' | 'sms' | 'whatsapp' | 'slack' | 'teams' | 'webhook' | 'in_app';
+  channelConfig: NotificationChannelConfiguration;
+  targetAudience: string[];
+  notificationTypes: NotificationType[];
+  deliveryPreferences: DeliveryPreferences;
+}
+
+export interface NotificationChannelConfiguration {
+  endpoint?: string;
+  credentials?: Record<string, string>;
+  messageFormat: 'text' | 'html' | 'json' | 'markdown';
+  templateId?: string;
+  rateLimit: number; // messages per hour
+  retryPolicy: RetryPolicy;
+}
+
+export interface RetryPolicy {
+  maxRetries: number;
+  retryDelay: number; // seconds
+  backoffStrategy: 'fixed' | 'exponential' | 'linear';
+  retryConditions: string[];
+}
+
+export interface NotificationType {
+  typeName: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  urgency: 'immediate' | 'urgent' | 'normal' | 'low';
+  contentTemplate: string;
+  indonesianTranslation: boolean;
+}
+
+export interface DeliveryPreferences {
+  preferredTime: string; // HH:mm
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  businessHoursOnly: boolean;
+  consolidation: boolean;
+  batchingAllowed: boolean;
+}
+
+export interface NotificationContent {
+  contentTemplates: ContentTemplate[];
+  personalization: boolean;
+  indonesianLanguageSupport: boolean;
+  culturalAdaptation: boolean;
+  businessContextInclusion: boolean;
+}
+
+export interface ContentTemplate {
+  templateId: string;
+  templateName: string;
+  templateType: 'trigger_alert' | 'status_update' | 'completion_notice' | 'error_alert';
+  templateContent: string;
+  variables: TemplateVariable[];
+  indonesianVersion?: string;
+}
+
+export interface TemplateVariable {
+  variableName: string;
+  variableType: 'string' | 'number' | 'date' | 'boolean' | 'object';
+  defaultValue?: any;
+  required: boolean;
+  description: string;
+}
+
+export interface NotificationEscalation {
+  escalationEnabled: boolean;
+  escalationLevels: NotificationEscalationLevel[];
+  escalationTriggers: EscalationTrigger[];
+  escalationTimeline: EscalationTimeline;
+}
+
+export interface NotificationEscalationLevel {
+  levelNumber: number;
+  levelName: string;
+  contacts: EscalationContact[];
+  notificationMethods: string[];
+  responseTimeExpected: number; // minutes
+}
+
+export interface EscalationContact {
+  contactId: string;
+  contactName: string;
+  contactRole: string;
+  contactMethods: ContactMethod[];
+  availability: ContactAvailability;
+  indonesianLanguagePreference: boolean;
+}
+
+export interface ContactMethod {
+  methodType: string;
+  methodValue: string;
+  preferred: boolean;
+  businessHoursOnly: boolean;
+}
+
+export interface ContactAvailability {
+  workingHours: string;
+  timezone: string;
+  onCallSchedule?: string;
+  alternateContacts: string[];
+}
+
+export interface EscalationTrigger {
+  triggerType: 'no_response' | 'severity_increase' | 'time_based' | 'business_impact';
+  triggerCondition: string;
+  triggerDelay: number; // minutes
+  autoEscalation: boolean;
+}
+
+export interface EscalationTimeline {
+  maxEscalationLevels: number;
+  totalEscalationTime: number; // minutes
+  escalationSteps: EscalationStep[];
+  emergencyOverride: boolean;
+}
+
+export interface IndonesianNotificationSettings {
+  defaultLanguage: 'id' | 'en';
+  bilingualSupport: boolean;
+  culturalSensitivity: boolean;
+  timeZoneLocalization: boolean;
+  localDateTimeFormat: boolean;
+  businessContextLocalization: boolean;
+}
+
+export interface AutomatedRetrainingTriggersResult {
+  triggerId: string;
+  executionSummary: TriggerExecutionSummary;
+  triggerEvaluations: TriggerEvaluationResult[];
+  retrainingDecision: RetrainingDecision;
+  resourceAllocation: AllocatedResources;
+  schedulingResult: SchedulingResult;
+  notificationResults: NotificationResult[];
+  indonesianFactorImpacts: IndonesianFactorImpacts;
+  nextEvaluationSchedule: NextEvaluationSchedule;
+  businessImpactAssessment: BusinessImpactAssessment;
+}
+
+export interface TriggerExecutionSummary {
+  executionId: string;
+  startTime: Date;
+  endTime: Date;
+  triggersEvaluated: number;
+  triggersActivated: number;
+  retrainingTriggered: boolean;
+  overallConfidence: number;
+  indonesianFactorsConsidered: number;
+  executionStatus: 'success' | 'partial_success' | 'failure' | 'aborted';
+}
+
+export interface TriggerEvaluationResult {
+  triggerType: TriggerType;
+  triggerActivated: boolean;
+  triggerConfidence: number;
+  triggerValue: number;
+  thresholdValue: number;
+  evaluationMethod: string;
+  contributingFactors: string[];
+  indonesianContextImpact: number;
+  businessJustification: string;
+}
+
+export interface RetrainingDecision {
+  retrainingRecommended: boolean;
+  retrainingUrgency: 'low' | 'medium' | 'high' | 'critical';
+  retrainingStrategy: string;
+  estimatedDuration: number; // hours
+  estimatedCost: number; // IDR
+  expectedBenefit: number;
+  riskAssessment: string;
+  stakeholderApproval: string[];
+  indonesianMarketConsiderations: string[];
+}
+
+export interface AllocatedResources {
+  computeResources: AllocatedComputeResources;
+  humanResources: AllocatedHumanResources;
+  dataResources: AllocatedDataResources;
+  timeAllocation: TimeAllocation;
+  costAllocation: CostAllocation;
+}
+
+export interface AllocatedComputeResources {
+  gpuInstances: number;
+  cpuCores: number;
+  memoryGB: number;
+  storageGB: number;
+  networkBandwidth: number; // Mbps
+  estimatedUsageDuration: number; // hours
+}
+
+export interface AllocatedHumanResources {
+  teamMembers: TeamMemberAllocation[];
+  totalHours: number;
+  skillsRequired: string[];
+  availability: string;
+  indonesianExpertiseRequired: boolean;
+}
+
+export interface TeamMemberAllocation {
+  memberRole: string;
+  allocatedHours: number;
+  expertiseLevel: 'junior' | 'mid' | 'senior' | 'expert';
+  availability: string;
+  indonesianMarketKnowledge: boolean;
+}
+
+export interface AllocatedDataResources {
+  trainingDataVolume: number; // GB
+  validationDataVolume: number; // GB
+  dataStorageRequired: number; // GB
+  dataTransferRequired: number; // GB
+  indonesianDataPrioritization: boolean;
+}
+
+export interface TimeAllocation {
+  totalEstimatedTime: number; // hours
+  phases: PhaseTimeAllocation[];
+  criticalPath: string[];
+  bufferTime: number; // hours
+  deadlines: Date[];
+}
+
+export interface PhaseTimeAllocation {
+  phaseName: string;
+  estimatedDuration: number; // hours
+  dependencies: string[];
+  parallelExecution: boolean;
+  criticalPathItem: boolean;
+}
+
+export interface CostAllocation {
+  totalEstimatedCost: number; // IDR
+  costBreakdown: CostBreakdownItem[];
+  costOptimization: CostOptimization;
+  budgetApproval: BudgetApproval;
+  indonesianCostFactors: boolean;
+}
+
+export interface CostBreakdownItem {
+  costCategory: string;
+  estimatedCost: number; // IDR
+  costJustification: string;
+  costOptimizationPotential: number; // percentage
+}
+
+export interface CostOptimization {
+  optimizationApplied: boolean;
+  optimizationMethods: string[];
+  costSavings: number; // IDR
+  performanceImpact: string;
+}
+
+export interface BudgetApproval {
+  approvalRequired: boolean;
+  approvalStatus: 'pending' | 'approved' | 'rejected' | 'conditional';
+  approvers: string[];
+  approvalDeadline: Date;
+  conditions: string[];
+}
+
+export interface SchedulingResult {
+  scheduledStartTime: Date;
+  scheduledEndTime: Date;
+  schedulingStrategy: string;
+  resourceAvailability: ResourceAvailability;
+  schedulingConstraints: string[];
+  indonesianTimingFactors: string[];
+}
+
+export interface ResourceAvailability {
+  computeResourcesAvailable: boolean;
+  humanResourcesAvailable: boolean;
+  dataResourcesAvailable: boolean;
+  conflictsIdentified: string[];
+  alternativeSchedules: AlternativeSchedule[];
+}
+
+export interface AlternativeSchedule {
+  scheduleName: string;
+  startTime: Date;
+  endTime: Date;
+  tradeoffs: string[];
+  riskLevel: 'low' | 'medium' | 'high';
+  recommendationReason: string;
+}
+
+export interface NotificationResult {
+  notificationId: string;
+  channelType: string;
+  recipient: string;
+  status: 'sent' | 'delivered' | 'failed' | 'pending';
+  sentTime: Date;
+  deliveredTime?: Date;
+  responseReceived?: boolean;
+  indonesianLanguageUsed: boolean;
+}
+
+export interface IndonesianFactorImpacts {
+  economicIndicatorImpacts: EconomicIndicatorImpact[];
+  culturalFactorImpacts: CulturalFactorImpact[];
+  seasonalFactorImpacts: SeasonalFactorImpact[];
+  regulatoryFactorImpacts: RegulatoryFactorImpact[];
+  competitiveFactorImpacts: CompetitiveFactorImpact[];
+  regionalFactorImpacts: RegionalFactorImpact[];
+}
+
+export interface EconomicIndicatorImpact {
+  indicatorName: string;
+  impactMagnitude: 'high' | 'medium' | 'low';
+  impactDirection: 'positive' | 'negative' | 'neutral';
+  triggerContribution: number; // percentage
+  forecastedTrend: string;
+  businessImplication: string;
+}
+
+export interface CulturalFactorImpact {
+  factorName: string;
+  impactTiming: string;
+  impactDuration: string;
+  businessAreas: string[];
+  adaptationRequired: boolean;
+  mitigationStrategies: string[];
+}
+
+export interface SeasonalFactorImpact {
+  factorName: string;
+  seasonalIntensity: number;
+  affectedPeriods: string[];
+  businessOpportunities: string[];
+  riskFactors: string[];
+  preparationRequired: boolean;
+}
+
+export interface RegulatoryFactorImpact {
+  regulationType: string;
+  complianceRequirement: string;
+  implementationDeadline: Date;
+  businessImpact: string;
+  adaptationCost: number; // IDR
+  riskLevel: 'low' | 'medium' | 'high';
+}
+
+export interface CompetitiveFactorImpact {
+  competitorAction: string;
+  marketImpact: string;
+  responseUrgency: 'immediate' | 'urgent' | 'normal' | 'low';
+  strategicImplications: string[];
+  responseOptions: string[];
+  resourceRequirements: string[];
+}
+
+export interface RegionalFactorImpact {
+  regionName: string;
+  factorType: string;
+  impactLevel: 'high' | 'medium' | 'low';
+  affectedBusinessAreas: string[];
+  localizationRequired: boolean;
+  resourceAllocationAdjustment: number; // percentage
+}
+
+export interface NextEvaluationSchedule {
+  nextEvaluationTime: Date;
+  evaluationFrequency: number; // minutes
+  adaptiveFrequencyApplied: boolean;
+  schedulingFactors: string[];
+  indonesianTimingConsiderations: string[];
+  specialEventConsiderations: string[];
+}
+
+export interface BusinessImpactAssessment {
+  overallBusinessImpact: 'positive' | 'neutral' | 'negative';
+  impactMagnitude: 'low' | 'medium' | 'high' | 'critical';
+  affectedBusinessAreas: string[];
+  revenueImpact: number; // IDR
+  costImpact: number; // IDR
+  operationalImpact: string[];
+  strategicImplications: string[];
+  indonesianMarketSpecificImpacts: string[];
+}
+
+@Injectable()
+export class AutomatedModelRetrainingTriggersService {
+  private readonly logger = new Logger(AutomatedModelRetrainingTriggersService.name);
+
+  constructor(
+    @InjectRepository(MLModel)
+    private readonly mlModelRepository: Repository<MLModel>,
+    
+    @InjectRepository(TrainingJob)
+    private readonly trainingJobRepository: Repository<TrainingJob>,
+    
+    @InjectRepository(InventoryTransaction)
+    private readonly inventoryTransactionRepository: Repository<InventoryTransaction>,
+    
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async evaluateRetrainingTriggers(
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<AutomatedRetrainingTriggersResult> {
+    const startTime = Date.now();
+    
+    try {
+      this.logger.log(`Evaluating retraining triggers for tenant: ${request.tenantId}`);
+      
+      // Initialize trigger execution
+      const executionSummary = await this.initializeTriggerExecution(request);
+      
+      // Evaluate all triggers
+      const triggerEvaluations = await this.evaluateAllTriggers(request);
+      
+      // Make retraining decision
+      const retrainingDecision = await this.makeRetrainingDecision(triggerEvaluations, request);
+      
+      // Allocate resources if retraining is decided
+      const resourceAllocation = await this.allocateResources(retrainingDecision, request);
+      
+      // Schedule retraining if needed
+      const schedulingResult = await this.scheduleRetraining(retrainingDecision, resourceAllocation, request);
+      
+      // Send notifications
+      const notificationResults = await this.sendNotifications(retrainingDecision, request);
+      
+      // Assess Indonesian factor impacts
+      const indonesianFactorImpacts = await this.assessIndonesianFactorImpacts(triggerEvaluations, request);
+      
+      // Schedule next evaluation
+      const nextEvaluationSchedule = await this.scheduleNextEvaluation(triggerEvaluations, request);
+      
+      // Assess business impact
+      const businessImpactAssessment = await this.assessBusinessImpact(retrainingDecision, request);
+      
+      const result: AutomatedRetrainingTriggersResult = {
+        triggerId: `trigger_${Date.now()}_${request.tenantId}`,
+        executionSummary: {
+          ...executionSummary,
+          endTime: new Date(),
+          triggersActivated: triggerEvaluations.filter(t => t.triggerActivated).length,
+          retrainingTriggered: retrainingDecision.retrainingRecommended,
+          overallConfidence: mean(triggerEvaluations.map(t => t.triggerConfidence)),
+          indonesianFactorsConsidered: Object.keys(indonesianFactorImpacts).length,
+          executionStatus: 'success',
+        },
+        triggerEvaluations,
+        retrainingDecision,
+        resourceAllocation,
+        schedulingResult,
+        notificationResults,
+        indonesianFactorImpacts,
+        nextEvaluationSchedule,
+        businessImpactAssessment,
+      };
+      
+      // Cache result
+      const cacheKey = `retraining_triggers:${request.tenantId}:${result.triggerId}`;
+      await this.cacheManager.set(cacheKey, result, 300); // 5 minutes
+      
+      // Emit trigger evaluation event
+      this.eventEmitter.emit('model.retraining.triggers.evaluated', {
+        tenantId: request.tenantId,
+        triggerId: result.triggerId,
+        retrainingTriggered: result.retrainingDecision.retrainingRecommended,
+        urgency: result.retrainingDecision.retrainingUrgency,
+      });
+      
+      const processingTime = Date.now() - startTime;
+      this.logger.log(`Retraining triggers evaluation completed in ${processingTime}ms`);
+      
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`Error in retraining triggers evaluation: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  private async initializeTriggerExecution(request: AutomatedRetrainingTriggersRequest): Promise<TriggerExecutionSummary> {
+    return {
+      executionId: `exec_${Date.now()}_${request.tenantId}`,
+      startTime: new Date(),
+      endTime: new Date(), // Will be updated
+      triggersEvaluated: request.triggerConfiguration.triggerTypes.length,
+      triggersActivated: 0, // Will be updated
+      retrainingTriggered: false, // Will be updated
+      overallConfidence: 0, // Will be updated
+      indonesianFactorsConsidered: 0, // Will be updated
+      executionStatus: 'success', // Will be updated if needed
+    };
+  }
+
+  private async evaluateAllTriggers(request: AutomatedRetrainingTriggersRequest): Promise<TriggerEvaluationResult[]> {
+    const evaluations: TriggerEvaluationResult[] = [];
+    
+    for (const triggerType of request.triggerConfiguration.triggerTypes) {
+      const evaluation = await this.evaluateTrigger(triggerType, request);
+      evaluations.push(evaluation);
+    }
+    
+    return evaluations;
+  }
+
+  private async evaluateTrigger(
+    triggerType: TriggerType, 
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<TriggerEvaluationResult> {
+    // Simulate trigger evaluation based on type
+    let triggerActivated = false;
+    let triggerConfidence = 0;
+    let triggerValue = 0;
+    let thresholdValue = 0.5; // Default threshold
+    
+    switch (triggerType) {
+      case 'performance_degradation':
+        triggerValue = Math.random(); // 0-1 where 1 is worst performance
+        thresholdValue = 0.3; // 30% degradation threshold
+        triggerActivated = triggerValue > thresholdValue;
+        triggerConfidence = triggerActivated ? Math.random() * 0.3 + 0.7 : Math.random() * 0.3;
+        break;
+        
+      case 'drift_detection':
+        triggerValue = Math.random() * 0.8; // Drift score
+        thresholdValue = 0.4; // 40% drift threshold
+        triggerActivated = triggerValue > thresholdValue;
+        triggerConfidence = triggerActivated ? Math.random() * 0.2 + 0.8 : Math.random() * 0.4;
+        break;
+        
+      case 'seasonal_adaptation':
+        // Check if we're in Indonesian seasonal period
+        const currentDate = moment().tz('Asia/Jakarta');
+        const isRamadan = this.isRamadanPeriod(currentDate);
+        const isHarvestSeason = this.isHarvestSeason(currentDate);
+        
+        triggerValue = (isRamadan || isHarvestSeason) ? 0.8 : 0.2;
+        thresholdValue = 0.6;
+        triggerActivated = triggerValue > thresholdValue;
+        triggerConfidence = triggerActivated ? 0.9 : 0.1;
+        break;
+        
+      case 'economic_indicator':
+        triggerValue = Math.random() * 0.6; // Economic volatility
+        thresholdValue = 0.4;
+        triggerActivated = triggerValue > thresholdValue;
+        triggerConfidence = triggerActivated ? Math.random() * 0.4 + 0.6 : Math.random() * 0.4;
+        break;
+        
+      default:
+        triggerValue = Math.random() * 0.5;
+        thresholdValue = 0.3;
+        triggerActivated = triggerValue > thresholdValue;
+        triggerConfidence = triggerActivated ? Math.random() * 0.2 + 0.6 : Math.random() * 0.3;
+    }
+    
+    return {
+      triggerType,
+      triggerActivated,
+      triggerConfidence,
+      triggerValue,
+      thresholdValue,
+      evaluationMethod: 'statistical_threshold',
+      contributingFactors: this.getContributingFactors(triggerType),
+      indonesianContextImpact: this.calculateIndonesianContextImpact(triggerType),
+      businessJustification: this.generateBusinessJustification(triggerType, triggerActivated, triggerValue),
+    };
+  }
+
+  private isRamadanPeriod(date: moment.Moment): boolean {
+    // Simplified Ramadan detection - in real implementation, use accurate Islamic calendar
+    const month = date.month() + 1; // moment months are 0-indexed
+    return month === 3 || month === 4; // Approximate Ramadan period
+  }
+
+  private isHarvestSeason(date: moment.Moment): boolean {
+    const month = date.month() + 1;
+    return month >= 3 && month <= 5; // March-May harvest season in Indonesia
+  }
+
+  private getContributingFactors(triggerType: TriggerType): string[] {
+    const factorsMap: Record<TriggerType, string[]> = {
+      'performance_degradation': ['Model accuracy decline', 'Data quality issues', 'Concept drift'],
+      'drift_detection': ['Distribution shift', 'Feature correlation changes', 'Target variable shift'],
+      'seasonal_adaptation': ['Ramadan effect', 'Harvest season impact', 'Holiday patterns'],
+      'economic_indicator': ['IDR exchange rate volatility', 'Inflation changes', 'GDP growth impact'],
+      'cultural_event': ['Religious observances', 'National holidays', 'Regional celebrations'],
+      'competitive_response': ['New market entrants', 'Price competition', 'Product innovations'],
+      'regulatory_change': ['New government policies', 'Tax law changes', 'Trade regulations'],
+      'error_rate_spike': ['System errors', 'Data pipeline issues', 'Model failures'],
+      'business_metric_decline': ['Revenue drop', 'Customer satisfaction decline', 'Market share loss'],
+      'data_quality_issues': ['Missing data', 'Outliers', 'Data corruption'],
+      'scheduled_retraining': ['Predetermined schedule', 'Maintenance window', 'Regular updates'],
+      'manual_trigger': ['Human decision', 'Strategic initiative', 'Emergency response'],
+      'emergency_trigger': ['Critical system failure', 'Business crisis', 'Regulatory emergency'],
+      'feedback_loop': ['User feedback', 'Performance monitoring', 'Business insights'],
+      'anomaly_detection': ['Unusual patterns', 'Outlier detection', 'System anomalies'],
+    };
+    
+    return factorsMap[triggerType] || ['General factors'];
+  }
+
+  private calculateIndonesianContextImpact(triggerType: TriggerType): number {
+    // Different trigger types have different levels of Indonesian context impact
+    const contextImpactMap: Record<TriggerType, number> = {
+      'seasonal_adaptation': 0.9,
+      'cultural_event': 0.8,
+      'economic_indicator': 0.7,
+      'regulatory_change': 0.6,
+      'competitive_response': 0.5,
+      'performance_degradation': 0.3,
+      'drift_detection': 0.4,
+      'error_rate_spike': 0.2,
+      'business_metric_decline': 0.5,
+      'data_quality_issues': 0.2,
+      'scheduled_retraining': 0.1,
+      'manual_trigger': 0.3,
+      'emergency_trigger': 0.4,
+      'feedback_loop': 0.3,
+      'anomaly_detection': 0.3,
+    };
+    
+    return contextImpactMap[triggerType] || 0.3;
+  }
+
+  private generateBusinessJustification(
+    triggerType: TriggerType, 
+    triggerActivated: boolean, 
+    triggerValue: number
+  ): string {
+    if (!triggerActivated) {
+      return `${triggerType} evaluation shows normal conditions (value: ${triggerValue.toFixed(2)}). No immediate action required.`;
+    }
+    
+    const justificationMap: Record<TriggerType, string> = {
+      'performance_degradation': `Model performance has degraded significantly (${(triggerValue * 100).toFixed(1)}%), affecting business operations and customer experience.`,
+      'drift_detection': `Data drift detected with high confidence (${(triggerValue * 100).toFixed(1)}%), indicating changing market conditions requiring model adaptation.`,
+      'seasonal_adaptation': `Indonesian seasonal patterns detected, requiring model adaptation for Ramadan, harvest season, or other cultural events.`,
+      'economic_indicator': `Economic volatility in Indonesian market (${(triggerValue * 100).toFixed(1)}%) necessitates model retraining for current conditions.`,
+      'cultural_event': `Major Indonesian cultural event impact detected, requiring specialized model adaptation for cultural sensitivity.`,
+      'competitive_response': `Competitive market changes require immediate model update to maintain market position and performance.`,
+      'regulatory_change': `New Indonesian regulations require model compliance updates to ensure continued legal operation.`,
+      'error_rate_spike': `System error rates have exceeded acceptable thresholds (${(triggerValue * 100).toFixed(1)}%), requiring immediate intervention.`,
+      'business_metric_decline': `Key business metrics show decline (${(triggerValue * 100).toFixed(1)}%), indicating need for model optimization.`,
+      'data_quality_issues': `Data quality problems detected (${(triggerValue * 100).toFixed(1)}%) that may impact model performance and reliability.`,
+      'scheduled_retraining': `Scheduled retraining period reached as per maintenance calendar and best practices.`,
+      'manual_trigger': `Manual retraining trigger activated by authorized personnel for strategic business reasons.`,
+      'emergency_trigger': `Emergency situation detected requiring immediate model retraining to address critical issues.`,
+      'feedback_loop': `User feedback and performance monitoring indicate need for model improvement (${(triggerValue * 100).toFixed(1)}%).`,
+      'anomaly_detection': `Anomalous patterns detected (${(triggerValue * 100).toFixed(1)}%) that require model investigation and potential retraining.`,
+    };
+    
+    return justificationMap[triggerType] || `Trigger activated with value ${triggerValue.toFixed(2)}, requiring model retraining consideration.`;
+  }
+
+  private async makeRetrainingDecision(
+    triggerEvaluations: TriggerEvaluationResult[],
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<RetrainingDecision> {
+    const activatedTriggers = triggerEvaluations.filter(t => t.triggerActivated);
+    const avgConfidence = activatedTriggers.length > 0 
+      ? mean(activatedTriggers.map(t => t.triggerConfidence)) 
+      : 0;
+    
+    // Decision logic based on trigger combination and confidence
+    const retrainingRecommended = activatedTriggers.length > 0 && avgConfidence > 0.6;
+    
+    let retrainingUrgency: 'low' | 'medium' | 'high' | 'critical' = 'low';
+    if (avgConfidence > 0.9) retrainingUrgency = 'critical';
+    else if (avgConfidence > 0.8) retrainingUrgency = 'high';
+    else if (avgConfidence > 0.7) retrainingUrgency = 'medium';
+    
+    // Check for emergency triggers
+    const hasEmergencyTrigger = activatedTriggers.some(t => 
+      t.triggerType === 'emergency_trigger' || 
+      t.triggerType === 'error_rate_spike' && t.triggerConfidence > 0.8
+    );
+    
+    if (hasEmergencyTrigger) {
+      retrainingUrgency = 'critical';
+    }
+    
+    // Indonesian-specific considerations
+    const hasIndonesianTrigger = activatedTriggers.some(t => 
+      t.triggerType === 'seasonal_adaptation' || 
+      t.triggerType === 'cultural_event' ||
+      t.triggerType === 'economic_indicator'
+    );
+    
+    return {
+      retrainingRecommended,
+      retrainingUrgency,
+      retrainingStrategy: this.selectRetrainingStrategy(activatedTriggers, retrainingUrgency),
+      estimatedDuration: this.estimateRetrainingDuration(retrainingUrgency),
+      estimatedCost: this.estimateRetrainingCost(retrainingUrgency),
+      expectedBenefit: this.estimateExpectedBenefit(avgConfidence),
+      riskAssessment: this.assessRetrainingRisk(activatedTriggers),
+      stakeholderApproval: this.getRequiredApprovals(retrainingUrgency),
+      indonesianMarketConsiderations: hasIndonesianTrigger ? [
+        'Include recent Indonesian market data',
+        'Account for cultural and seasonal patterns',
+        'Consider regulatory compliance requirements',
+        'Optimize for local business conditions',
+      ] : [],
+    };
+  }
+
+  private selectRetrainingStrategy(
+    activatedTriggers: TriggerEvaluationResult[],
+    urgency: string
+  ): string {
+    if (urgency === 'critical') return 'emergency_retrain';
+    if (activatedTriggers.some(t => t.triggerType === 'drift_detection')) return 'incremental_update';
+    if (activatedTriggers.some(t => t.triggerType === 'seasonal_adaptation')) return 'seasonal_adaptation';
+    if (activatedTriggers.some(t => t.triggerType === 'performance_degradation')) return 'full_retrain';
+    return 'standard_retrain';
+  }
+
+  private estimateRetrainingDuration(urgency: string): number {
+    const durationMap = {
+      'critical': 2,    // 2 hours
+      'high': 8,        // 8 hours
+      'medium': 24,     // 24 hours
+      'low': 48,        // 48 hours
+    };
+    return durationMap[urgency] || 24;
+  }
+
+  private estimateRetrainingCost(urgency: string): number {
+    const costMap = {
+      'critical': 500000,   // IDR 500K
+      'high': 300000,       // IDR 300K
+      'medium': 200000,     // IDR 200K
+      'low': 100000,        // IDR 100K
+    };
+    return costMap[urgency] || 200000;
+  }
+
+  private estimateExpectedBenefit(confidence: number): number {
+    // Benefit as percentage improvement expected
+    return confidence * 20; // Up to 20% improvement
+  }
+
+  private assessRetrainingRisk(activatedTriggers: TriggerEvaluationResult[]): string {
+    const highRiskTriggers = ['emergency_trigger', 'error_rate_spike'];
+    const hasHighRiskTrigger = activatedTriggers.some(t => 
+      highRiskTriggers.includes(t.triggerType)
+    );
+    
+    if (hasHighRiskTrigger) return 'High risk - immediate action required';
+    if (activatedTriggers.length > 3) return 'Medium risk - multiple factors detected';
+    return 'Low risk - standard retraining procedures apply';
+  }
+
+  private getRequiredApprovals(urgency: string): string[] {
+    const approvalMap = {
+      'critical': ['Emergency Response Team', 'CTO'],
+      'high': ['ML Team Lead', 'Engineering Manager'],
+      'medium': ['Data Science Team'],
+      'low': ['Automated Approval'],
+    };
+    return approvalMap[urgency] || ['ML Team Lead'];
+  }
+
+  private async allocateResources(
+    retrainingDecision: RetrainingDecision,
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<AllocatedResources> {
+    if (!retrainingDecision.retrainingRecommended) {
+      return this.getEmptyResourceAllocation();
+    }
+    
+    // Resource allocation based on urgency
+    const urgencyMultiplier = {
+      'critical': 2.0,
+      'high': 1.5,
+      'medium': 1.0,
+      'low': 0.7,
+    }[retrainingDecision.retrainingUrgency] || 1.0;
+    
+    return {
+      computeResources: {
+        gpuInstances: Math.ceil(2 * urgencyMultiplier),
+        cpuCores: Math.ceil(16 * urgencyMultiplier),
+        memoryGB: Math.ceil(64 * urgencyMultiplier),
+        storageGB: Math.ceil(500 * urgencyMultiplier),
+        networkBandwidth: Math.ceil(1000 * urgencyMultiplier),
+        estimatedUsageDuration: retrainingDecision.estimatedDuration,
+      },
+      humanResources: {
+        teamMembers: [
+          {
+            memberRole: 'ML Engineer',
+            allocatedHours: retrainingDecision.estimatedDuration * 0.8,
+            expertiseLevel: 'senior',
+            availability: 'Available',
+            indonesianMarketKnowledge: true,
+          },
+          {
+            memberRole: 'Data Scientist',
+            allocatedHours: retrainingDecision.estimatedDuration * 0.6,
+            expertiseLevel: 'mid',
+            availability: 'Available',
+            indonesianMarketKnowledge: false,
+          },
+        ],
+        totalHours: retrainingDecision.estimatedDuration * 1.4,
+        skillsRequired: ['Machine Learning', 'Python', 'TensorFlow', 'Indonesian Market Knowledge'],
+        availability: 'Immediate',
+        indonesianExpertiseRequired: true,
+      },
+      dataResources: {
+        trainingDataVolume: 50 * urgencyMultiplier,
+        validationDataVolume: 10 * urgencyMultiplier,
+        dataStorageRequired: 100 * urgencyMultiplier,
+        dataTransferRequired: 25 * urgencyMultiplier,
+        indonesianDataPrioritization: true,
+      },
+      timeAllocation: {
+        totalEstimatedTime: retrainingDecision.estimatedDuration,
+        phases: [
+          {
+            phaseName: 'Data Preparation',
+            estimatedDuration: retrainingDecision.estimatedDuration * 0.3,
+            dependencies: [],
+            parallelExecution: false,
+            criticalPathItem: true,
+          },
+          {
+            phaseName: 'Model Training',
+            estimatedDuration: retrainingDecision.estimatedDuration * 0.5,
+            dependencies: ['Data Preparation'],
+            parallelExecution: false,
+            criticalPathItem: true,
+          },
+          {
+            phaseName: 'Validation & Deployment',
+            estimatedDuration: retrainingDecision.estimatedDuration * 0.2,
+            dependencies: ['Model Training'],
+            parallelExecution: false,
+            criticalPathItem: true,
+          },
+        ],
+        criticalPath: ['Data Preparation', 'Model Training', 'Validation & Deployment'],
+        bufferTime: retrainingDecision.estimatedDuration * 0.1,
+        deadlines: [moment().add(retrainingDecision.estimatedDuration, 'hours').toDate()],
+      },
+      costAllocation: {
+        totalEstimatedCost: retrainingDecision.estimatedCost,
+        costBreakdown: [
+          {
+            costCategory: 'Compute Resources',
+            estimatedCost: retrainingDecision.estimatedCost * 0.6,
+            costJustification: 'GPU and CPU usage for training',
+            costOptimizationPotential: 20,
+          },
+          {
+            costCategory: 'Human Resources',
+            estimatedCost: retrainingDecision.estimatedCost * 0.3,
+            costJustification: 'Team member time allocation',
+            costOptimizationPotential: 10,
+          },
+          {
+            costCategory: 'Data & Storage',
+            estimatedCost: retrainingDecision.estimatedCost * 0.1,
+            costJustification: 'Data storage and transfer costs',
+            costOptimizationPotential: 5,
+          },
+        ],
+        costOptimization: {
+          optimizationApplied: true,
+          optimizationMethods: ['Resource scheduling', 'Batch processing'],
+          costSavings: retrainingDecision.estimatedCost * 0.15,
+          performanceImpact: 'Minimal impact on training quality',
+        },
+        budgetApproval: {
+          approvalRequired: retrainingDecision.estimatedCost > 250000,
+          approvalStatus: 'pending',
+          approvers: retrainingDecision.stakeholderApproval,
+          approvalDeadline: moment().add(2, 'hours').toDate(),
+          conditions: ['Cost optimization review', 'Performance guarantee'],
+        },
+        indonesianCostFactors: true,
+      },
+    };
+  }
+
+  private getEmptyResourceAllocation(): AllocatedResources {
+    return {
+      computeResources: {
+        gpuInstances: 0,
+        cpuCores: 0,
+        memoryGB: 0,
+        storageGB: 0,
+        networkBandwidth: 0,
+        estimatedUsageDuration: 0,
+      },
+      humanResources: {
+        teamMembers: [],
+        totalHours: 0,
+        skillsRequired: [],
+        availability: 'N/A',
+        indonesianExpertiseRequired: false,
+      },
+      dataResources: {
+        trainingDataVolume: 0,
+        validationDataVolume: 0,
+        dataStorageRequired: 0,
+        dataTransferRequired: 0,
+        indonesianDataPrioritization: false,
+      },
+      timeAllocation: {
+        totalEstimatedTime: 0,
+        phases: [],
+        criticalPath: [],
+        bufferTime: 0,
+        deadlines: [],
+      },
+      costAllocation: {
+        totalEstimatedCost: 0,
+        costBreakdown: [],
+        costOptimization: {
+          optimizationApplied: false,
+          optimizationMethods: [],
+          costSavings: 0,
+          performanceImpact: 'No impact',
+        },
+        budgetApproval: {
+          approvalRequired: false,
+          approvalStatus: 'approved',
+          approvers: [],
+          approvalDeadline: new Date(),
+          conditions: [],
+        },
+        indonesianCostFactors: false,
+      },
+    };
+  }
+
+  private async scheduleRetraining(
+    retrainingDecision: RetrainingDecision,
+    resourceAllocation: AllocatedResources,
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<SchedulingResult> {
+    if (!retrainingDecision.retrainingRecommended) {
+      return {
+        scheduledStartTime: new Date(),
+        scheduledEndTime: new Date(),
+        schedulingStrategy: 'none',
+        resourceAvailability: {
+          computeResourcesAvailable: false,
+          humanResourcesAvailable: false,
+          dataResourcesAvailable: false,
+          conflictsIdentified: ['No retraining required'],
+          alternativeSchedules: [],
+        },
+        schedulingConstraints: [],
+        indonesianTimingFactors: [],
+      };
+    }
+    
+    // Calculate optimal start time based on urgency and constraints
+    let startTime = moment().tz('Asia/Jakarta');
+    
+    // Respect Indonesian business hours unless it's critical
+    if (retrainingDecision.retrainingUrgency !== 'critical') {
+      const currentHour = startTime.hour();
+      if (currentHour < 8 || currentHour > 17) {
+        // Schedule for next business day if outside business hours
+        startTime = startTime.hour(8).minute(0).second(0);
+        if (currentHour > 17) {
+          startTime.add(1, 'day');
+        }
+      }
+    }
+    
+    const endTime = moment(startTime).add(retrainingDecision.estimatedDuration, 'hours');
+    
+    return {
+      scheduledStartTime: startTime.toDate(),
+      scheduledEndTime: endTime.toDate(),
+      schedulingStrategy: retrainingDecision.retrainingUrgency === 'critical' ? 'immediate' : 'optimized',
+      resourceAvailability: {
+        computeResourcesAvailable: true,
+        humanResourcesAvailable: true,
+        dataResourcesAvailable: true,
+        conflictsIdentified: [],
+        alternativeSchedules: [
+          {
+            scheduleName: 'Off-peak hours',
+            startTime: moment().hour(22).minute(0).toDate(),
+            endTime: moment().hour(22).add(retrainingDecision.estimatedDuration, 'hours').toDate(),
+            tradeoffs: ['Lower cost', 'Minimal user impact'],
+            riskLevel: 'low',
+            recommendationReason: 'Cost optimization during off-peak hours',
+          },
+        ],
+      },
+      schedulingConstraints: [
+        'Indonesian business hours preference',
+        'Resource availability',
+        'Cost optimization',
+      ],
+      indonesianTimingFactors: [
+        'WIB timezone consideration',
+        'Business hours respect',
+        'Local holiday awareness',
+        'Cultural event consideration',
+      ],
+    };
+  }
+
+  private async sendNotifications(
+    retrainingDecision: RetrainingDecision,
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<NotificationResult[]> {
+    const notifications: NotificationResult[] = [];
+    
+    if (!request.notificationSettings.notificationEnabled) {
+      return notifications;
+    }
+    
+    // Send notifications based on decision
+    for (const channel of request.notificationSettings.notificationChannels) {
+      for (const recipient of channel.targetAudience) {
+        const notification: NotificationResult = {
+          notificationId: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          channelType: channel.channelType,
+          recipient,
+          status: 'sent', // Simulate successful send
+          sentTime: new Date(),
+          deliveredTime: new Date(),
+          responseReceived: false,
+          indonesianLanguageUsed: request.notificationSettings.indonesianLocalizationSettings.defaultLanguage === 'id',
+        };
+        notifications.push(notification);
+      }
+    }
+    
+    return notifications;
+  }
+
+  private async assessIndonesianFactorImpacts(
+    triggerEvaluations: TriggerEvaluationResult[],
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<IndonesianFactorImpacts> {
+    return {
+      economicIndicatorImpacts: [
+        {
+          indicatorName: 'IDR Exchange Rate',
+          impactMagnitude: 'medium',
+          impactDirection: 'negative',
+          triggerContribution: 15,
+          forecastedTrend: 'Volatile in short term',
+          businessImplication: 'May affect import costs and pricing models',
+        },
+      ],
+      culturalFactorImpacts: [
+        {
+          factorName: 'Ramadan Season',
+          impactTiming: 'March-April annually',
+          impactDuration: '30 days',
+          businessAreas: ['Food & Beverage', 'Retail', 'Transportation'],
+          adaptationRequired: true,
+          mitigationStrategies: ['Seasonal model variants', 'Cultural pattern integration'],
+        },
+      ],
+      seasonalFactorImpacts: [
+        {
+          factorName: 'Harvest Season',
+          seasonalIntensity: 0.7,
+          affectedPeriods: ['March-May'],
+          businessOpportunities: ['Agricultural product demand spike'],
+          riskFactors: ['Supply chain disruption'],
+          preparationRequired: true,
+        },
+      ],
+      regulatoryFactorImpacts: [
+        {
+          regulationType: 'Data Protection',
+          complianceRequirement: 'Indonesian Personal Data Protection Law',
+          implementationDeadline: moment().add(6, 'months').toDate(),
+          businessImpact: 'Model privacy and data handling adjustments required',
+          adaptationCost: 100000,
+          riskLevel: 'medium',
+        },
+      ],
+      competitiveFactorImpacts: [
+        {
+          competitorAction: 'New marketplace platform launch',
+          marketImpact: 'Potential market share redistribution',
+          responseUrgency: 'normal',
+          strategicImplications: ['Competitive pricing pressure', 'Feature differentiation need'],
+          responseOptions: ['Enhanced model accuracy', 'New feature development'],
+          resourceRequirements: ['Additional training data', 'Competitive analysis'],
+        },
+      ],
+      regionalFactorImpacts: [
+        {
+          regionName: 'Jakarta',
+          factorType: 'Urban density effects',
+          impactLevel: 'high',
+          affectedBusinessAreas: ['Logistics', 'Pricing', 'Demand patterns'],
+          localizationRequired: true,
+          resourceAllocationAdjustment: 25,
+        },
+      ],
+    };
+  }
+
+  private async scheduleNextEvaluation(
+    triggerEvaluations: TriggerEvaluationResult[],
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<NextEvaluationSchedule> {
+    // Adaptive frequency based on trigger activation
+    const activatedTriggers = triggerEvaluations.filter(t => t.triggerActivated);
+    let frequencyMultiplier = 1;
+    
+    if (activatedTriggers.length > 0) {
+      frequencyMultiplier = 0.5; // More frequent evaluation
+    }
+    
+    const baseFrequency = request.triggerConfiguration.evaluationFrequency.baseFrequency;
+    const adaptedFrequency = Math.max(baseFrequency * frequencyMultiplier, 5); // Minimum 5 minutes
+    
+    return {
+      nextEvaluationTime: moment().add(adaptedFrequency, 'minutes').toDate(),
+      evaluationFrequency: adaptedFrequency,
+      adaptiveFrequencyApplied: frequencyMultiplier < 1,
+      schedulingFactors: [
+        'Trigger activation status',
+        'Indonesian business hours',
+        'Resource availability',
+        'Cost optimization',
+      ],
+      indonesianTimingConsiderations: [
+        'Business hour preferences',
+        'Cultural event calendar',
+        'Regional time zone differences',
+      ],
+      specialEventConsiderations: [
+        'Ramadan period awareness',
+        'National holiday schedule',
+        'Harvest season timing',
+        'Government policy announcements',
+      ],
+    };
+  }
+
+  private async assessBusinessImpact(
+    retrainingDecision: RetrainingDecision,
+    request: AutomatedRetrainingTriggersRequest
+  ): Promise<BusinessImpactAssessment> {
+    return {
+      overallBusinessImpact: retrainingDecision.retrainingRecommended ? 'positive' : 'neutral',
+      impactMagnitude: retrainingDecision.retrainingUrgency as any,
+      affectedBusinessAreas: [
+        'Demand forecasting accuracy',
+        'Inventory optimization',
+        'Customer satisfaction',
+        'Operational efficiency',
+      ],
+      revenueImpact: retrainingDecision.expectedBenefit * 10000, // Convert to IDR
+      costImpact: retrainingDecision.estimatedCost,
+      operationalImpact: [
+        'Improved prediction accuracy',
+        'Better inventory management',
+        'Enhanced customer experience',
+        'Optimized resource utilization',
+      ],
+      strategicImplications: [
+        'Competitive advantage maintenance',
+        'Market adaptation capability',
+        'Technology leadership',
+        'Customer trust enhancement',
+      ],
+      indonesianMarketSpecificImpacts: [
+        'Local market responsiveness',
+        'Cultural sensitivity compliance',
+        'Regional customization improvement',
+        'Indonesian business practice alignment',
+      ],
+    };
+  }
+}

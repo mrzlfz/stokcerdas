@@ -7,6 +7,11 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
+import { Customer } from '../../customers/entities/customer.entity';
+import { OrderItem } from './order-item.entity';
+
+// Re-export OrderItem for backward compatibility
+export { OrderItem } from './order-item.entity';
 
 export enum OrderStatus {
   PENDING = 'pending',
@@ -48,6 +53,9 @@ export enum FulfillmentStatus {
 @Index(['tenantId', 'channelId'])
 @Index(['tenantId', 'status'])
 @Index(['tenantId', 'orderDate'])
+@Index(['tenantId', 'customerId'], {
+  where: 'customerId IS NOT NULL',
+})
 @Index(['tenantId', 'externalOrderId'], {
   where: 'externalOrderId IS NOT NULL',
 })
@@ -95,7 +103,11 @@ export class Order extends BaseEntity {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   orderDate: Date;
 
-  // Customer Information
+  // Customer Relationship
+  @Column({ type: 'uuid', nullable: true })
+  customerId?: string;
+
+  // Customer Information (legacy fields for backward compatibility)
   @Column({ type: 'varchar', length: 255 })
   customerName: string;
 
@@ -108,9 +120,12 @@ export class Order extends BaseEntity {
   @Column({ type: 'jsonb', nullable: true })
   customerInfo?: {
     id?: string;
+    customerId?: string; // Reference to Customer entity
+    customerNumber?: string;
     username?: string;
     loyaltyLevel?: string;
     notes?: string;
+    migrationDate?: string;
   };
 
   // Shipping Information
@@ -236,6 +251,13 @@ export class Order extends BaseEntity {
   @OneToMany(() => OrderStatusHistory, status => status.order)
   statusHistory?: OrderStatusHistory[];
 
+  @ManyToOne(() => Customer, customer => customer.orders, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'customerId' })
+  customer?: Customer;
+
   // Virtual fields
   get isActive(): boolean {
     return ![OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(this.status);
@@ -306,85 +328,6 @@ export class Order extends BaseEntity {
     if (!this.items) this.items = [];
     this.items.push(item as OrderItem);
     this.calculateTotals();
-  }
-}
-
-// Supporting entities
-@Entity('order_items')
-@Index(['tenantId', 'orderId'])
-@Index(['tenantId', 'productId'])
-export class OrderItem extends BaseEntity {
-  @Column({ type: 'uuid' })
-  orderId: string;
-
-  @Column({ type: 'uuid' })
-  productId: string;
-
-  @Column({ type: 'uuid', nullable: true })
-  variantId?: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  sku: string;
-
-  @Column({ type: 'varchar', length: 255 })
-  productName: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  variantName?: string;
-
-  @Column({ type: 'integer' })
-  quantity: number;
-
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  unitPrice: number;
-
-  @Column({ type: 'decimal', precision: 15, scale: 2 })
-  totalPrice: number;
-
-  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
-  discountAmount: number;
-
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
-  taxRate?: number;
-
-  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
-  taxAmount: number;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  image?: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  attributes?: Record<string, any>;
-
-  @Column({ type: 'text', nullable: true })
-  notes?: string;
-
-  // External platform specific data
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  externalItemId?: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  externalProductId?: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  externalVariantId?: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  externalData?: Record<string, any>;
-
-  @ManyToOne(() => Order, order => order.items, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'orderId' })
-  order: Order;
-
-  // Virtual fields
-  get finalPrice(): number {
-    return this.totalPrice - this.discountAmount + this.taxAmount;
-  }
-
-  // Methods
-  calculateTotals(): void {
-    this.totalPrice = this.unitPrice * this.quantity;
-    this.taxAmount = (this.totalPrice * (this.taxRate || 0)) / 100;
   }
 }
 

@@ -25,9 +25,11 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/entities/user.entity';
 
+import { BaseAnalyticsController } from './base-analytics.controller';
 import { BusinessIntelligenceService } from '../services/business-intelligence.service';
 import { CustomMetricsService } from '../services/custom-metrics.service';
 import { BenchmarkingService } from '../services/benchmarking.service';
+import { CustomerInsightsService } from '../services/customer-insights.service';
 
 import {
   RevenueAnalyticsQueryDto,
@@ -53,14 +55,15 @@ import {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Controller('analytics')
-export class AnalyticsController {
-  private readonly logger = new Logger(AnalyticsController.name);
-
+export class AnalyticsController extends BaseAnalyticsController {
   constructor(
     private readonly businessIntelligenceService: BusinessIntelligenceService,
     private readonly customMetricsService: CustomMetricsService,
     private readonly benchmarkingService: BenchmarkingService,
-  ) {}
+    private readonly customerInsightsService: CustomerInsightsService,
+  ) {
+    super();
+  }
 
   // Dashboard & Overview Endpoints
 
@@ -80,27 +83,42 @@ export class AnalyticsController {
     @CurrentUser() user: any,
     @Query() query: DashboardMetricsQueryDto,
   ): Promise<DashboardMetricsResponseDto> {
+    const startTime = Date.now();
+
     try {
-      this.logger.debug(
-        `Getting dashboard metrics for tenant ${user.tenantId}`,
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Dashboard Metrics Generation',
+        undefined,
+        {
+          granularity: query.granularity,
+          includeComparison: query.includeComparison,
+        },
       );
 
-      return await this.businessIntelligenceService.generateDashboardMetrics(
+      const result =
+        await this.businessIntelligenceService.generateDashboardMetrics(
+          user.tenantId,
+          query,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
         user.tenantId,
-        query,
+        'Dashboard Metrics Generation Completed',
+        executionTime,
       );
+
+      return result;
     } catch (error) {
-      this.logger.error(
-        `Failed to get dashboard metrics: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Dashboard Metrics Generation Failed',
+        executionTime,
       );
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+
+      this.handleServiceError(error, 'Generasi metrik dashboard');
     }
   }
 
@@ -122,27 +140,42 @@ export class AnalyticsController {
     @CurrentUser() user: any,
     @Query() query: RevenueAnalyticsQueryDto,
   ): Promise<RevenueAnalyticsResponseDto> {
+    const startTime = Date.now();
+
     try {
-      this.logger.debug(
-        `Generating revenue analytics for tenant ${user.tenantId}`,
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Revenue Analytics Generation',
+        undefined,
+        {
+          includeComparison: query.includeComparison,
+          includeTrends: query.includeTrends,
+        },
       );
 
-      return await this.businessIntelligenceService.generateRevenueAnalytics(
+      const result =
+        await this.businessIntelligenceService.generateRevenueAnalytics(
+          user.tenantId,
+          query,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
         user.tenantId,
-        query,
+        'Revenue Analytics Generation Completed',
+        executionTime,
       );
+
+      return result;
     } catch (error) {
-      this.logger.error(
-        `Failed to generate revenue analytics: ${error.message}`,
-        error.stack,
+      const executionTime = Date.now() - startTime;
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'Revenue Analytics Generation Failed',
+        executionTime,
       );
-      throw new HttpException(
-        {
-          success: false,
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+
+      this.handleServiceError(error, 'Generasi analitik pendapatan');
     }
   }
 
@@ -510,36 +543,29 @@ export class AnalyticsController {
     @CurrentUser() user: any,
     @Query() query: CustomerInsightsQueryDto,
   ): Promise<CustomerInsightsResponseDto> {
+    const startTime = Date.now();
+
     try {
-      // Note: This would require customer data integration
-      // For now, return mock structure
-      return {
-        data: [],
-        meta: {
-          total: 0,
-          page: 1,
-          limit: 50,
-          totalPages: 0,
-          generatedAt: new Date().toISOString(),
-          executionTime: 0,
-          parameters: query,
-          dataAsOf: new Date().toISOString(),
-        },
-        summary: {
-          totalCustomers: 0,
-          activeCustomers: 0,
-          newCustomers: 0,
-          returningCustomers: 0,
-          averageLTV: 0,
-          customerRetentionRate: 0,
-          churnRate: 0,
-          topSpendingSegment: '',
-          mostLoyalSegment: '',
-          averageOrderValue: 0,
-          averagePurchaseFrequency: 0,
-        },
-        trends: [],
-      };
+      this.logAnalyticsOperation(
+        user.tenantId,
+        'customer_insights',
+        undefined,
+        { query, userId: user.userId },
+      );
+
+      // Generate real customer insights using CustomerInsightsService
+      const insights =
+        await this.customerInsightsService.generateCustomerInsights(
+          user.tenantId,
+          query,
+        );
+
+      const executionTime = Date.now() - startTime;
+      this.logger.log(
+        `Customer insights generated successfully for tenant ${user.tenantId} in ${executionTime}ms`,
+      );
+
+      return insights;
     } catch (error) {
       this.logger.error(
         `Failed to generate customer insights: ${error.message}`,

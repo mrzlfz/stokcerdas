@@ -1,10 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddAllMissingColumns1751629333467 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Fix Products table missing columns
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Fix Products table missing columns
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add metadata column if missing
@@ -27,8 +26,8 @@ export class AddAllMissingColumns1751629333467 implements MigrationInterface {
             END $$;
         `);
 
-        // Fix other tables' is_deleted columns
-        await queryRunner.query(`
+    // Fix other tables' is_deleted columns
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add isDeleted to department table if missing
@@ -45,8 +44,8 @@ export class AddAllMissingColumns1751629333467 implements MigrationInterface {
             END $$;
         `);
 
-        // Fix automation tables if they exist
-        await queryRunner.query(`
+    // Fix automation tables if they exist
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add isDeleted to automation_schedule table if it exists and column missing
@@ -63,8 +62,8 @@ export class AddAllMissingColumns1751629333467 implements MigrationInterface {
             END $$;
         `);
 
-        // Fix notification table take parameter issue
-        await queryRunner.query(`
+    // Fix notification table take parameter issue
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Make sure notification table has proper structure if it exists
@@ -81,8 +80,8 @@ export class AddAllMissingColumns1751629333467 implements MigrationInterface {
             END $$;
         `);
 
-        // Add indexes for better performance
-        await queryRunner.query(`
+    // Add indexes for better performance
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add index on products.isDeleted if table exists
@@ -98,11 +97,11 @@ export class AddAllMissingColumns1751629333467 implements MigrationInterface {
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Remove added columns in reverse order
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove added columns in reverse order
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove indexes
@@ -148,6 +147,5 @@ export class AddAllMissingColumns1751629333467 implements MigrationInterface {
                 END IF;
             END $$;
         `);
-    }
-
+  }
 }

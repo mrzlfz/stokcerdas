@@ -1,0 +1,774 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Logger,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import {
+  AdaptiveSeasonalityService,
+  SeasonalityLearningRequest,
+  SeasonalityLearningResult,
+  DetectedSeasonalPattern,
+  LearnedSeasonalModel,
+  IndonesianSeasonalInsight,
+  SeasonalityStrength,
+  IndonesianBusinessEvent,
+  CustomSeasonalPeriod,
+  SeasonalityRecommendation,
+  AdaptiveSeasonalityConfig,
+} from '../services/adaptive-seasonality.service';
+import { TimeSeriesDataPoint } from '../services/data-pipeline.service';
+
+// DTOs for API documentation and validation
+export class SeasonalityLearningRequestDto implements SeasonalityLearningRequest {
+  jobId: string;
+  tenantId: string;
+  data: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: any[];
+    products?: any[];
+    orders?: any[];
+    external?: any[];
+  };
+  learningConfig: {
+    methods: ('fourier' | 'stl' | 'x13' | 'wavelet' | 'ensemble')[];
+    detectionSensitivity: 'low' | 'medium' | 'high' | 'adaptive';
+    minPeriodLength: number;
+    maxPeriodLength: number;
+    confidenceThreshold: number;
+    adaptiveUpdates: boolean;
+    indonesianContext: boolean;
+  };
+  businessContext: {
+    industry: string;
+    businessType: 'retail' | 'wholesale' | 'manufacturing' | 'service';
+    operatingDays: number[];
+    seasonalEvents: IndonesianBusinessEvent[];
+    customPeriods: CustomSeasonalPeriod[];
+  };
+  validationConfig: {
+    backtestPeriods: number;
+    validationMethod: 'holdout' | 'rolling' | 'expanding';
+    accuracyMetrics: ('mae' | 'rmse' | 'mape' | 'smape')[];
+    minimumAccuracy: number;
+  };
+}
+
+export class QuickSeasonalityAnalysisDto {
+  data: TimeSeriesDataPoint[];
+  businessType: 'retail' | 'wholesale' | 'manufacturing' | 'service';
+  industry?: string;
+  analysisDepth: 'basic' | 'standard' | 'comprehensive';
+  includeIndonesianContext?: boolean;
+}
+
+export class SeasonalityPresetDto {
+  name: string;
+  description: string;
+  businessType: string;
+  industry: string;
+  methods: string[];
+  expectedPatterns: string[];
+  useCase: string;
+  indonesianOptimizations: {
+    holidayAdjustments: boolean;
+    ramadanConsiderations: boolean;
+    regionalVariations: boolean;
+    culturalEvents: boolean;
+  };
+}
+
+export class IndonesianBusinessEventDto implements IndonesianBusinessEvent {
+  name: string;
+  type: 'national_holiday' | 'religious' | 'cultural' | 'business_cycle' | 'economic';
+  dates: string[];
+  impact: 'positive' | 'negative' | 'neutral';
+  magnitude: number;
+  duration: number;
+  leadTime: number;
+  lagTime: number;
+  region?: 'national' | 'java' | 'sumatra' | 'kalimantan' | 'sulawesi' | 'papua';
+  businessImpact: {
+    sales: number;
+    inventory: number;
+    demand: number;
+    supply: number;
+  };
+}
+
+export class PatternValidationDto {
+  patterns: DetectedSeasonalPattern[];
+  validationPeriod: { from: string; to: string };
+  metrics: ('accuracy' | 'stability' | 'robustness' | 'business_relevance')[];
+  includeBacktest?: boolean;
+}
+
+export class AdaptiveConfigDto {
+  updateFrequency: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+  adaptationRate: number;
+  minimumDataPoints: number;
+  indonesianAdaptations: {
+    holidayLearning: boolean;
+    economicIndicatorIntegration: boolean;
+    regionalAdaptation: boolean;
+    culturalEventTracking: boolean;
+  };
+}
+
+export class SeasonalityForecastDto {
+  patterns: DetectedSeasonalPattern[];
+  forecastHorizon: number;
+  includeConfidenceIntervals?: boolean;
+  indonesianBusinessContext?: boolean;
+}
+
+export class PatternComparisonDto {
+  beforeJobId: string;
+  afterJobId: string;
+  comparisonMetrics: string[];
+  includeBusinessImpact?: boolean;
+}
+
+@Controller('ml-forecasting/seasonality')
+@ApiTags('Adaptive Seasonality Learning')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+export class AdaptiveSeasonalityController {
+  private readonly logger = new Logger(AdaptiveSeasonalityController.name);
+
+  constructor(
+    private readonly seasonalityService: AdaptiveSeasonalityService,
+  ) {}
+
+  @Post('learn')
+  @ApiOperation({ 
+    summary: 'Learn Seasonal Patterns',
+    description: 'Comprehensive seasonality learning using machine learning techniques and Indonesian business context'
+  })
+  @ApiResponse({ status: 200, description: 'Seasonality learning completed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid learning request' })
+  @Permissions('ml_forecasting:seasonality:write')
+  @HttpCode(HttpStatus.OK)
+  async learnSeasonalPatterns(
+    @Body() request: SeasonalityLearningRequestDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ): Promise<SeasonalityLearningResult> {
+    try {
+      this.logger.log(`Starting seasonality learning for tenant ${tenantId}`);
+
+      // Set tenant context
+      request.tenantId = tenantId;
+      request.jobId = request.jobId || `seasonality_${Date.now()}_${tenantId}`;
+
+      // Enable Indonesian context by default
+      if (request.learningConfig.indonesianContext === undefined) {
+        request.learningConfig.indonesianContext = true;
+      }
+
+      const result = await this.seasonalityService.learnSeasonalPatterns(request);
+
+      this.logger.log(`Seasonality learning completed: ${result.detectedPatterns.length} patterns detected`);
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Seasonality learning failed: ${error.message}`, error.stack);
+      throw new BadRequestException(`Seasonality learning failed: ${error.message}`);
+    }
+  }
+
+  @Post('analyze-quick')
+  @ApiOperation({ 
+    summary: 'Quick Seasonality Analysis',
+    description: 'Fast seasonality analysis with predefined settings for common Indonesian business patterns'
+  })
+  @ApiResponse({ status: 200, description: 'Quick analysis completed' })
+  @Permissions('ml_forecasting:seasonality:read')
+  @HttpCode(HttpStatus.OK)
+  async quickSeasonalityAnalysis(
+    @Body() dto: QuickSeasonalityAnalysisDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    seasonalityStrength: SeasonalityStrength;
+    detectedPatterns: DetectedSeasonalPattern[];
+    indonesianInsights: IndonesianSeasonalInsight[];
+    recommendations: string[];
+  }> {
+    try {
+      // Create simplified request for quick analysis
+      const request: SeasonalityLearningRequest = {
+        jobId: `quick_analysis_${Date.now()}_${tenantId}`,
+        tenantId,
+        data: { sales: dto.data },
+        learningConfig: {
+          methods: dto.analysisDepth === 'basic' ? ['fourier'] : 
+                  dto.analysisDepth === 'standard' ? ['fourier', 'stl'] : 
+                  ['fourier', 'stl', 'wavelet', 'ensemble'],
+          detectionSensitivity: 'medium',
+          minPeriodLength: 7, // 1 week minimum
+          maxPeriodLength: 365, // 1 year maximum
+          confidenceThreshold: 0.6,
+          adaptiveUpdates: false,
+          indonesianContext: dto.includeIndonesianContext ?? true,
+        },
+        businessContext: {
+          industry: dto.industry || 'general',
+          businessType: dto.businessType,
+          operatingDays: [1, 2, 3, 4, 5, 6], // Monday to Saturday (typical Indonesian business)
+          seasonalEvents: await this.getDefaultIndonesianEvents(),
+          customPeriods: [],
+        },
+        validationConfig: {
+          backtestPeriods: 3,
+          validationMethod: 'holdout',
+          accuracyMetrics: ['mae', 'mape'],
+          minimumAccuracy: 0.7,
+        },
+      };
+
+      const result = await this.seasonalityService.learnSeasonalPatterns(request);
+
+      return {
+        seasonalityStrength: result.overallSeasonality,
+        detectedPatterns: result.detectedPatterns.slice(0, 5), // Top 5 patterns
+        indonesianInsights: result.indonesianPatterns,
+        recommendations: result.recommendations.map(r => r.description),
+      };
+
+    } catch (error) {
+      this.logger.error(`Quick seasonality analysis failed: ${error.message}`);
+      throw new BadRequestException(`Quick analysis failed: ${error.message}`);
+    }
+  }
+
+  @Get('presets')
+  @ApiOperation({ 
+    summary: 'Get Seasonality Learning Presets',
+    description: 'Retrieve predefined seasonality learning configurations for different Indonesian business types'
+  })
+  @ApiResponse({ status: 200, description: 'Seasonality presets retrieved successfully' })
+  @Permissions('ml_forecasting:seasonality:read')
+  async getSeasonalityPresets(): Promise<SeasonalityPresetDto[]> {
+    const presets: SeasonalityPresetDto[] = [
+      {
+        name: 'Indonesian Retail Business',
+        description: 'Comprehensive seasonality learning for Indonesian retail businesses with Ramadan, Eid, and holiday considerations',
+        businessType: 'retail',
+        industry: 'retail',
+        methods: ['fourier', 'stl', 'ensemble'],
+        expectedPatterns: ['Weekly shopping cycles', 'Monthly salary cycles', 'Ramadan effects', 'Holiday seasons', 'Back-to-school periods'],
+        useCase: 'Traditional and modern retail stores in Indonesia',
+        indonesianOptimizations: {
+          holidayAdjustments: true,
+          ramadanConsiderations: true,
+          regionalVariations: true,
+          culturalEvents: true,
+        },
+      },
+      {
+        name: 'Indonesian Food & Beverage',
+        description: 'Specialized seasonality learning for F&B businesses with Indonesian dining and cultural patterns',
+        businessType: 'retail',
+        industry: 'food_beverage',
+        methods: ['fourier', 'stl', 'wavelet'],
+        expectedPatterns: ['Daily meal patterns', 'Ramadan fasting effects', 'Weekend dining', 'Cultural celebrations', 'Weather influences'],
+        useCase: 'Restaurants, cafes, and food delivery businesses',
+        indonesianOptimizations: {
+          holidayAdjustments: true,
+          ramadanConsiderations: true,
+          regionalVariations: false,
+          culturalEvents: true,
+        },
+      },
+      {
+        name: 'Indonesian Fashion & Apparel',
+        description: 'Fashion-specific seasonality with Indonesian cultural events and seasonal clothing patterns',
+        businessType: 'retail',
+        industry: 'fashion',
+        methods: ['fourier', 'stl', 'x13'],
+        expectedPatterns: ['Eid fashion peaks', 'Seasonal collections', 'Back-to-school apparel', 'Wedding seasons', 'Holiday collections'],
+        useCase: 'Fashion retailers, clothing stores, and apparel e-commerce',
+        indonesianOptimizations: {
+          holidayAdjustments: true,
+          ramadanConsiderations: true,
+          regionalVariations: true,
+          culturalEvents: true,
+        },
+      },
+      {
+        name: 'Indonesian Manufacturing',
+        description: 'Manufacturing seasonality with Indonesian production cycles and supply chain patterns',
+        businessType: 'manufacturing',
+        industry: 'manufacturing',
+        methods: ['stl', 'x13', 'ensemble'],
+        expectedPatterns: ['Production cycles', 'Supplier patterns', 'Export seasons', 'Raw material availability', 'Economic cycles'],
+        useCase: 'Manufacturing companies and industrial suppliers',
+        indonesianOptimizations: {
+          holidayAdjustments: true,
+          ramadanConsiderations: false,
+          regionalVariations: true,
+          culturalEvents: false,
+        },
+      },
+      {
+        name: 'Indonesian FMCG & Consumer Goods',
+        description: 'Fast-moving consumer goods with Indonesian consumption patterns and market dynamics',
+        businessType: 'wholesale',
+        industry: 'fmcg',
+        methods: ['fourier', 'stl', 'wavelet', 'ensemble'],
+        expectedPatterns: ['Weekly consumption cycles', 'Salary-driven purchases', 'Seasonal demand shifts', 'Promotional effects', 'Economic sensitivity'],
+        useCase: 'FMCG distributors, wholesalers, and consumer goods companies',
+        indonesianOptimizations: {
+          holidayAdjustments: true,
+          ramadanConsiderations: true,
+          regionalVariations: true,
+          culturalEvents: true,
+        },
+      },
+      {
+        name: 'Indonesian E-commerce Marketplace',
+        description: 'E-commerce specific patterns with Indonesian online shopping behaviors and platform events',
+        businessType: 'retail',
+        industry: 'ecommerce',
+        methods: ['fourier', 'stl', 'ensemble'],
+        expectedPatterns: ['Platform sale events', 'Payday shopping', 'Mobile commerce peaks', 'Flash sale patterns', 'Logistics constraints'],
+        useCase: 'E-commerce sellers and marketplace participants',
+        indonesianOptimizations: {
+          holidayAdjustments: true,
+          ramadanConsiderations: true,
+          regionalVariations: true,
+          culturalEvents: true,
+        },
+      },
+    ];
+
+    return presets;
+  }
+
+  @Post('apply-preset')
+  @ApiOperation({ 
+    summary: 'Apply Seasonality Learning Preset',
+    description: 'Apply a predefined seasonality learning configuration with customizations'
+  })
+  @ApiResponse({ status: 200, description: 'Preset applied successfully' })
+  @Permissions('ml_forecasting:seasonality:write')
+  @HttpCode(HttpStatus.OK)
+  async applySeasonalityPreset(
+    @Body() body: { 
+      presetName: string; 
+      data: TimeSeriesDataPoint[];
+      customizations?: Partial<SeasonalityLearningRequest>;
+    },
+    @CurrentTenant() tenantId: string,
+  ): Promise<SeasonalityLearningResult> {
+    try {
+      const presets = await this.getSeasonalityPresets();
+      const preset = presets.find(p => p.name === body.presetName);
+
+      if (!preset) {
+        throw new BadRequestException(`Preset '${body.presetName}' not found`);
+      }
+
+      const request: SeasonalityLearningRequest = {
+        jobId: `preset_${preset.name.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}_${tenantId}`,
+        tenantId,
+        data: { sales: body.data },
+        learningConfig: {
+          methods: preset.methods as any,
+          detectionSensitivity: 'medium',
+          minPeriodLength: 7,
+          maxPeriodLength: 365,
+          confidenceThreshold: 0.6,
+          adaptiveUpdates: true,
+          indonesianContext: true,
+        },
+        businessContext: {
+          industry: preset.industry,
+          businessType: preset.businessType as any,
+          operatingDays: [1, 2, 3, 4, 5, 6],
+          seasonalEvents: await this.getDefaultIndonesianEvents(),
+          customPeriods: [],
+        },
+        validationConfig: {
+          backtestPeriods: 5,
+          validationMethod: 'rolling',
+          accuracyMetrics: ['mae', 'mape', 'smape'],
+          minimumAccuracy: 0.75,
+        },
+        ...body.customizations,
+      };
+
+      return await this.seasonalityService.learnSeasonalPatterns(request);
+
+    } catch (error) {
+      this.logger.error(`Failed to apply preset: ${error.message}`);
+      throw new BadRequestException(`Failed to apply preset: ${error.message}`);
+    }
+  }
+
+  @Get('patterns/:jobId')
+  @ApiOperation({ 
+    summary: 'Get Detected Seasonal Patterns',
+    description: 'Retrieve detailed information about detected seasonal patterns from a learning job'
+  })
+  @ApiResponse({ status: 200, description: 'Patterns retrieved successfully' })
+  @Permissions('ml_forecasting:seasonality:read')
+  async getDetectedPatterns(
+    @Param('jobId') jobId: string,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    patterns: DetectedSeasonalPattern[];
+    summary: any;
+    indonesianInsights: IndonesianSeasonalInsight[];
+  }> {
+    try {
+      // This would retrieve from cache or database
+      const cacheKey = `seasonality:${tenantId}:${jobId}`;
+      // Implementation would get from cache/database
+      
+      return {
+        patterns: [],
+        summary: {},
+        indonesianInsights: [],
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to retrieve patterns: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve patterns: ${error.message}`);
+    }
+  }
+
+  @Post('validate-patterns')
+  @ApiOperation({ 
+    summary: 'Validate Seasonal Patterns',
+    description: 'Validate detected seasonal patterns against new data or different time periods'
+  })
+  @ApiResponse({ status: 200, description: 'Pattern validation completed' })
+  @Permissions('ml_forecasting:seasonality:read')
+  @HttpCode(HttpStatus.OK)
+  async validatePatterns(
+    @Body() dto: PatternValidationDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    validation: any;
+    patternAccuracy: Record<string, number>;
+    recommendations: string[];
+    indonesianValidation: any;
+  }> {
+    try {
+      // Pattern validation implementation would go here
+      return {
+        validation: {},
+        patternAccuracy: {},
+        recommendations: [],
+        indonesianValidation: {},
+      };
+
+    } catch (error) {
+      this.logger.error(`Pattern validation failed: ${error.message}`);
+      throw new BadRequestException(`Pattern validation failed: ${error.message}`);
+    }
+  }
+
+  @Get('indonesian-events')
+  @ApiOperation({ 
+    summary: 'Get Indonesian Business Events',
+    description: 'Retrieve comprehensive list of Indonesian business events affecting seasonality'
+  })
+  @ApiResponse({ status: 200, description: 'Indonesian events retrieved successfully' })
+  @Permissions('ml_forecasting:seasonality:read')
+  async getIndonesianBusinessEvents(
+    @Query('year') year?: number,
+    @Query('region') region?: string,
+  ): Promise<{
+    events: IndonesianBusinessEvent[];
+    categories: string[];
+    regionalVariations: Record<string, any>;
+  }> {
+    try {
+      const events = await this.getDefaultIndonesianEvents();
+      
+      return {
+        events: events,
+        categories: ['national_holiday', 'religious', 'cultural', 'business_cycle', 'economic'],
+        regionalVariations: {
+          java: { economicWeight: 0.6, culturalInfluence: 0.8 },
+          sumatra: { economicWeight: 0.2, culturalInfluence: 0.7 },
+          kalimantan: { economicWeight: 0.1, culturalInfluence: 0.6 },
+          sulawesi: { economicWeight: 0.05, culturalInfluence: 0.7 },
+          papua: { economicWeight: 0.02, culturalInfluence: 0.9 },
+        },
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to retrieve Indonesian events: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve Indonesian events: ${error.message}`);
+    }
+  }
+
+  @Post('adaptive-config')
+  @ApiOperation({ 
+    summary: 'Configure Adaptive Learning',
+    description: 'Setup or update adaptive seasonality learning configuration'
+  })
+  @ApiResponse({ status: 200, description: 'Adaptive configuration updated' })
+  @Permissions('ml_forecasting:seasonality:write')
+  @HttpCode(HttpStatus.OK)
+  async configureAdaptiveLearning(
+    @Body() dto: AdaptiveConfigDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    configId: string;
+    status: string;
+    nextUpdate: string;
+    indonesianOptimizations: any;
+  }> {
+    try {
+      // Adaptive configuration implementation would go here
+      return {
+        configId: `adaptive_${tenantId}_${Date.now()}`,
+        status: 'configured',
+        nextUpdate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        indonesianOptimizations: dto.indonesianAdaptations,
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to configure adaptive learning: ${error.message}`);
+      throw new BadRequestException(`Failed to configure adaptive learning: ${error.message}`);
+    }
+  }
+
+  @Post('forecast-seasonal')
+  @ApiOperation({ 
+    summary: 'Generate Seasonal Forecast',
+    description: 'Generate forecasts based on learned seasonal patterns'
+  })
+  @ApiResponse({ status: 200, description: 'Seasonal forecast generated' })
+  @Permissions('ml_forecasting:seasonality:read')
+  @HttpCode(HttpStatus.OK)
+  async generateSeasonalForecast(
+    @Body() dto: SeasonalityForecastDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    forecast: any[];
+    seasonalComponents: any[];
+    confidence: any;
+    indonesianAdjustments: any;
+  }> {
+    try {
+      // Seasonal forecasting implementation would go here
+      return {
+        forecast: [],
+        seasonalComponents: [],
+        confidence: {},
+        indonesianAdjustments: {},
+      };
+
+    } catch (error) {
+      this.logger.error(`Seasonal forecast generation failed: ${error.message}`);
+      throw new BadRequestException(`Seasonal forecast generation failed: ${error.message}`);
+    }
+  }
+
+  @Post('compare-patterns')
+  @ApiOperation({ 
+    summary: 'Compare Seasonal Patterns',
+    description: 'Compare seasonal patterns between different time periods or learning jobs'
+  })
+  @ApiResponse({ status: 200, description: 'Pattern comparison completed' })
+  @Permissions('ml_forecasting:seasonality:read')
+  @HttpCode(HttpStatus.OK)
+  async comparePatterns(
+    @Body() dto: PatternComparisonDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    comparison: any;
+    changes: any[];
+    insights: string[];
+    indonesianImpact: any;
+  }> {
+    try {
+      // Pattern comparison implementation would go here
+      return {
+        comparison: {},
+        changes: [],
+        insights: [],
+        indonesianImpact: {},
+      };
+
+    } catch (error) {
+      this.logger.error(`Pattern comparison failed: ${error.message}`);
+      throw new BadRequestException(`Pattern comparison failed: ${error.message}`);
+    }
+  }
+
+  @Get('health-check')
+  @ApiOperation({ 
+    summary: 'Seasonality Learning Health Check',
+    description: 'Check the health and performance of seasonality learning systems'
+  })
+  @ApiResponse({ status: 200, description: 'Health check completed' })
+  @Permissions('ml_forecasting:seasonality:read')
+  async seasonalityHealthCheck(
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    status: 'healthy' | 'warning' | 'critical';
+    models: any;
+    patterns: any;
+    indonesianOptimizations: any;
+    recommendations: string[];
+  }> {
+    try {
+      // Health check implementation would go here
+      return {
+        status: 'healthy',
+        models: {},
+        patterns: {},
+        indonesianOptimizations: {},
+        recommendations: [],
+      };
+
+    } catch (error) {
+      this.logger.error(`Seasonality health check failed: ${error.message}`);
+      throw new BadRequestException(`Seasonality health check failed: ${error.message}`);
+    }
+  }
+
+  @Get('insights/indonesian')
+  @ApiOperation({ 
+    summary: 'Get Indonesian Business Insights',
+    description: 'Detailed insights about Indonesian business seasonality patterns and cultural impacts'
+  })
+  @ApiResponse({ status: 200, description: 'Indonesian insights retrieved successfully' })
+  @Permissions('ml_forecasting:seasonality:read')
+  async getIndonesianSeasonalInsights(
+    @Query('category') category?: string,
+    @Query('region') region?: string,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    insights: IndonesianSeasonalInsight[];
+    culturalPatterns: any[];
+    economicFactors: any[];
+    recommendations: string[];
+  }> {
+    try {
+      // Indonesian insights implementation would go here
+      return {
+        insights: [],
+        culturalPatterns: [],
+        economicFactors: [],
+        recommendations: [],
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to retrieve Indonesian insights: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve Indonesian insights: ${error.message}`);
+    }
+  }
+
+  // Helper method to get default Indonesian business events
+  private async getDefaultIndonesianEvents(): Promise<IndonesianBusinessEvent[]> {
+    return [
+      {
+        name: 'Eid al-Fitr (Lebaran)',
+        type: 'religious',
+        dates: ['2024-04-10', '2024-04-11'], // These would be calculated dynamically
+        impact: 'positive',
+        magnitude: 0.8,
+        duration: 7,
+        leadTime: 30,
+        lagTime: 7,
+        region: 'national',
+        businessImpact: {
+          sales: 1.5,
+          inventory: 1.3,
+          demand: 1.6,
+          supply: 0.8,
+        },
+      },
+      {
+        name: 'Independence Day',
+        type: 'national_holiday',
+        dates: ['2024-08-17'],
+        impact: 'positive',
+        magnitude: 0.6,
+        duration: 3,
+        leadTime: 14,
+        lagTime: 2,
+        region: 'national',
+        businessImpact: {
+          sales: 1.2,
+          inventory: 1.1,
+          demand: 1.3,
+          supply: 0.9,
+        },
+      },
+      {
+        name: 'Ramadan Period',
+        type: 'religious',
+        dates: ['2024-03-11'], // Start date, duration handled separately
+        impact: 'negative',
+        magnitude: 0.7,
+        duration: 30,
+        leadTime: 7,
+        lagTime: 3,
+        region: 'national',
+        businessImpact: {
+          sales: 0.7, // Daytime
+          inventory: 1.2,
+          demand: 1.4, // Evening/night
+          supply: 0.8,
+        },
+      },
+      {
+        name: 'Back to School Period',
+        type: 'business_cycle',
+        dates: ['2024-07-15'], // Start of new school year
+        impact: 'positive',
+        magnitude: 0.5,
+        duration: 21,
+        leadTime: 21,
+        lagTime: 7,
+        region: 'national',
+        businessImpact: {
+          sales: 1.3,
+          inventory: 1.2,
+          demand: 1.4,
+          supply: 1.1,
+        },
+      },
+      {
+        name: 'Chinese New Year',
+        type: 'cultural',
+        dates: ['2024-02-10'],
+        impact: 'positive',
+        magnitude: 0.4,
+        duration: 5,
+        leadTime: 14,
+        lagTime: 3,
+        region: 'national',
+        businessImpact: {
+          sales: 1.1,
+          inventory: 1.05,
+          demand: 1.2,
+          supply: 0.9,
+        },
+      },
+    ];
+  }
+}

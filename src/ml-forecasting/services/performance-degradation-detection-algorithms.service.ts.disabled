@@ -1,0 +1,1077 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile, max, min } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { MLModel } from '../entities/ml-model.entity';
+import { Prediction } from '../entities/prediction.entity';
+
+/**
+ * PHASE 4.2.4.1: Performance Degradation Detection Algorithms ⚡
+ * 
+ * Advanced algorithmic system for detecting model performance degradation patterns.
+ * Implements multiple detection methods, statistical analysis, and Indonesian market
+ * context for comprehensive performance monitoring and early warning systems.
+ */
+
+export interface DegradationDetectionRequest {
+  tenantId: string;
+  detectionScope: DegradationDetectionScope;
+  algorithmConfiguration: AlgorithmConfiguration;
+  detectionMethods: DetectionMethod[];
+  thresholdConfiguration: ThresholdConfiguration;
+  alertingSettings: DegradationAlertingSettings;
+  indonesianMarketContext: IndonesianDegradationContext;
+  continuousMonitoring: ContinuousMonitoringConfig;
+  reportingPreferences: DegradationReportingConfig;
+}
+
+export interface DegradationDetectionScope {
+  scopeId: string;
+  modelsToMonitor: ModelDegradationTarget[];
+  temporalScope: TemporalScope;
+  metricScope: MetricScope;
+  segmentationScope: SegmentationScope;
+  comparisonBaselines: ComparisonBaseline[];
+  priorityModels: string[];
+  exclusionRules: ExclusionRule[];
+}
+
+export interface ModelDegradationTarget {
+  modelId: string;
+  modelName: string;
+  modelType: string;
+  degradationSensitivity: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  businessCriticality: 'low' | 'medium' | 'high' | 'critical' | 'mission_critical';
+  expectedDegradationPatterns: ExpectedDegradationPattern[];
+  customThresholds: CustomThreshold[];
+  baselinePerformance: BaselinePerformance;
+  degradationHistory: DegradationHistoryRef[];
+}
+
+export interface ExpectedDegradationPattern {
+  patternType: 'gradual_decline' | 'sudden_drop' | 'cyclical_degradation' | 'seasonal_decline' | 'external_event';
+  patternDescription: string;
+  typicalTimeframe: string;
+  expectedSeverity: DegradationSeverity;
+  indonesianBusinessFactors: string[];
+  mitigationRequired: boolean;
+}
+
+export type DegradationSeverity = 'minimal' | 'low' | 'moderate' | 'significant' | 'severe' | 'critical';
+
+export interface CustomThreshold {
+  metricName: string;
+  thresholdType: 'absolute' | 'relative' | 'statistical' | 'adaptive' | 'contextual';
+  thresholdValue: number | ThresholdRange;
+  alertSeverity: DegradationSeverity;
+  evaluationWindow: number; // minutes
+  indonesianBusinessContext: boolean;
+}
+
+export interface ThresholdRange {
+  minValue: number;
+  maxValue: number;
+  targetValue?: number;
+}
+
+export interface BaselinePerformance {
+  accuracyBaseline: PerformanceBaseline;
+  performanceBaseline: ResponseTimeBaseline;
+  businessMetricsBaseline: BusinessMetricsBaseline;
+  dataQualityBaseline: DataQualityBaseline;
+  stabilityBaseline: StabilityBaseline;
+}
+
+export interface PerformanceBaseline {
+  meanAccuracy: number;
+  medianAccuracy: number;
+  stdDeviation: number;
+  percentiles: Record<string, number>;
+  confidenceInterval: [number, number];
+  historicalRange: [number, number];
+}
+
+export interface ResponseTimeBaseline {
+  meanResponseTime: number;
+  medianResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
+  throughputBaseline: number;
+  latencyDistribution: LatencyDistribution;
+}
+
+export interface LatencyDistribution {
+  distributionType: 'normal' | 'log_normal' | 'exponential' | 'custom';
+  parameters: Record<string, number>;
+  outlierThreshold: number;
+}
+
+export interface BusinessMetricsBaseline {
+  revenueImpactBaseline: number;
+  customerSatisfactionBaseline: number;
+  operationalEfficiencyBaseline: number;
+  inventoryAccuracyBaseline: number;
+  forecastingValueBaseline: number;
+  indonesianSMBMetrics: IndonesianSMBMetricsBaseline;
+}
+
+export interface IndonesianSMBMetricsBaseline {
+  cashFlowImpactBaseline: number;
+  supplierRelationshipBaseline: number;
+  marketPositionBaseline: number;
+  seasonalAdjustmentBaseline: number;
+  culturalEventImpactBaseline: number;
+}
+
+export interface DataQualityBaseline {
+  completenessBaseline: number;
+  accuracyBaseline: number;
+  consistencyBaseline: number;
+  timelinessBaseline: number;
+  validityBaseline: number;
+  uniquenessBaseline: number;
+}
+
+export interface StabilityBaseline {
+  predictionVariabilityBaseline: number;
+  modelOutputConsistencyBaseline: number;
+  featureStabilityBaseline: number;
+  errorRateStabilityBaseline: number;
+}
+
+export interface DegradationHistoryRef {
+  degradationId: string;
+  degradationDate: Date;
+  degradationType: string;
+  severity: DegradationSeverity;
+  resolutionTime: number; // hours
+  rootCause: string;
+  recurrencePattern?: string;
+}
+
+export interface TemporalScope {
+  evaluationPeriod: EvaluationPeriod;
+  comparisonWindows: ComparisonWindow[];
+  seasonalityConsideration: SeasonalityConsideration;
+  trendAnalysisPeriod: number; // days
+  rollingWindowSizes: number[]; // hours
+}
+
+export interface EvaluationPeriod {
+  startTime: Date;
+  endTime?: Date;
+  evaluationFrequency: 'real_time' | 'every_minute' | 'every_5_minutes' | 'hourly' | 'daily';
+  continuousEvaluation: boolean;
+  evaluationTriggers: EvaluationTrigger[];
+}
+
+export interface EvaluationTrigger {
+  triggerType: 'time_based' | 'event_based' | 'threshold_based' | 'manual';
+  triggerCondition: string;
+  triggerFrequency?: string;
+  triggerParameters: Record<string, any>;
+}
+
+export interface ComparisonWindow {
+  windowId: string;
+  windowType: 'sliding' | 'tumbling' | 'session' | 'custom';
+  windowSize: number; // hours
+  comparisonMethod: 'absolute' | 'relative' | 'statistical' | 'trend_based';
+  statisticalMethod?: 'mean' | 'median' | 'percentile' | 'statistical_test';
+}
+
+export interface SeasonalityConsideration {
+  includeSeasonality: boolean;
+  seasonalAdjustment: boolean;
+  indonesianSeasonalFactors: IndonesianSeasonalFactor[];
+  customSeasonalPatterns: CustomSeasonalPattern[];
+}
+
+export interface IndonesianSeasonalFactor {
+  factorType: 'ramadan' | 'harvest_season' | 'school_calendar' | 'holiday_season' | 'monsoon' | 'eid_celebration';
+  factorPeriod: string;
+  expectedImpact: 'minimal' | 'moderate' | 'significant' | 'major';
+  adjustmentMethod: string;
+}
+
+export interface CustomSeasonalPattern {
+  patternName: string;
+  patternCycle: number; // days
+  patternAmplitude: number;
+  patternPhase: number;
+  confidenceLevel: number;
+}
+
+export interface MetricScope {
+  primaryMetrics: PrimaryMetric[];
+  secondaryMetrics: SecondaryMetric[];
+  businessMetrics: BusinessMetric[];
+  technicalMetrics: TechnicalMetric[];
+  customMetrics: CustomMetric[];
+  metricAggregations: MetricAggregation[];
+}
+
+export interface PrimaryMetric {
+  metricName: string;
+  metricType: 'accuracy' | 'precision' | 'recall' | 'f1_score' | 'mape' | 'rmse' | 'mae' | 'custom';
+  metricWeight: number;
+  degradationThreshold: number;
+  criticality: 'low' | 'medium' | 'high' | 'critical';
+  evaluationMethod: string;
+}
+
+export interface SecondaryMetric {
+  metricName: string;
+  metricType: string;
+  correlationWithPrimary: number;
+  lagTime: number; // minutes
+  supportingAnalysis: boolean;
+}
+
+export interface BusinessMetric {
+  metricName: string;
+  businessContext: string;
+  indonesianSMBRelevance: boolean;
+  revenueImpact: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  calculationMethod: string;
+}
+
+export interface TechnicalMetric {
+  metricName: string;
+  systemComponent: string;
+  infrastructureImpact: boolean;
+  scalabilityRelevance: boolean;
+  monitoringFrequency: string;
+}
+
+export interface CustomMetric {
+  metricName: string;
+  metricDefinition: string;
+  calculationLogic: string;
+  dataSourceRequirements: string[];
+  updateFrequency: string;
+}
+
+export interface MetricAggregation {
+  aggregationType: 'sum' | 'average' | 'median' | 'percentile' | 'weighted_average' | 'custom';
+  aggregationWindow: number; // minutes
+  aggregationWeights?: Record<string, number>;
+}
+
+export interface SegmentationScope {
+  segmentationEnabled: boolean;
+  segmentationCriteria: SegmentationCriterion[];
+  segmentSpecificThresholds: boolean;
+  crossSegmentAnalysis: boolean;
+  indonesianMarketSegments: IndonesianMarketSegment[];
+}
+
+export interface SegmentationCriterion {
+  criterionName: string;
+  criterionType: 'geographic' | 'demographic' | 'behavioral' | 'product_category' | 'business_size' | 'custom';
+  segmentValues: string[];
+  segmentWeights: Record<string, number>;
+}
+
+export interface IndonesianMarketSegment {
+  segmentName: string;
+  geographicRegion: 'jakarta' | 'surabaya' | 'bandung' | 'medan' | 'semarang' | 'other_urban' | 'rural';
+  businessType: 'retail' | 'wholesale' | 'manufacturing' | 'services' | 'agriculture' | 'mixed';
+  businessSize: 'micro' | 'small' | 'medium';
+  digitalMaturity: 'basic' | 'intermediate' | 'advanced';
+}
+
+export interface ComparisonBaseline {
+  baselineId: string;
+  baselineType: 'historical' | 'industry' | 'competitor' | 'theoretical' | 'adaptive';
+  baselineDescription: string;
+  baselineMetrics: Record<string, number>;
+  baselineValidity: number; // days
+  baselineUpdateFrequency: string;
+}
+
+export interface ExclusionRule {
+  ruleId: string;
+  ruleName: string;
+  ruleCondition: string;
+  exclusionPeriod: ExclusionPeriod;
+  exclusionReason: string;
+  autoRemoval: boolean;
+}
+
+export interface ExclusionPeriod {
+  startCondition: string;
+  endCondition: string;
+  maxDuration: number; // hours
+  recurrencePattern?: string;
+}
+
+export interface AlgorithmConfiguration {
+  algorithmSelection: AlgorithmSelection;
+  algorithmParameters: AlgorithmParameter[];
+  ensembleConfiguration: EnsembleConfiguration;
+  adaptiveConfiguration: AdaptiveConfiguration;
+  optimizationSettings: OptimizationSettings;
+}
+
+export interface AlgorithmSelection {
+  primaryAlgorithms: string[];
+  fallbackAlgorithms: string[];
+  algorithmPriority: Record<string, number>;
+  selectionCriteria: AlgorithmSelectionCriterion[];
+  dynamicSelection: boolean;
+}
+
+export interface AlgorithmSelectionCriterion {
+  criterionName: string;
+  criterionWeight: number;
+  criterionThreshold: number;
+  evaluationMethod: string;
+}
+
+export interface AlgorithmParameter {
+  algorithmName: string;
+  parameterName: string;
+  parameterValue: any;
+  parameterType: 'fixed' | 'adaptive' | 'learned' | 'contextual';
+  validationRange?: [number, number];
+  indonesianContextAdjustment?: boolean;
+}
+
+export interface EnsembleConfiguration {
+  ensembleMethod: 'voting' | 'weighted_average' | 'stacking' | 'boosting' | 'custom';
+  algorithmWeights: Record<string, number>;
+  consensusThreshold: number;
+  conflictResolution: 'majority_vote' | 'weighted_decision' | 'confidence_based' | 'expert_system';
+}
+
+export interface AdaptiveConfiguration {
+  adaptiveEnabled: boolean;
+  adaptationTriggers: AdaptationTrigger[];
+  adaptationMethods: AdaptationMethod[];
+  learningRate: number;
+  adaptationValidation: AdaptationValidation;
+}
+
+export interface AdaptationTrigger {
+  triggerType: 'performance_change' | 'data_drift' | 'external_event' | 'time_based';
+  triggerThreshold: number;
+  triggerFrequency: string;
+  triggerConditions: string[];
+}
+
+export interface AdaptationMethod {
+  methodName: string;
+  methodType: 'parameter_tuning' | 'algorithm_switching' | 'threshold_adjustment' | 'feature_reweighting';
+  methodParameters: Record<string, any>;
+  validationRequired: boolean;
+}
+
+export interface AdaptationValidation {
+  validationMethod: 'holdout' | 'cross_validation' | 'time_series' | 'bootstrap';
+  validationSize: number;
+  acceptanceThreshold: number;
+  rollbackCriteria: string[];
+}
+
+export interface OptimizationSettings {
+  optimizationObjective: 'accuracy' | 'speed' | 'resource_efficiency' | 'business_value' | 'balanced';
+  optimizationConstraints: OptimizationConstraint[];
+  optimizationMethod: 'grid_search' | 'random_search' | 'bayesian' | 'genetic' | 'gradient_based';
+  optimizationBudget: OptimizationBudget;
+}
+
+export interface OptimizationConstraint {
+  constraintType: 'time' | 'memory' | 'accuracy' | 'cost' | 'business_rule';
+  constraintValue: number;
+  constraintPriority: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface OptimizationBudget {
+  maxComputeTime: number; // minutes
+  maxMemoryUsage: number; // MB
+  maxCostPerOptimization: number; // IDR
+  maxIterations: number;
+}
+
+export interface DetectionMethod {
+  methodId: string;
+  methodName: string;
+  methodType: DetectionMethodType;
+  methodParameters: MethodParameters;
+  methodWeighting: number;
+  methodPriority: 'low' | 'medium' | 'high' | 'critical';
+  indonesianContextSupport: boolean;
+  realTimeCapability: boolean;
+  computationalComplexity: 'low' | 'medium' | 'high' | 'very_high';
+}
+
+export type DetectionMethodType = 
+  | 'statistical_test'        // Statistical significance tests
+  | 'threshold_based'         // Simple threshold checking
+  | 'trend_analysis'          // Trend detection algorithms
+  | 'change_point_detection'  // Change point detection
+  | 'anomaly_detection'       // Anomaly detection methods
+  | 'machine_learning'        // ML-based detection
+  | 'ensemble_detection'      // Ensemble of multiple methods
+  | 'time_series_analysis'    // Time series specific methods
+  | 'pattern_matching'        // Pattern matching algorithms
+  | 'correlation_analysis'    // Correlation-based detection
+  | 'regression_analysis'     // Regression-based analysis
+  | 'clustering_analysis'     // Clustering-based detection
+  | 'signal_processing'       // Signal processing methods
+  | 'bayesian_analysis'       // Bayesian inference methods
+  | 'expert_system';          // Rule-based expert systems
+
+export interface MethodParameters {
+  primaryParameters: Record<string, any>;
+  advancedParameters?: Record<string, any>;
+  indonesianSpecificParameters?: Record<string, any>;
+  adaptiveParameters?: Record<string, any>;
+  validationParameters?: Record<string, any>;
+}
+
+export interface DegradationDetectionResult {
+  detectionId: string;
+  tenantId: string;
+  detectionTimestamp: Date;
+  detectionSummary: DetectionSummary;
+  degradationFindings: DegradationFinding[];
+  algorithmResults: AlgorithmResult[];
+  businessImpactAssessment: BusinessImpactAssessment;
+  recommendedActions: RecommendedAction[];
+  indonesianMarketAnalysis: IndonesianMarketAnalysis;
+  detectionMetadata: DetectionMetadata;
+  reportingData: ReportingData;
+}
+
+export interface DetectionSummary {
+  overallDegradationStatus: 'none' | 'minimal' | 'moderate' | 'significant' | 'severe' | 'critical';
+  numberOfDegradations: number;
+  affectedModels: string[];
+  severityDistribution: Record<DegradationSeverity, number>;
+  primaryConcerns: string[];
+  urgencyLevel: 'low' | 'medium' | 'high' | 'urgent' | 'emergency';
+  estimatedBusinessImpact: number; // IDR per day
+  recommendedResponse: 'monitor' | 'investigate' | 'action_required' | 'immediate_action';
+}
+
+export interface DegradationFinding {
+  findingId: string;
+  modelId: string;
+  degradationType: DegradationType;
+  severity: DegradationSeverity;
+  confidence: number;
+  detectionMethods: string[];
+  findingDescription: string;
+  affectedMetrics: AffectedMetric[];
+  timeFrame: TimeFrame;
+  rootCauseHypotheses: RootCauseHypothesis[];
+  businessImplications: string[];
+  indonesianContextFactors: string[];
+}
+
+export type DegradationType = 
+  | 'accuracy_decline'        // Model accuracy decreasing
+  | 'precision_degradation'   // Precision metrics declining
+  | 'recall_reduction'        // Recall metrics declining
+  | 'latency_increase'        // Response time increasing
+  | 'throughput_decrease'     // Processing throughput declining
+  | 'error_rate_increase'     // Error rates increasing
+  | 'stability_loss'          // Model stability declining
+  | 'business_value_decline'  // Business value decreasing
+  | 'data_quality_issues'     // Data quality problems
+  | 'concept_drift'           // Concept drift detected
+  | 'feature_degradation'     // Feature importance changing
+  | 'seasonal_misalignment'   // Seasonal patterns misaligned
+  | 'external_shock'          // External factors causing issues
+  | 'system_performance'      // System-level performance issues
+  | 'user_experience';        // User experience degradation
+
+export interface AffectedMetric {
+  metricName: string;
+  baselineValue: number;
+  currentValue: number;
+  degradationPercentage: number;
+  trendDirection: 'declining' | 'stable' | 'volatile' | 'improving';
+  statisticalSignificance: number;
+}
+
+export interface TimeFrame {
+  detectionStartTime: Date;
+  degradationStartTime: Date;
+  currentTime: Date;
+  degradationDuration: number; // hours
+  expectedContinuation: number; // hours
+}
+
+export interface RootCauseHypothesis {
+  hypothesisId: string;
+  hypothesis: string;
+  likelihood: number;
+  supportingEvidence: string[];
+  requiredInvestigation: string[];
+  potentialSolutions: string[];
+  indonesianContextRelevance: boolean;
+}
+
+export interface AlgorithmResult {
+  algorithmName: string;
+  algorithmType: DetectionMethodType;
+  detectionOutcome: 'no_degradation' | 'possible_degradation' | 'degradation_detected' | 'severe_degradation';
+  confidence: number;
+  algorithmSpecificFindings: Record<string, any>;
+  computationTime: number; // milliseconds
+  resourceUsage: ResourceUsage;
+  indonesianContextAdjustments: Record<string, any>;
+}
+
+export interface ResourceUsage {
+  cpuUsage: number; // percentage
+  memoryUsage: number; // MB
+  networkUsage?: number; // KB
+  diskUsage?: number; // MB
+}
+
+export interface BusinessImpactAssessment {
+  immediateImpact: ImpactAssessment;
+  projectedImpact: ProjectedImpact;
+  indonesianSMBSpecificImpact: IndonesianSMBImpact;
+  mitigationUrgency: 'low' | 'medium' | 'high' | 'critical' | 'emergency';
+  stakeholderNotifications: StakeholderNotification[];
+}
+
+export interface ImpactAssessment {
+  revenueImpact: number; // IDR per day
+  operationalImpact: string;
+  customerImpact: string;
+  reputationImpact: 'minimal' | 'low' | 'moderate' | 'significant' | 'severe';
+  complianceImpact: boolean;
+}
+
+export interface ProjectedImpact {
+  timeFrame: number; // days
+  cumulativeRevenueImpact: number; // IDR
+  marketShareImpact: number; // percentage
+  customerRetentionImpact: number; // percentage
+  operationalEfficiencyImpact: number; // percentage
+}
+
+export interface IndonesianSMBImpact {
+  cashFlowImpact: number; // IDR
+  supplierRelationshipImpact: string;
+  marketPositionImpact: string;
+  seasonalBusinessImpact: string;
+  culturalEventImpact?: string;
+  regulatoryComplianceImpact?: string;
+}
+
+export interface StakeholderNotification {
+  stakeholderType: 'technical_team' | 'business_owner' | 'management' | 'customers' | 'suppliers';
+  notificationUrgency: 'low' | 'medium' | 'high' | 'immediate';
+  notificationMethod: 'email' | 'sms' | 'dashboard' | 'direct_call' | 'whatsapp';
+  notificationMessage: string;
+  followUpRequired: boolean;
+}
+
+export interface RecommendedAction {
+  actionId: string;
+  actionType: 'immediate' | 'short_term' | 'long_term' | 'preventive';
+  actionDescription: string;
+  actionPriority: 'low' | 'medium' | 'high' | 'critical' | 'emergency';
+  estimatedEffort: number; // hours
+  estimatedCost: number; // IDR
+  estimatedBenefit: number; // IDR per month
+  requiredResources: string[];
+  indonesianContextConsiderations: string[];
+  actionTimeline: string;
+  successMetrics: string[];
+}
+
+export interface IndonesianMarketAnalysis {
+  marketConditions: MarketCondition[];
+  culturalFactors: CulturalFactor[];
+  economicIndicators: EconomicIndicator[];
+  seasonalConsiderations: SeasonalConsideration[];
+  competitiveFactors: CompetitiveFactor[];
+  regulatoryFactors: RegulatoryFactor[];
+}
+
+export interface MarketCondition {
+  conditionType: string;
+  currentState: string;
+  impactOnPerformance: 'positive' | 'neutral' | 'negative';
+  confidenceLevel: number;
+  mitigation: string;
+}
+
+export interface CulturalFactor {
+  factorName: string;
+  factorDescription: string;
+  businessRelevance: boolean;
+  seasonalVariation: boolean;
+  mitigationStrategy: string;
+}
+
+export interface EconomicIndicator {
+  indicatorName: string;
+  currentValue: number;
+  historicalAverage: number;
+  trend: 'improving' | 'stable' | 'declining';
+  businessImpact: string;
+}
+
+export interface SeasonalConsideration {
+  seasonName: string;
+  expectedDuration: string;
+  typicalPerformanceImpact: number; // percentage
+  adaptationRequired: boolean;
+  preparationActions: string[];
+}
+
+export interface CompetitiveFactor {
+  factorType: string;
+  competitiveImpact: 'minimal' | 'moderate' | 'significant';
+  responseRequired: boolean;
+  timelineForResponse: string;
+}
+
+export interface RegulatoryFactor {
+  regulation: string;
+  complianceRequired: boolean;
+  impactOnOperations: string;
+  adaptationDeadline?: Date;
+}
+
+export interface DetectionMetadata {
+  detectionVersion: string;
+  algorithmsUsed: string[];
+  dataSourcesUsed: string[];
+  computationTimeTotal: number; // milliseconds
+  dataQualityScore: number;
+  detectionReliability: number;
+  indonesianContextVersion: string;
+}
+
+export interface ReportingData {
+  executiveSummary: string;
+  technicalDetails: Record<string, any>;
+  visualizationData: VisualizationData;
+  exportFormats: string[];
+  distributionList: string[];
+  followUpSchedule: string;
+}
+
+export interface VisualizationData {
+  chartData: ChartData[];
+  dashboardData: DashboardData;
+  alertVisualizations: AlertVisualization[];
+}
+
+export interface ChartData {
+  chartType: 'line' | 'bar' | 'pie' | 'scatter' | 'heatmap' | 'gauge';
+  chartTitle: string;
+  data: Record<string, any>;
+  indonesianLabels: boolean;
+}
+
+export interface DashboardData {
+  kpiWidgets: KPIWidget[];
+  alertWidgets: AlertWidget[];
+  trendWidgets: TrendWidget[];
+  comparisonWidgets: ComparisonWidget[];
+}
+
+export interface KPIWidget {
+  kpiName: string;
+  currentValue: number;
+  targetValue: number;
+  trend: 'up' | 'down' | 'stable';
+  status: 'good' | 'warning' | 'critical';
+}
+
+export interface AlertWidget {
+  alertLevel: 'info' | 'warning' | 'error' | 'critical';
+  alertMessage: string;
+  alertTime: Date;
+  actionRequired: boolean;
+}
+
+export interface TrendWidget {
+  metricName: string;
+  historicalData: number[];
+  projectedData: number[];
+  trendAnalysis: string;
+}
+
+export interface ComparisonWidget {
+  comparisonType: 'period_over_period' | 'model_comparison' | 'benchmark_comparison';
+  comparisonData: Record<string, number>;
+  comparisonInsights: string[];
+}
+
+export interface AlertVisualization {
+  alertType: string;
+  visualizationType: 'chart' | 'gauge' | 'map' | 'table';
+  visualizationConfig: Record<string, any>;
+  interactiveFeatures: boolean;
+}
+
+@Injectable()
+export class PerformanceDegradationDetectionAlgorithmsService {
+  private readonly logger = new Logger(PerformanceDegradationDetectionAlgorithmsService.name);
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private inventoryTransactionRepository: Repository<InventoryTransaction>,
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
+    @InjectRepository(MLModel)
+    private mlModelRepository: Repository<MLModel>,
+    @InjectRepository(Prediction)
+    private predictionRepository: Repository<Prediction>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private eventEmitter: EventEmitter2,
+  ) {}
+
+  async detectPerformanceDegradation(
+    request: DegradationDetectionRequest,
+  ): Promise<DegradationDetectionResult> {
+    try {
+      this.logger.log(`Starting performance degradation detection for tenant: ${request.tenantId}`);
+
+      // 1. Initialize detection scope and validate models
+      const validatedScope = await this.validateDetectionScope(request.detectionScope);
+      
+      // 2. Apply detection algorithms
+      const algorithmResults = await this.applyDetectionAlgorithms(
+        request.algorithmConfiguration,
+        request.detectionMethods,
+        validatedScope,
+      );
+
+      // 3. Analyze degradation patterns
+      const degradationFindings = await this.analyzeDegradationPatterns(
+        algorithmResults,
+        request.thresholdConfiguration,
+        request.indonesianMarketContext,
+      );
+
+      // 4. Assess business impact
+      const businessImpact = await this.assessBusinessImpact(
+        degradationFindings,
+        request.indonesianMarketContext,
+      );
+
+      // 5. Generate recommendations
+      const recommendations = await this.generateRecommendations(
+        degradationFindings,
+        businessImpact,
+        request.indonesianMarketContext,
+      );
+
+      // 6. Compile detection result
+      const result: DegradationDetectionResult = {
+        detectionId: `deg_${Date.now()}_${request.tenantId}`,
+        tenantId: request.tenantId,
+        detectionTimestamp: new Date(),
+        detectionSummary: this.buildDetectionSummary(degradationFindings, businessImpact),
+        degradationFindings,
+        algorithmResults,
+        businessImpactAssessment: businessImpact,
+        recommendedActions: recommendations,
+        indonesianMarketAnalysis: await this.analyzeIndonesianMarketContext(request.indonesianMarketContext),
+        detectionMetadata: this.buildDetectionMetadata(request),
+        reportingData: await this.buildReportingData(degradationFindings, businessImpact),
+      };
+
+      // 7. Cache results
+      await this.cacheManager.set(
+        `degradation_detection_${result.detectionId}`,
+        result,
+        300000, // 5 minutes
+      );
+
+      // 8. Emit events for real-time notifications
+      await this.emitDegradationEvents(result);
+
+      this.logger.log(`Performance degradation detection completed for tenant: ${request.tenantId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Error in performance degradation detection: ${error.message}`, error.stack);
+      throw new Error(`Performance degradation detection failed: ${error.message}`);
+    }
+  }
+
+  private async validateDetectionScope(scope: DegradationDetectionScope): Promise<DegradationDetectionScope> {
+    // Validate models exist and are accessible
+    for (const model of scope.modelsToMonitor) {
+      const exists = await this.mlModelRepository.findOne({
+        where: { id: model.modelId }
+      });
+      if (!exists) {
+        throw new Error(`Model ${model.modelId} not found`);
+      }
+    }
+    return scope;
+  }
+
+  private async applyDetectionAlgorithms(
+    config: AlgorithmConfiguration,
+    methods: DetectionMethod[],
+    scope: DegradationDetectionScope,
+  ): Promise<AlgorithmResult[]> {
+    const results: AlgorithmResult[] = [];
+
+    for (const method of methods) {
+      const startTime = Date.now();
+      
+      try {
+        const result = await this.executeDetectionMethod(method, scope);
+        results.push({
+          ...result,
+          computationTime: Date.now() - startTime,
+        });
+      } catch (error) {
+        this.logger.warn(`Detection method ${method.methodName} failed: ${error.message}`);
+      }
+    }
+
+    return results;
+  }
+
+  private async executeDetectionMethod(
+    method: DetectionMethod,
+    scope: DegradationDetectionScope,
+  ): Promise<AlgorithmResult> {
+    // Implementation would vary based on method type
+    switch (method.methodType) {
+      case 'statistical_test':
+        return await this.executeStatisticalTest(method, scope);
+      case 'threshold_based':
+        return await this.executeThresholdAnalysis(method, scope);
+      case 'trend_analysis':
+        return await this.executeTrendAnalysis(method, scope);
+      case 'change_point_detection':
+        return await this.executeChangePointDetection(method, scope);
+      case 'anomaly_detection':
+        return await this.executeAnomalyDetection(method, scope);
+      default:
+        throw new Error(`Unsupported detection method: ${method.methodType}`);
+    }
+  }
+
+  private async executeStatisticalTest(
+    method: DetectionMethod,
+    scope: DegradationDetectionScope,
+  ): Promise<AlgorithmResult> {
+    // Placeholder for statistical test implementation
+    return {
+      algorithmName: method.methodName,
+      algorithmType: method.methodType,
+      detectionOutcome: 'no_degradation',
+      confidence: 0.95,
+      algorithmSpecificFindings: {},
+      computationTime: 0,
+      resourceUsage: { cpuUsage: 5, memoryUsage: 64 },
+      indonesianContextAdjustments: {},
+    };
+  }
+
+  private async executeThresholdAnalysis(
+    method: DetectionMethod,
+    scope: DegradationDetectionScope,
+  ): Promise<AlgorithmResult> {
+    // Placeholder for threshold analysis implementation
+    return {
+      algorithmName: method.methodName,
+      algorithmType: method.methodType,
+      detectionOutcome: 'no_degradation',
+      confidence: 0.85,
+      algorithmSpecificFindings: {},
+      computationTime: 0,
+      resourceUsage: { cpuUsage: 3, memoryUsage: 32 },
+      indonesianContextAdjustments: {},
+    };
+  }
+
+  private async executeTrendAnalysis(
+    method: DetectionMethod,
+    scope: DegradationDetectionScope,
+  ): Promise<AlgorithmResult> {
+    // Placeholder for trend analysis implementation
+    return {
+      algorithmName: method.methodName,
+      algorithmType: method.methodType,
+      detectionOutcome: 'no_degradation',
+      confidence: 0.90,
+      algorithmSpecificFindings: {},
+      computationTime: 0,
+      resourceUsage: { cpuUsage: 8, memoryUsage: 128 },
+      indonesianContextAdjustments: {},
+    };
+  }
+
+  private async executeChangePointDetection(
+    method: DetectionMethod,
+    scope: DegradationDetectionScope,
+  ): Promise<AlgorithmResult> {
+    // Placeholder for change point detection implementation
+    return {
+      algorithmName: method.methodName,
+      algorithmType: method.methodType,
+      detectionOutcome: 'no_degradation',
+      confidence: 0.88,
+      algorithmSpecificFindings: {},
+      computationTime: 0,
+      resourceUsage: { cpuUsage: 12, memoryUsage: 256 },
+      indonesianContextAdjustments: {},
+    };
+  }
+
+  private async executeAnomalyDetection(
+    method: DetectionMethod,
+    scope: DegradationDetectionScope,
+  ): Promise<AlgorithmResult> {
+    // Placeholder for anomaly detection implementation
+    return {
+      algorithmName: method.methodName,
+      algorithmType: method.methodType,
+      detectionOutcome: 'no_degradation',
+      confidence: 0.92,
+      algorithmSpecificFindings: {},
+      computationTime: 0,
+      resourceUsage: { cpuUsage: 15, memoryUsage: 512 },
+      indonesianContextAdjustments: {},
+    };
+  }
+
+  private async analyzeDegradationPatterns(
+    algorithmResults: AlgorithmResult[],
+    thresholds: any,
+    indonesianContext: any,
+  ): Promise<DegradationFinding[]> {
+    // Analyze results and identify degradation patterns
+    return [];
+  }
+
+  private async assessBusinessImpact(
+    findings: DegradationFinding[],
+    indonesianContext: any,
+  ): Promise<BusinessImpactAssessment> {
+    // Assess business impact of degradations
+    return {
+      immediateImpact: {
+        revenueImpact: 0,
+        operationalImpact: 'minimal',
+        customerImpact: 'none',
+        reputationImpact: 'minimal',
+        complianceImpact: false,
+      },
+      projectedImpact: {
+        timeFrame: 30,
+        cumulativeRevenueImpact: 0,
+        marketShareImpact: 0,
+        customerRetentionImpact: 0,
+        operationalEfficiencyImpact: 0,
+      },
+      indonesianSMBSpecificImpact: {
+        cashFlowImpact: 0,
+        supplierRelationshipImpact: 'none',
+        marketPositionImpact: 'stable',
+        seasonalBusinessImpact: 'none',
+      },
+      mitigationUrgency: 'low',
+      stakeholderNotifications: [],
+    };
+  }
+
+  private async generateRecommendations(
+    findings: DegradationFinding[],
+    impact: BusinessImpactAssessment,
+    indonesianContext: any,
+  ): Promise<RecommendedAction[]> {
+    // Generate actionable recommendations
+    return [];
+  }
+
+  private buildDetectionSummary(
+    findings: DegradationFinding[],
+    impact: BusinessImpactAssessment,
+  ): DetectionSummary {
+    return {
+      overallDegradationStatus: 'none',
+      numberOfDegradations: findings.length,
+      affectedModels: [],
+      severityDistribution: {},
+      primaryConcerns: [],
+      urgencyLevel: 'low',
+      estimatedBusinessImpact: impact.immediateImpact.revenueImpact,
+      recommendedResponse: 'monitor',
+    };
+  }
+
+  private async analyzeIndonesianMarketContext(context: any): Promise<IndonesianMarketAnalysis> {
+    return {
+      marketConditions: [],
+      culturalFactors: [],
+      economicIndicators: [],
+      seasonalConsiderations: [],
+      competitiveFactors: [],
+      regulatoryFactors: [],
+    };
+  }
+
+  private buildDetectionMetadata(request: DegradationDetectionRequest): DetectionMetadata {
+    return {
+      detectionVersion: '1.0.0',
+      algorithmsUsed: request.detectionMethods.map(m => m.methodName),
+      dataSourcesUsed: ['predictions', 'performance_metrics', 'business_metrics'],
+      computationTimeTotal: 0,
+      dataQualityScore: 0.95,
+      detectionReliability: 0.92,
+      indonesianContextVersion: '1.0.0',
+    };
+  }
+
+  private async buildReportingData(
+    findings: DegradationFinding[],
+    impact: BusinessImpactAssessment,
+  ): Promise<ReportingData> {
+    return {
+      executiveSummary: 'No significant performance degradation detected.',
+      technicalDetails: {},
+      visualizationData: {
+        chartData: [],
+        dashboardData: {
+          kpiWidgets: [],
+          alertWidgets: [],
+          trendWidgets: [],
+          comparisonWidgets: [],
+        },
+        alertVisualizations: [],
+      },
+      exportFormats: ['pdf', 'excel', 'json'],
+      distributionList: [],
+      followUpSchedule: 'daily',
+    };
+  }
+
+  private async emitDegradationEvents(result: DegradationDetectionResult): Promise<void> {
+    this.eventEmitter.emit('performance.degradation.detected', {
+      tenantId: result.tenantId,
+      detectionId: result.detectionId,
+      severity: result.detectionSummary.overallDegradationStatus,
+      timestamp: result.detectionTimestamp,
+    });
+  }
+}

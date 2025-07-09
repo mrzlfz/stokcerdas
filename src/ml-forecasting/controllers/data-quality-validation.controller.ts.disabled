@@ -1,0 +1,1694 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Logger,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import {
+  DataQualityValidationService,
+  DataQualityRequest,
+  DataQualityResult,
+  ValidationRule,
+  QualityThreshold,
+  QualityIssue,
+  QualityReport,
+} from '../services/data-quality-validation.service';
+import { TimeSeriesDataPoint } from '../services/data-pipeline.service';
+
+// DTOs for API documentation and validation
+export class DataQualityRequestDto implements DataQualityRequest {
+  jobId: string;
+  tenantId: string;
+  data: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: any[];
+    products?: any[];
+    orders?: any[];
+    external?: any[];
+  };
+  validationRules: ValidationRule[];
+  qualityThresholds: QualityThreshold[];
+  autoCorrection?: boolean;
+  generateReport?: boolean;
+  indonesianContext?: boolean;
+}
+
+export class QuickQualityCheckDto {
+  data: any[];
+  dataType: 'sales' | 'inventory' | 'products' | 'orders' | 'external';
+  checkLevel: 'basic' | 'standard' | 'comprehensive';
+}
+
+export class ValidationRuleDto implements ValidationRule {
+  id: string;
+  name: string;
+  type: 'completeness' | 'consistency' | 'validity' | 'uniqueness' | 'accuracy' | 'timeliness' | 'integrity';
+  dataTypes: ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+  fields: string[];
+  criteria: any;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  autoFix: boolean;
+  enabled: boolean;
+  description?: string;
+}
+
+export class QualityThresholdDto implements QualityThreshold {
+  metric: 'completeness' | 'consistency' | 'validity' | 'uniqueness' | 'accuracy' | 'timeliness' | 'overall';
+  threshold: number;
+  action: 'warn' | 'reject' | 'auto_fix' | 'flag';
+  scope: 'field' | 'record' | 'dataset';
+  priority: 'low' | 'medium' | 'high';
+}
+
+export class QualityProfileDto {
+  name: string;
+  description: string;
+  dataTypes: string[];
+  rules: ValidationRule[];
+  thresholds: QualityThreshold[];
+  autoCorrection: boolean;
+  businessContext: 'general' | 'indonesian_smb' | 'enterprise' | 'retail';
+}
+
+export class DataCleaningRequestDto {
+  data: any[];
+  dataType: string;
+  cleaningTypes: ('missing_values' | 'outliers' | 'duplicates' | 'formatting' | 'validation')[];
+  strategy: 'conservative' | 'moderate' | 'aggressive';
+  preserveOriginal?: boolean;
+}
+
+export class QualityMonitoringDto {
+  period: 'day' | 'week' | 'month';
+  dataTypes: string[];
+  alertThresholds: { metric: string; threshold: number }[];
+  includeComparison?: boolean;
+}
+
+@Controller('ml-forecasting/data-quality')
+@ApiTags('Data Quality Validation')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class DataQualityValidationController {
+  private readonly logger = new Logger(DataQualityValidationController.name);
+
+  constructor(
+    private readonly qualityService: DataQualityValidationService,
+  ) {}
+
+  /**
+   * Perform comprehensive data quality validation
+   */
+  @Post('validate')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:write', 'data_quality:validate')
+  @ApiOperation({
+    summary: 'Validate data quality',
+    description: 'Perform comprehensive data quality validation with configurable rules and thresholds',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data quality validation completed successfully',
+    type: DataQualityResult,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid validation request',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Insufficient permissions',
+  })
+  async validateDataQuality(
+    @Body() request: DataQualityRequestDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ): Promise<DataQualityResult> {
+    this.logger.log(`Data quality validation requested by user ${user.id} for tenant ${tenantId}`);
+
+    // Override tenant ID and generate job ID for security
+    request.tenantId = tenantId;
+    if (!request.jobId) {
+      request.jobId = `quality_${tenantId}_${Date.now()}`;
+    }
+
+    try {
+      const result = await this.qualityService.validateDataQuality(request);
+      
+      this.logger.log(`Data quality validation completed: ${result.jobId} (Score: ${result.overallScore.toFixed(2)})`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Data quality validation failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Quick data quality assessment
+   */
+  @Post('quick-check')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Quick data quality check',
+    description: 'Perform a quick data quality assessment with basic checks',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quick quality check completed successfully',
+  })
+  async quickQualityCheck(
+    @Body() request: QuickQualityCheckDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    score: number;
+    issues: QualityIssue[];
+    recommendations: string[];
+    fieldAnalysis: Record<string, any>;
+  }> {
+    this.logger.log(`Quick quality check for ${request.dataType} data: ${request.data.length} records`);
+
+    return await this.qualityService.quickQualityAssessment(
+      tenantId,
+      request.data,
+      request.dataType,
+    );
+  }
+
+  /**
+   * Get predefined quality profiles
+   */
+  @Get('profiles')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get data quality profiles',
+    description: 'Get predefined data quality validation profiles for common use cases',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality profiles retrieved successfully',
+  })
+  async getQualityProfiles(
+    @Query('businessContext') businessContext?: string,
+  ): Promise<QualityProfileDto[]> {
+    this.logger.log('Data quality profiles requested');
+
+    const profiles: QualityProfileDto[] = [
+      {
+        name: 'Basic Data Quality',
+        description: 'Essential data quality checks for general use',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        rules: this.getBasicValidationRules(),
+        thresholds: this.getBasicThresholds(),
+        autoCorrection: false,
+        businessContext: 'general',
+      },
+      {
+        name: 'Indonesian SMB Standard',
+        description: 'Data quality profile optimized for Indonesian SMB requirements',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        rules: this.getIndonesianSMBRules(),
+        thresholds: this.getStrictThresholds(),
+        autoCorrection: true,
+        businessContext: 'indonesian_smb',
+      },
+      {
+        name: 'Enterprise Grade',
+        description: 'Comprehensive data quality validation for enterprise use',
+        dataTypes: ['sales', 'inventory', 'products', 'orders', 'external'],
+        rules: this.getEnterpriseRules(),
+        thresholds: this.getEnterpriseThresholds(),
+        autoCorrection: true,
+        businessContext: 'enterprise',
+      },
+      {
+        name: 'Retail Focused',
+        description: 'Data quality profile tailored for retail operations',
+        dataTypes: ['sales', 'inventory', 'products'],
+        rules: this.getRetailRules(),
+        thresholds: this.getBasicThresholds(),
+        autoCorrection: true,
+        businessContext: 'retail',
+      },
+      {
+        name: 'ML Training Ready',
+        description: 'Strict data quality requirements for machine learning training',
+        dataTypes: ['sales', 'inventory', 'products', 'orders', 'external'],
+        rules: this.getMLTrainingRules(),
+        thresholds: this.getMLThresholds(),
+        autoCorrection: true,
+        businessContext: 'general',
+      },
+      {
+        name: 'Financial Audit Ready',
+        description: 'High precision data quality for financial auditing',
+        dataTypes: ['sales', 'orders'],
+        rules: this.getFinancialAuditRules(),
+        thresholds: this.getAuditThresholds(),
+        autoCorrection: false,
+        businessContext: 'enterprise',
+      },
+    ];
+
+    if (businessContext) {
+      return profiles.filter(profile => profile.businessContext === businessContext);
+    }
+
+    return profiles;
+  }
+
+  /**
+   * Apply quality profile to data
+   */
+  @Post('apply-profile')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:write')
+  @ApiOperation({
+    summary: 'Apply quality profile',
+    description: 'Apply a predefined data quality profile to validate data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality profile applied successfully',
+  })
+  async applyQualityProfile(
+    @Body() request: {
+      profileName: string;
+      data: any;
+      customizations?: {
+        autoCorrection?: boolean;
+        additionalRules?: ValidationRule[];
+        customThresholds?: QualityThreshold[];
+      };
+    },
+    @CurrentTenant() tenantId: string,
+  ): Promise<DataQualityResult> {
+    this.logger.log(`Applying quality profile: ${request.profileName}`);
+
+    const profiles = await this.getQualityProfiles();
+    const profile = profiles.find(p => p.name === request.profileName);
+
+    if (!profile) {
+      throw new BadRequestException(`Quality profile not found: ${request.profileName}`);
+    }
+
+    const validationRequest: DataQualityRequest = {
+      jobId: `profile_${tenantId}_${Date.now()}`,
+      tenantId,
+      data: request.data,
+      validationRules: [
+        ...profile.rules,
+        ...(request.customizations?.additionalRules || []),
+      ],
+      qualityThresholds: [
+        ...profile.thresholds,
+        ...(request.customizations?.customThresholds || []),
+      ],
+      autoCorrection: request.customizations?.autoCorrection ?? profile.autoCorrection,
+      generateReport: true,
+      indonesianContext: profile.businessContext === 'indonesian_smb',
+    };
+
+    return await this.qualityService.validateDataQuality(validationRequest);
+  }
+
+  /**
+   * Get quality trends and monitoring data
+   */
+  @Get('trends')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get data quality trends',
+    description: 'Get historical data quality trends and patterns for monitoring',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality trends retrieved successfully',
+  })
+  async getQualityTrends(
+    @Query('dataType') dataType: string,
+    @Query('period') period: 'day' | 'week' | 'month' = 'week',
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    trends: { date: string; score: number; issueCount: number }[];
+    patterns: { type: string; frequency: number; trend: string }[];
+    insights: string[];
+  }> {
+    this.logger.log(`Quality trends requested for ${dataType} over ${period}`);
+
+    return await this.qualityService.getQualityTrends(tenantId, dataType, period);
+  }
+
+  /**
+   * Data cleaning and correction service
+   */
+  @Post('clean')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:write')
+  @ApiOperation({
+    summary: 'Clean and correct data',
+    description: 'Apply data cleaning and correction algorithms to improve data quality',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Data cleaning completed successfully',
+  })
+  async cleanData(
+    @Body() request: DataCleaningRequestDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    originalData: any[];
+    cleanedData: any[];
+    cleaningActions: any[];
+    qualityImprovement: {
+      before: number;
+      after: number;
+      improvement: number;
+    };
+    summary: {
+      recordsProcessed: number;
+      recordsCleaned: number;
+      issuesFixed: number;
+      cleaningTime: number;
+    };
+  }> {
+    this.logger.log(`Data cleaning requested for ${request.dataType}: ${request.data.length} records`);
+
+    const startTime = Date.now();
+
+    // Perform quality assessment before cleaning
+    const beforeQuality = await this.qualityService.quickQualityAssessment(
+      tenantId,
+      request.data,
+      request.dataType,
+    );
+
+    // Apply cleaning based on strategy and types
+    const cleaningResult = this.performDataCleaning(request);
+
+    // Perform quality assessment after cleaning
+    const afterQuality = await this.qualityService.quickQualityAssessment(
+      tenantId,
+      cleaningResult.cleanedData,
+      request.dataType,
+    );
+
+    return {
+      originalData: request.preserveOriginal ? request.data : [],
+      cleanedData: cleaningResult.cleanedData,
+      cleaningActions: cleaningResult.actions,
+      qualityImprovement: {
+        before: beforeQuality.score,
+        after: afterQuality.score,
+        improvement: afterQuality.score - beforeQuality.score,
+      },
+      summary: {
+        recordsProcessed: request.data.length,
+        recordsCleaned: cleaningResult.cleanedCount,
+        issuesFixed: cleaningResult.actions.length,
+        cleaningTime: Date.now() - startTime,
+      },
+    };
+  }
+
+  /**
+   * Validate single field or value
+   */
+  @Post('validate-field')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Validate single field',
+    description: 'Validate a single field value against specific criteria',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Field validation completed',
+  })
+  async validateField(
+    @Body() request: {
+      field: string;
+      value: any;
+      validationType: 'format' | 'range' | 'business_rule' | 'indonesian_context';
+      criteria?: any;
+    },
+  ): Promise<{
+    valid: boolean;
+    issues: string[];
+    suggestions: string[];
+    correctedValue?: any;
+  }> {
+    this.logger.log(`Field validation for ${request.field}: ${request.value}`);
+
+    const validation = this.validateSingleField(
+      request.field,
+      request.value,
+      request.validationType,
+      request.criteria,
+    );
+
+    return validation;
+  }
+
+  /**
+   * Get validation statistics and metrics
+   */
+  @Get('stats')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get data quality statistics',
+    description: 'Get comprehensive data quality statistics and metrics for the tenant',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality statistics retrieved successfully',
+  })
+  async getQualityStats(
+    @CurrentTenant() tenantId: string,
+    @Query('period') period: 'day' | 'week' | 'month' = 'month',
+  ): Promise<{
+    totalValidations: number;
+    averageQualityScore: number;
+    commonIssueTypes: { type: string; count: number; percentage: number }[];
+    qualityTrends: { dimension: string; trend: string; change: number }[];
+    performanceMetrics: {
+      averageValidationTime: number;
+      autoCorrectionRate: number;
+      successRate: number;
+    };
+    recentValidations: any[];
+  }> {
+    this.logger.log(`Quality statistics requested for tenant ${tenantId}`);
+
+    // This would typically query historical validation metrics
+    // For now, return mock statistics
+    return {
+      totalValidations: 234,
+      averageQualityScore: 86.7,
+      commonIssueTypes: [
+        { type: 'missing_values', count: 156, percentage: 23.4 },
+        { type: 'invalid_format', count: 89, percentage: 13.4 },
+        { type: 'outliers', count: 67, percentage: 10.1 },
+        { type: 'duplicates', count: 45, percentage: 6.8 },
+        { type: 'inconsistent_type', count: 34, percentage: 5.1 },
+      ],
+      qualityTrends: [
+        { dimension: 'completeness', trend: 'improving', change: 3.2 },
+        { dimension: 'consistency', trend: 'stable', change: 0.1 },
+        { dimension: 'validity', trend: 'improving', change: 2.8 },
+        { dimension: 'uniqueness', trend: 'stable', change: -0.3 },
+      ],
+      performanceMetrics: {
+        averageValidationTime: 1850, // ms
+        autoCorrectionRate: 67.3,
+        successRate: 94.1,
+      },
+      recentValidations: [
+        {
+          jobId: 'quality_tenant1_1640995200000',
+          dataType: 'sales',
+          score: 89.2,
+          status: 'passed',
+          issuesFound: 12,
+          correctionsMade: 8,
+          processingTime: 1650,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          jobId: 'profile_tenant1_1640991600000',
+          dataType: 'inventory',
+          score: 76.8,
+          status: 'warning',
+          issuesFound: 23,
+          correctionsMade: 15,
+          processingTime: 2100,
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Generate quality report
+   */
+  @Post('generate-report')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Generate quality report',
+    description: 'Generate a comprehensive data quality report for specified data',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality report generated successfully',
+  })
+  async generateQualityReport(
+    @Body() request: {
+      data: any;
+      reportType: 'summary' | 'detailed' | 'executive' | 'technical';
+      includeRecommendations?: boolean;
+      includeVisualizations?: boolean;
+    },
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    report: QualityReport;
+    downloadUrl?: string;
+    expiresAt?: string;
+  }> {
+    this.logger.log(`Quality report generation requested: ${request.reportType}`);
+
+    // Perform comprehensive validation to generate report data
+    const validationRequest: DataQualityRequest = {
+      jobId: `report_${tenantId}_${Date.now()}`,
+      tenantId,
+      data: request.data,
+      validationRules: this.getBasicValidationRules(),
+      qualityThresholds: this.getBasicThresholds(),
+      autoCorrection: false,
+      generateReport: true,
+      indonesianContext: true,
+    };
+
+    const validationResult = await this.qualityService.validateDataQuality(validationRequest);
+
+    // Generate download URL for detailed reports
+    let downloadUrl: string | undefined;
+    let expiresAt: string | undefined;
+
+    if (request.reportType === 'detailed' || request.reportType === 'technical') {
+      downloadUrl = `https://storage.stokcerdas.com/reports/${tenantId}/${validationRequest.jobId}.pdf`;
+      expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+    }
+
+    return {
+      report: validationResult.report,
+      downloadUrl,
+      expiresAt,
+    };
+  }
+
+  /**
+   * Set up quality monitoring alerts
+   */
+  @Post('monitoring/setup')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('ml_forecasting:write')
+  @ApiOperation({
+    summary: 'Setup quality monitoring',
+    description: 'Configure automated data quality monitoring and alerts',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Quality monitoring configured successfully',
+  })
+  async setupQualityMonitoring(
+    @Body() request: QualityMonitoringDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    monitoringId: string;
+    status: 'active' | 'inactive';
+    configuration: QualityMonitoringDto;
+    nextCheck: string;
+  }> {
+    this.logger.log(`Setting up quality monitoring for tenant ${tenantId}`);
+
+    const monitoringId = `monitor_${tenantId}_${Date.now()}`;
+
+    // This would typically save monitoring configuration to database
+    // For now, return mock response
+    return {
+      monitoringId,
+      status: 'active',
+      configuration: request,
+      nextCheck: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Next day
+    };
+  }
+
+  /**
+   * Get monitoring alerts and status
+   */
+  @Get('monitoring/alerts')
+  @Permissions('ml_forecasting:read')
+  @ApiOperation({
+    summary: 'Get quality monitoring alerts',
+    description: 'Get current data quality monitoring alerts and status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Monitoring alerts retrieved successfully',
+  })
+  async getMonitoringAlerts(
+    @CurrentTenant() tenantId: string,
+    @Query('severity') severity?: 'low' | 'medium' | 'high' | 'critical',
+    @Query('status') status?: 'active' | 'resolved' | 'acknowledged',
+  ): Promise<{
+    alerts: any[];
+    summary: {
+      totalAlerts: number;
+      activeAlerts: number;
+      criticalAlerts: number;
+    };
+    recommendations: string[];
+  }> {
+    this.logger.log(`Quality monitoring alerts requested for tenant ${tenantId}`);
+
+    // This would typically query monitoring alerts from database
+    // For now, return mock alerts
+    const mockAlerts = [
+      {
+        id: 'alert_001',
+        type: 'quality_degradation',
+        severity: 'medium',
+        status: 'active',
+        dataType: 'sales',
+        metric: 'completeness',
+        threshold: 85,
+        actualValue: 78.3,
+        message: 'Sales data completeness below threshold',
+        timestamp: new Date().toISOString(),
+        recommendations: ['Review data collection process', 'Check data source integration'],
+      },
+      {
+        id: 'alert_002',
+        type: 'anomaly_detected',
+        severity: 'high',
+        status: 'active',
+        dataType: 'inventory',
+        metric: 'validity',
+        threshold: 90,
+        actualValue: 67.8,
+        message: 'High number of invalid inventory records',
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        recommendations: ['Validate inventory data sources', 'Implement stronger input validation'],
+      },
+    ];
+
+    const filteredAlerts = mockAlerts.filter(alert => {
+      if (severity && alert.severity !== severity) return false;
+      if (status && alert.status !== status) return false;
+      return true;
+    });
+
+    return {
+      alerts: filteredAlerts,
+      summary: {
+        totalAlerts: mockAlerts.length,
+        activeAlerts: mockAlerts.filter(a => a.status === 'active').length,
+        criticalAlerts: mockAlerts.filter(a => a.severity === 'critical').length,
+      },
+      recommendations: [
+        'Review data collection processes for consistent quality',
+        'Implement automated data validation at source',
+        'Set up regular quality monitoring dashboards',
+      ],
+    };
+  }
+
+  // ========== PRIVATE HELPER METHODS ==========
+
+  /**
+   * Get basic validation rules
+   */
+  private getBasicValidationRules(): ValidationRule[] {
+    return [
+      {
+        id: 'basic_completeness',
+        name: 'Basic Completeness Check',
+        type: 'completeness',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        fields: ['id', 'timestamp', 'value'],
+        criteria: { thresholds: { missing_rate: 0.1 } },
+        severity: 'medium',
+        autoFix: false,
+        enabled: true,
+        description: 'Check for missing values in core fields',
+      },
+      {
+        id: 'basic_validity',
+        name: 'Basic Value Validity',
+        type: 'validity',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        fields: ['value', 'quantity', 'price'],
+        criteria: { 
+          ranges: { 
+            value: { min: 0, max: 1000000 },
+            quantity: { min: 0, max: 10000 },
+            price: { min: 0, max: 100000000 }
+          }
+        },
+        severity: 'high',
+        autoFix: true,
+        enabled: true,
+        description: 'Validate numeric ranges for business values',
+      },
+      {
+        id: 'basic_uniqueness',
+        name: 'Basic Duplicate Check',
+        type: 'uniqueness',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        fields: ['id', 'timestamp'],
+        criteria: {},
+        severity: 'low',
+        autoFix: true,
+        enabled: true,
+        description: 'Check for duplicate records',
+      },
+    ];
+  }
+
+  /**
+   * Get Indonesian SMB specific rules
+   */
+  private getIndonesianSMBRules(): ValidationRule[] {
+    return [
+      ...this.getBasicValidationRules(),
+      {
+        id: 'indonesian_phone',
+        name: 'Indonesian Phone Number Validation',
+        type: 'validity',
+        dataTypes: ['orders'],
+        fields: ['customer_phone', 'phone'],
+        criteria: {
+          patterns: { phone: '^(\\+62|62|0)8[1-9][0-9]{6,9}$' }
+        },
+        severity: 'medium',
+        autoFix: true,
+        enabled: true,
+        description: 'Validate Indonesian phone number format',
+      },
+      {
+        id: 'indonesian_currency',
+        name: 'Indonesian Rupiah Validation',
+        type: 'validity',
+        dataTypes: ['sales', 'products'],
+        fields: ['price', 'amount', 'total'],
+        criteria: {
+          ranges: { price: { min: 100, max: 100000000 } },
+          businessRules: { currency: 'IDR' }
+        },
+        severity: 'high',
+        autoFix: false,
+        enabled: true,
+        description: 'Validate Indonesian currency values and ranges',
+      },
+      {
+        id: 'indonesian_business_hours',
+        name: 'Indonesian Business Hours Check',
+        type: 'timeliness',
+        dataTypes: ['sales', 'orders'],
+        fields: ['transaction_time', 'order_time'],
+        criteria: {
+          thresholds: { business_hours: { start: 6, end: 22 } }
+        },
+        severity: 'low',
+        autoFix: false,
+        enabled: true,
+        description: 'Check transactions within Indonesian business hours',
+      },
+    ];
+  }
+
+  /**
+   * Get enterprise grade rules
+   */
+  private getEnterpriseRules(): ValidationRule[] {
+    return [
+      ...this.getBasicValidationRules(),
+      {
+        id: 'enterprise_integrity',
+        name: 'Referential Integrity',
+        type: 'integrity',
+        dataTypes: ['sales', 'inventory', 'products', 'orders'],
+        fields: ['product_id', 'customer_id', 'location_id'],
+        criteria: {
+          dependencies: {
+            product_id: ['sku', 'name'],
+            customer_id: ['customer_name'],
+            location_id: ['location_name']
+          }
+        },
+        severity: 'critical',
+        autoFix: false,
+        enabled: true,
+        description: 'Ensure referential integrity between related records',
+      },
+      {
+        id: 'enterprise_accuracy',
+        name: 'Statistical Accuracy Check',
+        type: 'accuracy',
+        dataTypes: ['sales', 'inventory'],
+        fields: ['value', 'quantity', 'total'],
+        criteria: {
+          thresholds: { outlier_zscore: 2.5 },
+          businessRules: { total_calculation: true }
+        },
+        severity: 'high',
+        autoFix: true,
+        enabled: true,
+        description: 'Check statistical accuracy and business rule compliance',
+      },
+      {
+        id: 'enterprise_timeliness',
+        name: 'Data Freshness Check',
+        type: 'timeliness',
+        dataTypes: ['sales', 'inventory', 'external'],
+        fields: ['timestamp', 'last_updated', 'created_at'],
+        criteria: {
+          thresholds: { max_age_days: 7 }
+        },
+        severity: 'medium',
+        autoFix: false,
+        enabled: true,
+        description: 'Ensure data freshness within acceptable timeframes',
+      },
+    ];
+  }
+
+  /**
+   * Get retail specific rules
+   */
+  private getRetailRules(): ValidationRule[] {
+    return [
+      ...this.getBasicValidationRules(),
+      {
+        id: 'retail_pricing',
+        name: 'Retail Pricing Validation',
+        type: 'validity',
+        dataTypes: ['products', 'sales'],
+        fields: ['selling_price', 'cost_price', 'discount'],
+        criteria: {
+          businessRules: {
+            profit_margin: { min: 0.05 }, // 5% minimum margin
+            discount_limit: { max: 0.8 }   // 80% maximum discount
+          }
+        },
+        severity: 'high',
+        autoFix: false,
+        enabled: true,
+        description: 'Validate retail pricing rules and margins',
+      },
+      {
+        id: 'retail_inventory',
+        name: 'Retail Inventory Logic',
+        type: 'integrity',
+        dataTypes: ['inventory', 'sales'],
+        fields: ['stock_level', 'sales_quantity'],
+        criteria: {
+          businessRules: {
+            stock_consistency: true,
+            negative_stock: false
+          }
+        },
+        severity: 'critical',
+        autoFix: false,
+        enabled: true,
+        description: 'Ensure inventory logic consistency',
+      },
+    ];
+  }
+
+  /**
+   * Get ML training specific rules
+   */
+  private getMLTrainingRules(): ValidationRule[] {
+    return [
+      ...this.getBasicValidationRules(),
+      {
+        id: 'ml_completeness_strict',
+        name: 'ML Strict Completeness',
+        type: 'completeness',
+        dataTypes: ['sales', 'inventory', 'products', 'orders', 'external'],
+        fields: ['target_variable', 'features'],
+        criteria: { thresholds: { missing_rate: 0.02 } }, // 2% max missing
+        severity: 'critical',
+        autoFix: true,
+        enabled: true,
+        description: 'Strict completeness requirements for ML training',
+      },
+      {
+        id: 'ml_outliers',
+        name: 'ML Outlier Detection',
+        type: 'accuracy',
+        dataTypes: ['sales', 'inventory'],
+        fields: ['value', 'quantity'],
+        criteria: {
+          thresholds: { outlier_zscore: 2.0 } // Stricter outlier detection
+        },
+        severity: 'medium',
+        autoFix: true,
+        enabled: true,
+        description: 'Detect and handle outliers for ML training',
+      },
+      {
+        id: 'ml_consistency_strict',
+        name: 'ML Data Type Consistency',
+        type: 'consistency',
+        dataTypes: ['sales', 'inventory', 'products', 'orders', 'external'],
+        fields: ['numeric_features', 'categorical_features'],
+        criteria: {},
+        severity: 'critical',
+        autoFix: true,
+        enabled: true,
+        description: 'Ensure strict data type consistency for ML',
+      },
+    ];
+  }
+
+  /**
+   * Get financial audit rules
+   */
+  private getFinancialAuditRules(): ValidationRule[] {
+    return [
+      {
+        id: 'audit_completeness_full',
+        name: 'Complete Financial Records',
+        type: 'completeness',
+        dataTypes: ['sales', 'orders'],
+        fields: ['amount', 'tax', 'total', 'payment_method', 'timestamp'],
+        criteria: { thresholds: { missing_rate: 0 } }, // 0% missing allowed
+        severity: 'critical',
+        autoFix: false,
+        enabled: true,
+        description: 'Complete financial record requirements for audit',
+      },
+      {
+        id: 'audit_calculation_integrity',
+        name: 'Financial Calculation Integrity',
+        type: 'integrity',
+        dataTypes: ['sales', 'orders'],
+        fields: ['subtotal', 'tax', 'total'],
+        criteria: {
+          businessRules: {
+            total_calculation: true,
+            tax_calculation: true,
+            rounding_precision: 2
+          }
+        },
+        severity: 'critical',
+        autoFix: false,
+        enabled: true,
+        description: 'Ensure financial calculation accuracy',
+      },
+      {
+        id: 'audit_traceability',
+        name: 'Audit Trail Completeness',
+        type: 'completeness',
+        dataTypes: ['sales', 'orders'],
+        fields: ['user_id', 'timestamp', 'transaction_id'],
+        criteria: { thresholds: { missing_rate: 0 } },
+        severity: 'critical',
+        autoFix: false,
+        enabled: true,
+        description: 'Complete audit trail for financial transactions',
+      },
+    ];
+  }
+
+  /**
+   * Get basic quality thresholds
+   */
+  private getBasicThresholds(): QualityThreshold[] {
+    return [
+      {
+        metric: 'completeness',
+        threshold: 85,
+        action: 'warn',
+        scope: 'dataset',
+        priority: 'medium',
+      },
+      {
+        metric: 'validity',
+        threshold: 90,
+        action: 'warn',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'consistency',
+        threshold: 95,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'medium',
+      },
+      {
+        metric: 'overall',
+        threshold: 80,
+        action: 'warn',
+        scope: 'dataset',
+        priority: 'high',
+      },
+    ];
+  }
+
+  /**
+   * Get strict quality thresholds
+   */
+  private getStrictThresholds(): QualityThreshold[] {
+    return [
+      {
+        metric: 'completeness',
+        threshold: 95,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'validity',
+        threshold: 95,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'consistency',
+        threshold: 98,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'uniqueness',
+        threshold: 99,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'medium',
+      },
+      {
+        metric: 'overall',
+        threshold: 90,
+        action: 'reject',
+        scope: 'dataset',
+        priority: 'high',
+      },
+    ];
+  }
+
+  /**
+   * Get enterprise quality thresholds
+   */
+  private getEnterpriseThresholds(): QualityThreshold[] {
+    return [
+      {
+        metric: 'completeness',
+        threshold: 98,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'validity',
+        threshold: 99,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'consistency',
+        threshold: 99,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'accuracy',
+        threshold: 95,
+        action: 'flag',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'timeliness',
+        threshold: 90,
+        action: 'warn',
+        scope: 'dataset',
+        priority: 'medium',
+      },
+      {
+        metric: 'overall',
+        threshold: 95,
+        action: 'reject',
+        scope: 'dataset',
+        priority: 'high',
+      },
+    ];
+  }
+
+  /**
+   * Get ML training thresholds
+   */
+  private getMLThresholds(): QualityThreshold[] {
+    return [
+      {
+        metric: 'completeness',
+        threshold: 98,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'validity',
+        threshold: 99,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'consistency',
+        threshold: 99.5,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'accuracy',
+        threshold: 97,
+        action: 'auto_fix',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'overall',
+        threshold: 96,
+        action: 'reject',
+        scope: 'dataset',
+        priority: 'high',
+      },
+    ];
+  }
+
+  /**
+   * Get audit quality thresholds
+   */
+  private getAuditThresholds(): QualityThreshold[] {
+    return [
+      {
+        metric: 'completeness',
+        threshold: 100,
+        action: 'reject',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'validity',
+        threshold: 100,
+        action: 'reject',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'accuracy',
+        threshold: 100,
+        action: 'reject',
+        scope: 'dataset',
+        priority: 'high',
+      },
+      {
+        metric: 'overall',
+        threshold: 99,
+        action: 'reject',
+        scope: 'dataset',
+        priority: 'high',
+      },
+    ];
+  }
+
+  /**
+   * Perform data cleaning based on request
+   */
+  private performDataCleaning(request: DataCleaningRequestDto): {
+    cleanedData: any[];
+    actions: any[];
+    cleanedCount: number;
+  } {
+    let cleanedData = [...request.data];
+    const actions: any[] = [];
+    let cleanedCount = 0;
+
+    // Apply cleaning based on types and strategy
+    for (const cleaningType of request.cleaningTypes) {
+      switch (cleaningType) {
+        case 'missing_values':
+          const missingValueResult = this.handleMissingValues(cleanedData, request.strategy);
+          cleanedData = missingValueResult.data;
+          actions.push(...missingValueResult.actions);
+          cleanedCount += missingValueResult.cleanedCount;
+          break;
+
+        case 'outliers':
+          const outlierResult = this.handleOutliers(cleanedData, request.strategy);
+          cleanedData = outlierResult.data;
+          actions.push(...outlierResult.actions);
+          cleanedCount += outlierResult.cleanedCount;
+          break;
+
+        case 'duplicates':
+          const duplicateResult = this.handleDuplicates(cleanedData, request.strategy);
+          cleanedData = duplicateResult.data;
+          actions.push(...duplicateResult.actions);
+          cleanedCount += duplicateResult.cleanedCount;
+          break;
+
+        case 'formatting':
+          const formatResult = this.handleFormatting(cleanedData, request.strategy);
+          cleanedData = formatResult.data;
+          actions.push(...formatResult.actions);
+          cleanedCount += formatResult.cleanedCount;
+          break;
+
+        case 'validation':
+          const validationResult = this.handleValidation(cleanedData, request.strategy);
+          cleanedData = validationResult.data;
+          actions.push(...validationResult.actions);
+          cleanedCount += validationResult.cleanedCount;
+          break;
+      }
+    }
+
+    return {
+      cleanedData,
+      actions,
+      cleanedCount,
+    };
+  }
+
+  /**
+   * Validate single field value
+   */
+  private validateSingleField(
+    field: string,
+    value: any,
+    validationType: string,
+    criteria?: any,
+  ): {
+    valid: boolean;
+    issues: string[];
+    suggestions: string[];
+    correctedValue?: any;
+  } {
+    const issues: string[] = [];
+    const suggestions: string[] = [];
+    let correctedValue: any = undefined;
+    
+    switch (validationType) {
+      case 'format':
+        if (field.toLowerCase().includes('email')) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            issues.push('Invalid email format');
+            suggestions.push('Use format: user@domain.com');
+          }
+        }
+        if (field.toLowerCase().includes('phone')) {
+          const phoneStr = String(value).replace(/\D/g, '');
+          if (!phoneStr.match(/^(62|08)/)) {
+            issues.push('Invalid Indonesian phone format');
+            suggestions.push('Use format: +62xxx or 08xxx');
+            correctedValue = phoneStr.startsWith('8') ? '0' + phoneStr : '+62' + phoneStr;
+          }
+        }
+        break;
+
+      case 'range':
+        if (criteria && criteria.min !== undefined && value < criteria.min) {
+          issues.push(`Value ${value} below minimum ${criteria.min}`);
+          suggestions.push(`Use value >= ${criteria.min}`);
+          correctedValue = criteria.min;
+        }
+        if (criteria && criteria.max !== undefined && value > criteria.max) {
+          issues.push(`Value ${value} above maximum ${criteria.max}`);
+          suggestions.push(`Use value <= ${criteria.max}`);
+          correctedValue = criteria.max;
+        }
+        break;
+
+      case 'business_rule':
+        if (field.toLowerCase().includes('price') && value <= 0) {
+          issues.push('Price must be positive');
+          suggestions.push('Use positive price value');
+          correctedValue = Math.abs(value);
+        }
+        break;
+
+      case 'indonesian_context':
+        if (field.toLowerCase().includes('currency') || field.toLowerCase().includes('price')) {
+          if (value < 100) {
+            issues.push('Price too low for Indonesian market');
+            suggestions.push('Minimum price should be IDR 100');
+            correctedValue = 100;
+          }
+        }
+        break;
+    }
+
+    return {
+      valid: issues.length === 0,
+      issues,
+      suggestions,
+      correctedValue,
+    };
+  }
+
+  // ========== DATA CLEANING HELPER METHODS ==========
+
+  private handleMissingValues(data: any[], strategy: string): {
+    data: any[];
+    actions: any[];
+    cleanedCount: number;
+  } {
+    const actions: any[] = [];
+    let cleanedCount = 0;
+    const cleanedData = data.map(record => {
+      const newRecord = { ...record };
+      
+      for (const [field, value] of Object.entries(record)) {
+        if (value === null || value === undefined || value === '') {
+          cleanedCount++;
+          
+          switch (strategy) {
+            case 'conservative':
+              // Don't modify, just flag
+              actions.push({
+                type: 'missing_value_flagged',
+                field,
+                action: 'flagged for manual review',
+              });
+              break;
+              
+            case 'moderate':
+              // Use mean/mode imputation
+              const imputedValue = this.getImputedValue(data, field);
+              newRecord[field] = imputedValue;
+              actions.push({
+                type: 'missing_value_imputed',
+                field,
+                oldValue: value,
+                newValue: imputedValue,
+                method: 'mean_mode_imputation',
+              });
+              break;
+              
+            case 'aggressive':
+              // Remove record if too many missing values
+              const missingCount = Object.values(record).filter(v => 
+                v === null || v === undefined || v === ''
+              ).length;
+              
+              if (missingCount > Object.keys(record).length * 0.5) {
+                return null; // Mark for removal
+              } else {
+                const imputedValue = this.getImputedValue(data, field);
+                newRecord[field] = imputedValue;
+                actions.push({
+                  type: 'missing_value_imputed_aggressive',
+                  field,
+                  oldValue: value,
+                  newValue: imputedValue,
+                });
+              }
+              break;
+          }
+        }
+      }
+      
+      return newRecord;
+    }).filter(record => record !== null);
+
+    return { data: cleanedData, actions, cleanedCount };
+  }
+
+  private handleOutliers(data: any[], strategy: string): {
+    data: any[];
+    actions: any[];
+    cleanedCount: number;
+  } {
+    const actions: any[] = [];
+    let cleanedCount = 0;
+    
+    // Identify numeric fields
+    const numericFields = this.getNumericFields(data);
+    
+    for (const field of numericFields) {
+      const values = data.map(record => parseFloat(record[field])).filter(v => !isNaN(v));
+      if (values.length < 4) continue;
+      
+      const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+      const std = Math.sqrt(values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length);
+      
+      data.forEach((record, index) => {
+        const value = parseFloat(record[field]);
+        if (!isNaN(value)) {
+          const zscore = Math.abs(value - mean) / std;
+          
+          if (zscore > 3) {
+            cleanedCount++;
+            
+            switch (strategy) {
+              case 'conservative':
+                actions.push({
+                  type: 'outlier_flagged',
+                  field,
+                  value,
+                  zscore,
+                  action: 'flagged for review',
+                });
+                break;
+                
+              case 'moderate':
+                // Cap outliers to 3 standard deviations
+                const cappedValue = value > mean + 3 * std 
+                  ? mean + 3 * std 
+                  : mean - 3 * std;
+                data[index][field] = cappedValue;
+                actions.push({
+                  type: 'outlier_capped',
+                  field,
+                  oldValue: value,
+                  newValue: cappedValue,
+                  zscore,
+                });
+                break;
+                
+              case 'aggressive':
+                // Replace with median
+                const sortedValues = values.sort((a, b) => a - b);
+                const median = sortedValues[Math.floor(sortedValues.length / 2)];
+                data[index][field] = median;
+                actions.push({
+                  type: 'outlier_replaced',
+                  field,
+                  oldValue: value,
+                  newValue: median,
+                  zscore,
+                });
+                break;
+            }
+          }
+        }
+      });
+    }
+
+    return { data, actions, cleanedCount };
+  }
+
+  private handleDuplicates(data: any[], strategy: string): {
+    data: any[];
+    actions: any[];
+    cleanedCount: number;
+  } {
+    const actions: any[] = [];
+    let cleanedCount = 0;
+    
+    const seen = new Set();
+    const duplicateIndices: number[] = [];
+    
+    data.forEach((record, index) => {
+      const key = JSON.stringify(record);
+      
+      if (seen.has(key)) {
+        duplicateIndices.push(index);
+        cleanedCount++;
+        
+        actions.push({
+          type: 'duplicate_detected',
+          record,
+          index,
+          action: strategy === 'conservative' ? 'flagged' : 'removed',
+        });
+      } else {
+        seen.add(key);
+      }
+    });
+
+    let cleanedData = data;
+    if (strategy !== 'conservative') {
+      // Remove duplicates (keeping first occurrence)
+      cleanedData = data.filter((_, index) => !duplicateIndices.includes(index));
+    }
+
+    return { data: cleanedData, actions, cleanedCount };
+  }
+
+  private handleFormatting(data: any[], strategy: string): {
+    data: any[];
+    actions: any[];
+    cleanedCount: number;
+  } {
+    const actions: any[] = [];
+    let cleanedCount = 0;
+    
+    data.forEach(record => {
+      Object.entries(record).forEach(([field, value]) => {
+        if (typeof value === 'string') {
+          let formattedValue = value;
+          let needsFormatting = false;
+          
+          // Email formatting
+          if (field.toLowerCase().includes('email')) {
+            const formatted = value.toLowerCase().trim();
+            if (formatted !== value) {
+              formattedValue = formatted;
+              needsFormatting = true;
+            }
+          }
+          
+          // Phone formatting
+          if (field.toLowerCase().includes('phone')) {
+            const digits = value.replace(/\D/g, '');
+            if (digits.startsWith('62')) {
+              formattedValue = '+' + digits;
+            } else if (digits.startsWith('8')) {
+              formattedValue = '+62' + digits;
+            } else if (digits.startsWith('08')) {
+              formattedValue = '+62' + digits.substring(1);
+            }
+            needsFormatting = formattedValue !== value;
+          }
+          
+          // Currency formatting
+          if (field.toLowerCase().includes('price') || field.toLowerCase().includes('amount')) {
+            const numValue = parseFloat(value.replace(/\D/g, ''));
+            if (!isNaN(numValue)) {
+              formattedValue = numValue.toString();
+              needsFormatting = formattedValue !== value;
+            }
+          }
+          
+          if (needsFormatting && strategy !== 'conservative') {
+            record[field] = formattedValue;
+            cleanedCount++;
+            
+            actions.push({
+              type: 'value_formatted',
+              field,
+              oldValue: value,
+              newValue: formattedValue,
+              reason: 'standardization',
+            });
+          }
+        }
+      });
+    });
+
+    return { data, actions, cleanedCount };
+  }
+
+  private handleValidation(data: any[], strategy: string): {
+    data: any[];
+    actions: any[];
+    cleanedCount: number;
+  } {
+    const actions: any[] = [];
+    let cleanedCount = 0;
+    
+    data.forEach(record => {
+      Object.entries(record).forEach(([field, value]) => {
+        let isValid = true;
+        let correctedValue = value;
+        
+        // Numeric validation
+        if (typeof value === 'number' && (isNaN(value) || !isFinite(value))) {
+          isValid = false;
+          correctedValue = 0;
+        }
+        
+        // Business rule validation
+        if (field.toLowerCase().includes('price') && parseFloat(value) < 0) {
+          isValid = false;
+          correctedValue = Math.abs(parseFloat(value));
+        }
+        
+        if (field.toLowerCase().includes('quantity') && parseFloat(value) < 0) {
+          isValid = false;
+          correctedValue = 0;
+        }
+        
+        if (!isValid && strategy !== 'conservative') {
+          record[field] = correctedValue;
+          cleanedCount++;
+          
+          actions.push({
+            type: 'value_corrected',
+            field,
+            oldValue: value,
+            newValue: correctedValue,
+            reason: 'validation_failure',
+          });
+        }
+      });
+    });
+
+    return { data, actions, cleanedCount };
+  }
+
+  // ========== UTILITY METHODS ==========
+
+  private getImputedValue(data: any[], field: string): any {
+    const values = data.map(record => record[field]).filter(v => 
+      v !== null && v !== undefined && v !== ''
+    );
+    
+    if (values.length === 0) return null;
+    
+    // For numeric fields, use median
+    if (values.every(v => !isNaN(parseFloat(v)))) {
+      const numValues = values.map(v => parseFloat(v)).sort((a, b) => a - b);
+      return numValues[Math.floor(numValues.length / 2)];
+    }
+    
+    // For categorical fields, use mode
+    const counts: Record<string, number> = {};
+    values.forEach(v => {
+      counts[v] = (counts[v] || 0) + 1;
+    });
+    
+    return Object.entries(counts).reduce((max, [value, count]) => 
+      count > (counts[max] || 0) ? value : max, Object.keys(counts)[0]
+    );
+  }
+
+  private getNumericFields(data: any[]): string[] {
+    if (data.length === 0) return [];
+    
+    const fields = Object.keys(data[0]);
+    return fields.filter(field => {
+      const values = data.map(record => record[field]).filter(v => v !== null && v !== undefined);
+      return values.length > 0 && values.every(v => !isNaN(parseFloat(v)));
+    });
+  }
+}

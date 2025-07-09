@@ -1,661 +1,241 @@
 import {
   Controller,
-  Post,
   Get,
+  Post,
   Body,
-  Query,
   Param,
+  Query,
   UseGuards,
-  HttpCode,
-  HttpStatus,
-  BadRequestException,
-  NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiBody,
-  ApiQuery,
-  ApiParam,
-  ApiProperty,
 } from '@nestjs/swagger';
-import {
-  IsString,
-  IsOptional,
-  IsEnum,
-  IsDateString,
-  IsArray,
-  IsObject,
-  IsNumber,
-  Min,
-  Max,
-} from 'class-validator';
-import { Transform } from 'class-transformer';
 
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { GetTenant } from '../../common/decorators/tenant.decorator';
-import { GetUser } from '../../common/decorators/user.decorator';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/entities/user.entity';
 
-import {
-  ModelTrainingService,
-  TrainingRequest,
-} from '../services/model-training.service';
+import { ModelTrainingService } from '../services/model-training.service';
 import { ModelType } from '../entities/ml-model.entity';
-
-// DTOs
-class StartTrainingDto {
-  @ApiProperty({ description: 'Model name' })
-  @IsString()
-  modelName: string;
-
-  @ApiProperty({ description: 'Model type to train' })
-  @IsEnum(ModelType)
-  modelType: ModelType;
-
-  @ApiProperty({
-    description: 'Product ID for product-specific models (optional)',
-  })
-  @IsOptional()
-  @IsString()
-  productId?: string;
-
-  @ApiProperty({
-    description: 'Category ID for category-level models (optional)',
-  })
-  @IsOptional()
-  @IsString()
-  categoryId?: string;
-
-  @ApiProperty({
-    description: 'Location ID for location-specific models (optional)',
-  })
-  @IsOptional()
-  @IsString()
-  locationId?: string;
-
-  @ApiProperty({ description: 'Training data start date' })
-  @IsDateString()
-  trainingDataFrom: string;
-
-  @ApiProperty({ description: 'Training data end date' })
-  @IsDateString()
-  trainingDataTo: string;
-
-  @ApiProperty({ description: 'Product IDs to include in training (optional)' })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  productIds?: string[];
-
-  @ApiProperty({
-    description: 'Category IDs to include in training (optional)',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  categoryIds?: string[];
-
-  @ApiProperty({
-    description: 'Location IDs to include in training (optional)',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  locationIds?: string[];
-
-  @ApiProperty({ description: 'Validation split ratio (0.1-0.9)' })
-  @IsNumber()
-  @Min(0.1)
-  @Max(0.9)
-  validationSplit: number = 0.8;
-
-  @ApiProperty({ description: 'Validation method' })
-  @IsEnum(['time_series', 'random'])
-  validationMethod: 'time_series' | 'random' = 'time_series';
-
-  @ApiProperty({ description: 'Feature list for training' })
-  @IsArray()
-  @IsString({ each: true })
-  features: string[];
-
-  @ApiProperty({ description: 'Target variable for prediction' })
-  @IsString()
-  target: string;
-
-  @ApiProperty({ description: 'Model hyperparameters' })
-  @IsObject()
-  hyperparameters: Record<string, any>;
-}
-
-class RetrainModelDto {
-  @ApiProperty({ description: 'New training data start date (optional)' })
-  @IsOptional()
-  @IsDateString()
-  trainingDataFrom?: string;
-
-  @ApiProperty({ description: 'New training data end date (optional)' })
-  @IsOptional()
-  @IsDateString()
-  trainingDataTo?: string;
-
-  @ApiProperty({ description: 'Updated hyperparameters (optional)' })
-  @IsOptional()
-  @IsObject()
-  hyperparameters?: Record<string, any>;
-
-  @ApiProperty({ description: 'Updated feature list (optional)' })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  features?: string[];
-}
-
-class TrainingJobQueryDto {
-  @ApiProperty({ description: 'Filter by model ID' })
-  @IsOptional()
-  @IsString()
-  modelId?: string;
-
-  @ApiProperty({ description: 'Filter by job status' })
-  @IsOptional()
-  @IsString()
-  status?: string;
-
-  @ApiProperty({ description: 'Number of results to return' })
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value))
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20;
-
-  @ApiProperty({ description: 'Number of results to skip' })
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value))
-  @IsNumber()
-  @Min(0)
-  offset?: number = 0;
-}
 
 @ApiTags('ML Training')
 @ApiBearerAuth()
-@Controller('api/v1/ml/training')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@Controller('ml-forecasting/training')
 export class MLTrainingController {
+  private readonly logger = new Logger(MLTrainingController.name);
+
   constructor(private readonly modelTrainingService: ModelTrainingService) {}
 
   @Post('start')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @HttpCode(HttpStatus.ACCEPTED)
+  @Roles(UserRole.ADMIN)
   @ApiOperation({
-    summary: 'Start Model Training',
+    summary: 'Start ML model training',
     description:
-      'Start training a new machine learning model for demand forecasting',
+      'Start training a new ML model with the specified configuration',
   })
   @ApiResponse({
-    status: 202,
-    description: 'Training job started successfully',
-    schema: {
-      properties: {
-        success: { type: 'boolean' },
-        modelId: { type: 'string' },
-        jobId: { type: 'string' },
-        message: { type: 'string' },
-      },
-    },
+    status: 200,
+    description: 'Training started successfully',
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid training configuration',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Admin/Manager access required',
-  })
-  @ApiBody({ type: StartTrainingDto })
   async startTraining(
-    @GetTenant() tenantId: string,
-    @GetUser('id') userId: string,
-    @Body() trainingDto: StartTrainingDto,
-  ): Promise<{
-    success: boolean;
-    modelId: string;
-    jobId: string;
-    message: string;
-  }> {
-    // Validate training configuration
-    const trainingFrom = new Date(trainingDto.trainingDataFrom);
-    const trainingTo = new Date(trainingDto.trainingDataTo);
+    @CurrentUser() user: any,
+    @Body()
+    trainingDto: {
+      modelType: ModelType;
+      modelName: string;
+      productId?: string;
+      categoryId?: string;
+      locationId?: string;
+      trainingPeriod: {
+        startDate: string;
+        endDate: string;
+      };
+      features?: string[];
+      hyperparameters?: Record<string, any>;
+    },
+  ) {
+    try {
+      const request = {
+        modelType: trainingDto.modelType,
+        modelName: trainingDto.modelName,
+        productId: trainingDto.productId,
+        categoryId: trainingDto.categoryId,
+        locationId: trainingDto.locationId,
+        trainingConfig: {
+          dataSource: {
+            from: trainingDto.trainingPeriod.startDate,
+            to: trainingDto.trainingPeriod.endDate,
+            productIds: trainingDto.productId ? [trainingDto.productId] : undefined,
+            categoryIds: trainingDto.categoryId ? [trainingDto.categoryId] : undefined,
+            locationIds: trainingDto.locationId ? [trainingDto.locationId] : undefined,
+          },
+          hyperparameters: trainingDto.hyperparameters || {},
+          validation: {
+            splitRatio: 0.8,
+            method: 'time_series' as const,
+          },
+          features: trainingDto.features || ['quantity', 'price'],
+          target: 'quantity',
+        },
+      };
 
-    if (trainingFrom >= trainingTo) {
-      throw new BadRequestException(
-        'Training start date must be before end date',
+      const result = await this.modelTrainingService.startTraining(
+        request,
+        user.tenantId,
+        user.id,
       );
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      this.logger.error(`Error starting training: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+      };
     }
-
-    // Check if enough training data timespan
-    const daysDiff = Math.ceil(
-      (trainingTo.getTime() - trainingFrom.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    if (daysDiff < 30) {
-      throw new BadRequestException('Training data must span at least 30 days');
-    }
-
-    const trainingRequest: TrainingRequest = {
-      modelType: trainingDto.modelType,
-      modelName: trainingDto.modelName,
-      productId: trainingDto.productId,
-      categoryId: trainingDto.categoryId,
-      locationId: trainingDto.locationId,
-      trainingConfig: {
-        dataSource: {
-          from: trainingDto.trainingDataFrom,
-          to: trainingDto.trainingDataTo,
-          productIds: trainingDto.productIds,
-          categoryIds: trainingDto.categoryIds,
-          locationIds: trainingDto.locationIds,
-        },
-        hyperparameters: trainingDto.hyperparameters,
-        validation: {
-          splitRatio: trainingDto.validationSplit,
-          method: trainingDto.validationMethod,
-        },
-        features: trainingDto.features,
-        target: trainingDto.target,
-      },
-      userId,
-    };
-
-    const result = await this.modelTrainingService.startTraining(
-      tenantId,
-      trainingRequest,
-    );
-
-    if (!result.success) {
-      throw new BadRequestException(result.error);
-    }
-
-    return {
-      success: true,
-      modelId: result.modelId,
-      jobId: result.jobId,
-      message:
-        'Model training started successfully. Check job status for progress.',
-    };
-  }
-
-  @Post(':modelId/retrain')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({
-    summary: 'Retrain Existing Model',
-    description: 'Retrain an existing model with new data or parameters',
-  })
-  @ApiResponse({
-    status: 202,
-    description: 'Retraining job started successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Model not found',
-  })
-  @ApiParam({
-    name: 'modelId',
-    description: 'Model ID to retrain',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @ApiBody({ type: RetrainModelDto })
-  async retrainModel(
-    @GetTenant() tenantId: string,
-    @GetUser('id') userId: string,
-    @Param('modelId') modelId: string,
-    @Body() retrainDto: RetrainModelDto,
-  ): Promise<{
-    success: boolean;
-    modelId: string;
-    jobId: string;
-    message: string;
-  }> {
-    // This would implement retraining logic
-    // For now, return a placeholder response
-    throw new BadRequestException(
-      'Retraining functionality will be implemented in Phase 2',
-    );
   }
 
   @Get('jobs')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
-    summary: 'Get Training Jobs',
-    description: 'Retrieve list of training jobs with their status',
+    summary: 'Get training jobs',
+    description: 'Get list of training jobs for the tenant',
   })
   @ApiResponse({
     status: 200,
     description: 'Training jobs retrieved successfully',
-    schema: {
-      properties: {
-        jobs: {
-          type: 'array',
-          items: {
-            properties: {
-              id: { type: 'string' },
-              modelId: { type: 'string' },
-              modelName: { type: 'string' },
-              modelType: { type: 'string' },
-              status: { type: 'string' },
-              progress: { type: 'number' },
-              currentStep: { type: 'string' },
-              startedAt: { type: 'string' },
-              completedAt: { type: 'string' },
-              duration: { type: 'number' },
-              performance: { type: 'object' },
-              errorMessage: { type: 'string' },
-            },
-          },
-        },
-        total: { type: 'number' },
-        hasMore: { type: 'boolean' },
-      },
-    },
-  })
-  @ApiQuery({
-    name: 'modelId',
-    required: false,
-    description: 'Filter by model ID',
-  })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    description: 'Filter by job status',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Number of results to return (1-100)',
-    example: 20,
-  })
-  @ApiQuery({
-    name: 'offset',
-    required: false,
-    description: 'Number of results to skip',
-    example: 0,
   })
   async getTrainingJobs(
-    @GetTenant() tenantId: string,
-    @Query() query: TrainingJobQueryDto,
-  ): Promise<{
-    jobs: any[];
-    total: number;
-    hasMore: boolean;
-  }> {
-    // This would query training jobs from database
-    // For now, return a placeholder response
-    return {
-      jobs: [],
-      total: 0,
-      hasMore: false,
-    };
+    @CurrentUser() user: any,
+    @Query('limit') limit?: number,
+  ) {
+    try {
+      const jobs = await this.modelTrainingService.listTrainingJobs(
+        user.tenantId,
+        limit || 50,
+      );
+
+      return {
+        success: true,
+        data: jobs,
+        total: jobs.length,
+      };
+    } catch (error) {
+      this.logger.error(`Error getting training jobs: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        data: [],
+      };
+    }
   }
 
-  @Get('jobs/:jobId')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  @ApiOperation({
-    summary: 'Get Training Job Details',
-    description: 'Retrieve detailed information about a specific training job',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Training job details retrieved successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Training job not found',
-  })
-  @ApiParam({
-    name: 'jobId',
-    description: 'Training job ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  async getTrainingJobDetails(
-    @GetTenant() tenantId: string,
-    @Param('jobId') jobId: string,
-  ): Promise<{
-    id: string;
-    modelId: string;
-    modelName: string;
-    modelType: string;
-    status: string;
-    progress: number;
-    currentStep: string;
-    startedAt: string;
-    completedAt: string;
-    duration: number;
-    trainingConfig: any;
-    performance: any;
-    logs: string[];
-    errorMessage: string;
-    resourceUsage: any;
-  }> {
-    // This would query specific training job from database
-    // For now, return a placeholder response
-    throw new NotFoundException('Training job not found');
-  }
-
-  @Post('jobs/:jobId/cancel')
+  @Get('jobs/:jobId/status')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Cancel Training Job',
-    description: 'Cancel a running training job',
+    summary: 'Get training job status',
+    description: 'Get the status of a specific training job',
   })
   @ApiResponse({
     status: 200,
-    description: 'Training job cancelled successfully',
+    description: 'Training job status retrieved successfully',
   })
-  @ApiResponse({
-    status: 404,
-    description: 'Training job not found',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Training job cannot be cancelled',
-  })
-  @ApiParam({
-    name: 'jobId',
-    description: 'Training job ID to cancel',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  async cancelTrainingJob(
-    @GetTenant() tenantId: string,
-    @GetUser('id') userId: string,
+  async getTrainingStatus(
+    @CurrentUser() user: any,
     @Param('jobId') jobId: string,
-  ): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    // This would implement job cancellation logic
-    // For now, return a placeholder response
-    throw new BadRequestException(
-      'Job cancellation functionality will be implemented in Phase 2',
-    );
+  ) {
+    try {
+      const job = await this.modelTrainingService.getTrainingStatus(
+        jobId,
+        user.tenantId,
+      );
+
+      return {
+        success: true,
+        data: job,
+      };
+    } catch (error) {
+      this.logger.error(`Error getting training status: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 
-  @Get('models')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @Get('models/trained')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({
-    summary: 'Get Trained Models',
-    description: 'Retrieve list of trained ML models',
+    summary: 'Get trained models',
+    description: 'Get list of successfully trained models',
   })
   @ApiResponse({
     status: 200,
-    description: 'Models retrieved successfully',
-    schema: {
-      properties: {
-        models: {
-          type: 'array',
-          items: {
-            properties: {
-              id: { type: 'string' },
-              name: { type: 'string' },
-              modelType: { type: 'string' },
-              status: { type: 'string' },
-              productId: { type: 'string' },
-              categoryId: { type: 'string' },
-              locationId: { type: 'string' },
-              performance: { type: 'object' },
-              trainedAt: { type: 'string' },
-              deployedAt: { type: 'string' },
-              lastPredictionAt: { type: 'string' },
-              isActive: { type: 'boolean' },
-            },
-          },
-        },
-        total: { type: 'number' },
-      },
-    },
+    description: 'Trained models retrieved successfully',
   })
-  async getTrainedModels(
-    @GetTenant() tenantId: string,
-    @Query('status') status?: string,
-    @Query('modelType') modelType?: string,
-    @Query('limit') limit: number = 20,
-    @Query('offset') offset: number = 0,
-  ): Promise<{
-    models: any[];
-    total: number;
-  }> {
-    // This would query models from database
-    // For now, return a placeholder response
-    return {
-      models: [],
-      total: 0,
-    };
-  }
+  async getTrainedModels(@CurrentUser() user: any) {
+    try {
+      const models = await this.modelTrainingService.getTrainedModels(
+        user.tenantId,
+      );
 
-  @Get('models/:modelId')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
-  @ApiOperation({
-    summary: 'Get Model Details',
-    description: 'Retrieve detailed information about a specific ML model',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Model details retrieved successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Model not found',
-  })
-  @ApiParam({
-    name: 'modelId',
-    description: 'Model ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  async getModelDetails(
-    @GetTenant() tenantId: string,
-    @Param('modelId') modelId: string,
-  ): Promise<{
-    id: string;
-    name: string;
-    description: string;
-    modelType: string;
-    status: string;
-    productId: string;
-    categoryId: string;
-    locationId: string;
-    hyperparameters: any;
-    trainingConfig: any;
-    performance: any;
-    featureImportance: any;
-    trainedAt: string;
-    deployedAt: string;
-    lastPredictionAt: string;
-    nextRetrainingAt: string;
-    isActive: boolean;
-  }> {
-    // This would query specific model from database
-    // For now, return a placeholder response
-    throw new NotFoundException('Model not found');
+      return {
+        success: true,
+        data: models,
+        total: models.length,
+      };
+    } catch (error) {
+      this.logger.error(`Error getting trained models: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        data: [],
+      };
+    }
   }
 
   @Post('models/:modelId/deploy')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN)
   @ApiOperation({
-    summary: 'Deploy Model',
-    description: 'Deploy a trained model for predictions',
+    summary: 'Deploy trained model',
+    description: 'Deploy a successfully trained model for predictions',
   })
   @ApiResponse({
     status: 200,
     description: 'Model deployed successfully',
   })
-  @ApiResponse({
-    status: 404,
-    description: 'Model not found',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Model cannot be deployed',
-  })
-  @ApiParam({
-    name: 'modelId',
-    description: 'Model ID to deploy',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
   async deployModel(
-    @GetTenant() tenantId: string,
+    @CurrentUser() user: any,
     @Param('modelId') modelId: string,
-  ): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    // This would implement model deployment logic
-    // For now, return a placeholder response
-    throw new BadRequestException(
-      'Model deployment functionality will be implemented in Phase 2',
-    );
-  }
+  ) {
+    try {
+      const model = await this.modelTrainingService.deployModel(
+        modelId,
+        user.tenantId,
+      );
 
-  @Post('models/:modelId/deprecate')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Deprecate Model',
-    description: 'Deprecate a deployed model',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Model deprecated successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Model not found',
-  })
-  @ApiParam({
-    name: 'modelId',
-    description: 'Model ID to deprecate',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  async deprecateModel(
-    @GetTenant() tenantId: string,
-    @Param('modelId') modelId: string,
-  ): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    // This would implement model deprecation logic
-    // For now, return a placeholder response
-    throw new BadRequestException(
-      'Model deprecation functionality will be implemented in Phase 2',
-    );
+      return {
+        success: true,
+        data: model,
+        message: 'Model deployed successfully',
+      };
+    } catch (error) {
+      this.logger.error(`Error deploying model: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 }

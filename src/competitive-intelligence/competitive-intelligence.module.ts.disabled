@@ -1,0 +1,62 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { CacheModule } from '@nestjs/cache-manager';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+
+import { CompetitiveIntelligenceController } from './controllers/competitive-intelligence.controller';
+import { MarketplaceDataCollectionController } from './controllers/marketplace-data-collection.controller';
+import { PriceMonitoringController } from './controllers/price-monitoring.controller';
+import { ProductCompetitionAnalysisController } from './controllers/product-competition-analysis.controller';
+import { MarketIntelligenceController } from './controllers/market-intelligence.controller';
+import { CompetitiveAlertingController } from './controllers/competitive-alerting.controller';
+import { CompetitiveIntelligenceService } from './services/competitive-intelligence.service';
+import { MarketplaceDataCollectionService } from './services/marketplace-data-collection.service';
+import { PriceMonitoringService } from './services/price-monitoring.service';
+import { ProductCompetitionAnalysisService } from './services/product-competition-analysis.service';
+import { MarketIntelligenceService } from './services/market-intelligence.service';
+import { CompetitiveAlertingService } from './services/competitive-alerting.service';
+
+import { CompetitiveProduct } from './entities/competitive-product.entity';
+import { CompetitivePriceHistory } from './entities/competitive-price-history.entity';
+import { CompetitiveAnalysis } from './entities/competitive-analysis.entity';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      CompetitiveProduct,
+      CompetitivePriceHistory,
+      CompetitiveAnalysis,
+    ]),
+    CacheModule.register({
+      ttl: 300, // 5 minutes cache for competitive data
+      max: 1000, // maximum number of items in cache
+    }),
+    EventEmitterModule,
+  ],
+  controllers: [
+    CompetitiveIntelligenceController,
+    MarketplaceDataCollectionController,
+    PriceMonitoringController,
+    ProductCompetitionAnalysisController,
+    MarketIntelligenceController,
+    CompetitiveAlertingController,
+  ],
+  providers: [
+    CompetitiveIntelligenceService,
+    MarketplaceDataCollectionService,
+    PriceMonitoringService,
+    ProductCompetitionAnalysisService,
+    MarketIntelligenceService,
+    CompetitiveAlertingService,
+  ],
+  exports: [
+    CompetitiveIntelligenceService,
+    MarketplaceDataCollectionService,
+    PriceMonitoringService,
+    ProductCompetitionAnalysisService,
+    MarketIntelligenceService,
+    CompetitiveAlertingService,
+    TypeOrmModule,
+  ],
+})
+export class CompetitiveIntelligenceModule {}

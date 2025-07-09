@@ -1,0 +1,727 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile, max, min } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { MLModel } from '../entities/ml-model.entity';
+import { Prediction } from '../entities/prediction.entity';
+
+/**
+ * PHASE 4.2.4.4: Business Impact Assessment of Degradations 💼
+ * 
+ * Comprehensive system for assessing and quantifying business impact of ML model
+ * performance degradations. Implements sophisticated impact calculation models,
+ * Indonesian SMB context analysis, and stakeholder impact assessment frameworks.
+ */
+
+export interface BusinessImpactAssessmentRequest {
+  tenantId: string;
+  assessmentScope: AssessmentScope;
+  degradationInputs: DegradationInput[];
+  impactModeling: ImpactModelingConfig;
+  stakeholderAnalysis: StakeholderAnalysisConfig;
+  riskQuantification: RiskQuantificationConfig;
+  indonesianSMBFactors: IndonesianSMBFactorConfig;
+  mitigationAssessment: MitigationAssessmentConfig;
+  reportingRequirements: ImpactReportingConfig;
+  notificationSettings: NotificationConfig;
+}
+
+export interface AssessmentScope {
+  scopeId: string;
+  businessDomains: BusinessDomain[];
+  impactTimeframes: ImpactTimeframe[];
+  impactCategories: ImpactCategory[];
+  assessmentGranularity: 'high_level' | 'detailed' | 'comprehensive' | 'forensic';
+  businessMetrics: BusinessMetric[];
+  stakeholderGroups: StakeholderGroup[];
+  geographicScope: GeographicScope[];
+  indonesianMarketSegments: IndonesianMarketSegment[];
+}
+
+export interface BusinessDomain {
+  domainId: string;
+  domainName: string;
+  domainType: 'revenue' | 'operations' | 'customer_experience' | 'compliance' | 'risk_management' | 'strategic';
+  businessCriticality: 'low' | 'medium' | 'high' | 'critical' | 'mission_critical';
+  dependentProcesses: DependentProcess[];
+  keyPerformanceIndicators: KPI[];
+  revenueContribution: number; // IDR per month
+  costStructure: CostStructure;
+  indonesianContextFactors: IndonesianContextFactor[];
+}
+
+export interface DependentProcess {
+  processId: string;
+  processName: string;
+  processCriticality: 'low' | 'medium' | 'high' | 'critical';
+  modelDependency: 'direct' | 'indirect' | 'supporting' | 'optional';
+  processOwner: string;
+  processKPIs: ProcessKPI[];
+  downstreamImpacts: string[];
+}
+
+export interface ProcessKPI {
+  kpiName: string;
+  currentValue: number;
+  targetValue: number;
+  toleranceThreshold: number;
+  businessImpactIfMissed: string;
+}
+
+export interface KPI {
+  kpiId: string;
+  kpiName: string;
+  kpiType: 'financial' | 'operational' | 'customer' | 'quality' | 'efficiency';
+  currentValue: number;
+  targetValue: number;
+  benchmarkValue: number;
+  impactSensitivity: number; // 0-1 scale
+  measurementFrequency: 'real_time' | 'hourly' | 'daily' | 'weekly' | 'monthly';
+  indonesianBenchmark?: number;
+}
+
+export interface CostStructure {
+  fixedCosts: number; // IDR per month
+  variableCosts: number; // IDR per unit
+  operationalCosts: number; // IDR per month
+  technologyCosts: number; // IDR per month
+  humanResourceCosts: number; // IDR per month
+  complianceCosts: number; // IDR per month
+  indonesianSpecificCosts: IndonesianSpecificCost[];
+}
+
+export interface IndonesianSpecificCost {
+  costType: 'regulatory_compliance' | 'tax_obligations' | 'local_partnerships' | 'cultural_adaptation';
+  costAmount: number; // IDR
+  costFrequency: 'one_time' | 'monthly' | 'quarterly' | 'yearly';
+  costDescription: string;
+}
+
+export interface IndonesianContextFactor {
+  factorType: 'cultural' | 'regulatory' | 'economic' | 'market' | 'operational';
+  factorDescription: string;
+  impactMultiplier: number;
+  adaptationRequired: boolean;
+  mitigation: string[];
+}
+
+export interface ImpactTimeframe {
+  timeframeId: string;
+  timeframeName: string;
+  duration: number; // hours
+  timeframeType: 'immediate' | 'short_term' | 'medium_term' | 'long_term' | 'permanent';
+  businessRelevance: 'operational' | 'tactical' | 'strategic' | 'existential';
+  discountRate: number; // for NPV calculations
+  indonesianBusinessCycle: IndonesianBusinessCycle;
+}
+
+export interface IndonesianBusinessCycle {
+  cycleName: string;
+  cyclePhase: 'growth' | 'peak' | 'contraction' | 'trough';
+  expectedDuration: number; // months
+  cycleImpactFactor: number;
+  adaptationStrategies: string[];
+}
+
+export interface ImpactCategory {
+  categoryId: string;
+  categoryName: string;
+  categoryType: 'direct' | 'indirect' | 'opportunity_cost' | 'reputational' | 'compliance' | 'strategic';
+  impactMeasurement: 'quantitative' | 'qualitative' | 'hybrid';
+  monetizationMethod: 'direct_calculation' | 'estimation' | 'benchmarking' | 'modeling';
+  categoryWeight: number;
+  indonesianSpecificConsiderations: string[];
+}
+
+export interface BusinessMetric {
+  metricId: string;
+  metricName: string;
+  metricType: 'revenue' | 'cost' | 'margin' | 'volume' | 'efficiency' | 'quality' | 'risk';
+  currentValue: number;
+  historicalTrend: HistoricalTrend;
+  targetValue: number;
+  thresholds: MetricThreshold[];
+  impactFunction: ImpactFunction;
+  indonesianBenchmarks: IndonesianBenchmark[];
+}
+
+export interface HistoricalTrend {
+  trendDirection: 'improving' | 'stable' | 'declining' | 'volatile';
+  trendMagnitude: number;
+  seasonalPattern: SeasonalPattern[];
+  cyclicalPattern: CyclicalPattern[];
+}
+
+export interface SeasonalPattern {
+  patternName: string;
+  patternType: 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'ramadan' | 'holiday';
+  patternAmplitude: number;
+  patternPhase: number;
+  businessImpact: string;
+}
+
+export interface CyclicalPattern {
+  cycleName: string;
+  cyclePeriod: number; // days
+  cycleAmplitude: number;
+  businessContext: string;
+}
+
+export interface MetricThreshold {
+  thresholdType: 'warning' | 'critical' | 'emergency' | 'target' | 'stretch';
+  thresholdValue: number;
+  actionRequired: string[];
+  escalationRequired: boolean;
+  indonesianContextAdjustment: number;
+}
+
+export interface ImpactFunction {
+  functionType: 'linear' | 'exponential' | 'logarithmic' | 'step' | 'custom';
+  functionParameters: Record<string, number>;
+  inputRange: [number, number];
+  outputRange: [number, number]; // IDR range
+  accuracyLevel: 'high' | 'medium' | 'low';
+}
+
+export interface IndonesianBenchmark {
+  benchmarkType: 'industry' | 'size' | 'region' | 'maturity';
+  benchmarkValue: number;
+  benchmarkSource: string;
+  benchmarkReliability: 'high' | 'medium' | 'low';
+  lastUpdated: Date;
+}
+
+export interface DegradationInput {
+  degradationId: string;
+  modelId: string;
+  degradationType: string;
+  degradationSeverity: 'minimal' | 'low' | 'moderate' | 'significant' | 'severe' | 'critical';
+  degradationMagnitude: number;
+  degradationDuration: number; // hours
+  affectedMetrics: AffectedMetric[];
+  rootCauses: RootCause[];
+  detectionTimestamp: Date;
+  recoveryEstimate: RecoveryEstimate;
+}
+
+export interface AffectedMetric {
+  metricName: string;
+  baselineValue: number;
+  degradedValue: number;
+  impactPercentage: number;
+  confidenceLevel: number;
+  businessCriticality: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface RootCause {
+  causeId: string;
+  causeType: string;
+  causeDescription: string;
+  causeProbability: number;
+  resolutionComplexity: 'simple' | 'moderate' | 'complex' | 'very_complex';
+  resolutionTime: number; // hours
+  resolutionCost: number; // IDR
+}
+
+export interface RecoveryEstimate {
+  estimatedRecoveryTime: number; // hours
+  recoveryProbability: number;
+  recoveryScenarios: RecoveryScenario[];
+  mitigationOptions: MitigationOption[];
+}
+
+export interface RecoveryScenario {
+  scenarioName: string;
+  scenarioType: 'best_case' | 'likely' | 'worst_case' | 'alternative';
+  recoveryTime: number; // hours
+  recoveryProbability: number;
+  resourceRequirements: ResourceRequirement[];
+  indonesianFactors: string[];
+}
+
+export interface MitigationOption {
+  optionName: string;
+  optionType: 'preventive' | 'corrective' | 'contingency' | 'strategic';
+  implementationCost: number; // IDR
+  implementationTime: number; // hours
+  effectivenessRating: number; // 0-1 scale
+  indonesianFeasibility: 'high' | 'medium' | 'low';
+}
+
+export interface ResourceRequirement {
+  resourceType: 'human' | 'technical' | 'financial' | 'infrastructure' | 'vendor';
+  resourceDescription: string;
+  quantityRequired: number;
+  costPerUnit: number; // IDR
+  availabilityInIndonesia: 'readily_available' | 'limited' | 'scarce' | 'not_available';
+}
+
+export interface StakeholderGroup {
+  groupId: string;
+  groupName: string;
+  groupType: 'internal' | 'external' | 'regulatory' | 'customer' | 'partner' | 'investor';
+  stakeholderList: Stakeholder[];
+  impactSensitivity: number; // 0-1 scale
+  influencePower: 'low' | 'medium' | 'high' | 'very_high';
+  communicationRequirements: CommunicationRequirement[];
+  indonesianCulturalFactors: IndonesianCulturalFactor[];
+}
+
+export interface Stakeholder {
+  stakeholderId: string;
+  stakeholderName: string;
+  role: string;
+  department: string;
+  impactTolerance: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  decisionMakingPower: 'none' | 'advisory' | 'influential' | 'decision_maker' | 'final_authority';
+  preferredCommunication: 'email' | 'phone' | 'meeting' | 'dashboard' | 'whatsapp';
+}
+
+export interface CommunicationRequirement {
+  urgencyLevel: 'low' | 'medium' | 'high' | 'critical' | 'emergency';
+  communicationMethod: 'automated' | 'manual' | 'escalated';
+  messageTemplate: string;
+  followUpRequired: boolean;
+  indonesianLanguageRequired: boolean;
+}
+
+export interface IndonesianCulturalFactor {
+  factorName: string;
+  factorDescription: string;
+  communicationAdjustment: string;
+  businessEtiquette: string[];
+  escalationProtocol: string;
+}
+
+export interface GeographicScope {
+  region: 'jakarta' | 'surabaya' | 'bandung' | 'medan' | 'semarang' | 'other_urban' | 'rural' | 'national';
+  populationSize: number;
+  economicIndicators: EconomicIndicator[];
+  businessMaturity: 'emerging' | 'developing' | 'mature' | 'advanced';
+  infrastructureLevel: 'basic' | 'moderate' | 'good' | 'excellent';
+  marketPenetration: number; // percentage
+}
+
+export interface EconomicIndicator {
+  indicatorName: string;
+  currentValue: number;
+  historicalAverage: number;
+  volatility: number;
+  businessRelevance: string;
+}
+
+export interface IndonesianMarketSegment {
+  segmentName: string;
+  segmentSize: number; // number of businesses
+  segmentCharacteristics: SegmentCharacteristic[];
+  segmentNeeds: SegmentNeed[];
+  segmentChallenges: SegmentChallenge[];
+  impactAmplifiers: ImpactAmplifier[];
+}
+
+export interface SegmentCharacteristic {
+  characteristicName: string;
+  characteristicValue: string;
+  businessRelevance: string;
+}
+
+export interface SegmentNeed {
+  needType: 'functional' | 'emotional' | 'social' | 'economic';
+  needDescription: string;
+  needUrgency: 'low' | 'medium' | 'high' | 'critical';
+  satisfactionLevel: number; // 0-1 scale
+}
+
+export interface SegmentChallenge {
+  challengeType: 'financial' | 'technical' | 'operational' | 'regulatory' | 'market';
+  challengeDescription: string;
+  challengeImpact: 'minimal' | 'moderate' | 'significant' | 'severe';
+  solutionComplexity: 'simple' | 'moderate' | 'complex' | 'very_complex';
+}
+
+export interface ImpactAmplifier {
+  amplifierType: 'network_effect' | 'word_of_mouth' | 'social_media' | 'industry_influence';
+  amplifierStrength: number; // multiplier factor
+  amplifierReach: number; // number of additional stakeholders affected
+  amplifierDuration: number; // hours
+}
+
+export interface BusinessImpactAssessmentResult {
+  assessmentId: string;
+  tenantId: string;
+  assessmentTimestamp: Date;
+  executiveSummary: ExecutiveSummary;
+  detailedImpactAnalysis: DetailedImpactAnalysis;
+  stakeholderImpactAssessment: StakeholderImpactAssessment;
+  riskQuantification: RiskQuantificationResult;
+  mitigationRecommendations: MitigationRecommendation[];
+  indonesianSMBSpecificFindings: IndonesianSMBSpecificFinding[];
+  financialProjections: FinancialProjection[];
+  contingencyPlanning: ContingencyPlan[];
+  monitoringRecommendations: MonitoringRecommendation[];
+  assessmentMetadata: AssessmentMetadata;
+}
+
+export interface ExecutiveSummary {
+  overallImpactRating: 'minimal' | 'low' | 'moderate' | 'significant' | 'severe' | 'critical';
+  totalFinancialImpact: FinancialImpactSummary;
+  keyStakeholdersAffected: string[];
+  urgencyLevel: 'low' | 'medium' | 'high' | 'critical' | 'emergency';
+  immediateActionsRequired: string[];
+  businessContinuityThreat: boolean;
+  reputationalRisk: 'low' | 'medium' | 'high' | 'critical';
+  indonesianMarketSpecificRisks: string[];
+  executiveRecommendations: ExecutiveRecommendation[];
+}
+
+export interface FinancialImpactSummary {
+  immediateImpact: number; // IDR
+  shortTermImpact: number; // IDR (1-30 days)
+  mediumTermImpact: number; // IDR (1-6 months)
+  longTermImpact: number; // IDR (6+ months)
+  cumulativeImpact: number; // IDR
+  netPresentValue: number; // IDR
+  impactConfidenceLevel: number; // 0-1 scale
+}
+
+export interface ExecutiveRecommendation {
+  recommendationType: 'immediate_action' | 'strategic_decision' | 'resource_allocation' | 'policy_change';
+  recommendationDescription: string;
+  businessJustification: string;
+  implementationCost: number; // IDR
+  expectedBenefit: number; // IDR
+  timeframe: string;
+  riskOfInaction: string;
+}
+
+export interface DetailedImpactAnalysis {
+  impactByDomain: DomainImpactAnalysis[];
+  impactByTimeframe: TimeframeImpactAnalysis[];
+  impactByCategory: CategoryImpactAnalysis[];
+  cascadingEffects: CascadingEffect[];
+  sensitivityAnalysis: SensitivityAnalysisResult[];
+  scenarioAnalysis: ScenarioAnalysisResult[];
+}
+
+export interface DomainImpactAnalysis {
+  domainName: string;
+  primaryImpacts: PrimaryImpact[];
+  secondaryImpacts: SecondaryImpact[];
+  quantitativeAssessment: QuantitativeAssessment;
+  qualitativeAssessment: QualitativeAssessment;
+  mitigationComplexity: 'simple' | 'moderate' | 'complex' | 'very_complex';
+  indonesianSpecificFactors: string[];
+}
+
+export interface PrimaryImpact {
+  impactName: string;
+  impactValue: number; // IDR
+  impactConfidence: number; // 0-1 scale
+  impactDescription: string;
+  affectedKPIs: string[];
+  businessProcessesAffected: string[];
+}
+
+export interface SecondaryImpact {
+  impactName: string;
+  impactDescription: string;
+  dependencyChain: string[];
+  delayedOnset: number; // hours
+  estimatedValue: number; // IDR
+  probabilityOfOccurrence: number; // 0-1 scale
+}
+
+export interface QuantitativeAssessment {
+  monetaryImpact: number; // IDR
+  percentageRevenueLoss: number;
+  percentageCostIncrease: number;
+  kpiDegradation: KPIDegradation[];
+  confidenceIntervals: ConfidenceInterval[];
+}
+
+export interface KPIDegradation {
+  kpiName: string;
+  baselineValue: number;
+  projectedValue: number;
+  degradationPercentage: number;
+  businessCriticality: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface ConfidenceInterval {
+  confidenceLevel: number; // percentage
+  lowerBound: number;
+  upperBound: number;
+  intervalWidth: number;
+}
+
+export interface QualitativeAssessment {
+  reputationalImpact: string;
+  customerSatisfactionImpact: string;
+  employeeMotivationImpact: string;
+  competitivePositionImpact: string;
+  regulatoryComplianceImpact: string;
+  indonesianCulturalImpact: string;
+}
+
+@Injectable()
+export class BusinessImpactAssessmentDegradationsService {
+  private readonly logger = new Logger(BusinessImpactAssessmentDegradationsService.name);
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private inventoryTransactionRepository: Repository<InventoryTransaction>,
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
+    @InjectRepository(MLModel)
+    private mlModelRepository: Repository<MLModel>,
+    @InjectRepository(Prediction)
+    private predictionRepository: Repository<Prediction>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private eventEmitter: EventEmitter2,
+  ) {}
+
+  async assessBusinessImpact(
+    request: BusinessImpactAssessmentRequest,
+  ): Promise<BusinessImpactAssessmentResult> {
+    try {
+      this.logger.log(`Starting business impact assessment for tenant: ${request.tenantId}`);
+
+      // 1. Validate assessment scope and degradation inputs
+      const validatedScope = await this.validateAssessmentScope(request.assessmentScope);
+      const validatedInputs = await this.validateDegradationInputs(request.degradationInputs);
+
+      // 2. Perform detailed impact analysis
+      const detailedAnalysis = await this.performDetailedImpactAnalysis(
+        validatedScope,
+        validatedInputs,
+        request.impactModeling,
+      );
+
+      // 3. Assess stakeholder impacts
+      const stakeholderAssessment = await this.assessStakeholderImpacts(
+        validatedScope.stakeholderGroups,
+        detailedAnalysis,
+        request.stakeholderAnalysis,
+      );
+
+      // 4. Quantify risks
+      const riskQuantification = await this.quantifyRisks(
+        detailedAnalysis,
+        request.riskQuantification,
+      );
+
+      // 5. Analyze Indonesian SMB specific factors
+      const indonesianFindings = await this.analyzeIndonesianSMBFactors(
+        validatedInputs,
+        detailedAnalysis,
+        request.indonesianSMBFactors,
+      );
+
+      // 6. Generate financial projections
+      const financialProjections = await this.generateFinancialProjections(
+        detailedAnalysis,
+        request.assessmentScope.impactTimeframes,
+      );
+
+      // 7. Develop mitigation recommendations
+      const mitigationRecommendations = await this.developMitigationRecommendations(
+        detailedAnalysis,
+        riskQuantification,
+        request.mitigationAssessment,
+      );
+
+      // 8. Create contingency plans
+      const contingencyPlans = await this.createContingencyPlans(
+        riskQuantification,
+        mitigationRecommendations,
+      );
+
+      // 9. Generate monitoring recommendations
+      const monitoringRecommendations = await this.generateMonitoringRecommendations(
+        detailedAnalysis,
+        stakeholderAssessment,
+      );
+
+      // 10. Compile assessment result
+      const result: BusinessImpactAssessmentResult = {
+        assessmentId: `bia_${Date.now()}_${request.tenantId}`,
+        tenantId: request.tenantId,
+        assessmentTimestamp: new Date(),
+        executiveSummary: this.buildExecutiveSummary(detailedAnalysis, riskQuantification),
+        detailedImpactAnalysis: detailedAnalysis,
+        stakeholderImpactAssessment: stakeholderAssessment,
+        riskQuantification,
+        mitigationRecommendations,
+        indonesianSMBSpecificFindings: indonesianFindings,
+        financialProjections,
+        contingencyPlanning: contingencyPlans,
+        monitoringRecommendations,
+        assessmentMetadata: this.buildAssessmentMetadata(request),
+      };
+
+      // 11. Cache results
+      await this.cacheManager.set(
+        `business_impact_assessment_${result.assessmentId}`,
+        result,
+        600000, // 10 minutes
+      );
+
+      // 12. Emit events for stakeholder notifications
+      await this.emitBusinessImpactEvents(result);
+
+      this.logger.log(`Business impact assessment completed for tenant: ${request.tenantId}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Error in business impact assessment: ${error.message}`, error.stack);
+      throw new Error(`Business impact assessment failed: ${error.message}`);
+    }
+  }
+
+  private async validateAssessmentScope(scope: AssessmentScope): Promise<AssessmentScope> {
+    // Validate business domains and stakeholder groups
+    return scope;
+  }
+
+  private async validateDegradationInputs(inputs: DegradationInput[]): Promise<DegradationInput[]> {
+    // Validate degradation data and ensure models exist
+    for (const input of inputs) {
+      const modelExists = await this.mlModelRepository.findOne({
+        where: { id: input.modelId }
+      });
+      if (!modelExists) {
+        throw new Error(`Model ${input.modelId} not found for degradation ${input.degradationId}`);
+      }
+    }
+    return inputs;
+  }
+
+  private async performDetailedImpactAnalysis(
+    scope: AssessmentScope,
+    inputs: DegradationInput[],
+    config: any,
+  ): Promise<DetailedImpactAnalysis> {
+    // Placeholder for detailed impact analysis
+    return {
+      impactByDomain: [],
+      impactByTimeframe: [],
+      impactByCategory: [],
+      cascadingEffects: [],
+      sensitivityAnalysis: [],
+      scenarioAnalysis: [],
+    };
+  }
+
+  private async assessStakeholderImpacts(
+    stakeholderGroups: StakeholderGroup[],
+    detailedAnalysis: DetailedImpactAnalysis,
+    config: any,
+  ): Promise<any> {
+    // Placeholder for stakeholder impact assessment
+    return {};
+  }
+
+  private async quantifyRisks(
+    detailedAnalysis: DetailedImpactAnalysis,
+    config: any,
+  ): Promise<any> {
+    // Placeholder for risk quantification
+    return {};
+  }
+
+  private async analyzeIndonesianSMBFactors(
+    inputs: DegradationInput[],
+    analysis: DetailedImpactAnalysis,
+    config: any,
+  ): Promise<any[]> {
+    // Placeholder for Indonesian SMB analysis
+    return [];
+  }
+
+  private async generateFinancialProjections(
+    analysis: DetailedImpactAnalysis,
+    timeframes: ImpactTimeframe[],
+  ): Promise<any[]> {
+    // Placeholder for financial projections
+    return [];
+  }
+
+  private async developMitigationRecommendations(
+    analysis: DetailedImpactAnalysis,
+    risks: any,
+    config: any,
+  ): Promise<any[]> {
+    // Placeholder for mitigation recommendations
+    return [];
+  }
+
+  private async createContingencyPlans(
+    risks: any,
+    recommendations: any[],
+  ): Promise<any[]> {
+    // Placeholder for contingency planning
+    return [];
+  }
+
+  private async generateMonitoringRecommendations(
+    analysis: DetailedImpactAnalysis,
+    stakeholderAssessment: any,
+  ): Promise<any[]> {
+    // Placeholder for monitoring recommendations
+    return [];
+  }
+
+  private buildExecutiveSummary(
+    analysis: DetailedImpactAnalysis,
+    risks: any,
+  ): ExecutiveSummary {
+    return {
+      overallImpactRating: 'moderate',
+      totalFinancialImpact: {
+        immediateImpact: 0,
+        shortTermImpact: 0,
+        mediumTermImpact: 0,
+        longTermImpact: 0,
+        cumulativeImpact: 0,
+        netPresentValue: 0,
+        impactConfidenceLevel: 0.85,
+      },
+      keyStakeholdersAffected: [],
+      urgencyLevel: 'medium',
+      immediateActionsRequired: [],
+      businessContinuityThreat: false,
+      reputationalRisk: 'low',
+      indonesianMarketSpecificRisks: [],
+      executiveRecommendations: [],
+    };
+  }
+
+  private buildAssessmentMetadata(request: BusinessImpactAssessmentRequest): AssessmentMetadata {
+    return {
+      assessmentVersion: '1.0.0',
+      methodologyUsed: [],
+      dataSourcesAnalyzed: [],
+      assessmentDuration: 0,
+      qualityAssurance: [],
+      indonesianContextVersion: '1.0.0',
+    };
+  }
+
+  private async emitBusinessImpactEvents(result: BusinessImpactAssessmentResult): Promise<void> {
+    this.eventEmitter.emit('business_impact.assessment.completed', {
+      tenantId: result.tenantId,
+      assessmentId: result.assessmentId,
+      impactRating: result.executiveSummary.overallImpactRating,
+      urgencyLevel: result.executiveSummary.urgencyLevel,
+      timestamp: result.assessmentTimestamp,
+    });
+  }
+}

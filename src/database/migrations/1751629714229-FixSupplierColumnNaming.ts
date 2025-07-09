@@ -1,10 +1,11 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixSupplierColumnNaming1751629714229 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Add camelCase columns that match entity property names
-        await queryRunner.query(`
+export class FixSupplierColumnNaming1751629714229
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add camelCase columns that match entity property names
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add legalName column (camelCase) if suppliers table exists and column missing
@@ -102,11 +103,11 @@ export class FixSupplierColumnNaming1751629714229 implements MigrationInterface 
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Remove camelCase columns that were added
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove camelCase columns that were added
+    await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove camelCase columns from suppliers table
@@ -150,6 +151,5 @@ export class FixSupplierColumnNaming1751629714229 implements MigrationInterface 
                 DROP TYPE IF EXISTS supplier_payment_terms_enum;
             END $$;
         `);
-    }
-
+  }
 }

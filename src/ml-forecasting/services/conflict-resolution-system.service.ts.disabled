@@ -1,0 +1,916 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile, max, min } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { ProductCategory } from '../../products/entities/product-category.entity';
+
+/**
+ * PHASE 3.2.3.5.3: Conflict Resolution System ⚖️
+ * 
+ * Advanced conflict resolution engine that detects, analyzes, and resolves
+ * conflicts between different pattern learning systems. Provides intelligent
+ * conflict resolution strategies and maintains pattern coherence.
+ */
+
+export interface ConflictResolutionRequest {
+  tenantId: string;
+  patternInputs: ConflictPatternInput[];
+  resolutionStrategy: ResolutionStrategy;
+  businessContext?: BusinessResolutionContext;
+  resolutionPriorities?: ResolutionPriority[];
+  conflictSensitivity: 'low' | 'medium' | 'high' | 'very_high';
+  autoResolveThreshold?: number;
+  requireManualReview?: boolean;
+  analysisDepth: 'basic' | 'standard' | 'comprehensive' | 'expert';
+}
+
+export interface ConflictPatternInput {
+  patternId: string;
+  patternType: string;
+  source: string;
+  predictions: PatternPrediction[];
+  confidence: number;
+  businessImpact: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  weight: number;
+  metadata: {
+    analysisDate: Date;
+    dataQuality: number;
+    sampleSize: number;
+    timeHorizon: string;
+    methodology: string;
+  };
+}
+
+export interface PatternPrediction {
+  timeFrame: string;
+  direction: 'increase' | 'decrease' | 'stable' | 'volatile';
+  magnitude: number;
+  confidence: number;
+  category?: string;
+  seasonalFactor?: number;
+  details: Record<string, any>;
+}
+
+export type ResolutionStrategy = 
+  | 'confidence_weighted'       // Prioritize highest confidence patterns
+  | 'business_impact_weighted'  // Prioritize highest business impact
+  | 'recency_weighted'         // Prioritize most recent analysis
+  | 'data_quality_weighted'    // Prioritize highest data quality
+  | 'ensemble_averaging'       // Average conflicting patterns
+  | 'expert_system'            // Rule-based expert system
+  | 'machine_learning'         // ML-based resolution
+  | 'hybrid_approach'          // Combination of multiple strategies
+  | 'manual_review'            // Require manual intervention
+  | 'context_aware';           // Business context-aware resolution
+
+export interface BusinessResolutionContext {
+  industry: string;
+  businessSize: 'micro' | 'small' | 'medium' | 'large';
+  riskTolerance: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  decisionUrgency: 'immediate' | 'urgent' | 'normal' | 'planned';
+  costOfError: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  strategicImportance: 'critical' | 'high' | 'medium' | 'low';
+  seasonalSensitivity: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+}
+
+export interface ResolutionPriority {
+  criterion: 'confidence' | 'business_impact' | 'data_quality' | 'recency' | 'methodology' | 'sample_size';
+  weight: number;
+  threshold?: number;
+  direction: 'higher_better' | 'lower_better';
+}
+
+export interface ConflictResolutionResult {
+  resolutionId: string;
+  request: ConflictResolutionRequest;
+  conflictAnalysis: ConflictAnalysis;
+  resolutionDecisions: ResolutionDecision[];
+  resolvedPatterns: ResolvedPattern[];
+  unresolvableConflicts: UnresolvableConflict[];
+  resolutionSummary: ResolutionSummary;
+  confidenceAssessment: ConfidenceAssessment;
+  recommendedActions: RecommendedAction[];
+  metadata: {
+    resolutionDate: Date;
+    processingTime: number;
+    conflictsDetected: number;
+    conflictsResolved: number;
+    resolutionEfficiency: number;
+    limitations: string[];
+  };
+}
+
+export interface ConflictAnalysis {
+  totalConflicts: number;
+  conflictTypes: ConflictType[];
+  conflictSeverity: ConflictSeverity;
+  conflictPatterns: ConflictPattern[];
+  temporalConflicts: TemporalConflict[];
+  magnitudeConflicts: MagnitudeConflict[];
+  directionalConflicts: DirectionalConflict[];
+  confidenceConflicts: ConfidenceConflict[];
+}
+
+export interface ConflictType {
+  type: 'directional' | 'magnitude' | 'temporal' | 'confidence' | 'categorical' | 'logical';
+  count: number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  description: string;
+  examples: ConflictExample[];
+  resolutionComplexity: 'simple' | 'moderate' | 'complex' | 'expert_required';
+}
+
+export interface ConflictExample {
+  conflictingPatterns: string[];
+  description: string;
+  impact: string;
+  suggestedResolution: string;
+}
+
+export interface ConflictSeverity {
+  overall: 'critical' | 'high' | 'medium' | 'low' | 'minimal';
+  criticalConflicts: number;
+  highSeverityConflicts: number;
+  mediumSeverityConflicts: number;
+  lowSeverityConflicts: number;
+  severityScore: number;
+}
+
+export interface ConflictPattern {
+  conflictId: string;
+  conflictType: string;
+  involvedPatterns: string[];
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  description: string;
+  impact: string;
+  timeFrame: string;
+  businessConsequence: string;
+  resolutionUrgency: 'immediate' | 'urgent' | 'normal' | 'low';
+}
+
+export interface TemporalConflict {
+  conflictId: string;
+  timeFrame: string;
+  conflictingPredictions: PatternPrediction[];
+  timingMismatch: number; // days
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  impact: string;
+}
+
+export interface MagnitudeConflict {
+  conflictId: string;
+  timeFrame: string;
+  magnitudeRange: { min: number; max: number };
+  magnitudeDifference: number;
+  relativeVariance: number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  businessSignificance: string;
+}
+
+export interface DirectionalConflict {
+  conflictId: string;
+  timeFrame: string;
+  conflictingDirections: string[];
+  agreementLevel: number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  decisionImpact: string;
+}
+
+export interface ConfidenceConflict {
+  conflictId: string;
+  confidenceRange: { min: number; max: number };
+  confidenceVariance: number;
+  involvedPatterns: string[];
+  reliability: 'high' | 'medium' | 'low' | 'very_low';
+  trustworthiness: string;
+}
+
+export interface ResolutionDecision {
+  decisionId: string;
+  conflictId: string;
+  resolutionMethod: string;
+  chosenPattern?: string;
+  resolutionRationale: string;
+  confidence: number;
+  businessJustification: string;
+  alternativeOptions: AlternativeOption[];
+  riskAssessment: ResolutionRiskAssessment;
+  implementationGuidance: string[];
+}
+
+export interface AlternativeOption {
+  optionId: string;
+  description: string;
+  pros: string[];
+  cons: string[];
+  riskLevel: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  suitability: number;
+}
+
+export interface ResolutionRiskAssessment {
+  overallRisk: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  riskFactors: RiskFactor[];
+  mitigationStrategies: string[];
+  contingencyPlans: string[];
+  monitoringRecommendations: string[];
+}
+
+export interface RiskFactor {
+  factor: string;
+  probability: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  impact: 'very_low' | 'low' | 'medium' | 'high' | 'very_high';
+  description: string;
+  mitigation: string;
+}
+
+export interface ResolvedPattern {
+  resolvedId: string;
+  originalConflicts: string[];
+  finalPrediction: PatternPrediction;
+  resolutionMethod: string;
+  contributingPatterns: ContributingPattern[];
+  confidence: number;
+  reliability: number;
+  businessApplicability: number;
+  implementationReadiness: 'ready' | 'conditional' | 'requires_validation' | 'not_ready';
+}
+
+export interface ContributingPattern {
+  patternId: string;
+  contribution: number;
+  weight: number;
+  reason: string;
+  adjustments: string[];
+}
+
+export interface UnresolvableConflict {
+  conflictId: string;
+  reason: 'insufficient_data' | 'fundamental_disagreement' | 'business_context_unclear' | 'expert_review_required';
+  description: string;
+  involvedPatterns: string[];
+  recommendedAction: string;
+  escalationLevel: 'team_lead' | 'data_scientist' | 'business_analyst' | 'senior_management';
+  urgency: 'immediate' | 'urgent' | 'normal' | 'low';
+  businessImpact: string;
+}
+
+export interface ResolutionSummary {
+  totalConflictsProcessed: number;
+  conflictsResolved: number;
+  conflictsUnresolved: number;
+  resolutionRate: number;
+  averageResolutionConfidence: number;
+  primaryResolutionMethods: string[];
+  businessImpactMitigated: string;
+  keyDecisions: string[];
+  implementationComplexity: 'simple' | 'moderate' | 'complex' | 'very_complex';
+}
+
+export interface ConfidenceAssessment {
+  overallConfidence: number;
+  resolutionConfidenceDistribution: {
+    high: number;    // > 0.8
+    medium: number;  // 0.6-0.8
+    low: number;     // < 0.6
+  };
+  reliabilityFactors: ReliabilityFactor[];
+  uncertaintyAreas: UncertaintyArea[];
+  validationRecommendations: string[];
+}
+
+export interface ReliabilityFactor {
+  factor: string;
+  impact: 'positive' | 'negative' | 'neutral';
+  strength: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  description: string;
+  contribution: number;
+}
+
+export interface UncertaintyArea {
+  area: string;
+  uncertaintyLevel: 'very_high' | 'high' | 'medium' | 'low' | 'very_low';
+  impact: string;
+  mitigationApproach: string;
+  monitoringNeeded: boolean;
+}
+
+export interface RecommendedAction {
+  actionId: string;
+  type: 'immediate' | 'short_term' | 'medium_term' | 'long_term' | 'ongoing';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  category: 'decision_implementation' | 'monitoring' | 'validation' | 'process_improvement' | 'risk_mitigation';
+  title: string;
+  description: string;
+  expectedBenefit: string;
+  effort: 'minimal' | 'moderate' | 'significant' | 'extensive';
+  timeline: string;
+  dependencies: string[];
+  successMetrics: string[];
+}
+
+@Injectable()
+export class ConflictResolutionSystemService {
+  private readonly logger = new Logger(ConflictResolutionSystemService.name);
+
+  constructor(
+    @InjectRepository(InventoryTransaction)
+    private readonly inventoryTransactionRepository: Repository<InventoryTransaction>,
+    
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    
+    @InjectRepository(ProductCategory)
+    private readonly productCategoryRepository: Repository<ProductCategory>,
+    
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async resolveConflicts(request: ConflictResolutionRequest): Promise<ConflictResolutionResult> {
+    this.logger.log(`Starting conflict resolution for tenant: ${request.tenantId}`);
+    const startTime = Date.now();
+    
+    try {
+      const resolutionId = `conflict_resolution_${request.tenantId}_${Date.now()}`;
+      
+      // Analyze conflicts
+      const conflictAnalysis = this.analyzeConflicts(request.patternInputs);
+      
+      // Generate resolution decisions
+      const resolutionDecisions = await this.generateResolutionDecisions(
+        conflictAnalysis, 
+        request
+      );
+      
+      // Resolve patterns
+      const resolvedPatterns = this.resolvePatterns(
+        request.patternInputs, 
+        resolutionDecisions, 
+        request
+      );
+      
+      // Identify unresolvable conflicts
+      const unresolvableConflicts = this.identifyUnresolvableConflicts(
+        conflictAnalysis, 
+        resolutionDecisions
+      );
+      
+      // Generate resolution summary
+      const resolutionSummary = this.generateResolutionSummary(
+        conflictAnalysis, 
+        resolutionDecisions, 
+        resolvedPatterns
+      );
+      
+      // Assess confidence
+      const confidenceAssessment = this.assessResolutionConfidence(
+        resolutionDecisions, 
+        resolvedPatterns
+      );
+      
+      // Generate recommendations
+      const recommendedActions = this.generateRecommendedActions(
+        resolutionSummary, 
+        unresolvableConflicts, 
+        request
+      );
+      
+      const result: ConflictResolutionResult = {
+        resolutionId,
+        request,
+        conflictAnalysis,
+        resolutionDecisions,
+        resolvedPatterns,
+        unresolvableConflicts,
+        resolutionSummary,
+        confidenceAssessment,
+        recommendedActions,
+        metadata: {
+          resolutionDate: new Date(),
+          processingTime: Date.now() - startTime,
+          conflictsDetected: conflictAnalysis.totalConflicts,
+          conflictsResolved: resolutionDecisions.length,
+          resolutionEfficiency: resolutionDecisions.length / Math.max(1, conflictAnalysis.totalConflicts),
+          limitations: this.getResolutionLimitations(request.analysisDepth)
+        }
+      };
+
+      // Cache result
+      await this.cacheManager.set(
+        `conflict_resolution_${resolutionId}`,
+        result,
+        1800 // 30 minutes TTL
+      );
+
+      // Emit resolution completion event
+      this.eventEmitter.emit('conflict.resolution.completed', {
+        resolutionId,
+        tenantId: request.tenantId,
+        conflictsDetected: conflictAnalysis.totalConflicts,
+        conflictsResolved: resolutionDecisions.length,
+        resolutionRate: result.metadata.resolutionEfficiency,
+        averageConfidence: confidenceAssessment.overallConfidence,
+        processingTime: result.metadata.processingTime
+      });
+
+      this.logger.log(`Conflict resolution completed: ${resolutionId} in ${result.metadata.processingTime}ms`);
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`Error in conflict resolution: ${error.message}`, error.stack);
+      throw new Error(`Conflict resolution failed: ${error.message}`);
+    }
+  }
+
+  private analyzeConflicts(patterns: ConflictPatternInput[]): ConflictAnalysis {
+    const conflicts: ConflictPattern[] = [];
+    const temporalConflicts: TemporalConflict[] = [];
+    const magnitudeConflicts: MagnitudeConflict[] = [];
+    const directionalConflicts: DirectionalConflict[] = [];
+    const confidenceConflicts: ConfidenceConflict[] = [];
+
+    // Analyze directional conflicts
+    const timeFrames = this.extractTimeFrames(patterns);
+    
+    timeFrames.forEach(timeFrame => {
+      const timeFramePatterns = patterns.filter(p => 
+        p.predictions.some(pred => pred.timeFrame === timeFrame)
+      );
+      
+      if (timeFramePatterns.length > 1) {
+        const directions = timeFramePatterns.map(p => 
+          p.predictions.find(pred => pred.timeFrame === timeFrame)?.direction
+        ).filter(Boolean);
+        
+        const uniqueDirections = [...new Set(directions)];
+        
+        if (uniqueDirections.length > 1) {
+          directionalConflicts.push({
+            conflictId: `directional_${timeFrame}_${Date.now()}`,
+            timeFrame,
+            conflictingDirections: uniqueDirections,
+            agreementLevel: 1 - (uniqueDirections.length - 1) / directions.length,
+            severity: uniqueDirections.length > 2 ? 'high' : 'medium',
+            decisionImpact: 'Contradictory predictions may lead to poor decision making'
+          });
+        }
+      }
+    });
+
+    // Analyze magnitude conflicts
+    timeFrames.forEach(timeFrame => {
+      const magnitudes = patterns
+        .map(p => p.predictions.find(pred => pred.timeFrame === timeFrame)?.magnitude)
+        .filter(m => m !== undefined) as number[];
+      
+      if (magnitudes.length > 1) {
+        const magnitudeRange = { min: min(magnitudes), max: max(magnitudes) };
+        const magnitudeDifference = magnitudeRange.max - magnitudeRange.min;
+        const relativeVariance = standardDeviation(magnitudes) / mean(magnitudes);
+        
+        if (relativeVariance > 0.3) { // 30% variance threshold
+          magnitudeConflicts.push({
+            conflictId: `magnitude_${timeFrame}_${Date.now()}`,
+            timeFrame,
+            magnitudeRange,
+            magnitudeDifference,
+            relativeVariance,
+            severity: relativeVariance > 0.5 ? 'high' : 'medium',
+            businessSignificance: 'Significant variance in predicted magnitude'
+          });
+        }
+      }
+    });
+
+    // Analyze confidence conflicts
+    const confidences = patterns.map(p => p.confidence);
+    const confidenceVariance = standardDeviation(confidences);
+    
+    if (confidenceVariance > 0.2) {
+      confidenceConflicts.push({
+        conflictId: `confidence_${Date.now()}`,
+        confidenceRange: { min: min(confidences), max: max(confidences) },
+        confidenceVariance,
+        involvedPatterns: patterns.map(p => p.patternId),
+        reliability: confidenceVariance > 0.4 ? 'low' : 'medium',
+        trustworthiness: 'Inconsistent confidence levels reduce overall reliability'
+      });
+    }
+
+    const totalConflicts = directionalConflicts.length + magnitudeConflicts.length + confidenceConflicts.length;
+    
+    return {
+      totalConflicts,
+      conflictTypes: this.categorizeConflictTypes(directionalConflicts, magnitudeConflicts, confidenceConflicts),
+      conflictSeverity: this.assessConflictSeverity(directionalConflicts, magnitudeConflicts, confidenceConflicts),
+      conflictPatterns: conflicts,
+      temporalConflicts,
+      magnitudeConflicts,
+      directionalConflicts,
+      confidenceConflicts
+    };
+  }
+
+  private async generateResolutionDecisions(
+    conflictAnalysis: ConflictAnalysis, 
+    request: ConflictResolutionRequest
+  ): Promise<ResolutionDecision[]> {
+    const decisions: ResolutionDecision[] = [];
+    
+    // Resolve directional conflicts
+    for (const conflict of conflictAnalysis.directionalConflicts) {
+      const decision = await this.resolveDirectionalConflict(conflict, request);
+      decisions.push(decision);
+    }
+    
+    // Resolve magnitude conflicts
+    for (const conflict of conflictAnalysis.magnitudeConflicts) {
+      const decision = await this.resolveMagnitudeConflict(conflict, request);
+      decisions.push(decision);
+    }
+    
+    return decisions;
+  }
+
+  private async resolveDirectionalConflict(
+    conflict: DirectionalConflict, 
+    request: ConflictResolutionRequest
+  ): Promise<ResolutionDecision> {
+    let resolutionMethod: string;
+    let chosenPattern: string | undefined;
+    let confidence: number;
+    
+    switch (request.resolutionStrategy) {
+      case 'confidence_weighted':
+        const highestConfidencePattern = this.findHighestConfidencePattern(
+          request.patternInputs, 
+          conflict.timeFrame
+        );
+        chosenPattern = highestConfidencePattern.patternId;
+        resolutionMethod = 'Highest confidence pattern selected';
+        confidence = highestConfidencePattern.confidence;
+        break;
+        
+      case 'business_impact_weighted':
+        const highestImpactPattern = this.findHighestBusinessImpactPattern(
+          request.patternInputs, 
+          conflict.timeFrame
+        );
+        chosenPattern = highestImpactPattern.patternId;
+        resolutionMethod = 'Highest business impact pattern selected';
+        confidence = highestImpactPattern.confidence;
+        break;
+        
+      case 'ensemble_averaging':
+        resolutionMethod = 'Ensemble averaging of conflicting directions';
+        confidence = conflict.agreementLevel;
+        break;
+        
+      default:
+        resolutionMethod = 'Default confidence-weighted resolution';
+        const defaultPattern = this.findHighestConfidencePattern(request.patternInputs, conflict.timeFrame);
+        chosenPattern = defaultPattern.patternId;
+        confidence = defaultPattern.confidence * 0.8; // Reduce confidence due to conflict
+    }
+    
+    return {
+      decisionId: `decision_${conflict.conflictId}`,
+      conflictId: conflict.conflictId,
+      resolutionMethod,
+      chosenPattern,
+      resolutionRationale: `Resolved using ${request.resolutionStrategy} strategy`,
+      confidence,
+      businessJustification: 'Selected approach minimizes business risk while maintaining accuracy',
+      alternativeOptions: [],
+      riskAssessment: {
+        overallRisk: 'medium',
+        riskFactors: [
+          {
+            factor: 'Pattern disagreement',
+            probability: 'medium',
+            impact: 'medium',
+            description: 'Conflicting patterns may indicate uncertainty',
+            mitigation: 'Monitor actual outcomes and adjust accordingly'
+          }
+        ],
+        mitigationStrategies: ['Regular pattern validation', 'Outcome monitoring'],
+        contingencyPlans: ['Fallback to alternative patterns if resolution fails'],
+        monitoringRecommendations: ['Track prediction accuracy', 'Monitor business outcomes']
+      },
+      implementationGuidance: [
+        'Implement chosen pattern with heightened monitoring',
+        'Prepare alternative approaches',
+        'Set up validation checkpoints'
+      ]
+    };
+  }
+
+  private async resolveMagnitudeConflict(
+    conflict: MagnitudeConflict, 
+    request: ConflictResolutionRequest
+  ): Promise<ResolutionDecision> {
+    const averageMagnitude = (conflict.magnitudeRange.min + conflict.magnitudeRange.max) / 2;
+    
+    return {
+      decisionId: `decision_${conflict.conflictId}`,
+      conflictId: conflict.conflictId,
+      resolutionMethod: 'Magnitude averaging with confidence adjustment',
+      resolutionRationale: 'Use average magnitude with reduced confidence due to variance',
+      confidence: Math.max(0.5, 1 - conflict.relativeVariance),
+      businessJustification: 'Conservative approach reduces risk of extreme predictions',
+      alternativeOptions: [
+        {
+          optionId: 'use_minimum',
+          description: 'Use minimum magnitude (conservative approach)',
+          pros: ['Lower risk', 'Conservative planning'],
+          cons: ['May underestimate opportunities'],
+          riskLevel: 'low',
+          suitability: 0.7
+        },
+        {
+          optionId: 'use_maximum',
+          description: 'Use maximum magnitude (aggressive approach)',
+          pros: ['Captures full potential', 'Optimistic planning'],
+          cons: ['Higher risk', 'May overestimate'],
+          riskLevel: 'high',
+          suitability: 0.4
+        }
+      ],
+      riskAssessment: {
+        overallRisk: 'medium',
+        riskFactors: [],
+        mitigationStrategies: ['Use range planning', 'Scenario analysis'],
+        contingencyPlans: ['Adjust based on early indicators'],
+        monitoringRecommendations: ['Track actual vs predicted magnitude']
+      },
+      implementationGuidance: [
+        `Use magnitude of ${averageMagnitude.toFixed(2)}`,
+        'Plan for range of outcomes',
+        'Monitor early indicators'
+      ]
+    };
+  }
+
+  private resolvePatterns(
+    patterns: ConflictPatternInput[], 
+    decisions: ResolutionDecision[], 
+    request: ConflictResolutionRequest
+  ): ResolvedPattern[] {
+    return decisions.map((decision, index) => ({
+      resolvedId: `resolved_${decision.decisionId}`,
+      originalConflicts: [decision.conflictId],
+      finalPrediction: {
+        timeFrame: 'resolved',
+        direction: 'stable',
+        magnitude: 1.0,
+        confidence: decision.confidence,
+        details: { resolutionMethod: decision.resolutionMethod }
+      },
+      resolutionMethod: decision.resolutionMethod,
+      contributingPatterns: patterns.map(p => ({
+        patternId: p.patternId,
+        contribution: p.patternId === decision.chosenPattern ? 1.0 : 0.0,
+        weight: p.weight,
+        reason: p.patternId === decision.chosenPattern ? 'Selected pattern' : 'Alternative pattern',
+        adjustments: []
+      })),
+      confidence: decision.confidence,
+      reliability: decision.confidence * 0.9, // Slight reduction due to conflict
+      businessApplicability: 0.85,
+      implementationReadiness: decision.confidence > 0.7 ? 'ready' : 'requires_validation'
+    }));
+  }
+
+  private identifyUnresolvableConflicts(
+    conflictAnalysis: ConflictAnalysis, 
+    decisions: ResolutionDecision[]
+  ): UnresolvableConflict[] {
+    const resolvedConflictIds = new Set(decisions.map(d => d.conflictId));
+    const unresolvableConflicts: UnresolvableConflict[] = [];
+    
+    // Find conflicts that weren't resolved
+    conflictAnalysis.directionalConflicts.forEach(conflict => {
+      if (!resolvedConflictIds.has(conflict.conflictId) && conflict.severity === 'critical') {
+        unresolvableConflicts.push({
+          conflictId: conflict.conflictId,
+          reason: 'fundamental_disagreement',
+          description: 'Critical directional disagreement cannot be automatically resolved',
+          involvedPatterns: ['pattern1', 'pattern2'], // Would extract from actual conflict
+          recommendedAction: 'Requires expert review and manual resolution',
+          escalationLevel: 'data_scientist',
+          urgency: 'urgent',
+          businessImpact: 'High impact on business decisions'
+        });
+      }
+    });
+    
+    return unresolvableConflicts;
+  }
+
+  private generateResolutionSummary(
+    conflictAnalysis: ConflictAnalysis, 
+    decisions: ResolutionDecision[], 
+    resolvedPatterns: ResolvedPattern[]
+  ): ResolutionSummary {
+    return {
+      totalConflictsProcessed: conflictAnalysis.totalConflicts,
+      conflictsResolved: decisions.length,
+      conflictsUnresolved: conflictAnalysis.totalConflicts - decisions.length,
+      resolutionRate: decisions.length / Math.max(1, conflictAnalysis.totalConflicts),
+      averageResolutionConfidence: mean(decisions.map(d => d.confidence)),
+      primaryResolutionMethods: [...new Set(decisions.map(d => d.resolutionMethod))],
+      businessImpactMitigated: 'Resolved conflicts reduce decision uncertainty',
+      keyDecisions: decisions.map(d => d.resolutionRationale),
+      implementationComplexity: decisions.length > 5 ? 'complex' : 'moderate'
+    };
+  }
+
+  private assessResolutionConfidence(
+    decisions: ResolutionDecision[], 
+    resolvedPatterns: ResolvedPattern[]
+  ): ConfidenceAssessment {
+    const confidences = decisions.map(d => d.confidence);
+    const overallConfidence = mean(confidences);
+    
+    return {
+      overallConfidence,
+      resolutionConfidenceDistribution: {
+        high: confidences.filter(c => c > 0.8).length,
+        medium: confidences.filter(c => c >= 0.6 && c <= 0.8).length,
+        low: confidences.filter(c => c < 0.6).length
+      },
+      reliabilityFactors: [
+        {
+          factor: 'Resolution strategy effectiveness',
+          impact: 'positive',
+          strength: 'high',
+          description: 'Chosen resolution strategies are appropriate for conflict types',
+          contribution: 0.3
+        }
+      ],
+      uncertaintyAreas: [
+        {
+          area: 'Pattern disagreement persistence',
+          uncertaintyLevel: 'medium',
+          impact: 'May affect future predictions',
+          mitigationApproach: 'Continuous monitoring and validation',
+          monitoringNeeded: true
+        }
+      ],
+      validationRecommendations: [
+        'Monitor resolution outcomes',
+        'Validate against actual business results',
+        'Adjust resolution strategies based on performance'
+      ]
+    };
+  }
+
+  private generateRecommendedActions(
+    summary: ResolutionSummary, 
+    unresolvableConflicts: UnresolvableConflict[], 
+    request: ConflictResolutionRequest
+  ): RecommendedAction[] {
+    const actions: RecommendedAction[] = [
+      {
+        actionId: 'monitor_resolutions',
+        type: 'ongoing',
+        priority: 'high',
+        category: 'monitoring',
+        title: 'Monitor Resolution Outcomes',
+        description: 'Track the accuracy and effectiveness of conflict resolutions',
+        expectedBenefit: 'Improved resolution strategies and better pattern reliability',
+        effort: 'moderate',
+        timeline: 'Ongoing',
+        dependencies: ['Outcome tracking system'],
+        successMetrics: ['Resolution accuracy rate', 'Business outcome alignment']
+      }
+    ];
+    
+    if (unresolvableConflicts.length > 0) {
+      actions.push({
+        actionId: 'resolve_unresolvable',
+        type: 'immediate',
+        priority: 'critical',
+        category: 'decision_implementation',
+        title: 'Address Unresolvable Conflicts',
+        description: 'Manual review and resolution of conflicts that could not be automatically resolved',
+        expectedBenefit: 'Complete conflict resolution and improved decision confidence',
+        effort: 'significant',
+        timeline: '1-2 weeks',
+        dependencies: ['Expert availability', 'Business context clarification'],
+        successMetrics: ['All conflicts resolved', 'Stakeholder agreement']
+      });
+    }
+    
+    return actions;
+  }
+
+  // Helper methods
+  private extractTimeFrames(patterns: ConflictPatternInput[]): string[] {
+    const timeFrames = new Set<string>();
+    patterns.forEach(pattern => {
+      pattern.predictions.forEach(prediction => {
+        timeFrames.add(prediction.timeFrame);
+      });
+    });
+    return Array.from(timeFrames);
+  }
+
+  private findHighestConfidencePattern(patterns: ConflictPatternInput[], timeFrame: string): ConflictPatternInput {
+    return patterns.reduce((highest, current) => {
+      const currentPrediction = current.predictions.find(p => p.timeFrame === timeFrame);
+      const highestPrediction = highest.predictions.find(p => p.timeFrame === timeFrame);
+      
+      if (!currentPrediction) return highest;
+      if (!highestPrediction) return current;
+      
+      return currentPrediction.confidence > highestPrediction.confidence ? current : highest;
+    });
+  }
+
+  private findHighestBusinessImpactPattern(patterns: ConflictPatternInput[], timeFrame: string): ConflictPatternInput {
+    const impactWeights = { very_high: 5, high: 4, medium: 3, low: 2, very_low: 1 };
+    
+    return patterns.reduce((highest, current) => {
+      const currentWeight = impactWeights[current.businessImpact];
+      const highestWeight = impactWeights[highest.businessImpact];
+      
+      return currentWeight > highestWeight ? current : highest;
+    });
+  }
+
+  private categorizeConflictTypes(
+    directional: DirectionalConflict[], 
+    magnitude: MagnitudeConflict[], 
+    confidence: ConfidenceConflict[]
+  ): ConflictType[] {
+    return [
+      {
+        type: 'directional',
+        count: directional.length,
+        severity: directional.some(c => c.severity === 'critical') ? 'critical' : 'medium',
+        description: 'Patterns disagree on direction of change',
+        examples: [],
+        resolutionComplexity: 'moderate'
+      },
+      {
+        type: 'magnitude',
+        count: magnitude.length,
+        severity: magnitude.some(c => c.severity === 'high') ? 'high' : 'medium',
+        description: 'Patterns disagree on magnitude of change',
+        examples: [],
+        resolutionComplexity: 'simple'
+      },
+      {
+        type: 'confidence',
+        count: confidence.length,
+        severity: confidence.some(c => c.reliability === 'low') ? 'high' : 'medium',
+        description: 'Patterns have inconsistent confidence levels',
+        examples: [],
+        resolutionComplexity: 'simple'
+      }
+    ];
+  }
+
+  private assessConflictSeverity(
+    directional: DirectionalConflict[], 
+    magnitude: MagnitudeConflict[], 
+    confidence: ConfidenceConflict[]
+  ): ConflictSeverity {
+    const criticalConflicts = directional.filter(c => c.severity === 'critical').length;
+    const highSeverityConflicts = 
+      directional.filter(c => c.severity === 'high').length +
+      magnitude.filter(c => c.severity === 'high').length;
+    
+    const totalConflicts = directional.length + magnitude.length + confidence.length;
+    const severityScore = totalConflicts > 0 ? (criticalConflicts * 4 + highSeverityConflicts * 3) / (totalConflicts * 4) : 0;
+    
+    return {
+      overall: severityScore > 0.7 ? 'critical' : severityScore > 0.5 ? 'high' : 'medium',
+      criticalConflicts,
+      highSeverityConflicts,
+      mediumSeverityConflicts: totalConflicts - criticalConflicts - highSeverityConflicts,
+      lowSeverityConflicts: 0,
+      severityScore
+    };
+  }
+
+  private getResolutionLimitations(depth: string): string[] {
+    return [
+      'Conflict resolution based on available pattern data',
+      'Some conflicts may require domain expertise',
+      'Business context may affect optimal resolution strategy',
+      'Resolution quality depends on pattern quality'
+    ];
+  }
+}

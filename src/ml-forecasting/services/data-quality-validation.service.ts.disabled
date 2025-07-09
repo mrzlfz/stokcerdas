@@ -1,0 +1,2059 @@
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+
+import { TimeSeriesDataPoint } from './data-pipeline.service';
+import {
+  InventoryHistoryPoint,
+  ProductLifecyclePoint,
+  OrderPatternPoint,
+  ExternalDataPoint,
+} from './historical-data-extraction.service';
+
+export interface DataQualityRequest {
+  jobId: string;
+  tenantId: string;
+  data: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: InventoryHistoryPoint[];
+    products?: ProductLifecyclePoint[];
+    orders?: OrderPatternPoint[];
+    external?: ExternalDataPoint[];
+  };
+  validationRules: ValidationRule[];
+  qualityThresholds: QualityThreshold[];
+  autoCorrection?: boolean;
+  generateReport?: boolean;
+  indonesianContext?: boolean;
+}
+
+export interface ValidationRule {
+  id: string;
+  name: string;
+  type: 'completeness' | 'consistency' | 'validity' | 'uniqueness' | 'accuracy' | 'timeliness' | 'integrity';
+  dataTypes: ('sales' | 'inventory' | 'products' | 'orders' | 'external')[];
+  fields: string[];
+  criteria: ValidationCriteria;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  autoFix: boolean;
+  enabled: boolean;
+  description?: string;
+}
+
+export interface ValidationCriteria {
+  thresholds?: Record<string, number>;
+  patterns?: Record<string, string>; // regex patterns
+  ranges?: Record<string, { min: number; max: number }>;
+  allowedValues?: Record<string, any[]>;
+  dependencies?: Record<string, string[]>; // field dependencies
+  businessRules?: Record<string, any>;
+}
+
+export interface QualityThreshold {
+  metric: 'completeness' | 'consistency' | 'validity' | 'uniqueness' | 'accuracy' | 'timeliness' | 'overall';
+  threshold: number;
+  action: 'warn' | 'reject' | 'auto_fix' | 'flag';
+  scope: 'field' | 'record' | 'dataset';
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface DataQualityResult {
+  jobId: string;
+  status: 'passed' | 'warning' | 'failed' | 'auto_corrected';
+  overallScore: number;
+  dimensionScores: Record<string, number>;
+  validationResults: ValidationResult[];
+  correctedData?: {
+    sales?: TimeSeriesDataPoint[];
+    inventory?: InventoryHistoryPoint[];
+    products?: ProductLifecyclePoint[];
+    orders?: OrderPatternPoint[];
+    external?: ExternalDataPoint[];
+  };
+  report: QualityReport;
+  recommendations: string[];
+  warnings: string[];
+  errors: string[];
+  metadata: {
+    processingTime: number;
+    recordsProcessed: Record<string, number>;
+    recordsCorrected: Record<string, number>;
+    rulesApplied: string[];
+    correctionsMade: CorrectionAction[];
+  };
+}
+
+export interface ValidationResult {
+  ruleId: string;
+  ruleName: string;
+  dataType: string;
+  status: 'passed' | 'failed' | 'warning' | 'corrected';
+  score: number;
+  issues: QualityIssue[];
+  corrections: CorrectionAction[];
+  details: {
+    recordsChecked: number;
+    issuesFound: number;
+    issueRate: number;
+    fieldsCovered: string[];
+  };
+}
+
+export interface QualityIssue {
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  field: string;
+  record?: any;
+  description: string;
+  suggestedFix?: string;
+  impact: 'low' | 'medium' | 'high';
+  metadata?: Record<string, any>;
+}
+
+export interface CorrectionAction {
+  type: 'imputation' | 'transformation' | 'removal' | 'standardization' | 'validation';
+  field: string;
+  oldValue: any;
+  newValue: any;
+  method: string;
+  confidence: number;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+export interface QualityReport {
+  summary: {
+    overallScore: number;
+    dataQuality: 'excellent' | 'good' | 'fair' | 'poor';
+    totalRecords: number;
+    issuesFound: number;
+    correctionsMade: number;
+  };
+  dimensionBreakdown: {
+    completeness: DimensionReport;
+    consistency: DimensionReport;
+    validity: DimensionReport;
+    uniqueness: DimensionReport;
+    accuracy: DimensionReport;
+    timeliness: DimensionReport;
+  };
+  dataTypeAnalysis: Record<string, DataTypeQualityReport>;
+  trends: {
+    qualityOverTime: { date: string; score: number }[];
+    issueTypes: { type: string; count: number; trend: string }[];
+    improvements: string[];
+  };
+  businessImpact: {
+    riskLevel: 'low' | 'medium' | 'high' | 'critical';
+    forecastingImpact: string;
+    recommendedActions: string[];
+    estimatedCost: string;
+  };
+}
+
+export interface DimensionReport {
+  score: number;
+  status: 'excellent' | 'good' | 'fair' | 'poor';
+  issuesFound: number;
+  fieldsCovered: string[];
+  topIssues: string[];
+  improvements: string[];
+}
+
+export interface DataTypeQualityReport {
+  overallScore: number;
+  recordCount: number;
+  fieldAnalysis: Record<string, FieldQualityReport>;
+  commonIssues: string[];
+  recommendations: string[];
+}
+
+export interface FieldQualityReport {
+  completeness: number;
+  consistency: number;
+  validity: number;
+  uniqueness: number;
+  dataType: string;
+  nullCount: number;
+  invalidCount: number;
+  duplicateCount: number;
+  outlierCount: number;
+  patterns: string[];
+  suggestions: string[];
+}
+
+@Injectable()
+export class DataQualityValidationService {
+  private readonly logger = new Logger(DataQualityValidationService.name);
+
+  constructor(
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private eventEmitter: EventEmitter2,
+  ) {}
+
+  /**
+   * Perform comprehensive data quality validation
+   */
+  async validateDataQuality(request: DataQualityRequest): Promise<DataQualityResult> {
+    const startTime = Date.now();
+    this.logger.log(`Starting data quality validation: ${request.jobId}`);
+
+    try {
+      // Validate request
+      this.validateRequest(request);
+
+      // Initialize result structure
+      const result: DataQualityResult = {
+        jobId: request.jobId,
+        status: 'passed',
+        overallScore: 0,
+        dimensionScores: {},
+        validationResults: [],
+        correctedData: request.autoCorrection ? {} : undefined,
+        report: {} as QualityReport,
+        recommendations: [],
+        warnings: [],
+        errors: [],
+        metadata: {
+          processingTime: 0,
+          recordsProcessed: {},
+          recordsCorrected: {},
+          rulesApplied: [],
+          correctionsMade: [],
+        },
+      };
+
+      // Process each data type
+      for (const [dataType, data] of Object.entries(request.data)) {
+        if (data && data.length > 0) {
+          this.logger.log(`Validating ${dataType} data: ${data.length} records`);
+
+          const typeValidation = await this.validateDataType(
+            dataType as any,
+            data,
+            request.validationRules,
+            request.qualityThresholds,
+            request.autoCorrection,
+            request.indonesianContext,
+          );
+
+          result.validationResults.push(...typeValidation.results);
+          result.metadata.recordsProcessed[dataType] = data.length;
+          result.metadata.recordsCorrected[dataType] = typeValidation.correctionsMade;
+          result.metadata.correctionsMade.push(...typeValidation.corrections);
+
+          if (request.autoCorrection && typeValidation.correctedData) {
+            result.correctedData![dataType as keyof typeof result.correctedData] = typeValidation.correctedData;
+          }
+        }
+      }
+
+      // Calculate overall scores
+      result.dimensionScores = this.calculateDimensionScores(result.validationResults);
+      result.overallScore = this.calculateOverallScore(result.dimensionScores);
+
+      // Determine status
+      result.status = this.determineValidationStatus(result.overallScore, result.validationResults);
+
+      // Generate comprehensive report
+      if (request.generateReport) {
+        result.report = await this.generateQualityReport(result, request);
+      }
+
+      // Generate recommendations
+      result.recommendations = this.generateRecommendations(result, request);
+
+      // Update metadata
+      result.metadata.processingTime = Date.now() - startTime;
+      result.metadata.rulesApplied = request.validationRules.filter(r => r.enabled).map(r => r.id);
+
+      // Cache result
+      await this.cacheManager.set(
+        `data_quality_${request.jobId}`,
+        result,
+        300000, // 5 minutes
+      );
+
+      // Emit completion event
+      this.eventEmitter.emit('data.quality.validation.completed', {
+        tenantId: request.tenantId,
+        jobId: request.jobId,
+        score: result.overallScore,
+        status: result.status,
+        processingTime: result.metadata.processingTime,
+      });
+
+      this.logger.log(`Data quality validation completed: ${request.jobId} (Score: ${result.overallScore.toFixed(2)})`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`Data quality validation failed: ${error.message}`, error.stack);
+
+      const failedResult: DataQualityResult = {
+        jobId: request.jobId,
+        status: 'failed',
+        overallScore: 0,
+        dimensionScores: {},
+        validationResults: [],
+        report: {} as QualityReport,
+        recommendations: [],
+        warnings: [],
+        errors: [error.message],
+        metadata: {
+          processingTime: Date.now() - startTime,
+          recordsProcessed: {},
+          recordsCorrected: {},
+          rulesApplied: [],
+          correctionsMade: [],
+        },
+      };
+
+      return failedResult;
+    }
+  }
+
+  /**
+   * Quick data quality assessment
+   */
+  async quickQualityAssessment(
+    tenantId: string,
+    data: any[],
+    dataType: string,
+  ): Promise<{
+    score: number;
+    issues: QualityIssue[];
+    recommendations: string[];
+    fieldAnalysis: Record<string, any>;
+  }> {
+    this.logger.log(`Quick quality assessment for ${dataType} data: ${data.length} records`);
+
+    const cacheKey = `quick_quality_${tenantId}_${dataType}_${data.length}`;
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached as any;
+    }
+
+    // Basic quality checks
+    const completeness = this.calculateCompleteness(data);
+    const consistency = this.calculateConsistency(data);
+    const validity = this.calculateValidity(data);
+    const uniqueness = this.calculateUniqueness(data);
+
+    const score = (completeness + consistency + validity + uniqueness) / 4;
+
+    // Identify common issues
+    const issues: QualityIssue[] = [];
+    
+    if (completeness < 80) {
+      issues.push({
+        type: 'missing_values',
+        severity: 'medium',
+        field: 'multiple',
+        description: `High missing value rate: ${(100 - completeness).toFixed(1)}%`,
+        suggestedFix: 'Implement data imputation strategies',
+        impact: 'medium',
+      });
+    }
+
+    if (validity < 90) {
+      issues.push({
+        type: 'invalid_values',
+        severity: 'high',
+        field: 'multiple',
+        description: `Invalid data detected: ${(100 - validity).toFixed(1)}% invalid`,
+        suggestedFix: 'Add data validation rules',
+        impact: 'high',
+      });
+    }
+
+    if (uniqueness < 95) {
+      issues.push({
+        type: 'duplicates',
+        severity: 'low',
+        field: 'multiple',
+        description: `Duplicate records detected: ${(100 - uniqueness).toFixed(1)}%`,
+        suggestedFix: 'Remove duplicate entries',
+        impact: 'low',
+      });
+    }
+
+    // Field analysis
+    const fieldAnalysis = this.analyzeFields(data);
+
+    // Generate recommendations
+    const recommendations = this.generateQuickRecommendations(score, issues, fieldAnalysis);
+
+    const assessment = {
+      score,
+      issues,
+      recommendations,
+      fieldAnalysis,
+    };
+
+    // Cache for 5 minutes
+    await this.cacheManager.set(cacheKey, assessment, 300000);
+
+    return assessment;
+  }
+
+  /**
+   * Get data quality trends over time
+   */
+  async getQualityTrends(
+    tenantId: string,
+    dataType: string,
+    period: 'day' | 'week' | 'month' = 'week',
+  ): Promise<{
+    trends: { date: string; score: number; issueCount: number }[];
+    patterns: { type: string; frequency: number; trend: string }[];
+    insights: string[];
+  }> {
+    this.logger.log(`Getting quality trends for tenant ${tenantId}, type ${dataType}`);
+
+    // This would typically query historical quality metrics
+    // For now, return mock trend data
+    const trends = this.generateMockTrends(period);
+    const patterns = this.identifyTrendPatterns(trends);
+    const insights = this.generateTrendInsights(trends, patterns);
+
+    return {
+      trends,
+      patterns,
+      insights,
+    };
+  }
+
+  /**
+   * Validate specific data type
+   */
+  private async validateDataType(
+    dataType: string,
+    data: any[],
+    rules: ValidationRule[],
+    thresholds: QualityThreshold[],
+    autoCorrection: boolean = false,
+    indonesianContext: boolean = false,
+  ): Promise<{
+    results: ValidationResult[];
+    correctionsMade: number;
+    corrections: CorrectionAction[];
+    correctedData?: any[];
+  }> {
+    const results: ValidationResult[] = [];
+    const corrections: CorrectionAction[] = [];
+    let correctedData = autoCorrection ? [...data] : undefined;
+    let correctionsMade = 0;
+
+    // Filter rules applicable to this data type
+    const applicableRules = rules.filter(rule => 
+      rule.enabled && rule.dataTypes.includes(dataType as any)
+    );
+
+    for (const rule of applicableRules) {
+      this.logger.debug(`Applying validation rule: ${rule.name} to ${dataType}`);
+
+      const ruleResult = await this.applyValidationRule(
+        rule,
+        dataType,
+        correctedData || data,
+        indonesianContext,
+      );
+
+      // Apply corrections if auto-correction is enabled
+      if (autoCorrection && ruleResult.corrections.length > 0) {
+        const correctionResult = this.applyCorrections(
+          correctedData!,
+          ruleResult.corrections,
+        );
+        
+        correctedData = correctionResult.data;
+        correctionsMade += correctionResult.correctionCount;
+        corrections.push(...ruleResult.corrections);
+      }
+
+      results.push(ruleResult);
+    }
+
+    return {
+      results,
+      correctionsMade,
+      corrections,
+      correctedData,
+    };
+  }
+
+  /**
+   * Apply validation rule to data
+   */
+  private async applyValidationRule(
+    rule: ValidationRule,
+    dataType: string,
+    data: any[],
+    indonesianContext: boolean = false,
+  ): Promise<ValidationResult> {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    let score = 100;
+
+    switch (rule.type) {
+      case 'completeness':
+        const completenessResult = this.checkCompleteness(rule, data);
+        issues.push(...completenessResult.issues);
+        corrections.push(...completenessResult.corrections);
+        score = completenessResult.score;
+        break;
+
+      case 'consistency':
+        const consistencyResult = this.checkConsistency(rule, data);
+        issues.push(...consistencyResult.issues);
+        corrections.push(...consistencyResult.corrections);
+        score = consistencyResult.score;
+        break;
+
+      case 'validity':
+        const validityResult = this.checkValidity(rule, data, indonesianContext);
+        issues.push(...validityResult.issues);
+        corrections.push(...validityResult.corrections);
+        score = validityResult.score;
+        break;
+
+      case 'uniqueness':
+        const uniquenessResult = this.checkUniqueness(rule, data);
+        issues.push(...uniquenessResult.issues);
+        corrections.push(...uniquenessResult.corrections);
+        score = uniquenessResult.score;
+        break;
+
+      case 'accuracy':
+        const accuracyResult = this.checkAccuracy(rule, data, indonesianContext);
+        issues.push(...accuracyResult.issues);
+        corrections.push(...accuracyResult.corrections);
+        score = accuracyResult.score;
+        break;
+
+      case 'timeliness':
+        const timelinessResult = this.checkTimeliness(rule, data, indonesianContext);
+        issues.push(...timelinessResult.issues);
+        corrections.push(...timelinessResult.corrections);
+        score = timelinessResult.score;
+        break;
+
+      case 'integrity':
+        const integrityResult = this.checkIntegrity(rule, data);
+        issues.push(...integrityResult.issues);
+        corrections.push(...integrityResult.corrections);
+        score = integrityResult.score;
+        break;
+    }
+
+    const status = this.determineRuleStatus(score, issues, corrections);
+
+    return {
+      ruleId: rule.id,
+      ruleName: rule.name,
+      dataType,
+      status,
+      score,
+      issues,
+      corrections,
+      details: {
+        recordsChecked: data.length,
+        issuesFound: issues.length,
+        issueRate: data.length > 0 ? issues.length / data.length : 0,
+        fieldsCovered: rule.fields,
+      },
+    };
+  }
+
+  /**
+   * Check data completeness
+   */
+  private checkCompleteness(rule: ValidationRule, data: any[]): {
+    issues: QualityIssue[];
+    corrections: CorrectionAction[];
+    score: number;
+  } {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    let totalFields = 0;
+    let missingFields = 0;
+
+    for (const record of data) {
+      for (const field of rule.fields) {
+        totalFields++;
+        const value = record[field];
+        
+        if (value === null || value === undefined || value === '' || 
+            (typeof value === 'string' && value.trim() === '')) {
+          missingFields++;
+          
+          issues.push({
+            type: 'missing_value',
+            severity: rule.severity,
+            field,
+            record,
+            description: `Missing value in field: ${field}`,
+            suggestedFix: this.getSuggestedImputation(field, record),
+            impact: this.calculateImpact(rule.severity),
+          });
+
+          if (rule.autoFix) {
+            corrections.push({
+              type: 'imputation',
+              field,
+              oldValue: value,
+              newValue: this.getImputationValue(field, data),
+              method: 'mean_imputation',
+              confidence: 0.7,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    const completenessRate = totalFields > 0 ? ((totalFields - missingFields) / totalFields) * 100 : 100;
+    
+    return {
+      issues,
+      corrections,
+      score: completenessRate,
+    };
+  }
+
+  /**
+   * Check data consistency
+   */
+  private checkConsistency(rule: ValidationRule, data: any[]): {
+    issues: QualityIssue[];
+    corrections: CorrectionAction[];
+    score: number;
+  } {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    let totalChecks = 0;
+    let inconsistentChecks = 0;
+
+    // Check data type consistency
+    const fieldTypes: Record<string, Set<string>> = {};
+    
+    for (const record of data) {
+      for (const field of rule.fields) {
+        if (!fieldTypes[field]) fieldTypes[field] = new Set();
+        
+        const value = record[field];
+        if (value !== null && value !== undefined) {
+          fieldTypes[field].add(typeof value);
+          totalChecks++;
+        }
+      }
+    }
+
+    // Identify inconsistent types
+    for (const [field, types] of Object.entries(fieldTypes)) {
+      if (types.size > 1) {
+        inconsistentChecks += data.length;
+        
+        issues.push({
+          type: 'type_inconsistency',
+          severity: rule.severity,
+          field,
+          description: `Inconsistent data types in field: ${field} (${Array.from(types).join(', ')})`,
+          suggestedFix: 'Standardize data type',
+          impact: this.calculateImpact(rule.severity),
+        });
+
+        if (rule.autoFix) {
+          const dominantType = this.getDominantType(data, field);
+          corrections.push({
+            type: 'standardization',
+            field,
+            oldValue: 'mixed_types',
+            newValue: dominantType,
+            method: 'type_standardization',
+            confidence: 0.8,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // Check value format consistency
+    for (const field of rule.fields) {
+      if (rule.criteria.patterns && rule.criteria.patterns[field]) {
+        const pattern = new RegExp(rule.criteria.patterns[field]);
+        
+        for (const record of data) {
+          const value = record[field];
+          if (value && typeof value === 'string') {
+            totalChecks++;
+            if (!pattern.test(value)) {
+              inconsistentChecks++;
+              
+              issues.push({
+                type: 'format_inconsistency',
+                severity: rule.severity,
+                field,
+                record,
+                description: `Value does not match expected pattern: ${value}`,
+                suggestedFix: `Format value to match pattern: ${rule.criteria.patterns[field]}`,
+                impact: this.calculateImpact(rule.severity),
+              });
+
+              if (rule.autoFix) {
+                corrections.push({
+                  type: 'transformation',
+                  field,
+                  oldValue: value,
+                  newValue: this.formatValue(value, rule.criteria.patterns[field]),
+                  method: 'pattern_formatting',
+                  confidence: 0.6,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const consistencyRate = totalChecks > 0 ? ((totalChecks - inconsistentChecks) / totalChecks) * 100 : 100;
+    
+    return {
+      issues,
+      corrections,
+      score: consistencyRate,
+    };
+  }
+
+  /**
+   * Check data validity
+   */
+  private checkValidity(rule: ValidationRule, data: any[], indonesianContext: boolean = false): {
+    issues: QualityIssue[];
+    corrections: CorrectionAction[];
+    score: number;
+  } {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    let totalChecks = 0;
+    let invalidChecks = 0;
+
+    for (const record of data) {
+      for (const field of rule.fields) {
+        const value = record[field];
+        if (value !== null && value !== undefined) {
+          totalChecks++;
+          
+          // Range validation
+          if (rule.criteria.ranges && rule.criteria.ranges[field]) {
+            const range = rule.criteria.ranges[field];
+            const numValue = parseFloat(value);
+            
+            if (!isNaN(numValue) && (numValue < range.min || numValue > range.max)) {
+              invalidChecks++;
+              
+              issues.push({
+                type: 'out_of_range',
+                severity: rule.severity,
+                field,
+                record,
+                description: `Value ${numValue} is outside valid range [${range.min}, ${range.max}]`,
+                suggestedFix: `Clamp value to range [${range.min}, ${range.max}]`,
+                impact: this.calculateImpact(rule.severity),
+              });
+
+              if (rule.autoFix) {
+                const correctedValue = Math.max(range.min, Math.min(range.max, numValue));
+                corrections.push({
+                  type: 'validation',
+                  field,
+                  oldValue: value,
+                  newValue: correctedValue,
+                  method: 'range_clamping',
+                  confidence: 0.9,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }
+          }
+
+          // Allowed values validation
+          if (rule.criteria.allowedValues && rule.criteria.allowedValues[field]) {
+            const allowedValues = rule.criteria.allowedValues[field];
+            
+            if (!allowedValues.includes(value)) {
+              invalidChecks++;
+              
+              issues.push({
+                type: 'invalid_value',
+                severity: rule.severity,
+                field,
+                record,
+                description: `Value '${value}' is not in allowed values: ${allowedValues.join(', ')}`,
+                suggestedFix: `Use one of allowed values: ${allowedValues.join(', ')}`,
+                impact: this.calculateImpact(rule.severity),
+              });
+
+              if (rule.autoFix) {
+                const closestValue = this.findClosestValue(value, allowedValues);
+                corrections.push({
+                  type: 'validation',
+                  field,
+                  oldValue: value,
+                  newValue: closestValue,
+                  method: 'closest_match',
+                  confidence: 0.7,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }
+          }
+
+          // Indonesian-specific validations
+          if (indonesianContext) {
+            const indonesianValidation = this.validateIndonesianContext(field, value);
+            if (!indonesianValidation.valid) {
+              invalidChecks++;
+              
+              issues.push({
+                type: 'indonesian_context_invalid',
+                severity: rule.severity,
+                field,
+                record,
+                description: indonesianValidation.message,
+                suggestedFix: indonesianValidation.suggestion,
+                impact: this.calculateImpact(rule.severity),
+              });
+
+              if (rule.autoFix && indonesianValidation.correctedValue) {
+                corrections.push({
+                  type: 'validation',
+                  field,
+                  oldValue: value,
+                  newValue: indonesianValidation.correctedValue,
+                  method: 'indonesian_formatting',
+                  confidence: 0.8,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const validityRate = totalChecks > 0 ? ((totalChecks - invalidChecks) / totalChecks) * 100 : 100;
+    
+    return {
+      issues,
+      corrections,
+      score: validityRate,
+    };
+  }
+
+  /**
+   * Check data uniqueness
+   */
+  private checkUniqueness(rule: ValidationRule, data: any[]): {
+    issues: QualityIssue[];
+    corrections: CorrectionAction[];
+    score: number;
+  } {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    
+    // Check for duplicate records
+    const seen = new Set();
+    const duplicates: any[] = [];
+    
+    for (const record of data) {
+      const key = rule.fields.map(field => record[field]).join('|');
+      
+      if (seen.has(key)) {
+        duplicates.push(record);
+        
+        issues.push({
+          type: 'duplicate_record',
+          severity: rule.severity,
+          field: rule.fields.join(', '),
+          record,
+          description: `Duplicate record found based on fields: ${rule.fields.join(', ')}`,
+          suggestedFix: 'Remove duplicate record',
+          impact: this.calculateImpact(rule.severity),
+        });
+
+        if (rule.autoFix) {
+          corrections.push({
+            type: 'removal',
+            field: 'record',
+            oldValue: record,
+            newValue: null,
+            method: 'duplicate_removal',
+            confidence: 0.95,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } else {
+        seen.add(key);
+      }
+    }
+
+    const uniquenessRate = data.length > 0 ? ((data.length - duplicates.length) / data.length) * 100 : 100;
+    
+    return {
+      issues,
+      corrections,
+      score: uniquenessRate,
+    };
+  }
+
+  /**
+   * Check data accuracy
+   */
+  private checkAccuracy(rule: ValidationRule, data: any[], indonesianContext: boolean = false): {
+    issues: QualityIssue[];
+    corrections: CorrectionAction[];
+    score: number;
+  } {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    let totalChecks = 0;
+    let inaccurateChecks = 0;
+
+    // Statistical outlier detection
+    for (const field of rule.fields) {
+      const values = data.map(record => record[field]).filter(v => v !== null && v !== undefined && !isNaN(v));
+      
+      if (values.length > 0) {
+        const mean = values.reduce((sum, v) => sum + parseFloat(v), 0) / values.length;
+        const std = Math.sqrt(values.reduce((sum, v) => sum + Math.pow(parseFloat(v) - mean, 2), 0) / values.length);
+        
+        for (const record of data) {
+          const value = parseFloat(record[field]);
+          if (!isNaN(value)) {
+            totalChecks++;
+            
+            const zscore = std > 0 ? Math.abs(value - mean) / std : 0;
+            const threshold = rule.criteria.thresholds?.outlier_zscore || 3;
+            
+            if (zscore > threshold) {
+              inaccurateChecks++;
+              
+              issues.push({
+                type: 'statistical_outlier',
+                severity: zscore > threshold * 1.5 ? 'high' : rule.severity,
+                field,
+                record,
+                description: `Statistical outlier detected: value ${value} (z-score: ${zscore.toFixed(2)})`,
+                suggestedFix: 'Review value or apply outlier treatment',
+                impact: this.calculateImpact(rule.severity),
+                metadata: { zscore, mean, std },
+              });
+
+              if (rule.autoFix) {
+                const correctedValue = zscore > threshold * 2 ? mean : value; // Only fix extreme outliers
+                if (correctedValue !== value) {
+                  corrections.push({
+                    type: 'validation',
+                    field,
+                    oldValue: value,
+                    newValue: correctedValue,
+                    method: 'outlier_correction',
+                    confidence: 0.6,
+                    timestamp: new Date().toISOString(),
+                    metadata: { originalZscore: zscore },
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Business rule validation
+    if (rule.criteria.businessRules) {
+      for (const record of data) {
+        totalChecks++;
+        const businessValidation = this.validateBusinessRules(record, rule.criteria.businessRules, indonesianContext);
+        
+        if (!businessValidation.valid) {
+          inaccurateChecks++;
+          
+          issues.push({
+            type: 'business_rule_violation',
+            severity: rule.severity,
+            field: businessValidation.field,
+            record,
+            description: businessValidation.message,
+            suggestedFix: businessValidation.suggestion,
+            impact: this.calculateImpact(rule.severity),
+          });
+        }
+      }
+    }
+
+    const accuracyRate = totalChecks > 0 ? ((totalChecks - inaccurateChecks) / totalChecks) * 100 : 100;
+    
+    return {
+      issues,
+      corrections,
+      score: accuracyRate,
+    };
+  }
+
+  /**
+   * Check data timeliness
+   */
+  private checkTimeliness(rule: ValidationRule, data: any[], indonesianContext: boolean = false): {
+    issues: QualityIssue[];
+    corrections: CorrectionAction[];
+    score: number;
+  } {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    let totalChecks = 0;
+    let untimelyChecks = 0;
+
+    const now = moment.tz('Asia/Jakarta');
+    const maxAge = rule.criteria.thresholds?.max_age_days || 30;
+
+    for (const record of data) {
+      for (const field of rule.fields) {
+        const value = record[field];
+        if (value) {
+          totalChecks++;
+          
+          const timestamp = moment.tz(value, 'Asia/Jakarta');
+          if (timestamp.isValid()) {
+            const ageInDays = now.diff(timestamp, 'days');
+            
+            if (ageInDays > maxAge) {
+              untimelyChecks++;
+              
+              issues.push({
+                type: 'outdated_data',
+                severity: ageInDays > maxAge * 2 ? 'high' : rule.severity,
+                field,
+                record,
+                description: `Data is ${ageInDays} days old (threshold: ${maxAge} days)`,
+                suggestedFix: 'Update with more recent data',
+                impact: this.calculateImpact(rule.severity),
+                metadata: { ageInDays, threshold: maxAge },
+              });
+            }
+          } else {
+            untimelyChecks++;
+            
+            issues.push({
+              type: 'invalid_timestamp',
+              severity: rule.severity,
+              field,
+              record,
+              description: `Invalid timestamp format: ${value}`,
+              suggestedFix: 'Use valid timestamp format (ISO 8601)',
+              impact: this.calculateImpact(rule.severity),
+            });
+
+            if (rule.autoFix) {
+              corrections.push({
+                type: 'transformation',
+                field,
+                oldValue: value,
+                newValue: now.toISOString(),
+                method: 'timestamp_standardization',
+                confidence: 0.5,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const timelinessRate = totalChecks > 0 ? ((totalChecks - untimelyChecks) / totalChecks) * 100 : 100;
+    
+    return {
+      issues,
+      corrections,
+      score: timelinessRate,
+    };
+  }
+
+  /**
+   * Check data integrity
+   */
+  private checkIntegrity(rule: ValidationRule, data: any[]): {
+    issues: QualityIssue[];
+    corrections: CorrectionAction[];
+    score: number;
+  } {
+    const issues: QualityIssue[] = [];
+    const corrections: CorrectionAction[] = [];
+    let totalChecks = 0;
+    let integrityIssues = 0;
+
+    // Check referential integrity
+    if (rule.criteria.dependencies) {
+      for (const [parentField, childFields] of Object.entries(rule.criteria.dependencies)) {
+        for (const record of data) {
+          totalChecks++;
+          
+          const parentValue = record[parentField];
+          const hasParent = parentValue !== null && parentValue !== undefined && parentValue !== '';
+          
+          for (const childField of childFields) {
+            const childValue = record[childField];
+            const hasChild = childValue !== null && childValue !== undefined && childValue !== '';
+            
+            // Child exists but parent doesn't
+            if (hasChild && !hasParent) {
+              integrityIssues++;
+              
+              issues.push({
+                type: 'referential_integrity_violation',
+                severity: rule.severity,
+                field: childField,
+                record,
+                description: `Child field '${childField}' has value but parent field '${parentField}' is missing`,
+                suggestedFix: `Provide value for parent field '${parentField}' or remove child value`,
+                impact: this.calculateImpact(rule.severity),
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Check cross-field consistency
+    for (const record of data) {
+      totalChecks++;
+      
+      // Example: Check if total equals sum of parts
+      if (record.total && record.subtotal && record.tax) {
+        const calculatedTotal = parseFloat(record.subtotal) + parseFloat(record.tax);
+        const declaredTotal = parseFloat(record.total);
+        
+        if (Math.abs(calculatedTotal - declaredTotal) > 0.01) {
+          integrityIssues++;
+          
+          issues.push({
+            type: 'calculation_mismatch',
+            severity: rule.severity,
+            field: 'total',
+            record,
+            description: `Total (${declaredTotal}) doesn't match calculated value (${calculatedTotal})`,
+            suggestedFix: `Update total to calculated value: ${calculatedTotal}`,
+            impact: this.calculateImpact(rule.severity),
+          });
+
+          if (rule.autoFix) {
+            corrections.push({
+              type: 'validation',
+              field: 'total',
+              oldValue: declaredTotal,
+              newValue: calculatedTotal,
+              method: 'calculation_correction',
+              confidence: 0.95,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    const integrityRate = totalChecks > 0 ? ((totalChecks - integrityIssues) / totalChecks) * 100 : 100;
+    
+    return {
+      issues,
+      corrections,
+      score: integrityRate,
+    };
+  }
+
+  // ========== HELPER METHODS ==========
+
+  private validateRequest(request: DataQualityRequest): void {
+    if (!request.jobId || !request.tenantId) {
+      throw new BadRequestException('Job ID and tenant ID are required');
+    }
+
+    if (!request.data || Object.keys(request.data).length === 0) {
+      throw new BadRequestException('At least one data type is required');
+    }
+
+    if (!request.validationRules || request.validationRules.length === 0) {
+      throw new BadRequestException('At least one validation rule is required');
+    }
+
+    if (!request.qualityThresholds || request.qualityThresholds.length === 0) {
+      throw new BadRequestException('Quality thresholds are required');
+    }
+
+    this.logger.debug('Data quality request validation passed');
+  }
+
+  private calculateCompleteness(data: any[]): number {
+    if (data.length === 0) return 100;
+    
+    let totalFields = 0;
+    let filledFields = 0;
+    
+    data.forEach(record => {
+      Object.values(record).forEach(value => {
+        totalFields++;
+        if (value !== null && value !== undefined && value !== '') {
+          filledFields++;
+        }
+      });
+    });
+    
+    return totalFields > 0 ? (filledFields / totalFields) * 100 : 100;
+  }
+
+  private calculateConsistency(data: any[]): number {
+    const fieldTypes: Record<string, Set<string>> = {};
+    
+    data.forEach(record => {
+      Object.entries(record).forEach(([key, value]) => {
+        if (!fieldTypes[key]) fieldTypes[key] = new Set();
+        if (value !== null && value !== undefined) {
+          fieldTypes[key].add(typeof value);
+        }
+      });
+    });
+    
+    const consistentFields = Object.values(fieldTypes).filter(types => types.size <= 1).length;
+    const totalFields = Object.keys(fieldTypes).length;
+    
+    return totalFields > 0 ? (consistentFields / totalFields) * 100 : 100;
+  }
+
+  private calculateValidity(data: any[]): number {
+    let validRecords = 0;
+    
+    data.forEach(record => {
+      let isValid = true;
+      Object.values(record).forEach(value => {
+        if (typeof value === 'number' && (isNaN(value) || !isFinite(value))) {
+          isValid = false;
+        }
+      });
+      if (isValid) validRecords++;
+    });
+    
+    return data.length > 0 ? (validRecords / data.length) * 100 : 100;
+  }
+
+  private calculateUniqueness(data: any[]): number {
+    const uniqueRecords = new Set(data.map(record => JSON.stringify(record)));
+    return data.length > 0 ? (uniqueRecords.size / data.length) * 100 : 100;
+  }
+
+  private analyzeFields(data: any[]): Record<string, any> {
+    const analysis: Record<string, any> = {};
+    
+    if (data.length === 0) return analysis;
+    
+    const fields = Object.keys(data[0]);
+    
+    for (const field of fields) {
+      const values = data.map(record => record[field]).filter(v => v !== null && v !== undefined);
+      
+      analysis[field] = {
+        completeness: (values.length / data.length) * 100,
+        dataType: values.length > 0 ? typeof values[0] : 'unknown',
+        uniqueValues: new Set(values).size,
+        nullCount: data.length - values.length,
+        sampleValues: values.slice(0, 5),
+      };
+      
+      if (values.length > 0 && values.every(v => !isNaN(parseFloat(v)))) {
+        const numValues = values.map(v => parseFloat(v));
+        analysis[field].numericStats = {
+          min: Math.min(...numValues),
+          max: Math.max(...numValues),
+          mean: numValues.reduce((sum, v) => sum + v, 0) / numValues.length,
+          std: Math.sqrt(numValues.reduce((sum, v) => sum + Math.pow(v - analysis[field].numericStats?.mean || 0, 2), 0) / numValues.length),
+        };
+      }
+    }
+    
+    return analysis;
+  }
+
+  private generateQuickRecommendations(score: number, issues: QualityIssue[], fieldAnalysis: Record<string, any>): string[] {
+    const recommendations: string[] = [];
+    
+    if (score < 70) {
+      recommendations.push('Data quality is below acceptable threshold. Immediate attention required.');
+    } else if (score < 85) {
+      recommendations.push('Data quality needs improvement. Consider implementing data cleansing procedures.');
+    } else if (score < 95) {
+      recommendations.push('Data quality is good but can be optimized further.');
+    } else {
+      recommendations.push('Excellent data quality. Maintain current data governance practices.');
+    }
+    
+    // Issue-specific recommendations
+    const issueTypes = issues.map(i => i.type);
+    if (issueTypes.includes('missing_values')) {
+      recommendations.push('Implement data imputation strategies for missing values.');
+    }
+    if (issueTypes.includes('invalid_values')) {
+      recommendations.push('Add input validation and data type checking.');
+    }
+    if (issueTypes.includes('duplicates')) {
+      recommendations.push('Implement duplicate detection and removal processes.');
+    }
+    
+    // Field-specific recommendations
+    const lowCompletenessFields = Object.entries(fieldAnalysis)
+      .filter(([_, analysis]: [string, any]) => analysis.completeness < 80)
+      .map(([field, _]) => field);
+    
+    if (lowCompletenessFields.length > 0) {
+      recommendations.push(`Fields with low completeness: ${lowCompletenessFields.join(', ')}. Consider making these fields required or provide default values.`);
+    }
+    
+    return recommendations;
+  }
+
+  private calculateDimensionScores(results: ValidationResult[]): Record<string, number> {
+    const dimensions = ['completeness', 'consistency', 'validity', 'uniqueness', 'accuracy', 'timeliness', 'integrity'];
+    const scores: Record<string, number> = {};
+    
+    for (const dimension of dimensions) {
+      const dimensionResults = results.filter(r => r.ruleName.toLowerCase().includes(dimension));
+      if (dimensionResults.length > 0) {
+        scores[dimension] = dimensionResults.reduce((sum, r) => sum + r.score, 0) / dimensionResults.length;
+      } else {
+        scores[dimension] = 100; // Default score if no rules for this dimension
+      }
+    }
+    
+    return scores;
+  }
+
+  private calculateOverallScore(dimensionScores: Record<string, number>): number {
+    const scores = Object.values(dimensionScores);
+    return scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+  }
+
+  private determineValidationStatus(overallScore: number, results: ValidationResult[]): 'passed' | 'warning' | 'failed' | 'auto_corrected' {
+    const hasCorrections = results.some(r => r.corrections.length > 0);
+    const hasCriticalIssues = results.some(r => r.issues.some(i => i.severity === 'critical'));
+    
+    if (hasCriticalIssues) return 'failed';
+    if (hasCorrections) return 'auto_corrected';
+    if (overallScore < 70) return 'failed';
+    if (overallScore < 85) return 'warning';
+    return 'passed';
+  }
+
+  private determineRuleStatus(score: number, issues: QualityIssue[], corrections: CorrectionAction[]): 'passed' | 'failed' | 'warning' | 'corrected' {
+    if (corrections.length > 0) return 'corrected';
+    if (issues.some(i => i.severity === 'critical')) return 'failed';
+    if (score < 70) return 'failed';
+    if (score < 85 || issues.length > 0) return 'warning';
+    return 'passed';
+  }
+
+  private applyCorrections(data: any[], corrections: CorrectionAction[]): { data: any[]; correctionCount: number } {
+    let correctionCount = 0;
+    const correctedData = [...data];
+    
+    for (const correction of corrections) {
+      if (correction.type === 'removal') {
+        const index = correctedData.findIndex(record => JSON.stringify(record) === JSON.stringify(correction.oldValue));
+        if (index > -1) {
+          correctedData.splice(index, 1);
+          correctionCount++;
+        }
+      } else {
+        for (const record of correctedData) {
+          if (record[correction.field] === correction.oldValue) {
+            record[correction.field] = correction.newValue;
+            correctionCount++;
+          }
+        }
+      }
+    }
+    
+    return { data: correctedData, correctionCount };
+  }
+
+  private async generateQualityReport(result: DataQualityResult, request: DataQualityRequest): Promise<QualityReport> {
+    const totalRecords = Object.values(request.data).reduce((sum, data) => sum + (data?.length || 0), 0);
+    const issuesFound = result.validationResults.reduce((sum, r) => sum + r.issues.length, 0);
+    const correctionsMade = result.metadata.correctionsMade.length;
+
+    return {
+      summary: {
+        overallScore: result.overallScore,
+        dataQuality: this.getQualityLabel(result.overallScore),
+        totalRecords,
+        issuesFound,
+        correctionsMade,
+      },
+      dimensionBreakdown: this.generateDimensionBreakdown(result.validationResults),
+      dataTypeAnalysis: this.generateDataTypeAnalysis(request.data, result.validationResults),
+      trends: {
+        qualityOverTime: [],
+        issueTypes: this.aggregateIssueTypes(result.validationResults),
+        improvements: this.generateImprovements(result.validationResults),
+      },
+      businessImpact: {
+        riskLevel: this.assessRiskLevel(result.overallScore),
+        forecastingImpact: this.assessForecastingImpact(result.validationResults),
+        recommendedActions: result.recommendations,
+        estimatedCost: this.estimateCost(issuesFound, correctionsMade),
+      },
+    };
+  }
+
+  private generateRecommendations(result: DataQualityResult, request: DataQualityRequest): string[] {
+    const recommendations: string[] = [];
+    
+    // Overall score recommendations
+    if (result.overallScore < 70) {
+      recommendations.push('Critical data quality issues detected. Immediate remediation required.');
+    } else if (result.overallScore < 85) {
+      recommendations.push('Data quality needs improvement. Implement data governance practices.');
+    }
+    
+    // Dimension-specific recommendations
+    for (const [dimension, score] of Object.entries(result.dimensionScores)) {
+      if (score < 80) {
+        recommendations.push(`Improve ${dimension}: score is ${score.toFixed(1)}/100`);
+      }
+    }
+    
+    // Issue-specific recommendations
+    const commonIssues = this.aggregateIssueTypes(result.validationResults);
+    const topIssues = commonIssues.slice(0, 3);
+    
+    for (const issue of topIssues) {
+      recommendations.push(`Address ${issue.type} issues (${issue.count} occurrences)`);
+    }
+    
+    // Indonesian context recommendations
+    if (request.indonesianContext) {
+      recommendations.push('Consider Indonesian business calendar and cultural factors in data validation.');
+      recommendations.push('Implement IDR currency validation and Indonesian address formats.');
+    }
+    
+    return recommendations;
+  }
+
+  // ========== UTILITY METHODS ==========
+
+  private getSuggestedImputation(field: string, record: any): string {
+    const fieldLower = field.toLowerCase();
+    
+    if (fieldLower.includes('price') || fieldLower.includes('cost') || fieldLower.includes('amount')) {
+      return 'Use mean/median imputation for numeric fields';
+    }
+    if (fieldLower.includes('date') || fieldLower.includes('time')) {
+      return 'Use forward fill or interpolation for temporal fields';
+    }
+    if (fieldLower.includes('category') || fieldLower.includes('type')) {
+      return 'Use mode imputation for categorical fields';
+    }
+    
+    return 'Use appropriate imputation strategy based on field type and distribution';
+  }
+
+  private getImputationValue(field: string, data: any[]): any {
+    const values = data.map(record => record[field]).filter(v => v !== null && v !== undefined && v !== '');
+    
+    if (values.length === 0) return null;
+    
+    // For numeric fields, use median
+    if (values.every(v => !isNaN(parseFloat(v)))) {
+      const numValues = values.map(v => parseFloat(v)).sort((a, b) => a - b);
+      const mid = Math.floor(numValues.length / 2);
+      return numValues.length % 2 === 0 
+        ? (numValues[mid - 1] + numValues[mid]) / 2
+        : numValues[mid];
+    }
+    
+    // For categorical fields, use mode
+    const counts: Record<string, number> = {};
+    values.forEach(v => {
+      counts[v] = (counts[v] || 0) + 1;
+    });
+    
+    return Object.entries(counts).reduce((max, [value, count]) => 
+      count > (counts[max] || 0) ? value : max, Object.keys(counts)[0]
+    );
+  }
+
+  private getDominantType(data: any[], field: string): string {
+    const typeCounts: Record<string, number> = {};
+    
+    data.forEach(record => {
+      const value = record[field];
+      if (value !== null && value !== undefined) {
+        const type = typeof value;
+        typeCounts[type] = (typeCounts[type] || 0) + 1;
+      }
+    });
+    
+    return Object.entries(typeCounts).reduce((max, [type, count]) => 
+      count > (typeCounts[max] || 0) ? type : max, 'string'
+    );
+  }
+
+  private formatValue(value: string, pattern: string): string {
+    // Simple pattern-based formatting
+    if (pattern.includes('phone')) {
+      return value.replace(/\D/g, '').replace(/(\d{3})(\d{4})(\d{4})/, '+62-$1-$2-$3');
+    }
+    if (pattern.includes('email')) {
+      return value.toLowerCase().trim();
+    }
+    if (pattern.includes('currency')) {
+      return 'IDR ' + parseFloat(value.replace(/\D/g, '')).toLocaleString('id-ID');
+    }
+    
+    return value;
+  }
+
+  private findClosestValue(value: any, allowedValues: any[]): any {
+    if (typeof value === 'string') {
+      // Use Levenshtein distance for strings
+      let minDistance = Infinity;
+      let closestValue = allowedValues[0];
+      
+      for (const allowed of allowedValues) {
+        if (typeof allowed === 'string') {
+          const distance = this.levenshteinDistance(value.toLowerCase(), allowed.toLowerCase());
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestValue = allowed;
+          }
+        }
+      }
+      
+      return closestValue;
+    }
+    
+    if (typeof value === 'number') {
+      // Use absolute difference for numbers
+      let minDiff = Infinity;
+      let closestValue = allowedValues[0];
+      
+      for (const allowed of allowedValues) {
+        if (typeof allowed === 'number') {
+          const diff = Math.abs(value - allowed);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestValue = allowed;
+          }
+        }
+      }
+      
+      return closestValue;
+    }
+    
+    return allowedValues[0];
+  }
+
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array.from({ length: str2.length + 1 }, (_, i) => [i]);
+    matrix[0] = Array.from({ length: str1.length + 1 }, (_, i) => i);
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        const cost = str1[j - 1] === str2[i - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,      // deletion
+          matrix[i][j - 1] + 1,      // insertion
+          matrix[i - 1][j - 1] + cost // substitution
+        );
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+
+  private validateIndonesianContext(field: string, value: any): {
+    valid: boolean;
+    message: string;
+    suggestion: string;
+    correctedValue?: any;
+  } {
+    const fieldLower = field.toLowerCase();
+    
+    // Indonesian phone number validation
+    if (fieldLower.includes('phone') || fieldLower.includes('hp') || fieldLower.includes('telepon')) {
+      const phoneStr = String(value).replace(/\D/g, '');
+      if (!phoneStr.startsWith('62') && !phoneStr.startsWith('08')) {
+        return {
+          valid: false,
+          message: 'Invalid Indonesian phone number format',
+          suggestion: 'Use format +62xxx or 08xxx',
+          correctedValue: phoneStr.startsWith('8') ? '0' + phoneStr : '+62' + phoneStr.replace(/^0/, ''),
+        };
+      }
+    }
+    
+    // Indonesian postal code validation
+    if (fieldLower.includes('postal') || fieldLower.includes('zip') || fieldLower.includes('kodepos')) {
+      const postalStr = String(value);
+      if (!/^\d{5}$/.test(postalStr)) {
+        return {
+          valid: false,
+          message: 'Invalid Indonesian postal code format',
+          suggestion: 'Use 5-digit postal code format',
+        };
+      }
+    }
+    
+    // Indonesian currency validation
+    if (fieldLower.includes('price') || fieldLower.includes('harga') || fieldLower.includes('rupiah')) {
+      const numValue = parseFloat(value);
+      if (numValue < 0) {
+        return {
+          valid: false,
+          message: 'Negative currency value',
+          suggestion: 'Currency values should be positive',
+          correctedValue: Math.abs(numValue),
+        };
+      }
+    }
+    
+    return { valid: true, message: '', suggestion: '' };
+  }
+
+  private validateBusinessRules(record: any, businessRules: Record<string, any>, indonesianContext: boolean = false): {
+    valid: boolean;
+    field: string;
+    message: string;
+    suggestion: string;
+  } {
+    // Example business rule: Inventory level should not exceed capacity
+    if (record.stock_level && record.capacity) {
+      if (parseFloat(record.stock_level) > parseFloat(record.capacity)) {
+        return {
+          valid: false,
+          field: 'stock_level',
+          message: 'Stock level exceeds capacity',
+          suggestion: 'Adjust stock level or increase capacity',
+        };
+      }
+    }
+    
+    // Example: Sales price should be higher than cost
+    if (record.selling_price && record.cost_price) {
+      if (parseFloat(record.selling_price) <= parseFloat(record.cost_price)) {
+        return {
+          valid: false,
+          field: 'selling_price',
+          message: 'Selling price must be higher than cost price',
+          suggestion: 'Review pricing strategy',
+        };
+      }
+    }
+    
+    // Indonesian business context rules
+    if (indonesianContext) {
+      // Example: Business hours should be within Indonesian working hours
+      if (record.transaction_time) {
+        const hour = moment(record.transaction_time).tz('Asia/Jakarta').hour();
+        if (hour < 6 || hour > 22) {
+          return {
+            valid: false,
+            field: 'transaction_time',
+            message: 'Transaction outside typical Indonesian business hours',
+            suggestion: 'Verify transaction time accuracy',
+          };
+        }
+      }
+    }
+    
+    return { valid: true, field: '', message: '', suggestion: '' };
+  }
+
+  private calculateImpact(severity: string): 'low' | 'medium' | 'high' {
+    switch (severity) {
+      case 'critical': return 'high';
+      case 'high': return 'high';
+      case 'medium': return 'medium';
+      case 'low': return 'low';
+      default: return 'low';
+    }
+  }
+
+  private generateMockTrends(period: string): { date: string; score: number; issueCount: number }[] {
+    const trends = [];
+    const daysBack = period === 'day' ? 7 : (period === 'week' ? 12 : 30);
+    
+    for (let i = daysBack; i >= 0; i--) {
+      const date = moment().subtract(i, period === 'day' ? 'days' : (period === 'week' ? 'weeks' : 'months'));
+      const score = 85 + Math.random() * 15; // Random score between 85-100
+      const issueCount = Math.floor(Math.random() * 10); // Random issue count 0-9
+      
+      trends.push({
+        date: date.format('YYYY-MM-DD'),
+        score: Math.round(score * 10) / 10,
+        issueCount,
+      });
+    }
+    
+    return trends;
+  }
+
+  private identifyTrendPatterns(trends: { date: string; score: number; issueCount: number }[]): { type: string; frequency: number; trend: string }[] {
+    return [
+      { type: 'missing_values', frequency: 15, trend: 'decreasing' },
+      { type: 'invalid_values', frequency: 8, trend: 'stable' },
+      { type: 'duplicates', frequency: 3, trend: 'decreasing' },
+      { type: 'outliers', frequency: 12, trend: 'increasing' },
+    ];
+  }
+
+  private generateTrendInsights(
+    trends: { date: string; score: number; issueCount: number }[],
+    patterns: { type: string; frequency: number; trend: string }[],
+  ): string[] {
+    const insights = [];
+    
+    if (trends.length > 1) {
+      const firstScore = trends[0].score;
+      const lastScore = trends[trends.length - 1].score;
+      const improvement = lastScore - firstScore;
+      
+      if (improvement > 5) {
+        insights.push('Data quality has improved significantly over the selected period');
+      } else if (improvement < -5) {
+        insights.push('Data quality has degraded over the selected period - attention needed');
+      } else {
+        insights.push('Data quality has remained relatively stable');
+      }
+    }
+    
+    const increasingIssues = patterns.filter(p => p.trend === 'increasing');
+    if (increasingIssues.length > 0) {
+      insights.push(`Increasing issue types: ${increasingIssues.map(p => p.type).join(', ')}`);
+    }
+    
+    const mostCommonIssue = patterns.reduce((max, pattern) => 
+      pattern.frequency > max.frequency ? pattern : max, patterns[0]
+    );
+    insights.push(`Most common issue type: ${mostCommonIssue.type} (${mostCommonIssue.frequency} occurrences)`);
+    
+    return insights;
+  }
+
+  private getQualityLabel(score: number): 'excellent' | 'good' | 'fair' | 'poor' {
+    if (score >= 95) return 'excellent';
+    if (score >= 85) return 'good';
+    if (score >= 70) return 'fair';
+    return 'poor';
+  }
+
+  private generateDimensionBreakdown(results: ValidationResult[]): Record<string, DimensionReport> {
+    const dimensions = ['completeness', 'consistency', 'validity', 'uniqueness', 'accuracy', 'timeliness'];
+    const breakdown: Record<string, DimensionReport> = {};
+    
+    for (const dimension of dimensions) {
+      const dimensionResults = results.filter(r => r.ruleName.toLowerCase().includes(dimension));
+      const avgScore = dimensionResults.length > 0 
+        ? dimensionResults.reduce((sum, r) => sum + r.score, 0) / dimensionResults.length 
+        : 100;
+      
+      breakdown[dimension] = {
+        score: avgScore,
+        status: this.getQualityLabel(avgScore),
+        issuesFound: dimensionResults.reduce((sum, r) => sum + r.issues.length, 0),
+        fieldsCovered: [...new Set(dimensionResults.flatMap(r => r.details.fieldsCovered))],
+        topIssues: this.getTopIssues(dimensionResults),
+        improvements: this.getDimensionImprovements(dimension, avgScore),
+      };
+    }
+    
+    return breakdown;
+  }
+
+  private generateDataTypeAnalysis(
+    data: Record<string, any[]>,
+    results: ValidationResult[],
+  ): Record<string, DataTypeQualityReport> {
+    const analysis: Record<string, DataTypeQualityReport> = {};
+    
+    for (const [dataType, records] of Object.entries(data)) {
+      if (records && records.length > 0) {
+        const typeResults = results.filter(r => r.dataType === dataType);
+        const avgScore = typeResults.length > 0 
+          ? typeResults.reduce((sum, r) => sum + r.score, 0) / typeResults.length 
+          : 100;
+        
+        analysis[dataType] = {
+          overallScore: avgScore,
+          recordCount: records.length,
+          fieldAnalysis: this.analyzeTypeFields(records),
+          commonIssues: this.getCommonIssues(typeResults),
+          recommendations: this.getTypeRecommendations(dataType, avgScore),
+        };
+      }
+    }
+    
+    return analysis;
+  }
+
+  private aggregateIssueTypes(results: ValidationResult[]): { type: string; count: number; trend: string }[] {
+    const issueCounts: Record<string, number> = {};
+    
+    results.forEach(result => {
+      result.issues.forEach(issue => {
+        issueCounts[issue.type] = (issueCounts[issue.type] || 0) + 1;
+      });
+    });
+    
+    return Object.entries(issueCounts)
+      .map(([type, count]) => ({ type, count, trend: 'stable' }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  private generateImprovements(results: ValidationResult[]): string[] {
+    const improvements = [];
+    
+    const successfulCorrections = results.filter(r => r.status === 'corrected');
+    if (successfulCorrections.length > 0) {
+      improvements.push(`${successfulCorrections.length} validation rules successfully auto-corrected issues`);
+    }
+    
+    const highScoreRules = results.filter(r => r.score > 90);
+    if (highScoreRules.length > 0) {
+      improvements.push(`${highScoreRules.length} validation rules achieved scores above 90%`);
+    }
+    
+    return improvements;
+  }
+
+  private assessRiskLevel(score: number): 'low' | 'medium' | 'high' | 'critical' {
+    if (score >= 90) return 'low';
+    if (score >= 80) return 'medium';
+    if (score >= 70) return 'high';
+    return 'critical';
+  }
+
+  private assessForecastingImpact(results: ValidationResult[]): string {
+    const criticalIssues = results.reduce((sum, r) => sum + r.issues.filter(i => i.severity === 'critical').length, 0);
+    const totalIssues = results.reduce((sum, r) => sum + r.issues.length, 0);
+    
+    if (criticalIssues > 0) {
+      return 'Critical data quality issues will significantly impact forecasting accuracy. Immediate remediation required.';
+    }
+    if (totalIssues > 50) {
+      return 'High number of data quality issues may reduce forecasting performance by 10-20%.';
+    }
+    if (totalIssues > 20) {
+      return 'Moderate data quality issues may slightly impact forecasting accuracy.';
+    }
+    
+    return 'Good data quality should support accurate forecasting models.';
+  }
+
+  private estimateCost(issuesFound: number, correctionsMade: number): string {
+    const manualCostPerIssue = 5; // minutes
+    const automatedSavings = correctionsMade * manualCostPerIssue;
+    const remainingCost = (issuesFound - correctionsMade) * manualCostPerIssue;
+    
+    return `Estimated ${Math.floor(remainingCost / 60)}h ${remainingCost % 60}m manual effort required. Automated corrections saved ${Math.floor(automatedSavings / 60)}h ${automatedSavings % 60}m.`;
+  }
+
+  private getTopIssues(results: ValidationResult[]): string[] {
+    const issueCounts: Record<string, number> = {};
+    
+    results.forEach(result => {
+      result.issues.forEach(issue => {
+        issueCounts[issue.type] = (issueCounts[issue.type] || 0) + 1;
+      });
+    });
+    
+    return Object.entries(issueCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([type, count]) => `${type} (${count})`);
+  }
+
+  private getDimensionImprovements(dimension: string, score: number): string[] {
+    const improvements = [];
+    
+    if (score < 80) {
+      switch (dimension) {
+        case 'completeness':
+          improvements.push('Implement required field validation');
+          improvements.push('Add default value strategies');
+          break;
+        case 'consistency':
+          improvements.push('Standardize data formats');
+          improvements.push('Implement data type validation');
+          break;
+        case 'validity':
+          improvements.push('Add range and pattern validation');
+          improvements.push('Implement business rule checking');
+          break;
+        case 'uniqueness':
+          improvements.push('Add duplicate detection');
+          improvements.push('Implement unique constraint validation');
+          break;
+      }
+    }
+    
+    return improvements;
+  }
+
+  private analyzeTypeFields(records: any[]): Record<string, FieldQualityReport> {
+    const analysis: Record<string, FieldQualityReport> = {};
+    
+    if (records.length === 0) return analysis;
+    
+    const fields = Object.keys(records[0]);
+    
+    for (const field of fields) {
+      const values = records.map(r => r[field]);
+      const nonNullValues = values.filter(v => v !== null && v !== undefined && v !== '');
+      
+      analysis[field] = {
+        completeness: (nonNullValues.length / records.length) * 100,
+        consistency: this.calculateFieldConsistency(values),
+        validity: this.calculateFieldValidity(nonNullValues),
+        uniqueness: (new Set(nonNullValues).size / Math.max(nonNullValues.length, 1)) * 100,
+        dataType: nonNullValues.length > 0 ? typeof nonNullValues[0] : 'unknown',
+        nullCount: records.length - nonNullValues.length,
+        invalidCount: this.countInvalidValues(values),
+        duplicateCount: values.length - new Set(values).size,
+        outlierCount: this.countOutliers(nonNullValues),
+        patterns: this.identifyPatterns(nonNullValues),
+        suggestions: this.getFieldSuggestions(field, nonNullValues),
+      };
+    }
+    
+    return analysis;
+  }
+
+  private getCommonIssues(results: ValidationResult[]): string[] {
+    const issueCounts: Record<string, number> = {};
+    
+    results.forEach(result => {
+      result.issues.forEach(issue => {
+        issueCounts[issue.type] = (issueCounts[issue.type] || 0) + 1;
+      });
+    });
+    
+    return Object.entries(issueCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([type, _]) => type);
+  }
+
+  private getTypeRecommendations(dataType: string, score: number): string[] {
+    const recommendations = [];
+    
+    if (score < 80) {
+      switch (dataType) {
+        case 'sales':
+          recommendations.push('Validate sales amount ranges and currency formats');
+          recommendations.push('Ensure customer and product references are valid');
+          break;
+        case 'inventory':
+          recommendations.push('Validate stock levels against capacity constraints');
+          recommendations.push('Check location references and movement types');
+          break;
+        case 'products':
+          recommendations.push('Validate product categories and pricing rules');
+          recommendations.push('Ensure SKU uniqueness and barcode format');
+          break;
+      }
+    }
+    
+    return recommendations;
+  }
+
+  private calculateFieldConsistency(values: any[]): number {
+    const types = new Set(values.filter(v => v !== null && v !== undefined).map(v => typeof v));
+    return types.size <= 1 ? 100 : 0;
+  }
+
+  private calculateFieldValidity(values: any[]): number {
+    const validValues = values.filter(v => {
+      if (typeof v === 'number') return !isNaN(v) && isFinite(v);
+      if (typeof v === 'string') return v.trim().length > 0;
+      return true;
+    });
+    
+    return values.length > 0 ? (validValues.length / values.length) * 100 : 100;
+  }
+
+  private countInvalidValues(values: any[]): number {
+    return values.filter(v => {
+      if (typeof v === 'number') return isNaN(v) || !isFinite(v);
+      if (typeof v === 'string') return v.trim().length === 0;
+      return false;
+    }).length;
+  }
+
+  private countOutliers(values: any[]): number {
+    const numValues = values.filter(v => !isNaN(parseFloat(v))).map(v => parseFloat(v));
+    
+    if (numValues.length < 4) return 0;
+    
+    const mean = numValues.reduce((sum, v) => sum + v, 0) / numValues.length;
+    const std = Math.sqrt(numValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / numValues.length);
+    
+    return numValues.filter(v => Math.abs(v - mean) > 3 * std).length;
+  }
+
+  private identifyPatterns(values: any[]): string[] {
+    const patterns = [];
+    
+    if (values.length === 0) return patterns;
+    
+    // Check if all values are numeric
+    if (values.every(v => !isNaN(parseFloat(v)))) {
+      patterns.push('numeric');
+    }
+    
+    // Check if all values are dates
+    if (values.every(v => moment(v).isValid())) {
+      patterns.push('date');
+    }
+    
+    // Check if all values are emails
+    if (values.every(v => typeof v === 'string' && /\S+@\S+\.\S+/.test(v))) {
+      patterns.push('email');
+    }
+    
+    return patterns;
+  }
+
+  private getFieldSuggestions(field: string, values: any[]): string[] {
+    const suggestions = [];
+    const fieldLower = field.toLowerCase();
+    
+    if (fieldLower.includes('email') && values.some(v => typeof v === 'string' && !/\S+@\S+\.\S+/.test(v))) {
+      suggestions.push('Add email format validation');
+    }
+    
+    if (fieldLower.includes('phone') && values.some(v => typeof v === 'string' && !/^\+?[\d\s\-()]+$/.test(v))) {
+      suggestions.push('Standardize phone number format');
+    }
+    
+    if (fieldLower.includes('price') || fieldLower.includes('amount')) {
+      const numValues = values.filter(v => !isNaN(parseFloat(v)));
+      if (numValues.some(v => parseFloat(v) < 0)) {
+        suggestions.push('Validate positive values for monetary fields');
+      }
+    }
+    
+    return suggestions;
+  }
+}

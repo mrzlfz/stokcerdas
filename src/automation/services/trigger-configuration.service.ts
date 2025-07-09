@@ -5,14 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThanOrEqual, MoreThan, Between } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import * as cronParser from 'cron-parser';
-import * as moment from 'moment-timezone';
+import moment from 'moment-timezone';
 import * as crypto from 'crypto';
 
 import {
@@ -440,7 +440,7 @@ export class TriggerConfigurationService {
           triggerType: WorkflowTriggerType.SCHEDULED,
           isActive: true,
           status: WorkflowStatus.ACTIVE,
-          nextExecutionAt: { $lte: now } as any,
+          nextExecutionAt: LessThanOrEqual(now),
         },
       });
 

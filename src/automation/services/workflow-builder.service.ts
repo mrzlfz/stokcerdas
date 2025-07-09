@@ -11,7 +11,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import * as moment from 'moment-timezone';
+import moment from 'moment-timezone';
 
 import {
   Workflow,

@@ -4,7 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import * as redisStore from 'cache-manager-redis-store';
+// Fix for cache-manager-redis-store type compatibility
+const redisStore = require('cache-manager-redis-store');
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,6 +15,13 @@ import { databaseConfig } from './config/database.config';
 import { redisConfig } from './config/redis.config';
 import { authConfig } from './config/auth.config';
 import { storageConfig } from './config/storage.config';
+
+// Indonesian Business Context Configuration
+import { indonesianBusinessRulesConfig } from './config/indonesian-business-rules.config';
+import { indonesianPaymentConfig } from './config/indonesian-payments.config';
+import { indonesianGeographyConfig } from './config/indonesian-geography.config';
+import { indonesianTelecomConfig } from './config/indonesian-telecom.config';
+import { indonesianBusinessCalendarConfig } from './config/indonesian-business-calendar.config';
 
 // Modules
 import { AuthModule } from './auth/auth.module';
@@ -33,6 +41,9 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { ShippingModule } from './shipping/shipping.module';
+import { CustomersModule } from './customers/customers.module';
+// import { TestingModule } from './testing/testing.module';
+// import { DeploymentModule } from './deployment/deployment.module';
 
 // Common modules
 import { DatabaseModule } from './database/database.module';
@@ -43,7 +54,18 @@ import { CommonModule } from './common/common.module';
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, redisConfig, authConfig, storageConfig],
+      load: [
+        databaseConfig,
+        redisConfig,
+        authConfig,
+        storageConfig,
+        // Indonesian Business Context Configuration
+        indonesianBusinessRulesConfig,
+        indonesianPaymentConfig,
+        indonesianGeographyConfig,
+        indonesianTelecomConfig,
+        indonesianBusinessCalendarConfig,
+      ],
       envFilePath: [
         `.env.${process.env.NODE_ENV || 'development'}`,
         '.env.local',
@@ -131,16 +153,19 @@ import { CommonModule } from './common/common.module';
     PurchaseOrdersModule,
     InventoryModule,
     OrdersModule,
+    CustomersModule,
     ChannelsModule,
-    IntegrationsModule,
+    // IntegrationsModule, // Temporarily disabled for health monitoring testing
     AutomationModule,
     ReportsModule,
     AlertsModule,
     MLForecastingModule, // Re-enabled - no circular dependencies found
-    AnalyticsModule, // Re-enabled - duplicate service provision fixed  
+    AnalyticsModule, // Re-enabled - duplicate service provision fixed
     NotificationsModule,
-    ComplianceModule, // Re-enabled - EnterprisePermissionsGuard service layer fixes 
+    ComplianceModule, // Re-enabled - EnterprisePermissionsGuard service layer fixes
     ShippingModule, // Re-enabled with forwardRef() fixes
+    // TestingModule, // Integration testing infrastructure for comprehensive testing (disabled - missing module)
+    // DeploymentModule, // Docker container configuration and deployment infrastructure (disabled - missing module)
   ],
   controllers: [AppController],
   providers: [AppService],

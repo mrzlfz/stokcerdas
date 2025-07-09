@@ -672,6 +672,144 @@ export class TokopediaOrderService {
     }
   }
 
+  /**
+   * Bidirectional order status synchronization between local system and Tokopedia
+   * Handles conflicts and ensures consistent order status across systems
+   */
+  async syncOrderStatus(
+    tenantId: string,
+    channelId: string,
+    orderIds?: string[],
+  ): Promise<{
+    success: boolean;
+    syncedCount: number;
+    conflictCount: number;
+    errorCount: number;
+    errors: string[];
+    conflicts: Array<{
+      orderId: string;
+      invoiceNumber: string;
+      localStatus: OrderStatus;
+      tokopediaStatus: string;
+      resolution: string;
+    }>;
+  }> {
+    const startTime = Date.now();
+    let syncedCount = 0;
+    let conflictCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+    const conflicts: Array<{
+      orderId: string;
+      invoiceNumber: string;
+      localStatus: OrderStatus;
+      tokopediaStatus: string;
+      resolution: string;
+    }> = [];
+
+    try {
+      await this.logService.logSync(
+        tenantId,
+        channelId,
+        'tokopedia_order_status_sync',
+        'started',
+        'Starting bidirectional order status synchronization',
+        { orderIds: orderIds?.length || 'all' },
+      );
+
+      // Get orders to sync
+      const orders = await this.getOrdersForStatusSync(
+        tenantId,
+        channelId,
+        orderIds,
+      );
+
+      if (orders.length === 0) {
+        this.logger.log('No orders found for status synchronization');
+        return {
+          success: true,
+          syncedCount: 0,
+          conflictCount: 0,
+          errorCount: 0,
+          errors: [],
+          conflicts: [],
+        };
+      }
+
+      // Process orders in batches for better performance
+      const batchSize = 5; // Tokopedia has very strict rate limits
+      for (let i = 0; i < orders.length; i += batchSize) {
+        const batch = orders.slice(i, i + batchSize);
+        
+        const batchResult = await this.syncOrderStatusBatch(
+          tenantId,
+          channelId,
+          batch,
+        );
+
+        syncedCount += batchResult.syncedCount;
+        conflictCount += batchResult.conflictCount;
+        errorCount += batchResult.errorCount;
+        errors.push(...batchResult.errors);
+        conflicts.push(...batchResult.conflicts);
+
+        // Add longer delay between batches for Tokopedia
+        if (i + batchSize < orders.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      const duration = Date.now() - startTime;
+
+      await this.logService.logSync(
+        tenantId,
+        channelId,
+        'tokopedia_order_status_sync',
+        'completed',
+        `Status sync completed: ${syncedCount} synced, ${conflictCount} conflicts, ${errorCount} errors`,
+        { 
+          syncedCount, 
+          conflictCount, 
+          errorCount, 
+          duration, 
+          totalOrders: orders.length 
+        },
+      );
+
+      return {
+        success: true,
+        syncedCount,
+        conflictCount,
+        errorCount,
+        errors,
+        conflicts,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Order status sync failed: ${error.message}`,
+        error.stack,
+      );
+
+      await this.logService.logSync(
+        tenantId,
+        channelId,
+        'tokopedia_order_status_sync',
+        'failed',
+        error.message,
+        { syncedCount, conflictCount, errorCount },
+      );
+
+      return {
+        success: false,
+        syncedCount,
+        conflictCount,
+        errorCount,
+        errors: [...errors, error.message],
+        conflicts,
+      };
+    }
+  }
+
   // Private helper methods
 
   private async processInboundOrder(
@@ -815,6 +953,472 @@ export class TokopediaOrderService {
     };
 
     await this.orderItemRepository.save(orderItem);
+  }
+
+  /**
+   * Get orders that need status synchronization
+   */
+  private async getOrdersForStatusSync(
+    tenantId: string,
+    channelId: string,
+    orderIds?: string[],
+  ): Promise<Order[]> {
+    const queryBuilder = this.orderRepository
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.items', 'items')
+      .leftJoinAndSelect('order.channel', 'channel')
+      .where('order.tenantId = :tenantId', { tenantId })
+      .andWhere('order.channelId = :channelId', { channelId })
+      .andWhere('order.status != :cancelledStatus', { cancelledStatus: OrderStatus.CANCELLED })
+      .andWhere('order.status != :refundedStatus', { refundedStatus: OrderStatus.REFUNDED });
+
+    // Filter by specific order IDs if provided
+    if (orderIds && orderIds.length > 0) {
+      queryBuilder.andWhere('order.id IN (:...orderIds)', { orderIds });
+    } else {
+      // Only sync orders that haven't been synced in last 30 minutes
+      const thirtyMinutesAgo = new Date();
+      thirtyMinutesAgo.setMinutes(thirtyMinutesAgo.getMinutes() - 30);
+      
+      queryBuilder.andWhere(
+        '(order.channelMetadata->\'tokopedia\'->\'lastSyncAt\' IS NULL OR order.channelMetadata->\'tokopedia\'->\'lastSyncAt\'::timestamp < :thirtyMinutesAgo)',
+        { thirtyMinutesAgo }
+      );
+    }
+
+    return await queryBuilder
+      .orderBy('order.updatedAt', 'DESC')
+      .limit(100) // Limit to avoid overwhelming Tokopedia API
+      .getMany();
+  }
+
+  /**
+   * Process a batch of orders for status synchronization
+   */
+  private async syncOrderStatusBatch(
+    tenantId: string,
+    channelId: string,
+    orders: Order[],
+  ): Promise<{
+    syncedCount: number;
+    conflictCount: number;
+    errorCount: number;
+    errors: string[];
+    conflicts: Array<{
+      orderId: string;
+      invoiceNumber: string;
+      localStatus: OrderStatus;
+      tokopediaStatus: string;
+      resolution: string;
+    }>;
+  }> {
+    let syncedCount = 0;
+    let conflictCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+    const conflicts: Array<{
+      orderId: string;
+      invoiceNumber: string;
+      localStatus: OrderStatus;
+      tokopediaStatus: string;
+      resolution: string;
+    }> = [];
+
+    // Process orders one by one with delays for Tokopedia's strict rate limits
+    for (const order of orders) {
+      try {
+        const result = await this.syncSingleOrderStatus(
+          tenantId,
+          channelId,
+          order,
+        );
+
+        if (result.success) {
+          syncedCount++;
+        } else if (result.hasConflict) {
+          conflictCount++;
+          conflicts.push(result.conflict);
+        } else {
+          errorCount++;
+          errors.push(result.error);
+        }
+
+        // Add delay between each order for Tokopedia rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        errorCount++;
+        errors.push(`Order ${order.id}: ${error.message}`);
+      }
+    }
+
+    return {
+      syncedCount,
+      conflictCount,
+      errorCount,
+      errors,
+      conflicts,
+    };
+  }
+
+  /**
+   * Synchronize status for a single order
+   */
+  private async syncSingleOrderStatus(
+    tenantId: string,
+    channelId: string,
+    order: Order,
+  ): Promise<{
+    success: boolean;
+    hasConflict: boolean;
+    conflict?: {
+      orderId: string;
+      invoiceNumber: string;
+      localStatus: OrderStatus;
+      tokopediaStatus: string;
+      resolution: string;
+    };
+    error?: string;
+  }> {
+    try {
+      // Get Tokopedia order details
+      const tokopediaOrderId = order.channelMetadata?.tokopedia?.orderId;
+      if (!tokopediaOrderId) {
+        return {
+          success: false,
+          hasConflict: false,
+          error: 'No Tokopedia order ID found in metadata',
+        };
+      }
+
+      const orderDetails = await this.getTokopediaOrderDetails(
+        tenantId,
+        channelId,
+        tokopediaOrderId,
+      );
+
+      if (!orderDetails.success || !orderDetails.data) {
+        return {
+          success: false,
+          hasConflict: false,
+          error: orderDetails.error || 'Failed to fetch Tokopedia order details',
+        };
+      }
+
+      const tokopediaOrder = orderDetails.data;
+      const tokopediaStatus = tokopediaOrder.order_status;
+      const localStatus = order.status;
+
+      // Map Tokopedia status to local status
+      const expectedLocalStatus = this.statusMapping[tokopediaStatus];
+      
+      // Determine sync direction and resolve conflicts
+      const syncDirection = this.determineSyncDirection(
+        localStatus,
+        tokopediaStatus,
+        order.updatedAt,
+        new Date(tokopediaOrder.updated_at),
+      );
+
+      if (syncDirection === 'conflict') {
+        // Handle conflict with Indonesian business logic
+        const resolution = await this.resolveStatusConflict(
+          tenantId,
+          channelId,
+          order,
+          tokopediaOrder,
+        );
+
+        return {
+          success: false,
+          hasConflict: true,
+          conflict: {
+            orderId: order.id,
+            invoiceNumber: order.orderNumber,
+            localStatus,
+            tokopediaStatus,
+            resolution,
+          },
+        };
+      }
+
+      // Update based on sync direction
+      if (syncDirection === 'local-to-tokopedia') {
+        // Update Tokopedia with local status
+        const tokopediaAction = this.getTokopediaActionFromStatus(localStatus);
+        
+        if (tokopediaAction) {
+          // Execute action on Tokopedia (ship, cancel, etc.)
+          await this.executeTokopediaAction(
+            tenantId,
+            channelId,
+            tokopediaOrderId,
+            tokopediaAction,
+            order,
+          );
+        }
+      } else if (syncDirection === 'tokopedia-to-local') {
+        // Update local order with Tokopedia status
+        if (expectedLocalStatus && expectedLocalStatus !== localStatus) {
+          order.status = expectedLocalStatus;
+          
+          // Update channel metadata
+          order.channelMetadata = {
+            ...order.channelMetadata,
+            tokopedia: {
+              ...order.channelMetadata?.tokopedia,
+              lastSyncAt: new Date(),
+              lastTokopediaStatus: tokopediaStatus,
+            },
+          };
+
+          await this.orderRepository.save(order);
+
+          // Emit status change event
+          this.eventEmitter.emit('order.status.changed', {
+            orderId: order.id,
+            tenantId,
+            channelId,
+            previousStatus: localStatus,
+            newStatus: expectedLocalStatus,
+            source: 'tokopedia',
+          });
+        }
+      }
+
+      // Update mapping sync timestamp
+      await this.updateMappingLastSync(
+        tenantId,
+        channelId,
+        order.id,
+        tokopediaOrderId.toString(),
+      );
+
+      return { success: true, hasConflict: false };
+    } catch (error) {
+      this.logger.error(
+        `Failed to sync order status for order ${order.id}: ${error.message}`,
+        error.stack,
+      );
+
+      return {
+        success: false,
+        hasConflict: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Determine sync direction based on update timestamps and business logic
+   */
+  private determineSyncDirection(
+    localStatus: OrderStatus,
+    tokopediaStatus: string,
+    localUpdatedAt: Date,
+    tokopediaUpdatedAt: Date,
+  ): 'local-to-tokopedia' | 'tokopedia-to-local' | 'no-sync' | 'conflict' {
+    const expectedLocalStatus = this.statusMapping[tokopediaStatus];
+    
+    // If statuses match, no sync needed
+    if (localStatus === expectedLocalStatus) {
+      return 'no-sync';
+    }
+
+    // Indonesian business logic: Customer-facing statuses take priority
+    const customerFacingStatuses = [
+      OrderStatus.CANCELLED,
+      OrderStatus.DELIVERED,
+      OrderStatus.RETURNED,
+      OrderStatus.REFUNDED,
+    ];
+
+    // If local status is customer-facing, prioritize it
+    if (customerFacingStatuses.includes(localStatus)) {
+      return 'local-to-tokopedia';
+    }
+
+    // If Tokopedia status is customer-facing, prioritize it
+    if (tokopediaStatus === 'delivered' || tokopediaStatus === 'cancelled') {
+      return 'tokopedia-to-local';
+    }
+
+    // Check timestamps with 5-minute buffer for clock skew
+    const timeDiff = Math.abs(localUpdatedAt.getTime() - tokopediaUpdatedAt.getTime());
+    const fiveMinutes = 5 * 60 * 1000;
+
+    if (timeDiff <= fiveMinutes) {
+      // Close timestamps - use business logic
+      if (localStatus === OrderStatus.PROCESSING || localStatus === OrderStatus.SHIPPED) {
+        return 'local-to-tokopedia';
+      }
+      return 'tokopedia-to-local';
+    }
+
+    // Use most recent timestamp
+    if (localUpdatedAt > tokopediaUpdatedAt) {
+      return 'local-to-tokopedia';
+    } else if (tokopediaUpdatedAt > localUpdatedAt) {
+      return 'tokopedia-to-local';
+    }
+
+    // If we can't determine, it's a conflict
+    return 'conflict';
+  }
+
+  /**
+   * Get Tokopedia action from local order status
+   */
+  private getTokopediaActionFromStatus(
+    localStatus: OrderStatus,
+  ): string | null {
+    switch (localStatus) {
+      case OrderStatus.SHIPPED:
+        return 'ship';
+      case OrderStatus.CANCELLED:
+        return 'cancel';
+      case OrderStatus.PROCESSING:
+        return 'process';
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Execute action on Tokopedia based on local status
+   */
+  private async executeTokopediaAction(
+    tenantId: string,
+    channelId: string,
+    tokopediaOrderId: number,
+    action: string,
+    order: Order,
+  ): Promise<void> {
+    switch (action) {
+      case 'ship':
+        // Get order items for shipping
+        const orderItems = order.items?.map(item => 
+          item.attributes?.tokopedia?.orderItemId
+        ).filter(Boolean) || [];
+
+        if (orderItems.length > 0) {
+          await this.shipTokopediaOrder(tenantId, channelId, {
+            order_item_ids: orderItems,
+            shipping_service: order.shippingMethod || 'Regular',
+            tracking_number: order.trackingNumber,
+          });
+        }
+        break;
+
+      case 'cancel':
+        // Cancel order with reason
+        const cancelReason = order.notes || 'Cancelled by seller';
+        const orderItemIds = order.items?.map(item => 
+          item.attributes?.tokopedia?.orderItemId
+        ).filter(Boolean) || [];
+
+        if (orderItemIds.length > 0) {
+          await this.cancelTokopediaOrder(
+            tenantId,
+            channelId,
+            orderItemIds,
+            cancelReason,
+          );
+        }
+        break;
+
+      case 'process':
+        // No specific action needed for processing status
+        break;
+
+      default:
+        this.logger.warn(`Unknown Tokopedia action: ${action}`);
+    }
+  }
+
+  /**
+   * Resolve status conflict using Indonesian business logic
+   */
+  private async resolveStatusConflict(
+    tenantId: string,
+    channelId: string,
+    order: Order,
+    tokopediaOrder: TokopediaOrder,
+  ): Promise<string> {
+    const localStatus = order.status;
+    const tokopediaStatus = tokopediaOrder.order_status;
+
+    // Indonesian business priority rules
+    const priorityMatrix = {
+      // Local status -> Tokopedia status -> Resolution
+      [OrderStatus.DELIVERED]: {
+        'shipped': 'keep_local', // Customer already received
+        'processing': 'keep_local', // Customer already received
+        'cancelled': 'escalate', // Major conflict
+      },
+      [OrderStatus.CANCELLED]: {
+        'shipped': 'escalate', // Cannot cancel shipped order
+        'processing': 'keep_local', // Can cancel processing
+        'delivered': 'escalate', // Cannot cancel delivered order
+      },
+      [OrderStatus.SHIPPED]: {
+        'cancelled': 'escalate', // Cannot cancel shipped order
+        'processing': 'update_tokopedia', // Update Tokopedia to shipped
+        'delivered': 'update_local', // Customer feedback wins
+      },
+      [OrderStatus.PROCESSING]: {
+        'cancelled': 'update_local', // Marketplace cancellation wins
+        'shipped': 'update_local', // Marketplace shipping wins
+        'delivered': 'update_local', // Marketplace delivery wins
+      },
+    };
+
+    const resolution = priorityMatrix[localStatus]?.[tokopediaStatus] || 'manual_review';
+
+    // Log conflict for monitoring
+    await this.logService.logSync(
+      tenantId,
+      channelId,
+      'tokopedia_order_conflict',
+      'failed',
+      `Order status conflict: Local ${localStatus} vs Tokopedia ${tokopediaStatus}`,
+      {
+        orderId: order.id,
+        invoiceNumber: order.orderNumber,
+        localStatus,
+        tokopediaStatus,
+        resolution,
+        localUpdatedAt: order.updatedAt,
+        tokopediaUpdatedAt: tokopediaOrder.updated_at,
+      },
+    );
+
+    return resolution;
+  }
+
+  /**
+   * Update mapping last sync timestamp
+   */
+  private async updateMappingLastSync(
+    tenantId: string,
+    channelId: string,
+    orderId: string,
+    externalOrderId: string,
+  ): Promise<void> {
+    const mapping = await this.mappingRepository.findOne({
+      where: {
+        tenantId,
+        channelId,
+        entityType: 'order',
+        internalId: orderId,
+        externalId: externalOrderId,
+      },
+    });
+
+    if (mapping) {
+      mapping.lastSyncAt = new Date();
+      mapping.recordSync(true);
+      await this.mappingRepository.save(mapping);
+    }
   }
 
   // Helper method to extract error messages from API responses

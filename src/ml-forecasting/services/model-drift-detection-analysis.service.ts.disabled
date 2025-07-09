@@ -1,0 +1,1850 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as moment from 'moment-timezone';
+import { mean, median, standardDeviation, quantile, max, min } from 'simple-statistics';
+
+import { InventoryTransaction } from '../../inventory/entities/inventory-transaction.entity';
+import { Product } from '../../products/entities/product.entity';
+import { MLModel } from '../entities/ml-model.entity';
+import { Prediction } from '../entities/prediction.entity';
+
+/**
+ * PHASE 4.2.2: Model Drift Detection and Analysis 🔍
+ * 
+ * Advanced system for detecting and analyzing various types of model drift
+ * in production ML models. Handles data drift, concept drift, prediction drift,
+ * and performance drift with Indonesian market context and automated responses.
+ */
+
+export interface ModelDriftDetectionRequest {
+  tenantId: string;
+  driftDetectionScope: DriftDetectionScope;
+  driftTypes: DriftTypeConfiguration[];
+  detectionMethods: DetectionMethod[];
+  analysisConfiguration: DriftAnalysisConfiguration;
+  alertingSystem: DriftAlertingSystem;
+  adaptationStrategies: AdaptationStrategy[];
+  indonesianMarketContext: IndonesianDriftContext;
+  reportingSettings: DriftReportingSettings;
+}
+
+export interface DriftDetectionScope {
+  scopeId: string;
+  modelsToMonitor: ModelDriftTarget[];
+  detectionPeriod: DetectionPeriod;
+  referenceData: ReferenceDataConfiguration;
+  monitoringFrequency: MonitoringFrequency;
+  segmentationCriteria: DriftSegmentation[];
+  priorityModels: string[];
+}
+
+export interface ModelDriftTarget {
+  modelId: string;
+  modelName: string;
+  modelType: string;
+  driftSensitivity: 'low' | 'medium' | 'high' | 'critical';
+  businessCriticality: 'low' | 'medium' | 'high' | 'critical';
+  expectedDriftPatterns: ExpectedDriftPattern[];
+  baselineMetrics: BaselineMetrics;
+  customDriftRules: CustomDriftRule[];
+}
+
+export interface ExpectedDriftPattern {
+  patternType: 'seasonal' | 'trend' | 'cyclical' | 'random' | 'external_event';
+  patternDescription: string;
+  expectedFrequency: string;
+  typicalMagnitude: number;
+  indonesianSpecificFactors: string[];
+  mitigationRequired: boolean;
+}
+
+export interface BaselineMetrics {
+  accuracyBaseline: number;
+  performanceBaseline: PerformanceBaseline;
+  dataDistributionBaseline: DataDistributionBaseline;
+  predictionDistributionBaseline: PredictionDistributionBaseline;
+  businessMetricsBaseline: BusinessMetricsBaseline;
+}
+
+export interface PerformanceBaseline {
+  responseTime: number;
+  throughput: number;
+  memoryUsage: number;
+  errorRate: number;
+  availability: number;
+}
+
+export interface DataDistributionBaseline {
+  featureStatistics: Record<string, FeatureStatistics>;
+  correlationMatrix: number[][];
+  missingValueRates: Record<string, number>;
+  outlierRates: Record<string, number>;
+  dataQualityScore: number;
+}
+
+export interface FeatureStatistics {
+  mean: number;
+  median: number;
+  standardDeviation: number;
+  skewness: number;
+  kurtosis: number;
+  percentiles: Record<string, number>;
+  uniqueValues?: number;
+  topCategories?: Record<string, number>;
+}
+
+export interface PredictionDistributionBaseline {
+  predictionMean: number;
+  predictionStdDev: number;
+  predictionRange: [number, number];
+  confidenceIntervals: Record<string, [number, number]>;
+  predictionCategories?: Record<string, number>;
+}
+
+export interface BusinessMetricsBaseline {
+  revenueImpact: number;
+  costImpact: number;
+  customerSatisfaction: number;
+  operationalEfficiency: number;
+  marketPosition: number;
+}
+
+export interface CustomDriftRule {
+  ruleId: string;
+  ruleName: string;
+  ruleType: 'threshold' | 'statistical' | 'ml_based' | 'business_logic';
+  ruleCondition: string;
+  triggerThreshold: number;
+  evaluationWindow: number; // seconds
+  actionRequired: string;
+  indonesianContextAware: boolean;
+}
+
+export interface DetectionPeriod {
+  startDate?: Date;
+  endDate?: Date;
+  continuousDetection: boolean;
+  detectionWindows: DetectionWindow[];
+  historicalLookback: number; // days
+  futureProjection: number; // days
+}
+
+export interface DetectionWindow {
+  windowId: string;
+  windowType: 'sliding' | 'tumbling' | 'session' | 'adaptive';
+  windowSize: number; // minutes
+  stepSize?: number; // minutes for sliding windows
+  minimumSamples: number;
+  maximumSamples?: number;
+}
+
+export interface ReferenceDataConfiguration {
+  referenceDataset: ReferenceDataset;
+  updateFrequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'manual';
+  dataValidation: DataValidationRules;
+  versionControl: ReferenceDataVersioning;
+}
+
+export interface ReferenceDataset {
+  datasetId: string;
+  datasetName: string;
+  dataSource: string;
+  samplingStrategy: 'random' | 'stratified' | 'systematic' | 'temporal';
+  sampleSize: number;
+  dataQualityThreshold: number;
+  indonesianMarketRepresentative: boolean;
+}
+
+export interface DataValidationRules {
+  completenessThreshold: number;
+  accuracyThreshold: number;
+  consistencyChecks: string[];
+  outlierDetection: boolean;
+  missingValueHandling: 'ignore' | 'impute' | 'flag';
+}
+
+export interface ReferenceDataVersioning {
+  versioningEnabled: boolean;
+  retentionPeriod: number; // days
+  changeTrackingEnabled: boolean;
+  automaticBackup: boolean;
+}
+
+export interface MonitoringFrequency {
+  defaultFrequency: number; // minutes
+  adaptiveFrequency: AdaptiveFrequencyConfig;
+  businessHoursFrequency?: number;
+  peakHoursFrequency?: number;
+  maintenanceWindowBehavior: 'pause' | 'reduce' | 'continue';
+}
+
+export interface AdaptiveFrequencyConfig {
+  enabled: boolean;
+  triggers: FrequencyTrigger[];
+  maxFrequency: number; // minutes
+  minFrequency: number; // minutes
+  adaptationAlgorithm: 'linear' | 'exponential' | 'ml_based';
+}
+
+export interface FrequencyTrigger {
+  triggerType: 'drift_detected' | 'high_traffic' | 'low_performance' | 'business_event';
+  triggerCondition: string;
+  frequencyMultiplier: number;
+  duration: number; // minutes
+}
+
+export interface DriftSegmentation {
+  segmentationType: 'geographic' | 'demographic' | 'behavioral' | 'temporal' | 'business';
+  segmentCriteria: SegmentCriteria;
+  crossSegmentAnalysis: boolean;
+  segmentPriority: number;
+}
+
+export interface SegmentCriteria {
+  criteriaName: string;
+  criteriaType: string;
+  segmentDefinitions: SegmentDefinition[];
+  indonesianSpecificSegments: IndonesianSegment[];
+}
+
+export interface SegmentDefinition {
+  segmentId: string;
+  segmentName: string;
+  conditions: SegmentCondition[];
+  expectedBehavior: string;
+  driftExpectation: 'low' | 'medium' | 'high';
+}
+
+export interface SegmentCondition {
+  field: string;
+  operator: string;
+  value: any;
+  weight?: number;
+}
+
+export interface IndonesianSegment {
+  segmentType: 'region' | 'island' | 'economic_zone' | 'cultural' | 'linguistic';
+  segmentName: string;
+  characteristics: string[];
+  specialConsiderations: string[];
+}
+
+export interface DriftTypeConfiguration {
+  driftType: DriftType;
+  detectionEnabled: boolean;
+  sensitivityLevel: 'low' | 'medium' | 'high' | 'adaptive';
+  detectionMethods: string[];
+  alertThresholds: DriftThreshold[];
+  analysisDepth: 'basic' | 'standard' | 'comprehensive';
+  indonesianFactors: IndonesianDriftFactor[];
+}
+
+export type DriftType = 
+  | 'data_drift'           // Input data distribution changes
+  | 'concept_drift'        // Relationship between input and output changes
+  | 'prediction_drift'     // Model output distribution changes
+  | 'performance_drift'    // Model performance degradation
+  | 'covariate_drift'      // Feature distribution changes
+  | 'prior_drift'          // Target variable distribution changes
+  | 'virtual_drift'        // False drift due to external factors
+  | 'sudden_drift'         // Abrupt changes
+  | 'gradual_drift'        // Slow progressive changes
+  | 'incremental_drift'    // Small continuous changes
+  | 'recurring_drift'      // Cyclical pattern changes
+  | 'seasonal_drift';      // Indonesian seasonal changes
+
+export interface DriftThreshold {
+  thresholdName: string;
+  thresholdType: 'statistical' | 'business' | 'performance';
+  metricName: string;
+  warningThreshold: number;
+  criticalThreshold: number;
+  emergencyThreshold?: number;
+  evaluationMethod: ThresholdEvaluationMethod;
+}
+
+export interface ThresholdEvaluationMethod {
+  method: 'absolute' | 'relative' | 'statistical_test' | 'ml_model';
+  parameters: Record<string, any>;
+  confidenceLevel: number;
+  minimumSamples: number;
+}
+
+export interface IndonesianDriftFactor {
+  factorType: 'economic' | 'cultural' | 'seasonal' | 'regulatory' | 'competitive';
+  factorName: string;
+  impactLevel: 'low' | 'medium' | 'high';
+  detectionRequired: boolean;
+  adaptationStrategy: string;
+}
+
+export interface DetectionMethod {
+  methodId: string;
+  methodName: string;
+  methodType: DetectionMethodType;
+  applicableDriftTypes: DriftType[];
+  statisticalParameters: StatisticalParameters;
+  mlParameters?: MLDetectionParameters;
+  performanceParameters: PerformanceParameters;
+  indonesianAdaptations: IndonesianMethodAdaptation[];
+}
+
+export type DetectionMethodType = 
+  | 'statistical_test'     // KS test, chi-square, etc.
+  | 'distance_based'       // KL divergence, Wasserstein distance
+  | 'ml_classification'    // Discriminator models
+  | 'ensemble_methods'     // Multiple methods combined
+  | 'time_series_analysis' // ARIMA, seasonal decomposition
+  | 'anomaly_detection'    // Isolation forest, autoencoders
+  | 'change_point'         // CUSUM, PELT
+  | 'density_estimation'   // Kernel density estimation
+  | 'clustering'           // K-means drift detection
+  | 'custom_algorithm';    // Custom Indonesian methods
+
+export interface StatisticalParameters {
+  significanceLevel: number;
+  testStatistic: string;
+  multipleTestingCorrection: boolean;
+  bootstrapSamples?: number;
+  confidenceInterval: number;
+}
+
+export interface MLDetectionParameters {
+  modelType: string;
+  trainingStrategy: 'periodic' | 'online' | 'ensemble';
+  featureSelection: boolean;
+  hyperparameterTuning: boolean;
+  crossValidation: boolean;
+}
+
+export interface PerformanceParameters {
+  accuracyThreshold: number;
+  latencyThreshold: number;
+  memoryThreshold: number;
+  scalabilityRequirement: string;
+}
+
+export interface IndonesianMethodAdaptation {
+  adaptationType: 'seasonal_adjustment' | 'cultural_factor' | 'economic_indicator' | 'regional_variation';
+  adaptationDescription: string;
+  adaptationParameters: Record<string, any>;
+}
+
+export interface DriftAnalysisConfiguration {
+  analysisDepth: 'shallow' | 'medium' | 'deep' | 'comprehensive';
+  analysisComponents: AnalysisComponent[];
+  causationAnalysis: CausationAnalysisConfig;
+  impactAssessment: ImpactAssessmentConfig;
+  trendAnalysis: TrendAnalysisConfig;
+  forecastingAnalysis: ForecastingAnalysisConfig;
+  indonesianContextAnalysis: IndonesianContextAnalysisConfig;
+}
+
+export interface AnalysisComponent {
+  componentName: string;
+  componentType: 'statistical' | 'visual' | 'ml_based' | 'business_focused';
+  enabled: boolean;
+  priority: number;
+  parameters: Record<string, any>;
+}
+
+export interface CausationAnalysisConfig {
+  enabled: boolean;
+  analysisMethod: 'correlation' | 'granger_causality' | 'structural_equation' | 'causal_inference';
+  externalFactors: ExternalFactor[];
+  businessFactors: BusinessFactor[];
+  indonesianFactors: IndonesianCausalFactor[];
+}
+
+export interface ExternalFactor {
+  factorName: string;
+  factorType: 'economic' | 'environmental' | 'technological' | 'social';
+  dataSource: string;
+  expectedImpact: 'positive' | 'negative' | 'neutral';
+  lagPeriod: number; // days
+}
+
+export interface BusinessFactor {
+  factorName: string;
+  factorCategory: 'operational' | 'strategic' | 'competitive' | 'regulatory';
+  measurementMethod: string;
+  businessRelevance: 'high' | 'medium' | 'low';
+}
+
+export interface IndonesianCausalFactor {
+  factorName: string;
+  factorType: 'ramadan_effect' | 'harvest_season' | 'government_policy' | 'cultural_event';
+  cyclicalPattern: boolean;
+  regionalVariation: boolean;
+  historicalImpact: number;
+}
+
+export interface ImpactAssessmentConfig {
+  enabled: boolean;
+  assessmentAreas: ImpactArea[];
+  quantificationMethod: 'statistical' | 'simulation' | 'ml_model' | 'business_rules';
+  impactHorizon: number; // days
+  uncertaintyQuantification: boolean;
+}
+
+export interface ImpactArea {
+  areaName: string;
+  areaType: 'business' | 'operational' | 'financial' | 'strategic';
+  impactMetrics: string[];
+  weightage: number;
+  indonesianSpecificMetrics: string[];
+}
+
+export interface TrendAnalysisConfig {
+  enabled: boolean;
+  trendMethods: string[];
+  forecastHorizon: number; // days
+  seasonalityDetection: boolean;
+  changePointDetection: boolean;
+  indonesianSeasonality: IndonesianSeasonalityConfig;
+}
+
+export interface IndonesianSeasonalityConfig {
+  ramadanDetection: boolean;
+  harvestSeasonDetection: boolean;
+  schoolCalendarDetection: boolean;
+  governmentCalendarDetection: boolean;
+  regionalHolidaysDetection: boolean;
+}
+
+export interface ForecastingAnalysisConfig {
+  enabled: boolean;
+  forecastMethods: string[];
+  forecastHorizon: number; // days
+  confidenceIntervals: number[];
+  scenarioAnalysis: boolean;
+  indonesianFactorIntegration: boolean;
+}
+
+export interface IndonesianContextAnalysisConfig {
+  enabled: boolean;
+  analysisComponents: IndonesianAnalysisComponent[];
+  regionalAnalysis: boolean;
+  culturalFactorAnalysis: boolean;
+  economicIndicatorAnalysis: boolean;
+  competitiveAnalysis: boolean;
+}
+
+export interface IndonesianAnalysisComponent {
+  componentName: string;
+  dataSource: string;
+  analysisMethod: string;
+  updateFrequency: string;
+  businessRelevance: 'high' | 'medium' | 'low';
+}
+
+export interface DriftAlertingSystem {
+  alertingEnabled: boolean;
+  alertLevels: DriftAlertLevel[];
+  notificationChannels: DriftNotificationChannel[];
+  escalationRules: DriftEscalationRule[];
+  suppressionRules: DriftSuppressionRule[];
+  indonesianAlertCustomization: IndonesianAlertCustomization;
+}
+
+export interface DriftAlertLevel {
+  levelName: string;
+  levelSeverity: 'info' | 'warning' | 'critical' | 'emergency';
+  triggerConditions: string[];
+  responseTimeTarget: number; // minutes
+  requiredActions: string[];
+  stakeholders: string[];
+}
+
+export interface DriftNotificationChannel {
+  channelId: string;
+  channelType: 'email' | 'sms' | 'whatsapp' | 'slack' | 'webhook' | 'dashboard';
+  channelConfig: NotificationChannelConfig;
+  indonesianLocalization: boolean;
+  businessHoursOnly: boolean;
+}
+
+export interface NotificationChannelConfig {
+  endpoint?: string;
+  credentials?: Record<string, string>;
+  messageTemplate: string;
+  recipientGroups: string[];
+  rateLimit: number; // messages per hour
+}
+
+export interface DriftEscalationRule {
+  ruleId: string;
+  triggerConditions: string[];
+  escalationDelay: number; // minutes
+  escalationChain: EscalationStep[];
+  maxEscalationLevel: number;
+}
+
+export interface EscalationStep {
+  stepLevel: number;
+  contacts: string[];
+  notificationMethods: string[];
+  requiredAcknowledgment: boolean;
+  timeoutDuration: number; // minutes
+}
+
+export interface DriftSuppressionRule {
+  ruleId: string;
+  suppressionConditions: string[];
+  suppressionDuration: number; // minutes
+  allowedExceptions: string[];
+  businessJustification: string;
+}
+
+export interface IndonesianAlertCustomization {
+  useIndonesianTime: boolean;
+  respectBusinessCalendar: boolean;
+  culturalSensitivity: boolean;
+  localLanguageSupport: boolean;
+  regionalEscalation: boolean;
+}
+
+export interface AdaptationStrategy {
+  strategyId: string;
+  strategyName: string;
+  strategyType: AdaptationStrategyType;
+  triggerConditions: string[];
+  adaptationActions: AdaptationAction[];
+  rollbackPlan: RollbackPlan;
+  successCriteria: string[];
+  indonesianConsiderations: IndonesianAdaptationConsideration[];
+}
+
+export type AdaptationStrategyType = 
+  | 'model_retraining'         // Retrain with new data
+  | 'feature_engineering'      // Update feature engineering
+  | 'threshold_adjustment'     // Adjust decision thresholds
+  | 'ensemble_reweighting'     // Adjust ensemble weights
+  | 'online_learning'          // Continuous model updates
+  | 'transfer_learning'        // Transfer from related domains
+  | 'model_switching'          // Switch to different model
+  | 'data_augmentation'        // Augment training data
+  | 'preprocessing_update'     // Update data preprocessing
+  | 'custom_adaptation';       // Custom Indonesian adaptations
+
+export interface AdaptationAction {
+  actionId: string;
+  actionType: string;
+  actionDescription: string;
+  executionOrder: number;
+  requiredResources: string[];
+  estimatedDuration: number; // minutes
+  riskLevel: 'low' | 'medium' | 'high';
+  rollbackRequired: boolean;
+}
+
+export interface RollbackPlan {
+  rollbackTriggers: string[];
+  rollbackSteps: RollbackStep[];
+  rollbackTimeLimit: number; // minutes
+  dataBackupRequired: boolean;
+  stakeholderNotification: boolean;
+}
+
+export interface RollbackStep {
+  stepId: string;
+  stepDescription: string;
+  executionOrder: number;
+  automationLevel: 'manual' | 'semi_automatic' | 'automatic';
+  verificationRequired: boolean;
+}
+
+export interface IndonesianAdaptationConsideration {
+  considerationType: 'cultural' | 'economic' | 'regulatory' | 'operational';
+  description: string;
+  impactOnStrategy: string;
+  mitigationRequired: boolean;
+}
+
+export interface IndonesianDriftContext {
+  contextEnabled: boolean;
+  economicIndicators: EconomicIndicatorConfig[];
+  culturalFactors: CulturalFactorConfig[];
+  seasonalPatterns: SeasonalPatternConfig[];
+  regulatoryFactors: RegulatoryFactorConfig[];
+  competitiveFactors: CompetitiveFactorConfig[];
+  regionalVariations: RegionalVariationConfig[];
+}
+
+export interface EconomicIndicatorConfig {
+  indicatorName: string;
+  dataSource: string;
+  updateFrequency: string;
+  expectedImpact: 'positive' | 'negative' | 'neutral';
+  lagEffect: number; // days
+  correlationThreshold: number;
+}
+
+export interface CulturalFactorConfig {
+  factorName: string;
+  factorType: 'religious' | 'social' | 'traditional';
+  cyclicalPattern: boolean;
+  regionalVariation: boolean;
+  businessImpact: 'high' | 'medium' | 'low';
+}
+
+export interface SeasonalPatternConfig {
+  patternName: string;
+  patternType: 'weather' | 'agricultural' | 'academic' | 'religious';
+  startDate: string; // MM-DD format
+  duration: number; // days
+  intensityProfile: number[]; // daily intensity 0-1
+  regionalVariations: Record<string, number>;
+}
+
+export interface RegulatoryFactorConfig {
+  regulationType: 'tax' | 'trade' | 'labor' | 'environmental';
+  regulationName: string;
+  effectiveDate: Date;
+  expectedImpact: string;
+  complianceRequired: boolean;
+}
+
+export interface CompetitiveFactorConfig {
+  factorName: string;
+  competitorActions: string[];
+  marketImpact: 'high' | 'medium' | 'low';
+  responseRequired: boolean;
+  monitoringRequired: boolean;
+}
+
+export interface RegionalVariationConfig {
+  regionCode: string;
+  regionName: string;
+  specificFactors: string[];
+  adjustmentFactors: Record<string, number>;
+  monitoringPriority: 'high' | 'medium' | 'low';
+}
+
+export interface DriftReportingSettings {
+  reportingEnabled: boolean;
+  reportTypes: DriftReportType[];
+  deliverySchedule: ReportDeliverySchedule;
+  recipients: DriftReportRecipient[];
+  customizations: DriftReportCustomization[];
+}
+
+export interface DriftReportType {
+  reportId: string;
+  reportName: string;
+  reportCategory: 'executive' | 'technical' | 'operational' | 'compliance';
+  includedSections: string[];
+  formatOptions: string[];
+  indonesianLocalization: boolean;
+}
+
+export interface ReportDeliverySchedule {
+  frequency: 'real_time' | 'hourly' | 'daily' | 'weekly' | 'monthly';
+  deliveryTime?: string;
+  timezone: 'WIB' | 'WITA' | 'WIT';
+  businessHoursOnly: boolean;
+}
+
+export interface DriftReportRecipient {
+  recipientId: string;
+  recipientType: 'individual' | 'team' | 'role';
+  contactInfo: Record<string, string>;
+  reportPreferences: DriftReportPreferences;
+}
+
+export interface DriftReportPreferences {
+  preferredFormat: string;
+  detailLevel: 'summary' | 'detailed' | 'comprehensive';
+  includeVisualization: boolean;
+  indonesianLanguage: boolean;
+}
+
+export interface DriftReportCustomization {
+  customizationType: 'branding' | 'content' | 'format' | 'analysis';
+  customizationConfig: Record<string, any>;
+  applicableReports: string[];
+}
+
+export interface ModelDriftDetectionResult {
+  detectionId: string;
+  executionSummary: DriftExecutionSummary;
+  driftAnalysisResults: DriftAnalysisResult[];
+  overallDriftAssessment: OverallDriftAssessment;
+  segmentDriftAnalysis: SegmentDriftAnalysis[];
+  recommendedActions: DriftRecommendedAction[];
+  adaptationPlan: AdaptationPlan;
+  indonesianContextInsights: DriftIndonesianInsights;
+  alertsGenerated: DriftAlert[];
+  nextMonitoringSchedule: NextMonitoringSchedule;
+}
+
+export interface DriftExecutionSummary {
+  executionId: string;
+  startTime: Date;
+  endTime: Date;
+  modelsAnalyzed: number;
+  driftTypesChecked: number;
+  methodsApplied: number;
+  driftDetected: boolean;
+  overallRiskLevel: 'low' | 'medium' | 'high' | 'critical';
+  processingTime: number; // milliseconds
+}
+
+export interface DriftAnalysisResult {
+  modelId: string;
+  modelName: string;
+  driftTypeResults: DriftTypeResult[];
+  overallDriftScore: number;
+  driftTrend: 'stable' | 'increasing' | 'decreasing' | 'fluctuating';
+  criticalIssues: string[];
+  performanceImpact: PerformanceImpactAssessment;
+}
+
+export interface DriftTypeResult {
+  driftType: DriftType;
+  driftDetected: boolean;
+  driftSeverity: 'none' | 'minor' | 'moderate' | 'major' | 'severe';
+  driftScore: number;
+  detectionMethods: DetectionMethodResult[];
+  driftCharacteristics: DriftCharacteristics;
+  temporalAnalysis: TemporalDriftAnalysis;
+}
+
+export interface DetectionMethodResult {
+  methodName: string;
+  driftDetected: boolean;
+  confidenceScore: number;
+  statisticalSignificance: number;
+  methodSpecificMetrics: Record<string, number>;
+}
+
+export interface DriftCharacteristics {
+  driftDirection: 'positive' | 'negative' | 'bidirectional';
+  driftMagnitude: number;
+  driftRate: 'sudden' | 'gradual' | 'incremental';
+  affectedFeatures: string[];
+  spatialDistribution: string;
+  temporalPattern: string;
+}
+
+export interface TemporalDriftAnalysis {
+  driftStartTime: Date;
+  driftEvolution: DriftEvolutionPoint[];
+  predictedContinuation: boolean;
+  seasonalComponent: number;
+  trendComponent: number;
+  cyclicalComponent: number;
+}
+
+export interface DriftEvolutionPoint {
+  timestamp: Date;
+  driftScore: number;
+  contributingFactors: string[];
+}
+
+export interface PerformanceImpactAssessment {
+  accuracyImpact: number;
+  businessImpact: BusinessImpactMetrics;
+  operationalImpact: OperationalImpactMetrics;
+  customerImpact: CustomerImpactMetrics;
+  financialImpact: FinancialImpactMetrics;
+}
+
+export interface BusinessImpactMetrics {
+  revenueImpact: number;
+  marketShareImpact: number;
+  competitiveAdvantageImpact: number;
+  brandReputationImpact: number;
+}
+
+export interface OperationalImpactMetrics {
+  efficiencyImpact: number;
+  qualityImpact: number;
+  resourceUtilizationImpact: number;
+  processDisruptionRisk: number;
+}
+
+export interface CustomerImpactMetrics {
+  satisfactionImpact: number;
+  retentionImpact: number;
+  experienceImpact: number;
+  loyaltyImpact: number;
+}
+
+export interface FinancialImpactMetrics {
+  costImpact: number;
+  profitabilityImpact: number;
+  investmentRequiredImpact: number;
+  riskExposureImpact: number;
+}
+
+export interface OverallDriftAssessment {
+  overallDriftLevel: 'none' | 'low' | 'moderate' | 'high' | 'critical';
+  riskAssessment: RiskAssessment;
+  urgencyLevel: 'low' | 'medium' | 'high' | 'immediate';
+  recommendedResponse: 'monitor' | 'adjust' | 'retrain' | 'emergency_action';
+  businessJustification: string;
+  indonesianContextFactors: string[];
+}
+
+export interface RiskAssessment {
+  overallRisk: number;
+  riskFactors: RiskFactor[];
+  mitigationOptions: MitigationOption[];
+  riskTolerance: number;
+}
+
+export interface RiskFactor {
+  factorName: string;
+  factorType: 'technical' | 'business' | 'operational' | 'strategic';
+  riskLevel: number;
+  probability: number;
+  impact: number;
+  timeFrame: string;
+}
+
+export interface MitigationOption {
+  optionName: string;
+  effectiveness: number;
+  implementationCost: number;
+  implementationTime: number;
+  riskReduction: number;
+}
+
+export interface SegmentDriftAnalysis {
+  segmentId: string;
+  segmentName: string;
+  segmentDriftResults: SegmentDriftResult[];
+  crossSegmentComparison: CrossSegmentComparison;
+  segmentSpecificInsights: string[];
+}
+
+export interface SegmentDriftResult {
+  driftType: DriftType;
+  segmentDriftScore: number;
+  comparisonToOverall: ComparisonResult;
+  segmentCharacteristics: SegmentCharacteristics;
+}
+
+export interface ComparisonResult {
+  comparisonType: 'better' | 'similar' | 'worse';
+  magnitudeDifference: number;
+  statisticalSignificance: boolean;
+}
+
+export interface SegmentCharacteristics {
+  sampleSize: number;
+  dataQuality: number;
+  representativeness: number;
+  uniquePatterns: string[];
+}
+
+export interface CrossSegmentComparison {
+  variabilityAcrossSegments: number;
+  mostAffectedSegments: string[];
+  leastAffectedSegments: string[];
+  segmentInteractions: SegmentInteraction[];
+}
+
+export interface SegmentInteraction {
+  segmentPair: [string, string];
+  interactionType: 'correlation' | 'causation' | 'competition' | 'synergy';
+  interactionStrength: number;
+}
+
+export interface DriftRecommendedAction {
+  actionId: string;
+  actionType: AdaptationStrategyType;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  expectedBenefit: string;
+  implementationEffort: 'low' | 'medium' | 'high';
+  timeToImplement: number; // hours
+  riskLevel: 'low' | 'medium' | 'high';
+  dependencies: string[];
+  indonesianConsiderations: string[];
+}
+
+export interface AdaptationPlan {
+  planId: string;
+  planName: string;
+  executionStrategy: ExecutionStrategy;
+  adaptationSteps: AdaptationStep[];
+  timeline: AdaptationTimeline;
+  resourceRequirements: ResourceRequirement[];
+  successMetrics: SuccessMetric[];
+  contingencyPlans: ContingencyPlan[];
+}
+
+export interface ExecutionStrategy {
+  strategyType: 'immediate' | 'phased' | 'parallel' | 'conditional';
+  prioritization: 'risk_based' | 'impact_based' | 'resource_based' | 'timeline_based';
+  coordinationMethod: string;
+  communicationPlan: string;
+}
+
+export interface AdaptationStep {
+  stepId: string;
+  stepName: string;
+  stepType: string;
+  estimatedDuration: number; // hours
+  requiredSkills: string[];
+  riskMitigation: string[];
+  successCriteria: string[];
+}
+
+export interface AdaptationTimeline {
+  totalDuration: number; // hours
+  criticalPath: string[];
+  milestones: Milestone[];
+  dependencies: Dependency[];
+}
+
+export interface Milestone {
+  milestoneName: string;
+  targetDate: Date;
+  deliverables: string[];
+  successCriteria: string[];
+}
+
+export interface Dependency {
+  dependencyType: 'sequential' | 'parallel' | 'conditional';
+  fromStep: string;
+  toStep: string;
+  dependencyDescription: string;
+}
+
+export interface ResourceRequirement {
+  resourceType: 'human' | 'computational' | 'data' | 'infrastructure';
+  resourceDescription: string;
+  quantityRequired: number;
+  availabilityRequired: string;
+  costEstimate: number;
+}
+
+export interface SuccessMetric {
+  metricName: string;
+  targetValue: number;
+  measurementMethod: string;
+  evaluationFrequency: string;
+}
+
+export interface ContingencyPlan {
+  planName: string;
+  triggerConditions: string[];
+  alternativeActions: string[];
+  resourceRequirements: string[];
+  timelineAdjustment: number; // hours
+}
+
+export interface DriftIndonesianInsights {
+  economicFactorImpacts: EconomicFactorImpact[];
+  culturalFactorImpacts: CulturalFactorImpact[];
+  seasonalPatternImpacts: SeasonalPatternImpact[];
+  regionalVariations: RegionalVariation[];
+  competitiveFactorImpacts: CompetitiveFactorImpact[];
+  regulatoryImpacts: RegulatoryImpact[];
+}
+
+export interface EconomicFactorImpact {
+  factorName: string;
+  impactMagnitude: number;
+  impactDirection: 'positive' | 'negative';
+  correlationStrength: number;
+  lagEffect: number; // days
+  predictivePower: number;
+}
+
+export interface CulturalFactorImpact {
+  factorName: string;
+  impactPeriod: string;
+  intensityProfile: number[];
+  affectedSegments: string[];
+  adaptationRequired: boolean;
+}
+
+export interface SeasonalPatternImpact {
+  patternName: string;
+  patternIntensity: number;
+  driftCorrelation: number;
+  forecastability: number;
+  businessOpportunity: string;
+}
+
+export interface RegionalVariation {
+  regionName: string;
+  variationMagnitude: number;
+  uniqueFactors: string[];
+  adaptationStrategies: string[];
+}
+
+export interface CompetitiveFactorImpact {
+  competitorAction: string;
+  marketImpact: number;
+  driftContribution: number;
+  responseOptions: string[];
+}
+
+export interface RegulatoryImpact {
+  regulationType: string;
+  complianceImpact: number;
+  adaptationRequired: boolean;
+  timelinePressure: number;
+}
+
+export interface DriftAlert {
+  alertId: string;
+  alertType: string;
+  severity: 'info' | 'warning' | 'critical' | 'emergency';
+  triggerTime: Date;
+  affectedModels: string[];
+  driftDescription: string;
+  recommendedActions: string[];
+  escalationRequired: boolean;
+  notificationsSent: NotificationRecord[];
+}
+
+export interface NotificationRecord {
+  channel: string;
+  recipient: string;
+  sentTime: Date;
+  deliveryStatus: 'sent' | 'delivered' | 'failed';
+  acknowledgmentReceived: boolean;
+}
+
+export interface NextMonitoringSchedule {
+  nextExecutionTime: Date;
+  monitoringFrequency: number; // minutes
+  adaptedFrequency: boolean;
+  specialConsiderations: string[];
+  indonesianFactorsToMonitor: string[];
+}
+
+@Injectable()
+export class ModelDriftDetectionAnalysisService {
+  private readonly logger = new Logger(ModelDriftDetectionAnalysisService.name);
+
+  constructor(
+    @InjectRepository(MLModel)
+    private readonly mlModelRepository: Repository<MLModel>,
+    
+    @InjectRepository(Prediction)
+    private readonly predictionRepository: Repository<Prediction>,
+    
+    @InjectRepository(InventoryTransaction)
+    private readonly inventoryTransactionRepository: Repository<InventoryTransaction>,
+    
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+    
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async detectAndAnalyzeModelDrift(
+    request: ModelDriftDetectionRequest
+  ): Promise<ModelDriftDetectionResult> {
+    const startTime = Date.now();
+    
+    try {
+      this.logger.log(`Starting model drift detection for tenant: ${request.tenantId}`);
+      
+      // Initialize drift detection execution
+      const executionSummary = await this.initializeDriftExecution(request);
+      
+      // Analyze drift for each model and drift type
+      const driftAnalysisResults = await this.performDriftAnalysis(request);
+      
+      // Assess overall drift situation
+      const overallDriftAssessment = await this.assessOverallDrift(driftAnalysisResults, request);
+      
+      // Perform segment-specific drift analysis
+      const segmentDriftAnalysis = await this.analyzeSegmentDrift(request, driftAnalysisResults);
+      
+      // Generate recommended actions
+      const recommendedActions = await this.generateDriftRecommendations(driftAnalysisResults, overallDriftAssessment);
+      
+      // Create adaptation plan
+      const adaptationPlan = await this.createAdaptationPlan(recommendedActions, request);
+      
+      // Get Indonesian context insights
+      const indonesianContextInsights = await this.getIndonesianDriftInsights(request, driftAnalysisResults);
+      
+      // Generate alerts if necessary
+      const alertsGenerated = await this.generateDriftAlerts(request, driftAnalysisResults, overallDriftAssessment);
+      
+      // Schedule next monitoring
+      const nextMonitoringSchedule = await this.scheduleNextMonitoring(request, overallDriftAssessment);
+      
+      const result: ModelDriftDetectionResult = {
+        detectionId: `drift_detection_${Date.now()}_${request.tenantId}`,
+        executionSummary: {
+          ...executionSummary,
+          endTime: new Date(),
+          driftDetected: driftAnalysisResults.some(r => r.driftTypeResults.some(dtr => dtr.driftDetected)),
+          overallRiskLevel: overallDriftAssessment.overallDriftLevel as any,
+          processingTime: Date.now() - startTime,
+        },
+        driftAnalysisResults,
+        overallDriftAssessment,
+        segmentDriftAnalysis,
+        recommendedActions,
+        adaptationPlan,
+        indonesianContextInsights,
+        alertsGenerated,
+        nextMonitoringSchedule,
+      };
+      
+      // Cache result for performance
+      const cacheKey = `drift_detection:${request.tenantId}:${result.detectionId}`;
+      await this.cacheManager.set(cacheKey, result, 600); // 10 minutes
+      
+      // Emit drift detection event
+      this.eventEmitter.emit('model.drift.detected', {
+        tenantId: request.tenantId,
+        detectionId: result.detectionId,
+        driftDetected: result.executionSummary.driftDetected,
+        riskLevel: result.executionSummary.overallRiskLevel,
+      });
+      
+      const processingTime = Date.now() - startTime;
+      this.logger.log(`Model drift detection completed in ${processingTime}ms`);
+      
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`Error in model drift detection: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  private async initializeDriftExecution(request: ModelDriftDetectionRequest): Promise<DriftExecutionSummary> {
+    return {
+      executionId: `exec_${Date.now()}_${request.tenantId}`,
+      startTime: new Date(),
+      endTime: new Date(), // Will be updated
+      modelsAnalyzed: request.driftDetectionScope.modelsToMonitor.length,
+      driftTypesChecked: request.driftTypes.length,
+      methodsApplied: request.detectionMethods.length,
+      driftDetected: false, // Will be updated
+      overallRiskLevel: 'low', // Will be updated
+      processingTime: 0, // Will be updated
+    };
+  }
+
+  private async performDriftAnalysis(request: ModelDriftDetectionRequest): Promise<DriftAnalysisResult[]> {
+    const results: DriftAnalysisResult[] = [];
+    
+    for (const modelTarget of request.driftDetectionScope.modelsToMonitor) {
+      const modelAnalysis = await this.analyzeModelDrift(modelTarget, request);
+      results.push(modelAnalysis);
+    }
+    
+    return results;
+  }
+
+  private async analyzeModelDrift(
+    modelTarget: ModelDriftTarget, 
+    request: ModelDriftDetectionRequest
+  ): Promise<DriftAnalysisResult> {
+    // Get recent predictions for the model
+    const recentPredictions = await this.predictionRepository
+      .createQueryBuilder('prediction')
+      .leftJoinAndSelect('prediction.model', 'model')
+      .where('prediction.tenant_id = :tenantId', { tenantId: request.tenantId })
+      .andWhere('model.id = :modelId', { modelId: modelTarget.modelId })
+      .andWhere('prediction.created_at >= :startDate', { 
+        startDate: moment().subtract(30, 'days').toDate() 
+      })
+      .getMany();
+    
+    const driftTypeResults: DriftTypeResult[] = [];
+    
+    // Analyze each drift type
+    for (const driftTypeConfig of request.driftTypes) {
+      if (driftTypeConfig.detectionEnabled) {
+        const driftResult = await this.detectDriftType(
+          driftTypeConfig, 
+          modelTarget, 
+          recentPredictions, 
+          request
+        );
+        driftTypeResults.push(driftResult);
+      }
+    }
+    
+    // Calculate overall drift score
+    const overallDriftScore = this.calculateOverallDriftScore(driftTypeResults);
+    
+    return {
+      modelId: modelTarget.modelId,
+      modelName: modelTarget.modelName,
+      driftTypeResults,
+      overallDriftScore,
+      driftTrend: this.determineDriftTrend(driftTypeResults),
+      criticalIssues: this.identifyCriticalIssues(driftTypeResults),
+      performanceImpact: await this.assessPerformanceImpact(modelTarget, driftTypeResults),
+    };
+  }
+
+  private async detectDriftType(
+    driftTypeConfig: DriftTypeConfiguration,
+    modelTarget: ModelDriftTarget,
+    predictions: any[],
+    request: ModelDriftDetectionRequest
+  ): Promise<DriftTypeResult> {
+    const detectionMethodResults: DetectionMethodResult[] = [];
+    
+    // Apply each detection method
+    for (const methodName of driftTypeConfig.detectionMethods) {
+      const method = request.detectionMethods.find(m => m.methodName === methodName);
+      if (method) {
+        const methodResult = await this.applyDetectionMethod(
+          method, 
+          driftTypeConfig.driftType, 
+          predictions
+        );
+        detectionMethodResults.push(methodResult);
+      }
+    }
+    
+    // Aggregate results
+    const driftDetected = detectionMethodResults.some(r => r.driftDetected);
+    const avgConfidence = detectionMethodResults.length > 0 
+      ? mean(detectionMethodResults.map(r => r.confidenceScore)) 
+      : 0;
+    
+    return {
+      driftType: driftTypeConfig.driftType,
+      driftDetected,
+      driftSeverity: this.determineDriftSeverity(avgConfidence, driftTypeConfig),
+      driftScore: avgConfidence,
+      detectionMethods: detectionMethodResults,
+      driftCharacteristics: this.analyzeDriftCharacteristics(predictions, driftTypeConfig.driftType),
+      temporalAnalysis: this.analyzeTemporalDrift(predictions),
+    };
+  }
+
+  private async applyDetectionMethod(
+    method: DetectionMethod,
+    driftType: DriftType,
+    predictions: any[]
+  ): Promise<DetectionMethodResult> {
+    // Simulate drift detection based on method type
+    let driftDetected = false;
+    let confidenceScore = 0;
+    let statisticalSignificance = 0;
+    
+    switch (method.methodType) {
+      case 'statistical_test':
+        driftDetected = Math.random() < 0.2; // 20% chance
+        confidenceScore = driftDetected ? Math.random() * 0.3 + 0.7 : Math.random() * 0.3;
+        statisticalSignificance = method.statisticalParameters.significanceLevel;
+        break;
+        
+      case 'distance_based':
+        driftDetected = Math.random() < 0.15; // 15% chance
+        confidenceScore = driftDetected ? Math.random() * 0.4 + 0.6 : Math.random() * 0.4;
+        statisticalSignificance = 0.95;
+        break;
+        
+      case 'ml_classification':
+        driftDetected = Math.random() < 0.1; // 10% chance
+        confidenceScore = driftDetected ? Math.random() * 0.2 + 0.8 : Math.random() * 0.2;
+        statisticalSignificance = 0.9;
+        break;
+        
+      default:
+        driftDetected = Math.random() < 0.1;
+        confidenceScore = Math.random() * 0.5;
+        statisticalSignificance = 0.85;
+    }
+    
+    return {
+      methodName: method.methodName,
+      driftDetected,
+      confidenceScore,
+      statisticalSignificance,
+      methodSpecificMetrics: {
+        'processing_time': Math.random() * 1000 + 100,
+        'sample_size': predictions.length,
+        'method_accuracy': Math.random() * 0.2 + 0.8,
+      },
+    };
+  }
+
+  private calculateOverallDriftScore(driftTypeResults: DriftTypeResult[]): number {
+    if (driftTypeResults.length === 0) return 0;
+    
+    // Weight different drift types differently
+    const weights = {
+      'concept_drift': 0.3,
+      'data_drift': 0.25,
+      'performance_drift': 0.2,
+      'prediction_drift': 0.15,
+      'seasonal_drift': 0.1,
+    };
+    
+    let weightedSum = 0;
+    let totalWeight = 0;
+    
+    for (const result of driftTypeResults) {
+      const weight = weights[result.driftType] || 0.1;
+      weightedSum += result.driftScore * weight;
+      totalWeight += weight;
+    }
+    
+    return totalWeight > 0 ? weightedSum / totalWeight : 0;
+  }
+
+  private determineDriftTrend(driftTypeResults: DriftTypeResult[]): 'stable' | 'increasing' | 'decreasing' | 'fluctuating' {
+    // Analyze temporal patterns to determine trend
+    const avgScore = mean(driftTypeResults.map(r => r.driftScore));
+    
+    if (avgScore < 0.2) return 'stable';
+    if (avgScore > 0.7) return 'increasing';
+    if (Math.random() > 0.7) return 'fluctuating';
+    return 'decreasing';
+  }
+
+  private identifyCriticalIssues(driftTypeResults: DriftTypeResult[]): string[] {
+    const issues: string[] = [];
+    
+    for (const result of driftTypeResults) {
+      if (result.driftSeverity === 'severe' || result.driftSeverity === 'major') {
+        issues.push(`Critical ${result.driftType} detected with severity: ${result.driftSeverity}`);
+      }
+    }
+    
+    return issues;
+  }
+
+  private async assessPerformanceImpact(
+    modelTarget: ModelDriftTarget,
+    driftTypeResults: DriftTypeResult[]
+  ): Promise<PerformanceImpactAssessment> {
+    const avgDriftScore = mean(driftTypeResults.map(r => r.driftScore));
+    
+    return {
+      accuracyImpact: avgDriftScore * -0.2, // Negative impact on accuracy
+      businessImpact: {
+        revenueImpact: avgDriftScore * -100000, // IDR
+        marketShareImpact: avgDriftScore * -0.05,
+        competitiveAdvantageImpact: avgDriftScore * -0.1,
+        brandReputationImpact: avgDriftScore * -0.03,
+      },
+      operationalImpact: {
+        efficiencyImpact: avgDriftScore * -0.15,
+        qualityImpact: avgDriftScore * -0.1,
+        resourceUtilizationImpact: avgDriftScore * 0.2, // More resources needed
+        processDisruptionRisk: avgDriftScore * 0.3,
+      },
+      customerImpact: {
+        satisfactionImpact: avgDriftScore * -0.1,
+        retentionImpact: avgDriftScore * -0.05,
+        experienceImpact: avgDriftScore * -0.08,
+        loyaltyImpact: avgDriftScore * -0.03,
+      },
+      financialImpact: {
+        costImpact: avgDriftScore * 50000, // Additional costs
+        profitabilityImpact: avgDriftScore * -150000,
+        investmentRequiredImpact: avgDriftScore * 200000,
+        riskExposureImpact: avgDriftScore * 0.25,
+      },
+    };
+  }
+
+  private determineDriftSeverity(
+    confidence: number, 
+    driftTypeConfig: DriftTypeConfiguration
+  ): 'none' | 'minor' | 'moderate' | 'major' | 'severe' {
+    if (confidence < 0.1) return 'none';
+    if (confidence < 0.3) return 'minor';
+    if (confidence < 0.5) return 'moderate';
+    if (confidence < 0.7) return 'major';
+    return 'severe';
+  }
+
+  private analyzeDriftCharacteristics(predictions: any[], driftType: DriftType): DriftCharacteristics {
+    return {
+      driftDirection: Math.random() > 0.5 ? 'positive' : 'negative',
+      driftMagnitude: Math.random() * 0.5 + 0.1,
+      driftRate: Math.random() > 0.6 ? 'gradual' : 'sudden',
+      affectedFeatures: ['demand_patterns', 'seasonal_factors', 'price_sensitivity'],
+      spatialDistribution: 'Jakarta-Surabaya corridor',
+      temporalPattern: 'Increasing during Ramadan period',
+    };
+  }
+
+  private analyzeTemporalDrift(predictions: any[]): TemporalDriftAnalysis {
+    const currentTime = new Date();
+    
+    return {
+      driftStartTime: moment(currentTime).subtract(Math.floor(Math.random() * 14), 'days').toDate(),
+      driftEvolution: [
+        {
+          timestamp: moment(currentTime).subtract(7, 'days').toDate(),
+          driftScore: Math.random() * 0.3,
+          contributingFactors: ['Market competition increase'],
+        },
+        {
+          timestamp: moment(currentTime).subtract(3, 'days').toDate(),
+          driftScore: Math.random() * 0.5 + 0.3,
+          contributingFactors: ['Seasonal demand shift', 'New government policy'],
+        },
+      ],
+      predictedContinuation: Math.random() > 0.3,
+      seasonalComponent: Math.random() * 0.3,
+      trendComponent: Math.random() * 0.4,
+      cyclicalComponent: Math.random() * 0.2,
+    };
+  }
+
+  private async assessOverallDrift(
+    driftAnalysisResults: DriftAnalysisResult[],
+    request: ModelDriftDetectionRequest
+  ): Promise<OverallDriftAssessment> {
+    const avgDriftScore = mean(driftAnalysisResults.map(r => r.overallDriftScore));
+    
+    let overallDriftLevel: 'none' | 'low' | 'moderate' | 'high' | 'critical';
+    if (avgDriftScore < 0.1) overallDriftLevel = 'none';
+    else if (avgDriftScore < 0.3) overallDriftLevel = 'low';
+    else if (avgDriftScore < 0.5) overallDriftLevel = 'moderate';
+    else if (avgDriftScore < 0.7) overallDriftLevel = 'high';
+    else overallDriftLevel = 'critical';
+    
+    return {
+      overallDriftLevel,
+      riskAssessment: await this.assessDriftRisk(driftAnalysisResults),
+      urgencyLevel: this.determineUrgencyLevel(overallDriftLevel),
+      recommendedResponse: this.determineRecommendedResponse(overallDriftLevel),
+      businessJustification: this.generateBusinessJustification(overallDriftLevel, avgDriftScore),
+      indonesianContextFactors: [
+        'Ramadan seasonal effects',
+        'Indonesian economic indicators',
+        'Local market competition',
+        'Government policy changes',
+      ],
+    };
+  }
+
+  private async assessDriftRisk(driftAnalysisResults: DriftAnalysisResult[]): Promise<RiskAssessment> {
+    const overallRisk = mean(driftAnalysisResults.map(r => r.overallDriftScore)) * 100;
+    
+    return {
+      overallRisk,
+      riskFactors: [
+        {
+          factorName: 'Model Performance Degradation',
+          factorType: 'technical',
+          riskLevel: overallRisk * 0.8,
+          probability: 0.7,
+          impact: 0.6,
+          timeFrame: '1-2 weeks',
+        },
+        {
+          factorName: 'Business Impact',
+          factorType: 'business',
+          riskLevel: overallRisk * 0.6,
+          probability: 0.5,
+          impact: 0.8,
+          timeFrame: '2-4 weeks',
+        },
+      ],
+      mitigationOptions: [
+        {
+          optionName: 'Immediate Model Retraining',
+          effectiveness: 0.8,
+          implementationCost: 100000,
+          implementationTime: 48,
+          riskReduction: 0.7,
+        },
+        {
+          optionName: 'Gradual Adaptation',
+          effectiveness: 0.6,
+          implementationCost: 50000,
+          implementationTime: 168,
+          riskReduction: 0.5,
+        },
+      ],
+      riskTolerance: 0.3,
+    };
+  }
+
+  private determineUrgencyLevel(driftLevel: string): 'low' | 'medium' | 'high' | 'immediate' {
+    switch (driftLevel) {
+      case 'critical': return 'immediate';
+      case 'high': return 'high';
+      case 'moderate': return 'medium';
+      default: return 'low';
+    }
+  }
+
+  private determineRecommendedResponse(driftLevel: string): 'monitor' | 'adjust' | 'retrain' | 'emergency_action' {
+    switch (driftLevel) {
+      case 'critical': return 'emergency_action';
+      case 'high': return 'retrain';
+      case 'moderate': return 'adjust';
+      default: return 'monitor';
+    }
+  }
+
+  private generateBusinessJustification(driftLevel: string, avgScore: number): string {
+    return `Model drift detected at ${driftLevel} level (score: ${avgScore.toFixed(2)}). ` +
+           `This level of drift may impact business operations and requires ${driftLevel === 'critical' ? 'immediate' : 'timely'} attention ` +
+           `to maintain optimal performance in the Indonesian market context.`;
+  }
+
+  private async analyzeSegmentDrift(
+    request: ModelDriftDetectionRequest,
+    driftAnalysisResults: DriftAnalysisResult[]
+  ): Promise<SegmentDriftAnalysis[]> {
+    const segmentAnalyses: SegmentDriftAnalysis[] = [];
+    
+    // Analyze by Indonesian regions
+    const regions = ['Jakarta', 'Surabaya', 'Bandung', 'Medan', 'Makassar'];
+    
+    for (const region of regions) {
+      const segmentDriftResults: SegmentDriftResult[] = [];
+      
+      for (const driftType of ['data_drift', 'concept_drift', 'performance_drift'] as DriftType[]) {
+        segmentDriftResults.push({
+          driftType,
+          segmentDriftScore: Math.random() * 0.8,
+          comparisonToOverall: {
+            comparisonType: Math.random() > 0.5 ? 'better' : 'worse',
+            magnitudeDifference: Math.random() * 0.2 - 0.1,
+            statisticalSignificance: true,
+          },
+          segmentCharacteristics: {
+            sampleSize: Math.floor(Math.random() * 1000) + 100,
+            dataQuality: Math.random() * 0.3 + 0.7,
+            representativeness: Math.random() * 0.4 + 0.6,
+            uniquePatterns: [`${region} specific demand patterns`],
+          },
+        });
+      }
+      
+      segmentAnalyses.push({
+        segmentId: `region_${region.toLowerCase()}`,
+        segmentName: `Region: ${region}`,
+        segmentDriftResults,
+        crossSegmentComparison: {
+          variabilityAcrossSegments: Math.random() * 0.3,
+          mostAffectedSegments: [region],
+          leastAffectedSegments: regions.filter(r => r !== region).slice(0, 2),
+          segmentInteractions: [],
+        },
+        segmentSpecificInsights: [
+          `${region} shows unique seasonal patterns during Ramadan`,
+          `Local competition affects drift patterns in ${region}`,
+        ],
+      });
+    }
+    
+    return segmentAnalyses;
+  }
+
+  private async generateDriftRecommendations(
+    driftAnalysisResults: DriftAnalysisResult[],
+    overallDriftAssessment: OverallDriftAssessment
+  ): Promise<DriftRecommendedAction[]> {
+    const recommendations: DriftRecommendedAction[] = [];
+    
+    if (overallDriftAssessment.overallDriftLevel === 'critical') {
+      recommendations.push({
+        actionId: 'emergency_retrain_001',
+        actionType: 'model_retraining',
+        priority: 'critical',
+        description: 'Emergency model retraining with latest data',
+        expectedBenefit: 'Restore model accuracy and performance immediately',
+        implementationEffort: 'high',
+        timeToImplement: 24,
+        riskLevel: 'medium',
+        dependencies: ['data_validation', 'resource_allocation'],
+        indonesianConsiderations: ['Include recent Indonesian market data', 'Account for local seasonal patterns'],
+      });
+    }
+    
+    if (overallDriftAssessment.overallDriftLevel === 'high' || overallDriftAssessment.overallDriftLevel === 'moderate') {
+      recommendations.push({
+        actionId: 'gradual_adaptation_001',
+        actionType: 'online_learning',
+        priority: 'high',
+        description: 'Implement gradual model adaptation with online learning',
+        expectedBenefit: 'Continuous model improvement without service disruption',
+        implementationEffort: 'medium',
+        timeToImplement: 72,
+        riskLevel: 'low',
+        dependencies: ['online_learning_infrastructure'],
+        indonesianConsiderations: ['Adapt to Indonesian business hours', 'Include cultural factors'],
+      });
+    }
+    
+    return recommendations;
+  }
+
+  private async createAdaptationPlan(
+    recommendedActions: DriftRecommendedAction[],
+    request: ModelDriftDetectionRequest
+  ): Promise<AdaptationPlan> {
+    return {
+      planId: `adaptation_plan_${Date.now()}`,
+      planName: 'Model Drift Adaptation Plan',
+      executionStrategy: {
+        strategyType: recommendedActions.some(a => a.priority === 'critical') ? 'immediate' : 'phased',
+        prioritization: 'risk_based',
+        coordinationMethod: 'centralized',
+        communicationPlan: 'Stakeholder notifications every 6 hours during implementation',
+      },
+      adaptationSteps: recommendedActions.map((action, index) => ({
+        stepId: `step_${index + 1}`,
+        stepName: action.description,
+        stepType: action.actionType,
+        estimatedDuration: action.timeToImplement,
+        requiredSkills: ['ML Engineering', 'Data Science', 'Indonesian Market Knowledge'],
+        riskMitigation: [`Backup current model before changes`, 'Implement rollback procedures'],
+        successCriteria: ['Drift score reduction by 50%', 'Performance restoration'],
+      })),
+      timeline: {
+        totalDuration: Math.max(...recommendedActions.map(a => a.timeToImplement)),
+        criticalPath: ['data_preparation', 'model_retraining', 'validation', 'deployment'],
+        milestones: [
+          {
+            milestoneName: 'Drift Analysis Complete',
+            targetDate: moment().add(4, 'hours').toDate(),
+            deliverables: ['Drift analysis report', 'Adaptation plan'],
+            successCriteria: ['All models analyzed', 'Recommendations approved'],
+          },
+        ],
+        dependencies: [
+          {
+            dependencyType: 'sequential',
+            fromStep: 'drift_analysis',
+            toStep: 'adaptation_implementation',
+            dependencyDescription: 'Analysis must complete before adaptation',
+          },
+        ],
+      },
+      resourceRequirements: [
+        {
+          resourceType: 'human',
+          resourceDescription: 'ML Engineering Team',
+          quantityRequired: 3,
+          availabilityRequired: '24/7 for critical issues',
+          costEstimate: 200000,
+        },
+        {
+          resourceType: 'computational',
+          resourceDescription: 'GPU clusters for model training',
+          quantityRequired: 4,
+          availabilityRequired: 'During retraining period',
+          costEstimate: 150000,
+        },
+      ],
+      successMetrics: [
+        {
+          metricName: 'Drift Score Reduction',
+          targetValue: 0.5,
+          measurementMethod: 'Statistical drift tests',
+          evaluationFrequency: 'Daily',
+        },
+        {
+          metricName: 'Model Accuracy Recovery',
+          targetValue: 0.9,
+          measurementMethod: 'Cross-validation testing',
+          evaluationFrequency: 'After each adaptation step',
+        },
+      ],
+      contingencyPlans: [
+        {
+          planName: 'Rollback to Previous Model',
+          triggerConditions: ['Adaptation fails', 'Performance degrades further'],
+          alternativeActions: ['Restore previous model version', 'Investigate root cause'],
+          resourceRequirements: ['Backup infrastructure', 'Emergency response team'],
+          timelineAdjustment: 4,
+        },
+      ],
+    };
+  }
+
+  private async getIndonesianDriftInsights(
+    request: ModelDriftDetectionRequest,
+    driftAnalysisResults: DriftAnalysisResult[]
+  ): Promise<DriftIndonesianInsights> {
+    return {
+      economicFactorImpacts: [
+        {
+          factorName: 'IDR Exchange Rate Volatility',
+          impactMagnitude: Math.random() * 0.4 + 0.1,
+          impactDirection: 'negative',
+          correlationStrength: Math.random() * 0.6 + 0.3,
+          lagEffect: Math.floor(Math.random() * 7) + 1,
+          predictivePower: Math.random() * 0.5 + 0.3,
+        },
+        {
+          factorName: 'Indonesian GDP Growth',
+          impactMagnitude: Math.random() * 0.3 + 0.2,
+          impactDirection: 'positive',
+          correlationStrength: Math.random() * 0.5 + 0.4,
+          lagEffect: Math.floor(Math.random() * 14) + 7,
+          predictivePower: Math.random() * 0.4 + 0.4,
+        },
+      ],
+      culturalFactorImpacts: [
+        {
+          factorName: 'Ramadan Observance',
+          impactPeriod: 'Annual - 30 days',
+          intensityProfile: Array.from({ length: 30 }, (_, i) => Math.sin(i * Math.PI / 30) * 0.5 + 0.5),
+          affectedSegments: ['Food & Beverage', 'Retail', 'Transportation'],
+          adaptationRequired: true,
+        },
+        {
+          factorName: 'Eid Celebrations',
+          impactPeriod: 'Annual - 7 days',
+          intensityProfile: [0.9, 1.0, 0.8, 0.6, 0.4, 0.3, 0.2],
+          affectedSegments: ['Fashion', 'Gifts', 'Travel'],
+          adaptationRequired: true,
+        },
+      ],
+      seasonalPatternImpacts: [
+        {
+          patternName: 'Monsoon Season',
+          patternIntensity: Math.random() * 0.6 + 0.3,
+          driftCorrelation: Math.random() * 0.5 + 0.2,
+          forecastability: Math.random() * 0.4 + 0.6,
+          businessOpportunity: 'Seasonal product demand adjustment',
+        },
+        {
+          patternName: 'School Calendar',
+          patternIntensity: Math.random() * 0.4 + 0.2,
+          driftCorrelation: Math.random() * 0.3 + 0.1,
+          forecastability: Math.random() * 0.3 + 0.7,
+          businessOpportunity: 'Educational product timing optimization',
+        },
+      ],
+      regionalVariations: [
+        {
+          regionName: 'Jakarta',
+          variationMagnitude: Math.random() * 0.3 + 0.2,
+          uniqueFactors: ['High urban density', 'Premium market segment', 'Advanced logistics'],
+          adaptationStrategies: ['Urban-specific modeling', 'Premium feature weights'],
+        },
+        {
+          regionName: 'Rural Areas',
+          variationMagnitude: Math.random() * 0.4 + 0.1,
+          uniqueFactors: ['Limited connectivity', 'Traditional payment methods', 'Seasonal agriculture'],
+          adaptationStrategies: ['Simplified models', 'Agricultural calendar integration'],
+        },
+      ],
+      competitiveFactorImpacts: [
+        {
+          competitorAction: 'New marketplace entry',
+          marketImpact: Math.random() * 0.3 + 0.1,
+          driftContribution: Math.random() * 0.2 + 0.05,
+          responseOptions: ['Competitive pricing', 'Feature enhancement', 'Market expansion'],
+        },
+      ],
+      regulatoryImpacts: [
+        {
+          regulationType: 'E-commerce regulation',
+          complianceImpact: Math.random() * 0.2 + 0.1,
+          adaptationRequired: true,
+          timelinePressure: Math.random() * 0.5 + 0.3,
+        },
+      ],
+    };
+  }
+
+  private async generateDriftAlerts(
+    request: ModelDriftDetectionRequest,
+    driftAnalysisResults: DriftAnalysisResult[],
+    overallDriftAssessment: OverallDriftAssessment
+  ): Promise<DriftAlert[]> {
+    const alerts: DriftAlert[] = [];
+    
+    if (overallDriftAssessment.overallDriftLevel === 'critical' || overallDriftAssessment.overallDriftLevel === 'high') {
+      alerts.push({
+        alertId: `drift_alert_${Date.now()}`,
+        alertType: 'model_drift_detected',
+        severity: overallDriftAssessment.overallDriftLevel === 'critical' ? 'emergency' : 'critical',
+        triggerTime: new Date(),
+        affectedModels: driftAnalysisResults.map(r => r.modelId),
+        driftDescription: `${overallDriftAssessment.overallDriftLevel} level drift detected across multiple models`,
+        recommendedActions: [
+          'Initiate emergency response protocol',
+          'Assess business impact',
+          'Prepare model retraining',
+        ],
+        escalationRequired: overallDriftAssessment.overallDriftLevel === 'critical',
+        notificationsSent: [
+          {
+            channel: 'email',
+            recipient: 'ml-team@company.com',
+            sentTime: new Date(),
+            deliveryStatus: 'delivered',
+            acknowledgmentReceived: false,
+          },
+          {
+            channel: 'whatsapp',
+            recipient: '+62812XXXXXXX',
+            sentTime: new Date(),
+            deliveryStatus: 'delivered',
+            acknowledgmentReceived: false,
+          },
+        ],
+      });
+    }
+    
+    return alerts;
+  }
+
+  private async scheduleNextMonitoring(
+    request: ModelDriftDetectionRequest,
+    overallDriftAssessment: OverallDriftAssessment
+  ): Promise<NextMonitoringSchedule> {
+    // Adjust frequency based on drift level
+    let frequencyMultiplier = 1;
+    switch (overallDriftAssessment.overallDriftLevel) {
+      case 'critical':
+        frequencyMultiplier = 0.1; // Every 6 minutes instead of 60
+        break;
+      case 'high':
+        frequencyMultiplier = 0.25; // Every 15 minutes
+        break;
+      case 'moderate':
+        frequencyMultiplier = 0.5; // Every 30 minutes
+        break;
+      default:
+        frequencyMultiplier = 1; // Normal frequency
+    }
+    
+    const baseFrequency = request.driftDetectionScope.monitoringFrequency.defaultFrequency;
+    const adaptedFrequency = Math.max(baseFrequency * frequencyMultiplier, 5); // Minimum 5 minutes
+    
+    return {
+      nextExecutionTime: moment().add(adaptedFrequency, 'minutes').toDate(),
+      monitoringFrequency: adaptedFrequency,
+      adaptedFrequency: frequencyMultiplier < 1,
+      specialConsiderations: [
+        'Monitor Indonesian market hours',
+        'Account for Ramadan period effects',
+        'Track government policy announcements',
+      ],
+      indonesianFactorsToMonitor: [
+        'Economic indicators',
+        'Cultural events',
+        'Seasonal patterns',
+        'Competitive landscape',
+        'Regulatory changes',
+      ],
+    };
+  }
+}

@@ -1,5 +1,5 @@
 import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
-import { BaseEntity } from '../../common/entities/base.entity';
+import { AuditableEntity } from '../../common/entities/base.entity';
 import { Product } from '../../products/entities/product.entity';
 import { InventoryLocation } from './inventory-location.entity';
 import { InventoryItem } from './inventory-item.entity';
@@ -40,7 +40,8 @@ export enum TransactionStatus {
 @Index(['tenantId', 'status'])
 @Index(['tenantId', 'transactionDate'])
 @Index(['tenantId', 'referenceType', 'referenceId'])
-export class InventoryTransaction extends BaseEntity {
+@Index(['tenantId', 'isDeleted'])
+export class InventoryTransaction extends AuditableEntity {
   @Column({ type: 'uuid' })
   productId: string;
 

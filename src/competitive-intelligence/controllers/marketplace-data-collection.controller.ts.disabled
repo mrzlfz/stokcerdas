@@ -1,0 +1,958 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpStatus,
+  HttpException,
+  Logger,
+  ValidationPipe,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { Permissions } from '../../auth/decorators/permissions.decorator';
+import { CurrentTenant } from '../../auth/decorators/current-tenant.decorator';
+
+import { 
+  MarketplaceDataCollectionService, 
+  MarketplaceDataCollectionRequest, 
+  MarketplaceDataCollectionResult,
+  MarketplaceMetrics,
+} from '../services/marketplace-data-collection.service';
+import { MarketplaceType, DataQuality } from '../entities/competitive-product.entity';
+
+// DTOs for API requests
+export class CreateCollectionJobDto {
+  marketplace: MarketplaceType;
+  collectionType: 'product_details' | 'price_monitoring' | 'competitor_discovery' | 'category_analysis';
+  targets: {
+    productIds?: string[];
+    searchQueries?: string[];
+    categories?: string[];
+    competitors?: string[];
+    regions?: string[];
+  };
+  collectionConfig: {
+    includeImages?: boolean;
+    includeReviews?: boolean;
+    includeVariants?: boolean;
+    includePriceHistory?: boolean;
+    maxResults?: number;
+    dataQualityThreshold?: DataQuality;
+    respectRateLimit?: boolean;
+    useProxies?: boolean;
+    retryFailures?: boolean;
+  };
+  schedulingConfig?: {
+    frequency?: 'realtime' | 'hourly' | 'daily' | 'weekly';
+    priorityLevel?: 'low' | 'medium' | 'high' | 'critical';
+    timeWindow?: string;
+    maxConcurrency?: number;
+  };
+}
+
+export class BulkCollectionJobDto {
+  marketplaces: MarketplaceType[];
+  collectionType: 'product_details' | 'price_monitoring' | 'competitor_discovery' | 'category_analysis';
+  targets: {
+    productIds?: string[];
+    searchQueries?: string[];
+    categories?: string[];
+    competitors?: string[];
+    regions?: string[];
+  };
+  globalConfig: {
+    includeImages?: boolean;
+    includeReviews?: boolean;
+    includeVariants?: boolean;
+    includePriceHistory?: boolean;
+    maxResultsPerMarketplace?: number;
+    dataQualityThreshold?: DataQuality;
+    respectRateLimit?: boolean;
+    useProxies?: boolean;
+    retryFailures?: boolean;
+  };
+  priorityMarketplaces?: MarketplaceType[];
+}
+
+export class ScheduleCollectionDto {
+  marketplace: MarketplaceType;
+  collectionType: 'product_details' | 'price_monitoring' | 'competitor_discovery' | 'category_analysis';
+  targets: {
+    productIds?: string[];
+    searchQueries?: string[];
+    categories?: string[];
+    competitors?: string[];
+    regions?: string[];
+  };
+  schedule: {
+    frequency: 'realtime' | 'hourly' | 'daily' | 'weekly';
+    timeWindow?: string; // cron expression
+    priorityLevel?: 'low' | 'medium' | 'high' | 'critical';
+    maxConcurrency?: number;
+  };
+  collectionConfig?: {
+    includeImages?: boolean;
+    includeReviews?: boolean;
+    includeVariants?: boolean;
+    includePriceHistory?: boolean;
+    maxResults?: number;
+    dataQualityThreshold?: DataQuality;
+    respectRateLimit?: boolean;
+    useProxies?: boolean;
+    retryFailures?: boolean;
+  };
+}
+
+export class MarketplaceMetricsQueryDto {
+  marketplace?: MarketplaceType;
+  timeRangeFrom?: string;
+  timeRangeTo?: string;
+  includeCategories?: boolean;
+  includeRegionalData?: boolean;
+  includePerformanceMetrics?: boolean;
+}
+
+@ApiTags('Marketplace Data Collection')
+@Controller('api/v1/competitive-intelligence/marketplace-collection')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+export class MarketplaceDataCollectionController {
+  private readonly logger = new Logger(MarketplaceDataCollectionController.name);
+
+  constructor(
+    private readonly marketplaceDataCollectionService: MarketplaceDataCollectionService,
+  ) {}
+
+  @Post('collect')
+  @ApiOperation({
+    summary: 'Start marketplace data collection job',
+    description: 'Initiate data collection from specified marketplace with custom configuration',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Data collection job started successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string' },
+        status: { type: 'string' },
+        estimatedCompletionTime: { type: 'string' },
+        targets: { type: 'object' },
+        configuration: { type: 'object' },
+      },
+    },
+  })
+  @ApiBody({ type: CreateCollectionJobDto })
+  @Permissions('competitive_intelligence:collect')
+  async startDataCollection(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) collectionDto: CreateCollectionJobDto,
+  ): Promise<{
+    jobId: string;
+    status: string;
+    estimatedCompletionTime: string;
+    targets: any;
+    configuration: any;
+  }> {
+    try {
+      this.logger.log(`Starting data collection for tenant: ${tenantId}, marketplace: ${collectionDto.marketplace}`);
+
+      const request: MarketplaceDataCollectionRequest = {
+        tenantId,
+        marketplace: collectionDto.marketplace,
+        collectionType: collectionDto.collectionType,
+        targets: collectionDto.targets,
+        collectionConfig: {
+          includeImages: collectionDto.collectionConfig.includeImages ?? true,
+          includeReviews: collectionDto.collectionConfig.includeReviews ?? true,
+          includeVariants: collectionDto.collectionConfig.includeVariants ?? true,
+          includePriceHistory: collectionDto.collectionConfig.includePriceHistory ?? true,
+          maxResults: collectionDto.collectionConfig.maxResults ?? 100,
+          dataQualityThreshold: collectionDto.collectionConfig.dataQualityThreshold ?? DataQuality.MEDIUM,
+          respectRateLimit: collectionDto.collectionConfig.respectRateLimit ?? true,
+          useProxies: collectionDto.collectionConfig.useProxies ?? false,
+          retryFailures: collectionDto.collectionConfig.retryFailures ?? true,
+        },
+        schedulingConfig: collectionDto.schedulingConfig,
+      };
+
+      const result = await this.marketplaceDataCollectionService.collectMarketplaceData(request);
+
+      const estimatedTime = this.calculateEstimatedCompletionTime(
+        collectionDto.collectionType,
+        collectionDto.targets,
+        collectionDto.marketplace,
+      );
+
+      this.logger.log(`Data collection job started: ${result.jobId}, status: ${result.status}`);
+
+      return {
+        jobId: result.jobId,
+        status: result.status,
+        estimatedCompletionTime: estimatedTime,
+        targets: collectionDto.targets,
+        configuration: collectionDto.collectionConfig,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to start data collection: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to start marketplace data collection',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('collect/bulk')
+  @ApiOperation({
+    summary: 'Start bulk marketplace data collection',
+    description: 'Initiate data collection from multiple marketplaces simultaneously',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk data collection jobs started successfully',
+  })
+  @ApiBody({ type: BulkCollectionJobDto })
+  @Permissions('competitive_intelligence:collect')
+  async startBulkDataCollection(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) bulkCollectionDto: BulkCollectionJobDto,
+  ): Promise<{
+    jobs: Array<{
+      marketplace: MarketplaceType;
+      jobId: string;
+      status: string;
+      estimatedCompletionTime: string;
+    }>;
+    totalJobs: number;
+    batchId: string;
+    priorityMarketplaces: MarketplaceType[];
+  }> {
+    try {
+      this.logger.log(`Starting bulk data collection for tenant: ${tenantId}, marketplaces: ${bulkCollectionDto.marketplaces.join(', ')}`);
+
+      const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const jobs: Array<{
+        marketplace: MarketplaceType;
+        jobId: string;
+        status: string;
+        estimatedCompletionTime: string;
+      }> = [];
+
+      // Sort marketplaces by priority
+      const priorityMarketplaces = bulkCollectionDto.priorityMarketplaces || [
+        MarketplaceType.TOKOPEDIA,
+        MarketplaceType.SHOPEE,
+        MarketplaceType.LAZADA,
+      ];
+      
+      const sortedMarketplaces = bulkCollectionDto.marketplaces.sort((a, b) => {
+        const priorityA = priorityMarketplaces.indexOf(a);
+        const priorityB = priorityMarketplaces.indexOf(b);
+        
+        if (priorityA === -1 && priorityB === -1) return 0;
+        if (priorityA === -1) return 1;
+        if (priorityB === -1) return -1;
+        
+        return priorityA - priorityB;
+      });
+
+      // Start collection jobs for each marketplace
+      for (const marketplace of sortedMarketplaces) {
+        try {
+          const request: MarketplaceDataCollectionRequest = {
+            tenantId,
+            marketplace,
+            collectionType: bulkCollectionDto.collectionType,
+            targets: bulkCollectionDto.targets,
+            collectionConfig: {
+              includeImages: bulkCollectionDto.globalConfig.includeImages ?? true,
+              includeReviews: bulkCollectionDto.globalConfig.includeReviews ?? true,
+              includeVariants: bulkCollectionDto.globalConfig.includeVariants ?? true,
+              includePriceHistory: bulkCollectionDto.globalConfig.includePriceHistory ?? true,
+              maxResults: bulkCollectionDto.globalConfig.maxResultsPerMarketplace ?? 100,
+              dataQualityThreshold: bulkCollectionDto.globalConfig.dataQualityThreshold ?? DataQuality.MEDIUM,
+              respectRateLimit: bulkCollectionDto.globalConfig.respectRateLimit ?? true,
+              useProxies: bulkCollectionDto.globalConfig.useProxies ?? false,
+              retryFailures: bulkCollectionDto.globalConfig.retryFailures ?? true,
+            },
+          };
+
+          const result = await this.marketplaceDataCollectionService.collectMarketplaceData(request);
+          
+          jobs.push({
+            marketplace,
+            jobId: result.jobId,
+            status: result.status,
+            estimatedCompletionTime: this.calculateEstimatedCompletionTime(
+              bulkCollectionDto.collectionType,
+              bulkCollectionDto.targets,
+              marketplace,
+            ),
+          });
+
+          // Add delay between marketplace requests untuk menghindari overload
+          if (sortedMarketplaces.indexOf(marketplace) < sortedMarketplaces.length - 1) {
+            await this.delay(2000); // 2 detik delay antar marketplace
+          }
+
+        } catch (marketplaceError) {
+          this.logger.error(`Failed to start collection for ${marketplace}: ${marketplaceError.message}`);
+          jobs.push({
+            marketplace,
+            jobId: '',
+            status: 'failed',
+            estimatedCompletionTime: new Date().toISOString(),
+          });
+        }
+      }
+
+      this.logger.log(`Bulk data collection started: ${jobs.length} jobs, batch ID: ${batchId}`);
+
+      return {
+        jobs,
+        totalJobs: jobs.length,
+        batchId,
+        priorityMarketplaces,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to start bulk data collection: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to start bulk marketplace data collection',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('jobs/:jobId/status')
+  @ApiOperation({
+    summary: 'Get collection job status',
+    description: 'Retrieve current status and results of a data collection job',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Collection job status retrieved successfully',
+  })
+  @ApiParam({ name: 'jobId', description: 'Collection job ID' })
+  @Permissions('competitive_intelligence:read')
+  async getCollectionJobStatus(
+    @CurrentTenant() tenantId: string,
+    @Param('jobId') jobId: string,
+  ): Promise<MarketplaceDataCollectionResult | { error: string }> {
+    try {
+      this.logger.log(`Getting collection job status: ${jobId} for tenant: ${tenantId}`);
+
+      const result = await this.marketplaceDataCollectionService.getCollectionJobStatus(jobId);
+      
+      if (!result) {
+        return { error: 'Collection job not found or expired' };
+      }
+
+      // Verify tenant access
+      if (result.tenantId !== tenantId) {
+        throw new HttpException('Access denied to this collection job', HttpStatus.FORBIDDEN);
+      }
+
+      this.logger.log(`Collection job status retrieved: ${jobId}, status: ${result.status}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get collection job status: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve collection job status',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('schedule')
+  @ApiOperation({
+    summary: 'Schedule periodic data collection',
+    description: 'Set up recurring marketplace data collection with custom schedule',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Periodic collection scheduled successfully',
+  })
+  @ApiBody({ type: ScheduleCollectionDto })
+  @Permissions('competitive_intelligence:schedule')
+  async schedulePeriodicCollection(
+    @CurrentTenant() tenantId: string,
+    @Body(ValidationPipe) scheduleDto: ScheduleCollectionDto,
+  ): Promise<{
+    scheduleId: string;
+    marketplace: MarketplaceType;
+    frequency: string;
+    nextRun: string;
+    estimatedJobsPerDay: number;
+    configuration: any;
+  }> {
+    try {
+      this.logger.log(`Scheduling periodic collection for tenant: ${tenantId}, marketplace: ${scheduleDto.marketplace}`);
+
+      const request: MarketplaceDataCollectionRequest = {
+        tenantId,
+        marketplace: scheduleDto.marketplace,
+        collectionType: scheduleDto.collectionType,
+        targets: scheduleDto.targets,
+        collectionConfig: {
+          includeImages: scheduleDto.collectionConfig?.includeImages ?? true,
+          includeReviews: scheduleDto.collectionConfig?.includeReviews ?? true,
+          includeVariants: scheduleDto.collectionConfig?.includeVariants ?? true,
+          includePriceHistory: scheduleDto.collectionConfig?.includePriceHistory ?? true,
+          maxResults: scheduleDto.collectionConfig?.maxResults ?? 100,
+          dataQualityThreshold: scheduleDto.collectionConfig?.dataQualityThreshold ?? DataQuality.MEDIUM,
+          respectRateLimit: scheduleDto.collectionConfig?.respectRateLimit ?? true,
+          useProxies: scheduleDto.collectionConfig?.useProxies ?? false,
+          retryFailures: scheduleDto.collectionConfig?.retryFailures ?? true,
+        },
+        schedulingConfig: {
+          frequency: scheduleDto.schedule.frequency,
+          priorityLevel: scheduleDto.schedule.priorityLevel || 'medium',
+          timeWindow: scheduleDto.schedule.timeWindow || '0 */6 * * *', // Every 6 hours by default
+          maxConcurrency: scheduleDto.schedule.maxConcurrency || 3,
+        },
+      };
+
+      const schedulingResult = await this.marketplaceDataCollectionService.schedulePeriodicCollection(request);
+      
+      const estimatedJobsPerDay = this.calculateEstimatedJobsPerDay(scheduleDto.schedule.frequency);
+
+      this.logger.log(`Periodic collection scheduled: ${schedulingResult.scheduleId} for ${scheduleDto.marketplace}`);
+
+      return {
+        scheduleId: schedulingResult.scheduleId,
+        marketplace: scheduleDto.marketplace,
+        frequency: scheduleDto.schedule.frequency,
+        nextRun: schedulingResult.nextRun,
+        estimatedJobsPerDay,
+        configuration: request.collectionConfig,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to schedule periodic collection: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to schedule periodic data collection',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('metrics/marketplace')
+  @ApiOperation({
+    summary: 'Get marketplace metrics',
+    description: 'Retrieve comprehensive metrics and analytics for specific marketplace',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Marketplace metrics retrieved successfully',
+  })
+  @ApiQuery({ name: 'marketplace', required: true, enum: MarketplaceType })
+  @ApiQuery({ name: 'timeRangeFrom', required: false, type: String })
+  @ApiQuery({ name: 'timeRangeTo', required: false, type: String })
+  @ApiQuery({ name: 'includeCategories', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeRegionalData', required: false, type: Boolean })
+  @ApiQuery({ name: 'includePerformanceMetrics', required: false, type: Boolean })
+  @Permissions('competitive_intelligence:read')
+  async getMarketplaceMetrics(
+    @CurrentTenant() tenantId: string,
+    @Query() query: MarketplaceMetricsQueryDto,
+  ): Promise<{
+    marketplace: MarketplaceType;
+    metrics: MarketplaceMetrics;
+    dataFreshness: {
+      lastUpdated: string;
+      dataAge: number; // in hours
+      coveragePercentage: number;
+    };
+    insights: {
+      topCategories: Array<{
+        category: string;
+        productCount: number;
+        averagePrice: number;
+        competitiveIntensity: number;
+      }>;
+      priceRanges: Array<{
+        range: string;
+        productCount: number;
+        percentage: number;
+      }>;
+      regionalDistribution: Record<string, {
+        productCount: number;
+        averagePrice: number;
+        topCategories: string[];
+      }>;
+      competitiveAnalysis: {
+        highCompetitionCategories: string[];
+        emergingCategories: string[];
+        priceGapOpportunities: Array<{
+          category: string;
+          averageCompetitorPrice: number;
+          averageOurPrice?: number;
+          opportunity: number;
+        }>;
+      };
+    };
+  }> {
+    try {
+      if (!query.marketplace) {
+        throw new BadRequestException('Marketplace parameter is required');
+      }
+
+      this.logger.log(`Getting marketplace metrics for tenant: ${tenantId}, marketplace: ${query.marketplace}`);
+
+      const timeRange = query.timeRangeFrom && query.timeRangeTo ? {
+        from: query.timeRangeFrom,
+        to: query.timeRangeTo,
+      } : undefined;
+
+      const metrics = await this.marketplaceDataCollectionService.getMarketplaceMetrics(
+        tenantId,
+        query.marketplace,
+        timeRange,
+      );
+
+      // Calculate data freshness
+      const dataFreshness = {
+        lastUpdated: new Date().toISOString(),
+        dataAge: 0, // Would calculate based on actual data timestamps
+        coveragePercentage: metrics.performanceMetrics.coverageRate * 100,
+      };
+
+      // Generate insights from metrics
+      const topCategories = Object.entries(metrics.categoryTrends)
+        .map(([category, data]) => ({
+          category,
+          productCount: data.productCount,
+          averagePrice: data.averagePrice,
+          competitiveIntensity: data.competitiveIntensity,
+        }))
+        .sort((a, b) => b.productCount - a.productCount)
+        .slice(0, 10);
+
+      const priceRanges = this.calculatePriceRanges(metrics.categoryTrends);
+      
+      const regionalDistribution = query.includeRegionalData 
+        ? metrics.regionalInsights 
+        : {};
+
+      const competitiveAnalysis = {
+        highCompetitionCategories: topCategories
+          .filter(cat => cat.competitiveIntensity > 0.7)
+          .map(cat => cat.category),
+        emergingCategories: topCategories
+          .filter(cat => cat.competitiveIntensity < 0.3 && cat.productCount > 5)
+          .map(cat => cat.category),
+        priceGapOpportunities: this.identifyPriceGapOpportunities(metrics.categoryTrends),
+      };
+
+      const insights = {
+        topCategories,
+        priceRanges,
+        regionalDistribution,
+        competitiveAnalysis,
+      };
+
+      this.logger.log(`Marketplace metrics retrieved for ${query.marketplace}: ${topCategories.length} categories analyzed`);
+
+      return {
+        marketplace: query.marketplace,
+        metrics,
+        dataFreshness,
+        insights,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get marketplace metrics: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve marketplace metrics',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('available-targets/:marketplace')
+  @ApiOperation({
+    summary: 'Get available collection targets',
+    description: 'Retrieve available categories, regions, and popular search terms for marketplace',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Available collection targets retrieved successfully',
+  })
+  @ApiParam({ name: 'marketplace', enum: MarketplaceType })
+  @Permissions('competitive_intelligence:read')
+  async getAvailableTargets(
+    @CurrentTenant() tenantId: string,
+    @Param('marketplace') marketplace: MarketplaceType,
+  ): Promise<{
+    marketplace: MarketplaceType;
+    availableTargets: {
+      categories: Array<{
+        name: string;
+        productCount: number;
+        subcategories: string[];
+        averagePrice: number;
+        competitiveLevel: 'low' | 'medium' | 'high';
+      }>;
+      regions: Array<{
+        name: string;
+        productCount: number;
+        averageShippingCost: number;
+        deliveryTime: number;
+        coverage: 'full' | 'partial' | 'limited';
+      }>;
+      popularSearchTerms: Array<{
+        term: string;
+        searchVolume: number;
+        competitiveLevel: 'low' | 'medium' | 'high';
+        suggestedBidding: number;
+      }>;
+      competitorBrands: Array<{
+        brand: string;
+        productCount: number;
+        averagePrice: number;
+        marketShare: number;
+        threatLevel: 'low' | 'medium' | 'high';
+      }>;
+    };
+    recommendations: {
+      priorityCategories: string[];
+      emergingOpportunities: string[];
+      highValueTargets: string[];
+      avoidCategories: string[];
+    };
+  }> {
+    try {
+      this.logger.log(`Getting available targets for tenant: ${tenantId}, marketplace: ${marketplace}`);
+
+      // Get current marketplace metrics to determine available targets
+      const metrics = await this.marketplaceDataCollectionService.getMarketplaceMetrics(tenantId, marketplace);
+
+      // Transform metrics into available targets
+      const categories = Object.entries(metrics.categoryTrends).map(([category, data]) => ({
+        name: category,
+        productCount: data.productCount,
+        subcategories: [], // Would be populated from actual data
+        averagePrice: data.averagePrice,
+        competitiveLevel: data.competitiveIntensity > 0.7 ? 'high' as const 
+          : data.competitiveIntensity > 0.4 ? 'medium' as const 
+          : 'low' as const,
+      }));
+
+      const regions = Object.entries(metrics.regionalInsights).map(([region, data]) => ({
+        name: region,
+        productCount: data.productAvailability,
+        averageShippingCost: data.averageShippingCost,
+        deliveryTime: data.deliveryTime,
+        coverage: data.productAvailability > 80 ? 'full' as const
+          : data.productAvailability > 40 ? 'partial' as const
+          : 'limited' as const,
+      }));
+
+      // Generate popular search terms based on categories
+      const popularSearchTerms = categories.slice(0, 20).map(cat => ({
+        term: cat.name.toLowerCase(),
+        searchVolume: Math.floor(cat.productCount * 10), // Estimated
+        competitiveLevel: cat.competitiveLevel,
+        suggestedBidding: cat.averagePrice * 0.1, // 10% of average price
+      }));
+
+      // Extract competitor brands from top categories
+      const competitorBrands = categories.slice(0, 10).flatMap(cat => 
+        (cat.name in metrics.categoryTrends ? metrics.categoryTrends[cat.name].topBrands : [])
+          .map(brand => ({
+            brand,
+            productCount: Math.floor(cat.productCount * 0.2), // Estimated
+            averagePrice: cat.averagePrice,
+            marketShare: Math.floor(Math.random() * 30) + 5, // 5-35% estimated
+            threatLevel: cat.competitiveLevel,
+          }))
+      ).slice(0, 15);
+
+      // Generate recommendations
+      const recommendations = {
+        priorityCategories: categories
+          .filter(cat => cat.competitiveLevel === 'medium' && cat.productCount > 50)
+          .slice(0, 5)
+          .map(cat => cat.name),
+        emergingOpportunities: categories
+          .filter(cat => cat.competitiveLevel === 'low' && cat.productCount > 10)
+          .slice(0, 5)
+          .map(cat => cat.name),
+        highValueTargets: categories
+          .filter(cat => cat.averagePrice > 100000 && cat.competitiveLevel !== 'high')
+          .slice(0, 5)
+          .map(cat => cat.name),
+        avoidCategories: categories
+          .filter(cat => cat.competitiveLevel === 'high' && cat.productCount > 200)
+          .slice(0, 3)
+          .map(cat => cat.name),
+      };
+
+      this.logger.log(`Available targets retrieved for ${marketplace}: ${categories.length} categories, ${regions.length} regions`);
+
+      return {
+        marketplace,
+        availableTargets: {
+          categories,
+          regions,
+          popularSearchTerms,
+          competitorBrands,
+        },
+        recommendations,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get available targets: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve available collection targets',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('health/collectors')
+  @ApiOperation({
+    summary: 'Get data collectors health status',
+    description: 'Check health and performance of marketplace data collectors',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Collectors health status retrieved successfully',
+  })
+  @Permissions('competitive_intelligence:read')
+  async getCollectorsHealth(
+    @CurrentTenant() tenantId: string,
+  ): Promise<{
+    overall: {
+      status: 'healthy' | 'degraded' | 'critical';
+      activeCollectors: number;
+      totalRequests24h: number;
+      successRate24h: number;
+      averageResponseTime: number;
+    };
+    marketplaces: Array<{
+      marketplace: MarketplaceType;
+      status: 'healthy' | 'degraded' | 'critical';
+      lastSuccessfulCollection: string;
+      successRate: number;
+      averageResponseTime: number;
+      rateLimitStatus: {
+        remaining: number;
+        resetTime: string;
+        isThrottled: boolean;
+      };
+      dataQuality: {
+        score: number;
+        lastUpdate: string;
+        issues: string[];
+      };
+      performance: {
+        requestsPerHour: number;
+        failureRate: number;
+        timeouts: number;
+      };
+    }>;
+    recommendations: Array<{
+      marketplace: MarketplaceType;
+      issue: string;
+      severity: 'low' | 'medium' | 'high';
+      recommendation: string;
+      estimatedImpact: string;
+    }>;
+  }> {
+    try {
+      this.logger.log(`Getting collectors health status for tenant: ${tenantId}`);
+
+      // This would be implemented with actual health monitoring data
+      // For now, returning mock data structure
+      const marketplaces = [
+        MarketplaceType.TOKOPEDIA,
+        MarketplaceType.SHOPEE,
+        MarketplaceType.LAZADA,
+        MarketplaceType.BUKALAPAK,
+        MarketplaceType.BLIBLI,
+      ];
+
+      const marketplaceHealth = marketplaces.map(marketplace => ({
+        marketplace,
+        status: Math.random() > 0.8 ? 'degraded' as const : 'healthy' as const,
+        lastSuccessfulCollection: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+        successRate: 85 + Math.random() * 15, // 85-100%
+        averageResponseTime: 1000 + Math.random() * 2000, // 1-3 seconds
+        rateLimitStatus: {
+          remaining: Math.floor(Math.random() * 1000),
+          resetTime: new Date(Date.now() + 3600000).toISOString(),
+          isThrottled: Math.random() > 0.9,
+        },
+        dataQuality: {
+          score: 0.7 + Math.random() * 0.3, // 70-100%
+          lastUpdate: new Date(Date.now() - Math.random() * 1800000).toISOString(),
+          issues: Math.random() > 0.7 ? ['Price formatting inconsistency'] : [],
+        },
+        performance: {
+          requestsPerHour: Math.floor(50 + Math.random() * 200),
+          failureRate: Math.random() * 10, // 0-10%
+          timeouts: Math.floor(Math.random() * 5),
+        },
+      }));
+
+      const overall = {
+        status: marketplaceHealth.every(m => m.status === 'healthy') ? 'healthy' as const : 'degraded' as const,
+        activeCollectors: marketplaceHealth.filter(m => m.status === 'healthy').length,
+        totalRequests24h: marketplaceHealth.reduce((sum, m) => sum + (m.performance.requestsPerHour * 24), 0),
+        successRate24h: marketplaceHealth.reduce((sum, m) => sum + m.successRate, 0) / marketplaceHealth.length,
+        averageResponseTime: marketplaceHealth.reduce((sum, m) => sum + m.averageResponseTime, 0) / marketplaceHealth.length,
+      };
+
+      const recommendations = marketplaceHealth
+        .filter(m => m.status !== 'healthy' || m.dataQuality.issues.length > 0)
+        .map(m => ({
+          marketplace: m.marketplace,
+          issue: m.status !== 'healthy' ? 'Performance degradation detected' : m.dataQuality.issues[0],
+          severity: m.status === 'critical' ? 'high' as const : 'medium' as const,
+          recommendation: m.status !== 'healthy' 
+            ? 'Increase request intervals and monitor rate limits'
+            : 'Review data transformation rules',
+          estimatedImpact: 'Medium - may affect data freshness',
+        }));
+
+      this.logger.log(`Collectors health status retrieved: ${overall.status}, ${overall.activeCollectors} active collectors`);
+
+      return {
+        overall,
+        marketplaces: marketplaceHealth,
+        recommendations,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get collectors health status: ${error.message}`, error.stack);
+      throw new HttpException(
+        'Failed to retrieve collectors health status',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // Helper methods
+  private calculateEstimatedCompletionTime(
+    collectionType: string,
+    targets: any,
+    marketplace: MarketplaceType,
+  ): string {
+    let baseTimeMinutes = 5; // Base time in minutes
+
+    // Adjust based on collection type
+    switch (collectionType) {
+      case 'product_details':
+        baseTimeMinutes = (targets.productIds?.length || 10) * 0.5; // 30 seconds per product
+        break;
+      case 'competitor_discovery':
+        baseTimeMinutes = (targets.searchQueries?.length || 5) * 2; // 2 minutes per search query
+        break;
+      case 'category_analysis':
+        baseTimeMinutes = (targets.categories?.length || 3) * 5; // 5 minutes per category
+        break;
+      case 'price_monitoring':
+        baseTimeMinutes = (targets.productIds?.length || 20) * 0.25; // 15 seconds per product
+        break;
+    }
+
+    // Adjust based on marketplace complexity
+    const marketplaceMultiplier = {
+      [MarketplaceType.TOKOPEDIA]: 1.0,
+      [MarketplaceType.SHOPEE]: 1.2,
+      [MarketplaceType.LAZADA]: 1.5,
+      [MarketplaceType.BUKALAPAK]: 1.3,
+      [MarketplaceType.BLIBLI]: 1.4,
+    };
+
+    const estimatedMinutes = baseTimeMinutes * (marketplaceMultiplier[marketplace] || 1.0);
+    const completionTime = new Date(Date.now() + estimatedMinutes * 60 * 1000);
+
+    return completionTime.toISOString();
+  }
+
+  private calculateEstimatedJobsPerDay(frequency: string): number {
+    switch (frequency) {
+      case 'realtime':
+        return 288; // Every 5 minutes
+      case 'hourly':
+        return 24;
+      case 'daily':
+        return 1;
+      case 'weekly':
+        return 1/7;
+      default:
+        return 4; // Default to every 6 hours
+    }
+  }
+
+  private calculatePriceRanges(categoryTrends: Record<string, any>): Array<{
+    range: string;
+    productCount: number;
+    percentage: number;
+  }> {
+    const allPrices: number[] = [];
+    let totalProducts = 0;
+
+    Object.values(categoryTrends).forEach((category: any) => {
+      for (let i = 0; i < category.productCount; i++) {
+        allPrices.push(category.averagePrice);
+      }
+      totalProducts += category.productCount;
+    });
+
+    if (totalProducts === 0) return [];
+
+    allPrices.sort((a, b) => a - b);
+
+    const ranges = [
+      { range: '< Rp 50,000', min: 0, max: 50000 },
+      { range: 'Rp 50,000 - 200,000', min: 50000, max: 200000 },
+      { range: 'Rp 200,000 - 500,000', min: 200000, max: 500000 },
+      { range: 'Rp 500,000 - 1,000,000', min: 500000, max: 1000000 },
+      { range: '> Rp 1,000,000', min: 1000000, max: Infinity },
+    ];
+
+    return ranges.map(range => {
+      const count = allPrices.filter(price => price >= range.min && price < range.max).length;
+      return {
+        range: range.range,
+        productCount: count,
+        percentage: Math.round((count / totalProducts) * 100),
+      };
+    });
+  }
+
+  private identifyPriceGapOpportunities(categoryTrends: Record<string, any>): Array<{
+    category: string;
+    averageCompetitorPrice: number;
+    averageOurPrice?: number;
+    opportunity: number;
+  }> {
+    return Object.entries(categoryTrends)
+      .map(([category, data]) => ({
+        category,
+        averageCompetitorPrice: data.averagePrice,
+        averageOurPrice: undefined, // Would be calculated from our products
+        opportunity: Math.round(data.competitiveIntensity * 100),
+      }))
+      .filter(item => item.opportunity > 30)
+      .sort((a, b) => b.opportunity - a.opportunity)
+      .slice(0, 10);
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}

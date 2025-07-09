@@ -1,10 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class FixSupplierIdColumn1751629080975 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Add correct supplierId column if it doesn't exist
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add correct supplierId column if it doesn't exist
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'products') 
@@ -14,8 +13,8 @@ export class FixSupplierIdColumn1751629080975 implements MigrationInterface {
             END $$;
         `);
 
-        // Remove incorrect supplier_id column if it exists
-        await queryRunner.query(`
+    // Remove incorrect supplier_id column if it exists
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'supplier_id') THEN
@@ -23,11 +22,11 @@ export class FixSupplierIdColumn1751629080975 implements MigrationInterface {
                 END IF;
             END $$;
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Revert changes
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Revert changes
+    await queryRunner.query(`
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'supplierId') THEN
@@ -35,6 +34,5 @@ export class FixSupplierIdColumn1751629080975 implements MigrationInterface {
                 END IF;
             END $$;
         `);
-    }
-
+  }
 }

@@ -30,6 +30,7 @@ import { IntegrationLog } from '../entities/integration-log.entity';
 import { SyncStatus } from '../entities/sync-status.entity';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { Channel } from '../../channels/entities/channel.entity';
+import { ChannelMapping } from '../../channels/entities/channel-mapping.entity';
 import { Product } from '../../products/entities/product.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { OrderItem } from '../../orders/entities/order.entity';
@@ -45,6 +46,7 @@ import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
       WebhookEvent,
       // Business entities
       Channel,
+      ChannelMapping,
       Product,
       Order,
       OrderItem,
